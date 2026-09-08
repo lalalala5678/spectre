@@ -94,10 +94,6 @@ export function buildIntelTools(record, caps) {
       // Single-entry full fetch: no silent truncation anywhere.
       const extraFilters = (params.kind || params.q || params.author || params.agentType || params.status || params.severity) != null;
       if (params.seq != null) {
-        if (extraFilters) {
-          // MCP pattern: explicit mutual-exclusion notice
-          return { content: [{ type: 'text', text: `seq=${params.seq} 模式下返回该条全文,其它过滤参数(kind/q/author等)已忽略。如需过滤查询请不传 seq。` }] };
-        }
         const e = inWs.find(x => x.seq === Number(params.seq)
           && (x.type === 'intel' || x.type === 'task-report'));
         if (!e) {
@@ -105,9 +101,15 @@ export function buildIntelTools(record, caps) {
         }
         const a = e.author;
         const prov = a ? `${a.name}(${a.typeLabel}${a.parent ? `,父:${a.parent.name}` : ''},L${a.depth})` : e.from;
+        // Fix-F (P13): filters passed alongside seq are IGNORED — say so
+        // inline and still return the body. The old notice claimed to
+        // "return the full entry" while returning nothing (project-3:
+        // agents burned a second call to actually fetch it).
+        const note = extraFilters
+          ? `(注:seq 模式下其它过滤参数已忽略,本条为 seq=${e.seq} 全文)\n` : '';
         return { content: [{ type: 'text', text:
-          `[seq=${e.seq}] [${e.type === 'task-report' ? `任务报告|${e.status}` : `FINDING|${e.severity}`}] ${prov}\n` +
-          `《${e.title ?? e.summary}》\n\n${e.detail ?? e.summary ?? ''}` }] };
+          `${note}[seq=${e.seq}] [${e.type === 'task-report' ? `任务报告|${e.status}` : `FINDING|${e.severity}`}] ${prov}\n` +
+          `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${e.detail ?? e.summary ?? ''}` }] };
       }
 
       const matched = inWs
@@ -155,10 +157,9 @@ export function buildIntelTools(record, caps) {
         const full = String(e.detail ?? e.summary ?? '');
         const body = full.slice(0, 400);
         // Never cut silently (repo rule): mark per-entry truncation and
-        // hand the agent the one-call remedy (seq fetch).
         const mark = full.length > 400
           ? `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)` : '';
-        return `${head}\n《${e.title ?? e.summary}》\n${body}${mark}`;
+        return `${head}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${mark}`;
       });
       return {
         content: [{
@@ -451,7 +452,10 @@ export function buildOrchestratorTools(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       agents: Type.Array(stageEnum, {
-        description: 'Target stage agent keys',
+        // Fix-E (P7): empty array sailed through schema and produced
+        // the lying receipt "Relayed to  (…)".
+        minItems: 1,
+        description: 'Target stage agent keys (members of the engagement)',
       }),
       text: Type.String({ description: 'Message to relay' }),
       engagementId: Type.Optional(Type.String({
@@ -465,20 +469,52 @@ export function buildOrchestratorTools(record, caps) {
       if (!engagement) {
         throw new Error('no active engagement; dispatch_agents first');
       }
+      // Fix-E (P7): membership validation BEFORE signaling. Implicit path
+      // reads the persisted activeEngagement.agents; explicit path derives
+      // members from the session store. When no member list can be
+      // resolved, SKIP the check (degrade to old behavior) — refusing all
+      // targets on a missing list would be worse than the status quo.
+      const members = params.engagementId
+        ? (caps.engagementMembers?.(params.engagementId.replace(/^autopwn-/, '')) ?? [])
+        : (record.activeEngagement?.agents ?? []);
+      if (members.length) {
+        const invalid = params.agents.filter(k => !members.includes(k));
+        if (invalid.length) {
+          return {
+            content: [{
+              type: 'text',
+              text: `未转发:${invalid.join(',')} 不在 ${engagement} 成员列表` +
+                `(成员:${members.join(',')})。请核对 agents 参数。`,
+            }],
+            details: { engagement, agents: params.agents, relayed: false, invalid },
+          };
+        }
+      }
       try {
         await caps.signalEngagement(engagement, 'orchestratorRelay', {
           to: [...params.agents],
           text: params.text,
         });
       } catch (err) {
-        // Engagement already completed — children are gone, nothing to
-        // relay to. Soft-fail instead of surfacing a tool error (the
-        // orchestrator treated the old error as a delivery failure).
+        // Fix-J (P8): distinguish "never existed" from "already finished"
+        // via describeWorkflow instead of matching Temporal's server-side
+        // English error string (unstable across versions). No more
+        // "已结束" lies about workflows that were never created.
+        let why = '已结束,子智能体均已停止。';
+        try {
+          const desc = await caps.describeEngagement?.(engagement);
+          if (!desc) {
+            why = '已结束,子智能体均已停止。';
+          } else if (desc.status === 'RUNNING') {
+            why = '投递信号失败(engagement 仍在运行,可重试)。';
+          }
+        } catch {
+          why = '不存在(id 有误或从未创建)。';
+        }
         return {
           content: [{
             type: 'text',
-            text: `未转发:${engagement} 已结束,子智能体均已停止。` +
-              `(${String(err?.message ?? err).slice(0, 80)})`,
+            text: `未转发:${engagement} ${why}`,
           }],
           details: { engagement, agents: params.agents, relayed: false },
         };

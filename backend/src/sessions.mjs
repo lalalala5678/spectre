@@ -445,6 +445,17 @@ export class SessionStore {
     return n;
   }
 
+  /** Member agentKeys of an engagement (derived from live sessions —
+   *  engagement children carry engagementId; restart-safe via WAL). */
+  engagementMembersOf(engagementId) {
+    if (!engagementId) return [];
+    const members = new Set();
+    for (const s of this.sessions.values()) {
+      if (s.engagementId === engagementId) members.add(s.agentKey);
+    }
+    return [...members];
+  }
+
   /** Workflow-side synthesized-report marker: bump counter + persist
    *  meta so the activeOnly quota releases the slot across restarts. */
   markReportSynthesized(record, meta = {}) {

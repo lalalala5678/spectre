@@ -18,7 +18,7 @@ import { Bus } from './src/bus.mjs';
 import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
 import { buildPi } from './src/pi.mjs';
-import { signalEngagement, startAutopwn } from './src/temporal.mjs';
+import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
 import { getSpawnSettings } from './src/settings.mjs';
 import { Wal } from './src/persist.mjs';
@@ -128,6 +128,10 @@ const caps = {
     }
     return { ok: true, active, total };
   },
+
+  /** Fix-E (P7): member roster for explicit-engagementId relay calls. */
+  engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
+  describeEngagement: (workflowId) => describeWorkflow(workflowId),
 
   /**
    * Runtime-side recursive spawn: creates the child session inside the
