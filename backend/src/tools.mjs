@@ -411,6 +411,17 @@ export function buildOrchestratorTools(record, caps) {
       }),
     }),
     execute: async (_id, params) => {
+      // Fix-B (A1): quota applies to BOTH dispatch entry points. A batch
+      // that would push the tree past the cap is refused up front — the
+      // project-3 lockout started exactly here (7+3=10>8 accepted).
+      const verdict = caps.dispatchCheck?.(record, params.agents.length)
+        ?? { ok: true };
+      if (!verdict.ok) {
+        return {
+          content: [{ type: 'text', text: `派发被拒绝:${verdict.reason}` }],
+          details: verdict,
+        };
+      }
       const started = await caps.dispatch({
         instruction: params.instruction,
         agents: [...params.agents],

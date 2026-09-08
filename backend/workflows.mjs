@@ -256,7 +256,15 @@ export async function agentTaskWorkflow(input) {
   try {
     result = await llm.promptAndWait(
       session.sessionId,
-      `【AutoPwn 任务 · ${engagementId}】${instruction}`,
+      // Fix-A (P1+P6): recipient identity injected. Project-3 exposed
+      // the full multi-role instruction to every agent WITHOUT naming
+      // the recipient — all three self-identified as the dispatcher and
+      // burned 12 spawn calls. Keep the 【AutoPwn 任务 prefix first:
+      // report-compliance rules and frontend fallback regexes key on it.
+      `【AutoPwn 任务 · ${engagementId}】你是本任务 ${agentKey} 阶段智能体。` +
+      `下方指令中的多角色分工由平行智能体各自执行,你只负责 ${agentKey} ` +
+      `对应的部分;除非指令明确要求,不要派生子智能体、不要代行其它角色` +
+      `的交付物。\n${instruction}`,
     );
     // Task-report gate: a task may only finish with a report on file.
     // Nudge ≤2 (followUp fires an idle agent; steer would only queue),
