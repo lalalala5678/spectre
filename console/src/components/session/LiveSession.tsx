@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { Bot, Check, ChevronDown, Loader2, User, X } from 'lucide-react';
 
 import {
@@ -27,6 +27,31 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   const [error, setError] = useState('');
   const lastSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Follow intent: the USER decides. At the bottom → stick; scrolled up
+  // to read → release; scrolled back down → re-stick. Scroll events are
+  // the only source of truth — never a distance probe at event-arrival
+  // time (the old followIfNearBottom ran BEFORE React committed the new
+  // content, so its scrollHeight was stale and any single commit growing
+  // past the 120px threshold — thinking panel first appearance is 224px
+  // capped — detached the follow permanently with no way back).
+  const stickToBottom = useRef(true);
+
+  const handleScroll = useCallback(() => {
+    const el = scrollRef.current;
+    if (!el) return;
+    stickToBottom.current =
+      el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+  }, []);
+
+  // Follow AFTER commit: this effect runs with the laid-out DOM (and
+  // pre-paint via useLayoutEffect, so there is no visible jump). Every
+  // committed growth — deltas, thinking panel, tool cards, injected
+  // messages — is followed as long as the user's intent says stick.
+  useLayoutEffect(() => {
+    if (!stickToBottom.current) return;
+    const el = scrollRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, busy, loaded, error]);
 
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
@@ -35,19 +60,13 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
     });
   }, []);
 
-  // Auto-follow only when the user is already near the bottom — reading
-  // history must never be yanked down by new deltas or refreshed messages.
-  const followIfNearBottom = useCallback(() => {
-    const el = scrollRef.current;
-    if (el && el.scrollHeight - el.scrollTop - el.clientHeight < 120) {
-      el.scrollTop = el.scrollHeight;
-    }
-  }, []);
-
   useEffect(() => {
     if (!sessionId) return;
     let cancelled = false;
     setLoaded(false);
+    // A fresh session starts in follow mode (also re-arms after the user
+    // scrolled up in the PREVIOUS session).
+    stickToBottom.current = true;
     setError('');  // stale errors must never follow the user across sessions
     (async () => {
       try {
@@ -101,7 +120,6 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
             }
             return next;
           });
-          followIfNearBottom();
         };
         if (ev.type === 'delta' && typeof ev.data?.delta === 'string') {
           // Text phase: extend the trailing bubble, demote thinking panel.
@@ -137,7 +155,6 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
             }
             return next.concat(msg);
           });
-          followIfNearBottom();
         } else if (ev.type === 'agent_start') {
           setBusy(true);
         } else if (ev.type === 'agent_end') {
@@ -149,7 +166,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       () => lastSeq.current,
     );
     return off;
-  }, [sessionId, loaded, followIfNearBottom]);
+  }, [sessionId, loaded]);
 
   const send = async (text: string, mode: 'prompt' | 'steer') => {
     if (!sessionId) return;
@@ -195,6 +212,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
 
       <div
         ref={scrollRef}
+        onScroll={handleScroll}
         className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-void-700 bg-void-950 p-3"
       >
         {!loaded && !error && (
@@ -510,14 +528,26 @@ function MessageBubble({ message }: { message: ApiMessage }) {
     );
   }
 
+  // Thinking-only phase (GLM streams reasoning BEFORE any text): the
+  // reply box would sit empty for the entire thinking duration — reads
+  // as "content missing". The thinking panel + footer pulse already
+  // express the state; the box appears when the first text delta lands.
+  if (message.streaming && message.streamingThinking === true && !message.text) {
+    return (
+      <div className="max-w-[92%]">
+        <ThinkingBlock thinking={message.thinking} active />
+      </div>
+    );
+  }
+
   // assistant reply
   return (
-    <div className="max-w-[92%]">
-      <ThinkingBlock
-        thinking={message.thinking}
-        active={message.streamingThinking === true}
-      />
-      <div className="rounded-sm border border-void-600 bg-void-900 px-3 py-2">
+     <div className="max-w-[92%]">
+       <ThinkingBlock
+         thinking={message.thinking}
+         active={message.streamingThinking === true}
+       />
+       <div className="rounded-sm border border-void-600 bg-void-900 px-3 py-2">
         <div className="mb-0.5 flex items-center gap-1 text-[9.5px] text-zinc-600">
           <Bot className="h-2.5 w-2.5" /> agent
           {message.tokens !== undefined && !message.streaming && (
