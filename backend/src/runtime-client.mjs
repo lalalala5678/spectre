@@ -63,4 +63,9 @@ export const runtime = {
   /** Task-report counter + last report meta (workflow gate reads this). */
   reportState: (sessionId) =>
     call('GET', `/api/sessions/${sessionId}/report-state`),
+
+  /** Bump the runtime task-report counter for a workflow-synthesized
+   *  report (activeOnly quota slot release). */
+  markReportSynthesized: (sessionId, meta = {}) =>
+    call('POST', `/api/sessions/${sessionId}/mark-report-synthesized`, meta),
 };

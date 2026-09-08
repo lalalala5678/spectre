@@ -172,6 +172,16 @@ export function createRouter({ store, bus }) {
           lastReport: record.lastReport,
         });
       }
+      if (action === '/mark-report-synthesized' && method === 'POST') {
+        if (!hasInternalToken(req)) {
+          return bad(res, 401, 'internal only');
+        }
+        // Workflow-synthesized fallback report: bump the counter so the
+        // activeOnly spawn quota releases the slot (P2 fix closing leg).
+        const meta = await readJson(req);
+        store.markReportSynthesized(record, meta);
+        return json(res, 200, { count: record.taskReportCount });
+      }
     }
 
     // ---------- bus ----------

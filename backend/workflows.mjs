@@ -279,6 +279,12 @@ export async function agentTaskWorkflow(input) {
         engagement: `autopwn-${engagementId}`,
       });
       // The bus event carries the report, but the runtime record counter did
+      // not follow — which would keep the session "active" forever under the
+      // activeOnly spawn quota (P2 narrow revival). Mark it on the runtime
+      // side so the slot is released.
+      await quick.markReportSynthesized(session.sessionId, {
+        title: `[系统代拟] ${agentKey} 任务报告`, status: 'no-result',
+      });
       report = { ...report, lastReport: { title: `[系统代拟] ${agentKey} 任务报告`, status: 'no-result' } };
     }
   } finally {

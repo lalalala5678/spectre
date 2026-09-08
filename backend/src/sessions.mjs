@@ -428,12 +428,32 @@ export class SessionStore {
     return parent ? this.rootIdOf(parent, seen) : sessionId;
   }
 
-  countTree(rootId) {
+  /**
+   * Tree size. activeOnly: completed sessions (filed a task report AND
+   * no run in flight) don't count against spawn quota — the P2 fix:
+   * total-count quota permanently locked dispatch once the tree grew
+   * past the cap with finished agents. Re-activation (prompt/followUp)
+   * flips `busy` synchronously, putting the session back in the count.
+   */
+  countTree(rootId, { activeOnly = false } = {}) {
     let n = 0;
     for (const s of this.sessions.values()) {
-      if (this.rootIdOf(s.id) === rootId) n += 1;
+      if (this.rootIdOf(s.id) !== rootId) continue;
+      if (activeOnly && s.taskReportCount > 0 && !s.busy) continue;
+      n += 1;
     }
     return n;
+  }
+
+  /** Workflow-side synthesized-report marker: bump counter + persist
+   *  meta so the activeOnly quota releases the slot across restarts. */
+  markReportSynthesized(record, meta = {}) {
+    record.taskReportCount += 1;
+    record.lastReport = {
+      title: String(meta.title ?? '[系统代拟] 任务报告'),
+      status: String(meta.status ?? 'no-result'),
+    };
+    this.wal?.append({ t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
   }
 
   /**

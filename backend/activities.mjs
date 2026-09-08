@@ -46,6 +46,13 @@ export async function followUpSession(sessionId, text) {
   return runtime.followUp(sessionId, text);
 }
 
+/** Mark a system-synthesized report on the runtime record so the
+ *  activeOnly spawn quota releases the slot (engagement children never
+ *  pass through _reportSpawnCompletion's runtime-side counter). */
+export async function markReportSynthesized(sessionId, meta = {}) {
+  return runtime.markReportSynthesized(sessionId, meta);
+}
+
 /** Notify the orchestrator session that its engagement finished. */
 export async function notifyEngagementDone({ orchestratorSessionId,
                                              engagementId, summary }) {
