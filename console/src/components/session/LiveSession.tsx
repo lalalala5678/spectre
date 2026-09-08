@@ -434,9 +434,20 @@ type MessageKind = 'user' | 'dm' | 'system' | 'assistant';
 
 const DM_PREFIX_RE = /^\[DM from ([a-z0-9_-]+)\]\s*/;
 
+/** Legacy transcripts (pre-source-tagging): recognize system injections
+ *  by our own emission prefixes so old sessions also render correctly. */
+const SYSTEM_INJECT_RE = /^\[engagement |^【系统要求】|^【派生任务|^【AutoPwn 任务/;
+
 function classify(message: ApiMessage): MessageKind {
   if (message.role === 'user') {
-    return DM_PREFIX_RE.test(message.text) ? 'dm' : 'user';
+    // Origin metadata first — a system-injected user-role turn must never
+    // render as the human user ("why is the agent talking as me" bug).
+    if (message.source === 'agent') return 'dm';
+    if (message.source === 'system') return 'system';
+    if (message.source === 'user') return 'user';
+    if (DM_PREFIX_RE.test(message.text)) return 'dm';
+    if (SYSTEM_INJECT_RE.test(message.text)) return 'system';
+    return 'user';
   }
   if (message.role === 'assistant') {
     return 'assistant';
@@ -482,13 +493,14 @@ function MessageBubble({ message }: { message: ApiMessage }) {
     );
   }
 
-  // system notifications (engagement lifecycle): left side, dashed neutral
+  // system injections (engagement lifecycle, nudges, spawn tasks):
+  // left side, dashed neutral — never rendered as the human user
   if (kind === 'system') {
     return (
       <div className="max-w-[92%]">
         <div className="rounded-sm border border-dashed border-zinc-700 bg-void-900/60 px-3 py-2">
           <div className="mb-0.5 font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">
-            系统 · engagement
+            系统
           </div>
           <div className="text-[12.5px] text-zinc-400">
             <Markdown>{message.text}</Markdown>

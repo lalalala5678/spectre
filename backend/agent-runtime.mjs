@@ -42,14 +42,6 @@ for (const e of entries) {
     const r = replay.records.get(e.d.sid);
     if (r) {
       r.messages.push(e.d.msg);
-  /** Read the last N messages of a session (for read_session tool). */
-  readSessionMessages: (sessionId, last) => {
-    const record = store.get(sessionId);
-    if (!record) return null;
-    return record.agent.state.messages.slice(-last)
-      .map(m => ({ role: m.role, text: m.content?.filter?.(c => c.type === 'text')
-        ?.map(c => c.text)?.join('') || '' }));
-  },
       Object.assign(r.meta, e.d.meta ?? {});
     }
   } else if (e.t === 'meta') {
@@ -73,6 +65,16 @@ const caps = {
         { statusCode: 404 });
     }
     store.followUp(record, text);
+  },
+  /** Read the last N messages of a session (read_session tool backing). */
+  readSessionMessages: (sessionId, last) => {
+    const record = store.get(sessionId);
+    if (!record) return null;
+    return record.agent.state.messages.slice(-last)
+      .map(m => ({ role: m.role, text: typeof m.content === 'string'
+        ? m.content
+        : (m.content?.filter?.(c => c.type === 'text')
+          ?.map(c => c.text)?.join('') || '') }));
   },
   /** Provenance snapshot for intel events (delegates to SessionStore). */
   authorOf: (record) => store.authorOf(record),
@@ -122,7 +124,7 @@ const caps = {
       workSessionId: parentRecord.workSessionId ?? null,
     });
     store.prompt(child,
-      `【派生任务 · ${agentKey}】${instruction}`);
+      `【派生任务 · ${agentKey}】${instruction}`, 'system');
     return child;
   },
 };

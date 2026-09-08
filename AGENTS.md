@@ -99,3 +99,4 @@
 | 静默截断 400 字 | slice 无标记 | 标记 + seq 补全 | 新增截断处必须附标记与补全手段 |
 | query_intel 重复调用 | 不完备计数 + 无诊断 | 总数披露 + 空结果诊断 | 空回执/截断处永远附诊断信息 |
 | engagement 'autopwn-null' | null 模板字符串 | 条件表达式 + 跳过 signal | 字段拼接前检查 null |
+| 系统注入伪装成用户发言 | followUp/steer 全部注入 role:'user',前端仅凭文本前缀分类 | 注入消息携带 source:'system'/'agent' 元数据,前端按 source 分类(旧数据用前缀回退) | 新增注入路径必须传 source;前端新增消息类型禁止只靠文本前缀识别 |

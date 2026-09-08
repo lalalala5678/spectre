@@ -27,6 +27,9 @@ export interface ApiMessage {
   role: 'user' | 'assistant' | 'toolResult';
   ts: number;
   text: string;
+  /** who injected this turn: 'user' (human) | 'agent' (DM) | 'system';
+   *  absent on legacy messages — classified by text-prefix fallback */
+  source?: 'user' | 'agent' | 'system';
   thinking?: string;
   toolCalls?: { id?: string; name: string; args: unknown }[];
   toolCallId?: string;

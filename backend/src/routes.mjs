@@ -11,6 +11,7 @@ import { CONFIG } from './config.mjs';
 import { hasInternalToken, json, readJson, sse } from './http.mjs';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
+import { injectionOriginOf } from './sessions.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 
@@ -139,10 +140,15 @@ export function createRouter({ store, bus }) {
           return bad(res, 401, 'agent source requires internal token');
         }
         try {
+          // body.source==='agent' marks Temporal-side injections (internal
+          // token enforced above); classify their origin so the console
+          // never renders them as the human user.
+          const source = body.source === 'agent'
+            ? injectionOriginOf(text) : undefined;
           if (action === '/messages') {
-            store.prompt(record, text);
+            store.prompt(record, text, source);
           } else {
-            store.steer(record, text);
+            store.steer(record, text, source);
           }
         } catch (err) {
           return bad(res, err.statusCode || 500, err.message);

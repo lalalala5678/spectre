@@ -28,6 +28,16 @@ const REPORT_NUDGE_TEXT = '【系统要求】本段运行尚未提交任务报�
   '遗漏时系统会按 outcome 推断),说明做了什么、结果或失败原因与全部必要信息——' +
   '即使没有任何发现也必须提交。这是结束任务的必要条件;提交后本任务即告完成。';
 
+
+/**
+ * Origin heuristic for system-injected user-role turns. Our own DM
+ * emissions carry a "[DM from x]" prefix → 'agent'; every other
+ * injection (engagement-done, report nudges, spawn tasks) → 'system'.
+ * The real human user NEVER passes through here.
+ */
+export const injectionOriginOf = (text) =>
+  String(text).startsWith('[DM from ') ? 'agent' : 'system';
+
 let seq = 0;
 
 export class SessionStore {
@@ -274,20 +284,28 @@ export class SessionStore {
    * microtask — waitIdle callers must never observe idle in the dispatch
    * window, or they'd harvest an empty reply (the "(无输出)" bug).
    */
-  prompt(record, text) {
+  prompt(record, text, source) {
     if (record.busy) {
       throw Object.assign(new Error('agent busy; use steer'), { statusCode: 409 });
     }
     record.busy = true;
-    record.agent.prompt(text).catch(err => {
+    // `source` tags WHO injected this user-role turn ('system'|'agent');
+    // absent = the real human user. Survives to the console via
+    // normalizeMessage so injections never render as "you".
+    const msg = source
+      ? { role: 'user', content: text, timestamp: Date.now(), source }
+      : text;
+    record.agent.prompt(msg).catch(err => {
       record.busy = false;  // run never started — don't strand waitIdle
       this._journal(record, 'error', { message: String(err) });
     });
   }
 
   /** Queue a steering message for delivery after the current turn. */
-  steer(record, text) {
-    record.agent.steer({ role: 'user', content: text, timestamp: Date.now() });
+  steer(record, text, source) {
+    record.agent.steer(source
+      ? { role: 'user', content: text, timestamp: Date.now(), source }
+      : { role: 'user', content: text, timestamp: Date.now() });
     this._journal(record, 'steer_queued', { text: truncateText(text, 200) });
   }
 
@@ -296,14 +314,19 @@ export class SessionStore {
    * queue only drains at run end — on an idle agent it never fires, so we
    * prompt directly instead (same transcript shape: a user-role message).
    *
+   * `source` defaults to the injection-origin heuristic: our own DM
+   * emissions carry a "[DM from x]" prefix → 'agent'; everything else
+   * (engagement-done, report nudges) → 'system'. Never the human user.
+   *
    * Race safety: `busy` is event-driven and can lag; on a lost race pi's
    * prompt() rejects with "already processing" — fall back to the queue
    * instead of surfacing an error.
    */
-  followUp(record, text) {
+  followUp(record, text, source = injectionOriginOf(text)) {
     const agent = record.agent;
+    const msg = { role: 'user', content: text, timestamp: Date.now(), source };
     const queue = () => {
-      agent.followUp({ role: 'user', content: text, timestamp: Date.now() });
+      agent.followUp(msg);
       this._journal(record, 'followup_queued', { text: truncateText(text, 200) });
     };
     if (agent.state.isStreaming) {
@@ -312,7 +335,7 @@ export class SessionStore {
     }
     record.busy = true;  // same synchronous-flip rule as prompt()
     this._journal(record, 'followup_injected', { text: truncateText(text, 200) });
-    Promise.resolve(record.agent.prompt(text)).catch(() => {
+    Promise.resolve(record.agent.prompt(msg)).catch(() => {
       record.busy = false;
       queue();
     });
