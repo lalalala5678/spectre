@@ -568,12 +568,17 @@ function MessageBubble({ message }: { message: ApiMessage }) {
 }
 
 /**
- * Reasoning panel: highlighted + expanded while streaming, collapsible
- * (orange-accented) once the final answer arrives.
+ * Reasoning panel: fully expanded while streaming (no height cap — a
+ * 10k-line think shows everything, only the page scroll limits it), and
+ * AUTO-COLLAPSES to the summary line when the stream ends
+ * (`open={open || active}`: active goes false → details closes unless
+ * the user re-opens it afterwards). Hook order: useState must run before
+ * the early return (a thinking='' → 'text' transition would otherwise
+ * change the hook count mid-instance).
  */
 function ThinkingBlock({ thinking, active }: { thinking?: string; active: boolean }) {
+  const [open, setOpen] = useState(false);
   if (!thinking) return null;
-  const [open, setOpen] = useState(true);
   return (
     <details
       open={open || active}
@@ -583,7 +588,7 @@ function ThinkingBlock({ thinking, active }: { thinking?: string; active: boolea
       <summary className="cursor-pointer select-none px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-widest text-orange-400/70">
         思考过程 {active ? '· streaming' : ''}
       </summary>
-      <div className="max-h-56 overflow-y-auto whitespace-pre-wrap border-t border-orange-900/30 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-orange-200/40">
+      <div className="whitespace-pre-wrap border-t border-orange-900/30 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-orange-200/40">
         {thinking}
       </div>
     </details>
