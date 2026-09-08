@@ -1,0 +1,30 @@
+{
+	order forward_proxy before file_server
+	admin off
+	log {
+		output file /var/log/caddy/caddy.log
+		level WARN
+	}
+	servers :443 {
+		protocols h1 h2
+	}
+}
+
+:80 {
+	redir https://www.REDACTED-DOMAIN{uri} permanent
+}
+
+:443, www.REDACTED-DOMAIN {
+	encode zstd gzip
+
+	forward_proxy {
+		basic_auth REDACTED REDACTED
+		hide_ip
+		hide_via
+		probe_resistance
+	}
+
+	file_server {
+		root /var/www/yujihang
+	}
+}

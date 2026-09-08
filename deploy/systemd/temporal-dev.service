@@ -1,0 +1,14 @@
+[Unit]
+Description=Temporal dev server (spectre backend)
+After=network.target
+
+[Service]
+ExecStart=/opt/temporal server start-dev --ip 127.0.0.1 --port 7233 --ui-ip 127.0.0.1 --ui-port 7234 --db-filename /var/lib/temporal-dev/spectre.db
+Restart=always
+RestartSec=2
+StateDirectory=temporal-dev
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

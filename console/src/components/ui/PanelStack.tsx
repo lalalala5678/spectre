@@ -1,0 +1,85 @@
+import { Fragment, useRef, useState, type ReactNode } from 'react';
+
+/**
+ * Vertical panel stack with draggable dividers: each child gets a share of
+ * the column height, adjusted by dragging the divider between panels. No
+ * artificial limits — a panel can shrink to a sliver or take the column;
+ * only a 1% floor keeps the divider itself grabbable. Shares persist per
+ * storage key; double-clicking a divider restores an even split.
+ */
+const DIVIDER_PX = 6;
+
+export function PanelStack({ storageKey, children }: {
+  storageKey: string;
+  children: ReactNode[];
+}) {
+  const n = children.length;
+  const stackRef = useRef<HTMLDivElement>(null);
+  const [ratios, setRatios] = useState<number[]>(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+      if (Array.isArray(saved) && saved.length === n
+        && saved.every(v => v > 0 && v < 1)
+        && Math.abs(saved.reduce((a, b) => a + b, 0) - 1) < 0.02) {
+        return saved;
+      }
+    } catch { /* fall through to even split */ }
+    return Array(n).fill(1 / n);
+  });
+  const drag = useRef<{ i: number; startY: number; a: number; b: number; moved: boolean } | null>(null);
+
+  const dividerDown = (e: React.PointerEvent<HTMLDivElement>, i: number) => {
+    drag.current = { i, startY: e.clientY, a: ratios[i], b: ratios[i + 1], moved: false };
+    e.currentTarget.setPointerCapture(e.pointerId);
+  };
+  const dividerMove = (e: React.PointerEvent<HTMLDivElement>) => {
+    const d = drag.current;
+    if (!d) return;
+    const usable = (stackRef.current?.clientHeight ?? 0) - (n - 1) * DIVIDER_PX;
+    const delta = usable > 0 ? (e.clientY - d.startY) / usable : 0;
+    if (!d.moved && Math.abs(delta) < 0.005) return;
+    d.moved = true;
+    setRatios(prev => {
+      const pair = d.a + d.b;
+      const next = [...prev];
+      next[d.i] = Math.min(pair - 0.01, Math.max(0.01, d.a + delta));
+      next[d.i + 1] = pair - next[d.i];
+      return next;
+    });
+  };
+  const dividerUp = () => {
+    if (drag.current?.moved) {
+      localStorage.setItem(storageKey, JSON.stringify(ratios));
+    }
+    drag.current = null;
+  };
+  const evenSplit = () => {
+    localStorage.removeItem(storageKey);
+    setRatios(Array(n).fill(1 / n));
+  };
+
+  return (
+    <div ref={stackRef} className="flex h-full min-h-0 flex-col">
+      {children.map((child, i) => (
+        <Fragment key={i}>
+          {i > 0 && (
+            <div
+              onPointerDown={e => dividerDown(e, i - 1)}
+              onPointerMove={dividerMove}
+              onPointerUp={dividerUp}
+              onDoubleClick={evenSplit}
+              title="拖动调整高度 · 双击均分"
+              className="relative z-10 h-1.5 shrink-0 cursor-row-resize after:absolute after:left-0 after:top-1/2 after:h-px after:w-full after:-translate-y-1/2 after:bg-void-700 after:transition-colors hover:after:bg-orange-600"
+            />
+          )}
+          <div
+            className="flex min-h-0 flex-col"
+            style={{ flex: `0 0 calc((100% - ${(n - 1) * DIVIDER_PX}px) * ${ratios[i]})` }}
+          >
+            {child}
+          </div>
+        </Fragment>
+      ))}
+    </div>
+  );
+}

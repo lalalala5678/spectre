@@ -1,0 +1,84 @@
+/**
+ * Central configuration for the SPECTRE backend.
+ *
+ * Reads `backend/.env` once at import time and exports frozen constants.
+ * Every module derives its settings from here — no scattered literals.
+ */
+
+import { existsSync, readFileSync } from 'node:fs';
+
+function loadEnvFile(path) {
+  if (!existsSync(path)) {
+    return;
+  }
+  for (const line of readFileSync(path, 'utf8').split('\n')) {
+    const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
+    if (match && !process.env[match[1]]) {
+      process.env[match[1]] = match[2];
+    }
+  }
+}
+
+loadEnvFile(new URL('../.env', import.meta.url).pathname);
+
+function required(name) {
+  const value = process.env[name];
+  if (!value) {
+    throw new Error(`missing required env var: ${name}`);
+  }
+  return value;
+}
+
+export const CONFIG = Object.freeze({
+  port: Number(process.env.PORT || 8090),
+  host: '127.0.0.1',
+
+  llmBaseUrl: required('LLM_BASE_URL'),
+  llmApiKey: required('LLM_API_KEY'),
+  llmModel: required('LLM_MODEL'),
+
+  internalToken: required('INTERNAL_TOKEN'),
+  temporalAddress: process.env.TEMPORAL_ADDRESS || '127.0.0.1:7233',
+  temporalTaskQueue: 'spectre',
+
+  /** Hard caps guarding the runtime against oversized payloads. */
+  maxPromptChars: 32_000,
+  maxBodyBytes: 1 << 20,
+  maxIdleWaitMs: 600_000,
+  busJournalLimit: 5_000,
+
+  /**
+   * [DM] spawn-completion report body cap. Beyond it the body is clipped
+   * with an explicit truncation marker + pointer to the full session —
+   * LLM-facing messages must never be cut silently.
+   */
+  dmReportMaxChars: 4_000,
+  /** Bus FINDING detail cap (FINDINGS panel expand view), marker-clipped. */
+  busDetailMaxChars: 4_000,
+  /** Completion-DM digest cap (full text lives in the task report). */
+  dmDigestChars: 400,
+
+  /**
+   * LLM transport resilience (pi-ai retryProviderRequest): retries only
+   * retryable errors (429/5xx/network) before the stream starts, honors
+   * Retry-After. Default in pi is 0 — B-2 died on the first hiccup.
+   */
+  llmMaxRetries: 3,
+  /** HTTP timeout per LLM request. */
+  llmTimeoutMs: 300_000,
+  /** L2c: 429 backpressure cooldown (exponential from base, capped). */
+  llmCooldownBaseMs: 5_000,
+  llmCooldownMaxMs: 60_000,
+  /** Max report-nudge loops before the system synthesizes the report. */
+  reportNudgeMax: 2,
+  /** query_intel formatted output cap. */
+  intelDigestChars: 6_000,
+
+  /** Durable state directory (WAL): survives restarts, updates, power loss. */
+  dataDir: process.env.SPECTRE_DATA_DIR || '/var/lib/spectre',
+
+  /** Session summary policy (same model as chats; cost bounded by policy). */
+  summaryMinDelta: Number(process.env.SUMMARY_MIN_DELTA || 4),
+  summaryEagerDelta: Number(process.env.SUMMARY_EAGER_DELTA || 8),
+  summaryIdleMs: Number(process.env.SUMMARY_IDLE_MS || 600_000),
+});

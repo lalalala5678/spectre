@@ -1,0 +1,28 @@
+[Unit]
+Description=SPECTRE console auth gateway (127.0.0.1:8081)
+After=network.target
+
+[Service]
+WorkingDirectory=/root/spectre/gateway
+ExecStart=/usr/bin/python3 /root/spectre/gateway/server.py
+Restart=always
+RestartSec=2
+User=root
+
+# sandbox
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/log/spectre-console
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+
+[Install]
+WantedBy=multi-user.target

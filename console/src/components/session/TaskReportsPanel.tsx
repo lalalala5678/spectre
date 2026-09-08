@@ -1,0 +1,82 @@
+import { useEffect, useState } from 'react';
+import { ChevronRight } from 'lucide-react';
+
+import { api, subscribeSse, type ApiBusEvent } from '../../api/client';
+import { StatusBadge } from './FindingsPanel';
+
+/**
+ * 任务报告 panel: the process record of every finished task (mandatory,
+ * system-enforced — synthesized on refusal or transport failure). Status
+ * badge + title + provenance line. SSE-driven (snapshot + live events);
+ * scoped to the current project (work session).
+ */
+export function TaskReportsPanel({ workSessionId, onOpen }: {
+  workSessionId?: string;
+  onOpen: (event: ApiBusEvent) => void;
+}) {
+  const [events, setEvents] = useState<ApiBusEvent[]>([]);
+
+  useEffect(() => {
+    let stopped = false;
+    const cursor = { v: 0 };
+    const accept = (e: ApiBusEvent) =>
+      e.type === 'task-report' && e.workSessionId === workSessionId;
+    (async () => {
+      try {
+        const all = await api<ApiBusEvent[]>('/bus');
+        if (stopped) return;
+        setEvents(all.filter(accept).slice(-20).reverse());
+        cursor.v = all.at(-1)?.seq ?? 0;
+      } catch { /* SSE reconnect will heal */ }
+    })();
+    const off = subscribeSse('/bus/events', (name, raw) => {
+      if (name !== 'bus') return;
+      const e = raw as ApiBusEvent;
+      if (e.seq <= cursor.v) return;
+      cursor.v = e.seq;
+      if (!accept(e)) return;
+      setEvents(prev => prev.some(x => x.seq === e.seq)
+        ? prev : [e, ...prev].slice(0, 20));
+    }, () => cursor.v);
+    return () => { stopped = true; off(); };
+  }, [workSessionId]);
+
+  return (
+    <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">
+      <header className="flex items-center justify-between border-b border-void-700 px-3 py-1.5">
+        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+          任务报告
+        </h3>
+        <span className="font-mono text-[10px] text-zinc-600">{events.length}</span>
+      </header>
+      <div className="flex-1 space-y-1 overflow-y-auto p-2">
+        {events.length === 0 && (
+          <p className="py-3 text-center text-[11px] text-zinc-700">本项目暂无任务报告</p>
+        )}
+        {events.map(event => {
+          const a = event.author;
+          return (
+            <button
+              key={event.seq}
+              onClick={() => onOpen(event)}
+              className="flex w-full flex-col gap-px rounded-sm border border-void-700 bg-void-900 px-2 py-1.5 text-left hover:border-void-500"
+            >
+              <div className="flex w-full items-center gap-2">
+                <StatusBadge status={event.status ?? 'no-result'} />
+                <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
+                  {event.title ?? event.summary}
+                </span>
+                <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
+              </div>
+              {a && (
+                <p className="truncate pl-1 text-[10px] leading-tight text-zinc-600">
+                  {a.name}（{a.typeLabel}{a.parent ? ` · 父:${a.parent.name}` : ''} · L{a.depth}）
+                </p>
+              )}
+            </button>
+          );
+        })}
+      </div>
+    </div>
+  );
+}

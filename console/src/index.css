@@ -1,0 +1,47 @@
+@import "tailwindcss";
+
+/* 细滚动条：默认收起，悬停区域时浮现 */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: transparent transparent;
+}
+*:hover {
+  scrollbar-color: #313134 transparent;
+}
+*::-webkit-scrollbar {
+  width: 5px;
+  height: 5px;
+}
+*::-webkit-scrollbar-track {
+  background: transparent;
+}
+*::-webkit-scrollbar-thumb {
+  background: transparent;
+  border-radius: 9999px;
+}
+*:hover::-webkit-scrollbar-thumb {
+  background: #313134;
+}
+*::-webkit-scrollbar-thumb:hover {
+  background: #3d3d41;
+}
+
+@theme {
+  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+
+  /* 中性灰背景层次（无蓝调，参照 Cobalt Strike / Grafana dark） */
+  --color-void-950: #101011;
+  --color-void-900: #141415;
+  --color-void-850: #181819;
+  --color-void-800: #1d1d1f;
+  --color-void-750: #222224;
+  --color-void-700: #28282b;
+  --color-void-600: #313134;
+  --color-void-500: #3d3d41;
+
+  /* 唯一强调色：暗橙 */
+  --color-accent-600: #c2410c;
+  --color-accent-500: #ea580c;
+  --color-accent-400: #f97316;
+}

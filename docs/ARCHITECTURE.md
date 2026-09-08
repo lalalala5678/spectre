@@ -1,0 +1,152 @@
+# SPECTRE 架构设计
+
+> 自主渗透测试作战控制台。单文件入口 `/root/spectre`,部署于单台公网主机。
+> 阶段状态:基座(全部子智能体 = 同一套基础 pi,零定制);定制化是规划中的扩展点。
+
+## 1. 系统总览
+
+```
+浏览器
+  │ https://www.REDACTED-DOMAIN/spectre/
+  ▼
+caddy (:443, /spectre*) ── 真实 TLS,唯一公网入口
+  ▼
+gateway (Python :8081, 仅 127.0.0.1)
+  │  认证(scrypt+会话) → 静态 dist / API 反代(含 SSE 流式)
+  ├── /spectre/api/* ──► agent-runtime (Node :8090, 仅 127.0.0.1)
+  │                        │  pi 会话池(pi-agent-core × GLM-5.3)
+  │                        │  消息总线 journal + SSE
+  │                        │  Temporal client(启动编排)
+  │                        ▼
+  │                     temporal-dev (:7233, 仅 127.0.0.1)
+  │                        ▲
+  │                     worker (Node, task queue "spectre")
+  │                        │  autoPwnWorkflow(父) → agentTaskWorkflow(子)×N
+  │                        │  activities: createSession/promptAndWait/
+  │                        │              steerSession/busEmit
+  └── /spectre/ 静态   ▲   │
+                       └───┴── HTTP + X-Internal-Token ──► agent-runtime
+```
+
+## 2. 目录结构(目标状态)
+
+```
+/root/spectre/
+├── docs/                          # 本文档、ADR、runbook
+│   └── ARCHITECTURE.md
+│
+├── console/                       # 前端 SPA(React+Vite,base=./ 适配 /spectre/ 挂载)
+│   ├── src/
+│   │   ├── api/                   # 后端客户端:fetch 封装 + SSE 订阅(client.ts)
+│   │   ├── components/            # 通用组件(Sidebar/Topbar/ui)
+│   │   ├── components/session/    # 会话视图(消息流/事件流/聊天输入)
+│   │   ├── pages/                 # 路由页(AutoPwn/BusView/Audit/…)
+│   │   ├── mock/                  # mock 数据(逐步退役,仅开发用)
+│   │   ├── types/                 # 前后端共享类型镜像
+│   │   └── utils/
+│   ├── dist/                      # 构建产物(gateway 托管的唯一静态源)
+│   └── package.json
+│
+├── gateway/                       # Python 认证网关(已拆包,全部文件 ≤193 行)
+│   ├── spectre_gateway/
+│   │   ├── __init__.py
+│   │   ├── config.py              # 路径/超时/cookie 常量
+│   │   ├── security.py            # scrypt 校验、会话存储、限速锁定、审计
+│   │   ├── static.py              # dist 静态服务(防穿越、缓存头)
+│   │   ├── proxy.py               # /spectre/api 反代(SSE 透传,read1 逐帧)
+│   │   ├── pages.py               # 登录页模板
+│   │   └── handler.py             # 路由分发
+│   └── server.py                  # 入口(systemd 指向)
+│
+├── backend/                       # Node 侧(agent-runtime + worker)
+│   ├── agent-runtime.mjs          # 入口:HTTP 服务装配
+│   ├── worker.mjs                 # 入口:Temporal Worker 装配
+│   ├── workflows.mjs              # autoPwnWorkflow / agentTaskWorkflow
+│   ├── activities.mjs             # 4 个 activity(唯一出站副作用点)
+│   ├── src/
+│   │   ├── config.mjs             # .env 加载 + 冻结常量(唯一配置源)
+│   │   ├── agents.mjs             # 智能体注册表(key/name/role)
+│   │   ├── pi.mjs                 # pi 构建 + 消息归一化(base 配置)
+│   │   ├── sessions.mjs           # SessionStore:pi 会话 + 事件 journal + SSE
+│   │   ├── bus.mjs                # Bus:跨智能体消息 journal + SSE
+│   │   ├── temporal.mjs           # Temporal client(启动/查询编排)
+│   │   ├── routes.mjs             # HTTP 路由(公共 vs 内部令牌分离)
+│   │   ├── http.mjs               # json/readJson/sse/内部令牌工具
+│   │   └── runtime-client.mjs     # activities→runtime 的带令牌 HTTP 客户端
+│   ├── agents/                    # 【扩展点】逐智能体深度定制
+│   │   ├── _base/                 #   共享底座(SYSTEM.md/tools/skills)
+│   │   ├── recon/                 #   每智能体:SYSTEM.md + tools.mjs + skills/
+│   │   └── …/
+│   ├── .env                       # 密钥(600):LLM_*/INTERNAL_TOKEN
+│   └── package.json
+│
+├── deploy/                        # 运维物料
+│   ├── systemd/                   # 单元文件(或符号链接说明)
+│   ├── caddy/                     # Caddyfile 备份 + 接入片段
+│   └── credentials.txt            # 控制台登录凭据(600)
+│
+└── (运行时数据,不在仓库)
+    /etc/spectre-auth/             #   passwd(多用户 scrypt)
+    /var/log/spectre-console/      #   auth.log(JSONL 审计)
+    /var/lib/temporal-dev/         #   Temporal dev 数据库
+```
+
+## 3. 模块边界与依赖规则(硬约束)
+
+| 规则 | 理由 |
+|---|---|
+| console 只经 `/spectre/api/*` 说话,不直连 runtime | 单一入口 = 单点认证与审计 |
+| gateway 不解析业务,只做 认证→静态/反代 | 认证域与业务域隔离 |
+| workflow 代码不 import runtime 内部模块 | worker 与 runtime 只通过 `runtime-client.mjs`(HTTP+令牌)交互,两服务独立部署/重启 |
+| activities 是 workflow 唯一出站副作用点 | Temporal 可观测性(history 完整记录每次副作用) |
+| `config.mjs` 是后端唯一配置源 | 换 LLM 厂商/端口 = 改 `.env` 一处 |
+| 智能体身份(agent impersonation)必须带 INTERNAL_TOKEN | 浏览器会话不能伪造 [DM] 注入 |
+| 每文件 ≤500 行、单一职责(Python 严格遵循 python-code-style) | 可读性/可维护性 |
+
+## 4. 控制面 vs 数据面
+
+- **控制面(Temporal)**:任务派发、跨智能体路由(公告/私信/共享)、engagement 生命周期、失败兜底。持久化在 Temporal history —— 进程崩溃任务图不丢。
+- **数据面(runtime 直连)**:用户↔单个智能体的实时对话(prompt/steer)、token 级事件流(SSE)。低延迟,不进 workflow(避免每 token 一次 Temporal 事件)。
+- 两面交汇点:消息总线 journal(runtime 内存 + SSE 重放)。后续接审计链时由 journal 落盘对账。
+
+## 5. 服务拓扑(systemd)
+
+| 单元 | 内容 | 端口 |
+|---|---|---|
+| caddy | TLS 终结 + /spectre* 路由 | 443(公网) |
+| spectre-console | Python 网关 | 127.0.0.1:8081 |
+| spectre-agent-runtime | pi 会话 + 总线 | 127.0.0.1:8090 |
+| spectre-worker | Temporal worker | -(轮询) |
+| temporal-dev | 编排引擎 + UI | 127.0.0.1:7233/7234 |
+
+## 6. 已验证能力(基座,2026-09-07 全链路浏览器实测)
+
+- 单智能体会话:点击侧栏智能体 → 复用/新建 pi 会话(顶栏切换器可选
+  旧会话、「新任务」开新会话)→ 实时对话,GLM-5.3 流式回复经
+  caddy→网关→runtime 三级 SSE 透传
+- **AutoPwn = 单一对话框直连调度智能体**:`dispatch_agents` 工具启动
+  Temporal 编排,orchestrator 自主拆解派发
+- **双向消息互通**(子↔主控,子不直达子):
+  - 子智能体中途 `publish_finding` → 总线私信(intel)+
+    [DM] 注入 orchestrator 会话(实测 2/2 送达)
+  - orchestrator 判定后 `relay_to_agents` → 定向 DM 注入子会话
+    (实测 4 次转发)
+  - engagement 完成 → 自动 followUp 通知 orchestrator 产出汇总
+- 右栏动态面板:子 Agent(engagement 子会话,运行中/结束,点击下钻
+  到该子智能体视角)、发现 FINDINGS(总线共享事件,点击跳转来源会话)
+- 对话体验:token 级流式渲染(delta 帧 + 尾气泡增量扩展,实测 227 帧/2.6s)、
+  用户消息零重复(SSE 游标从 lastSeq 起,乐观渲染去重)、
+  assistant 回复 Markdown 渲染(react-markdown + GFM 表格/代码/列表)
+- thinking 流式:thinking_delta 帧先于正文帧到达(实测 43 帧思考 + 406 帧正文),
+  流式期橙色展开面板,完成后折叠为「思考过程」
+- followUp 竞态修复:忙判用 pi 的 isStreaming + 失败回退队列,
+  「already processing」错误不再外泄(用户原始路径回归通过)
+- 网关 SSE 修复:反代必须用 `read1()` 逐帧转发(chunked 流不能用
+
+## 7. 已知限制与后续路线
+
+1. **会话内存态**:runtime 重启丢会话 → 接 pi SQLite session backend + 会话恢复
+2. **智能体零定制**:backend/agents/ 目录已预留,接入逐智能体 SYSTEM.md/tools/skills
+3. **无工具、无沙箱**:渗透工具接入必须先落 beforeToolCall 审批门 + 容器隔离(pi 官方:pi 无内置权限系统)
+4. **审计链未接 Merkle**:auth.log 已有,业务事件(journal)待对账入链
+5. **Temporal dev server**:单机开发态;生产需换正式集群 + PostgreSQL

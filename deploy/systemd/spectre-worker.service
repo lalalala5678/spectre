@@ -1,0 +1,15 @@
+[Unit]
+Description=SPECTRE Temporal worker (AutoPwn orchestration)
+After=network.target temporal-dev.service spectre-agent-runtime.service
+Wants=temporal-dev.service spectre-agent-runtime.service
+
+[Service]
+WorkingDirectory=/root/spectre/backend
+ExecStart=/opt/node22/bin/node worker.mjs
+Restart=always
+RestartSec=2
+NoNewPrivileges=true
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target
