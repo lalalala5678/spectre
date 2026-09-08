@@ -552,9 +552,18 @@ export class SessionStore {
         .map(m => m.errorMessage || '');
       return errs.length ? `\n⚠️ 该智能体运行出错:${errs[0].slice(0, 160) || '未知错误(见会话)'}` : '';
     })();
+    // Fix-I (P12): when FINDINGs were published this run, the spawner
+    // already got their full text via auto-DM — reference them instead
+    // of letting the reply repeat the content (dual-channel redundancy
+    // burned 1-2 turns per spawn in project-3).
+    const findingNote = record.publishedFindingTitles?.length
+      ? `\n已发布 ${record.publishedFindingTitles.length} 条 FINDING:` +
+        `${record.publishedFindingTitles.map(t => `《${clipMarked(t, 40)}》`).join('')}` +
+        `,全文经 query_intel 检索。\n`
+      : '';
     this.caps.followUp(
       record.parentSessionId,
-      `[DM from ${record.agentKey}] ${label}:\n${clipMarked(
+      `[DM from ${record.agentKey}] ${label}:\n${findingNote}${clipMarked(
         reply,
         CONFIG.dmDigestChars,
         `任务报告已入库,用 query_intel 读取;原始回复见会话 ${record.id}`,

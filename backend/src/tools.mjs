@@ -359,10 +359,12 @@ function buildSpawnAgentTool(record, caps) {
         description: 'Agent to spawn; "autopwn" = sub-orchestrator',
       }),
       name: Type.String({
+        maxLength: 20,
         description: 'Codename for the spawned agent that reflects its ' +
           'task, e.g. "边界测绘一组" (short, ≤20 chars)',
       }),
       description: Type.String({
+        maxLength: 60,
         description: 'One short sentence describing the agent\'s ' +
           'function/mission (≤60 chars)',
       }),
@@ -371,6 +373,17 @@ function buildSpawnAgentTool(record, caps) {
       }),
     }),
     execute: async (_id, params) => {
+      // Fix-H (A3): codename IS provenance (spawnName feeds authorOf,
+      // DMs, tree paths) — enforce the documented ≤20/≤60 contract with
+      // an actionable refusal instead of the store's silent slice.
+      if (String(params.name).length > 20) {
+        return { content: [{ type: 'text',
+          text: `派生被拒绝:代号超长(${String(params.name).length}/20 字符),请精简后重试。` }] };
+      }
+      if (String(params.description).length > 60) {
+        return { content: [{ type: 'text',
+          text: `派生被拒绝:描述超长(${String(params.description).length}/60 字符),请精简后重试。` }] };
+      }
       const verdict = caps.spawnCheck(record, params.agentKey);
       if (!verdict.ok) {
         return {
@@ -589,6 +602,12 @@ export function buildChildTools(record, caps) {
         workSessionId: record.workSessionId ?? null,
         engagement,
       });
+      // Fix-I (P12): remember titles so the completion DM can REFERENCE
+      // findings instead of repeating them (auto-DM already carried the
+      // full text). In-memory only: losing it on restart degrades to the
+      // old verbose DM — cosmetic. Capped to keep DMs bounded.
+      record.publishedFindingTitles = [...(record.publishedFindingTitles ?? []),
+        params.title].slice(-5);
       // Spawned sub-orchestrators carry no orchestratorSessionId (their
       // overlord is the SPAWNER) — fall back to parentSessionId so the
       // DM never targets null and 404s after the bus emit.
