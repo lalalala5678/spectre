@@ -20,6 +20,9 @@ import { clipMarked } from './pi.mjs';
 import { foldRevisions } from './revision.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 
+/** The exactly-three configuration agents (AGENTS.md 铁律:有且只有). */
+const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
+
 const STAGE_KEYS = [
   'recon', 'nday', 'weakcred', 'api', 'exploit',
   'phish', 'c2', 'persistence', 'postex', 'report',
@@ -892,7 +895,7 @@ export function buildDirectTools(record, caps) {
   if (record.agentKey === 'report') {
     return [publishVuln, publishIntel];
   }
-  if (record.agentKey === 'tools') {
+  if (CONFIG_AGENT_KEYS.includes(record.agentKey)) {
     return buildToolingTools(record, caps);
   }
   return [buildReportVulnerabilityTool(record, caps), publishIntel,

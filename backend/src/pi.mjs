@@ -297,8 +297,8 @@ const SCENARIO_COMMON = [
   '- CLI 安装一律进共享层:npm --prefix /opt/tools/npm-global、',
   '  pip --target /opt/tools/py、二进制放 /opt/tools/bin(PATH 已含)。',
   '- 完成后用 list_tool_config 核对,并告知"对目标智能体的新会话生效"。',
-  '- 需要联网找候选或读在线文档时,引导用户找发现智能体(discovery),',
-  '  你没有搜索工具,不要假装搜过。',
+  '- 需要找候选/读在线文档:用你自己的 search_web / fetch_url(垂直',
+  '  通道优先;通用 provider 未配置时如实说明,绝不假装搜过)。',
 ].join('\n');
 
 export const SKILL_CONFIG_PROMPT = [

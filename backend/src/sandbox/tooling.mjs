@@ -2,7 +2,7 @@
  * Tooling-agent toolkit — the capabilities the `tools` agent uses to
  * DISCOVER, BUILD and CONFIGURE skills / MCP servers / CLI tools for
  * OTHER agents. Design axioms (AGENTS.md):
- *   · the tools agent CONFIGURES mounts for named agents — it never
+ *   · each config agent CONFIGURES mounts for named agents — it never
  *     holds the configured skill/MCP itself (mount isolation is by
  *     agentKey at session creation, unchanged);
  *   · CLI installs are environment-level (shared PATH, 公理二);
