@@ -286,7 +286,7 @@ export const TOOLS_GUIDE = [
 ].join('\n');
 
 /**
- * Dedicated prompts for the FOUR tooling roles (direct sessions).
+ * Dedicated prompts for the THREE config agents (direct sessions).
  * Boundary axiom (AGENTS.md): each config agent holds EXACTLY its own
  * tooling toolkit plus its OWN search/fetch instances (independent
  * per agent — never a 4th role, per the user's three-agent design).

@@ -14,10 +14,11 @@ interface ApiSessionSummary {
 }
 
 /**
- * Embedded tooling-agent chat — the SAME `tools` conversation shared by
- * the Skills / MCP / CLI management pages (one agent, three aspects,
- * continuous context). Mount isolation unchanged: this is a tools-key
- * session; it never appears inside other agents' workspaces.
+ * Embedded config-agent chat. Each management page binds to ITS OWN
+ * config agent (SkillsPage→skill-config, McpPage→mcp-config,
+ * CliPage→cli-config) with a separate conversation per agentKey —
+ * boundary axiom: never a shared session, never inside other agents'
+ * workspaces.
  */
 export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; workSessionId: string }) {
   const [sessionId, setSessionId] = useState<string | null>(null);

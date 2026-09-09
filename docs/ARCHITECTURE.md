@@ -143,6 +143,24 @@ gateway (Python :8081, 仅 127.0.0.1)
   「already processing」错误不再外泄(用户原始路径回归通过)
 - 网关 SSE 修复:反代必须用 `read1()` 逐帧转发(chunked 流不能用
 
+## 6.5 工具配置三智能体(2026-09-10 落地,独立审计复核)
+
+恰好三个配置智能体,不许第四个(用户铁律,AGENTS.md 同步记载):
+
+|agentKey|专属工具(有且只有)|嵌入界面|
+|---|---|---|
+|skill-config|configure_skill + list_tool_config + search_web/fetch_url(独立实例)|Skill 管理页右栏|
+|mcp-config|configure_mcp + test_mcp_server + list_tool_config + search_web/fetch_url|MCP Server 页右栏|
+|cli-config|list_tool_config + search_web/fetch_url|CLI 工具页右栏|
+
+- **边界**:业务智能体(recon/nday/调度等)零配置工具;配置智能体的
+  systemPrompt 不拼业务 TOOLS_GUIDE(纯净提示词,只有自身动态工具清单);
+  bash/read/write/edit 由 mount 层统一拼给所有会话(官方四件,非配置工具)
+- **配置≠持有**:挂载边界=配置的 agents 字段/skill 目录;配置智能体自身
+  零挂载(运行时数据核验:/var/lib/spectre/skills 仅 api/nday/recon)
+- **四场景**(链接/上传/搜索发现/从零构建)由各配置智能体用
+  配置工具+官方四件+自有搜索实例完成,零硬编码流程
+
 ## 7. 已知限制与后续路线
 
 1. **会话内存态**:runtime 重启丢会话 → 接 pi SQLite session backend + 会话恢复

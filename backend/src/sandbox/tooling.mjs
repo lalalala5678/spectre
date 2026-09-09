@@ -267,7 +267,7 @@ function buildAllToolingTools(caps) {
     name: 'search_web',
     label: '搜索',
     description:
-      '[read-only] Tool discovery search. Vertical channels first (MCP '
+      '[read-only] Tool candidate search. Vertical channels first (MCP '
       + 'official registry, GitHub API, npm/pip in sandbox — all '
       + 'keyless); generic web search as fallback ONLY when a provider '
       + 'is configured. The receipt says which channels answered.',

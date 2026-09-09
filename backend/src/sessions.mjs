@@ -171,7 +171,11 @@ export class SessionStore {
         // the prompt can never again claim a tool this session lacks.
         systemPrompt: `${TOOLS_PROMPTS[record.agentKey]
             ?? (isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT)}\n\n` +
-          `${TOOLS_GUIDE}\n${tools.map(t => `- ${t.name}`).join('\n')}` +
+          // Config agents hold no business platform tools — the business
+          // TOOLS_GUIDE would be pure noise (and boundary pollution).
+          `${TOOLS_PROMPTS[record.agentKey] ? ''
+            : TOOLS_GUIDE + '\n'}` +
+          `${tools.map(t => `- ${t.name}`).join('\n')}` +
           (skillIndexBlock ? `\n\n${skillIndexBlock}` : ''),
         model: this.model,
         tools,
