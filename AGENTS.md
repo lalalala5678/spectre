@@ -25,7 +25,7 @@
 - 推断结果必须标注"(由系统推断为 X,如有误请再次提交修正)" — append-only 数据无更正机制
 
 ### 枚举值
-- 在 Type.Union 中收纳常见变体(finding/findings/task-report/reports/task_report)
+- 在 Type.Union 中收纳常见变体(vulnerability/vuln/task-report/reports/intel/notes/task_report)
 - execute 入口统一 `toLowerCase()` / `toUpperCase()` 后再匹配
 - 描述里列出全部合法值
 
@@ -45,12 +45,12 @@
 
 ### 空结果诊断
 ```
-无匹配情报。当前项目内:任务报告 3 条 / FINDING 2 条。可尝试放宽 kind/status/author 或去掉 q。
-注意:status 仅适用于任务报告;FINDING 请用 severity 过滤。
+无匹配条目。当前项目内:任务报告 3 条 / 漏洞 2 条 / 情报 1 条。可尝试放宽 kind/status/author 或去掉 q。
+注意:status 仅适用于任务报告;漏洞请用 severity 过滤。
 ```
 - 附总量统计(让 LLM 判断"真没有"还是"过滤太窄")
 - 附下一步指引(放宽哪个参数)
-- 参数误用时显式指出(kind=finding + status → "status 仅适用于任务报告")
+- 参数误用时显式指出(kind=vulnerability + status → "status 仅适用于任务报告")
 
 ### 总数披露
 ```

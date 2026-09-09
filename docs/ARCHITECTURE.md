@@ -127,13 +127,13 @@ gateway (Python :8081, 仅 127.0.0.1)
 - **AutoPwn = 单一对话框直连调度智能体**:`dispatch_agents` 工具启动
   Temporal 编排,orchestrator 自主拆解派发
 - **双向消息互通**(子↔主控,子不直达子):
-  - 子智能体中途 `publish_finding` → 总线私信(intel)+
+  - 子智能体中途 `publish_vulnerability` → 总线私信(intel)+
     [DM] 注入 orchestrator 会话(实测 2/2 送达)
   - orchestrator 判定后 `relay_to_agents` → 定向 DM 注入子会话
     (实测 4 次转发)
   - engagement 完成 → 自动 followUp 通知 orchestrator 产出汇总
 - 右栏动态面板:子 Agent(engagement 子会话,运行中/结束,点击下钻
-  到该子智能体视角)、发现 FINDINGS(总线共享事件,点击跳转来源会话)
+  到该子智能体视角)、漏洞 VULNS/情报 INTEL(总线共享事件,点击跳转来源会话)
 - 对话体验:token 级流式渲染(delta 帧 + 尾气泡增量扩展,实测 227 帧/2.6s)、
   用户消息零重复(SSE 游标从 lastSeq 起,乐观渲染去重)、
   assistant 回复 Markdown 渲染(react-markdown + GFM 表格/代码/列表)

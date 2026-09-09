@@ -556,14 +556,14 @@ export class SessionStore {
     // already got their full text via auto-DM — reference them instead
     // of letting the reply repeat the content (dual-channel redundancy
     // burned 1-2 turns per spawn in project-3).
-    const findingNote = record.publishedVulnTitles?.length
+    const vulnNote = record.publishedVulnTitles?.length
       ? `\n已发布 ${record.publishedVulnTitles.length} 条漏洞:` +
         `${record.publishedVulnTitles.map(t => `《${clipMarked(t, 40)}》`).join('')}` +
         `,全文经 query_intel 检索。\n`
       : '';
     this.caps.followUp(
       record.parentSessionId,
-      `[DM from ${record.agentKey}] ${label}:\n${findingNote}${clipMarked(
+      `[DM from ${record.agentKey}] ${label}:\n${vulnNote}${clipMarked(
         reply,
         CONFIG.dmDigestChars,
         `任务报告已入库,用 query_intel 读取;原始回复见会话 ${record.id}`,

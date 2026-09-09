@@ -60,7 +60,7 @@ export function buildIntelTools(record, caps) {
         Type.Literal('intel'), Type.Literal('both'), Type.Literal('reports'),
         Type.Literal('vuln'), Type.Literal('vulnerabilities'), Type.Literal('notes'),
         Type.Literal('task_report'),
-      ], { description: 'Intel kind: task-report(=reports) / finding(=findings) / both. Default both' })),
+      ], { description: 'Entry kind: task-report(=reports) / vulnerability(=vuln) / intel(=notes) / both. Default both' })),
       seq: Type.Optional(Type.Number({
         description: 'Fetch ONE entry in full detail by its seq (from a previous listing)',
       })),
@@ -753,7 +753,7 @@ export function buildDirectTools(record, caps) {
       severity: Type.Union([
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
-      ], { description: 'Finding severity: info/low/medium/high/critical' }),
+      ], { description: 'Vulnerability severity: info/low/medium/high/critical' }),
       text: Type.String({
         description: 'Full content (markdown): description, evidence, PoC.',
       }),
@@ -761,7 +761,7 @@ export function buildDirectTools(record, caps) {
     execute: async (_id, params) => {
       caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'user',
-        type: 'intel',
+        type: 'vulnerability',
         severity: String(params.severity).toLowerCase(),
         title: params.title,
         summary: params.title,

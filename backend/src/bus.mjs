@@ -57,9 +57,10 @@ export class Bus {
     };
     // Idempotency for vulnerability publications: an agent re-calling the tool
     // with the same title+severity (receipt-style duplicates) is a no-op.
-    if (entry.type === 'intel' && entry.title && entry.severity) {
+    if ((entry.type === 'vulnerability' || entry.type === 'intel')
+      && entry.title && entry.severity) {
       const dup = [...this.events].reverse().find(e =>
-        e.type === 'intel' && e.from === entry.from
+        (e.type === 'vulnerability' || e.type === 'intel') && e.from === entry.from
         && e.title === entry.title && e.severity === entry.severity);
       if (dup) return dup;
     }

@@ -472,7 +472,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <Panel title="历史会话" bodyClassName="p-0" className="w-full">
               <div className="divide-y divide-void-700">
                 {[
-                  ['sess-0905-2204', 'api.example-corp.com', 'done', '09-05 22:04', '3 个发现 · 1 critical'],
+                  ['sess-0905-2204', 'api.example-corp.com', 'done', '09-05 22:04', '3 个漏洞 · 1 critical'],
                   ['sess-0905-1841', '203.0.113.0/28 端口基线', 'done', '09-05 18:41', '47 端口 / 12 服务'],
                   ['sess-0904-2310', 'wiki 历史漏洞复验', 'failed', '09-04 23:10', '沙箱池耗尽，已重试成功'],
                 ].map(([id, title, st, time, summary]) => (
