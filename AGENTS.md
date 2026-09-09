@@ -111,3 +111,12 @@
 - 现行版=修订链上 revision.n 最大者;query_intel 与前端面板同语义折叠
 - 权限:情报/任务报告任意 agent 可改(reason 留审计);漏洞仅 writer(申请-审核制);用户直编=终审
 - 用户界面:详情页对话框(→报告agent)与直接编辑表单(→人工落账)双路径
+
+## 沙箱与工具体系(官方优先原则)
+
+- **不改 pi 框架**:优先使用 pi-agent-core 官方机制;自建仅限官方空缺处
+- **ExecutionEnv 驱动抽象**(官方接口,自建实现):local(零依赖)/docker(单长寿命容器+bind mount)——官方 bash/read/write/edit 工具跑在 env 上,沙箱化 env 即沙箱化全部官方工具
+- **项目工作目录**:/workspace/<wsId>(跨项目可读=特性);CLI 共享层 /opt/tools 装一次全员可用
+- **Skill=官方 agentskills.io 格式**:loadSkills 从 per-agent 目录挂载,formatSkillsForSystemPrompt 生成索引注入,模型按需 read 全文(动态加载,非全量 prompt 注入)
+- **MCP 双传输**:远程 http(用户自建机器直连,streamable-HTTP)与 stdio(host/sandbox 进程);会话创建时快照合并进工具面;配置存储 API 化(为未来 MCP 配置 agent 预留)
+- 官方契约对齐点:FileError 码表(not_found/permission_denied/…)、ShellOutputView 平铺形状、TruncationResult 字段、FileInfo.kind/mtimeMs——适配层逐一对齐,勿凭记忆

@@ -6,7 +6,7 @@
  * activity) routes are separated below.
  */
 
-import { AGENTS, isAgentKey } from './agents.mjs';
+import { AGENTS, AGENT_KEYS, isAgentKey } from './agents.mjs';
 import { CONFIG } from './config.mjs';
 import { hasInternalToken, json, readJson, sse } from './http.mjs';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
@@ -14,6 +14,9 @@ import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
 import { injectionOriginOf } from './sessions.mjs';
 import { entryKind as entryKindOf } from './tools.mjs';
 import { emitRevision } from './revision.mjs';
+import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
+import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
+import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 
@@ -184,6 +187,118 @@ export function createRouter({ store, bus, caps }) {
         store.markReportSynthesized(record, meta);
         return json(res, 200, { count: record.taskReportCount });
       }
+    }
+
+    // ---------- sandbox / skills / MCP / CLI management ----------
+    if (path === '/api/sandbox/status' && method === 'GET') {
+      const cfg = sandboxConfig();
+      return json(res, 200, {
+        ...cfg,
+        dockerAvailable: cfg.driver === 'docker',
+      });
+    }
+    if (path === '/api/sandbox/config' && method === 'PUT') {
+      const body = await readJson(req);
+      const cfg = await saveSandboxConfig({
+        driver: ['docker', 'local'].includes(body.driver) ? body.driver : undefined,
+        container: body.container ? String(body.container).slice(0, 80) : undefined,
+        image: body.image ? String(body.image).slice(0, 200) : undefined,
+      });
+      const ensured = await ensureSandbox();
+      const { rebuildMounts } = await import('./sandbox/mount.mjs');
+      await rebuildMounts(AGENT_KEYS);
+      return json(res, 200, { ...cfg, ensured });
+    }
+    if (path === '/api/sandbox/cli' && method === 'POST') {
+      const body = await readJson(req);
+      const cmd = String(body.command || '').trim();
+      if (!cmd) return bad(res, 400, 'command required');
+      const result = await installCli(cmd);
+      return json(res, 200, result);
+    }
+    if (path === '/api/sandbox/tools' && method === 'GET') {
+      return json(res, 200, await listInstalledTools());
+    }
+    // skills CRUD + per-agent mounts
+    if (path === '/api/sandbox/skills' && method === 'GET') {
+      return json(res, 200, await listSkillsTree(AGENT_KEYS));
+    }
+    if (path === '/api/sandbox/skills' && method === 'POST') {
+      const body = await readJson(req);
+      if (!body.agentKey || !body.name || !body.content) {
+        return bad(res, 400, 'agentKey, name, content required');
+      }
+      const filePath = await saveSkill(body.agentKey, {
+        name: String(body.name).slice(0, 60),
+        description: String(body.description ?? '').slice(0, 200),
+        content: String(body.content).slice(0, 50000),
+      });
+      const { rebuildMounts } = await import('./sandbox/mount.mjs');
+      await rebuildMounts(AGENT_KEYS);
+      return json(res, 201, { filePath });
+    }
+    if (path === '/api/sandbox/skills' && method === 'DELETE') {
+      const url2 = new URL(req.url, 'http://x');
+      const agentKey = url2.searchParams.get('agentKey');
+      const name = url2.searchParams.get('name');
+      if (!agentKey || !name) return bad(res, 400, 'agentKey, name required');
+      await deleteSkill(agentKey, name);
+      const { rebuildMounts } = await import('./sandbox/mount.mjs');
+      await rebuildMounts(AGENT_KEYS);
+      return json(res, 200, { deleted: true });
+    }
+    // MCP servers CRUD + test (remote http or stdio; future config-agent
+    // edits the same store through this API)
+    if (path === '/api/sandbox/mcp' && method === 'GET') {
+      const list = await loadMcpConfig();
+      // never leak header secrets wholesale — mask values
+      return json(res, 200, list.map(s => ({
+        ...s,
+        headers: Object.fromEntries(Object.keys(s.headers ?? {})
+          .map(k => [k, '***'])),
+      })));
+    }
+    if (path === '/api/sandbox/mcp' && method === 'POST') {
+      const body = await readJson(req);
+      if (!body.name || !body.transport) {
+        return bad(res, 400, 'name, transport required');
+      }
+      const entry = {
+        name: String(body.name).slice(0, 60),
+        transport: body.transport,
+        agents: Array.isArray(body.agents) ? body.agents.filter(isAgentKey) : [],
+        enabled: body.enabled !== false,
+        ...(body.transport === 'http'
+          ? { url: String(body.url ?? '').slice(0, 500),
+              headers: body.headers ?? {} }
+          : { command: body.command ?? [], env: body.env ?? {},
+              where: body.where === 'sandbox' ? 'sandbox' : 'host' }),
+      };
+      const list = (await loadMcpConfig())
+        .filter(s => s.name !== entry.name);
+      const next = await saveMcpConfig([...list, entry]);
+      const { rebuildMounts } = await import('./sandbox/mount.mjs');
+      await rebuildMounts(AGENT_KEYS);
+      return json(res, 201, next.find(s => s.name === entry.name));
+    }
+    if (path === '/api/sandbox/mcp' && method === 'DELETE') {
+      const url2 = new URL(req.url, 'http://x');
+      const name = url2.searchParams.get('name');
+      const next = (await loadMcpConfig()).filter(s => s.name !== name);
+      await saveMcpConfig(next);
+      const { rebuildMounts } = await import('./sandbox/mount.mjs');
+      await rebuildMounts(AGENT_KEYS);
+      return json(res, 200, { deleted: true });
+    }
+    if (path === '/api/sandbox/mcp/test' && method === 'POST') {
+      const body = await readJson(req);
+      const server = (await loadMcpConfig())
+        .find(s => s.name === body.name);
+      if (!server) return bad(res, 404, 'server not found');
+      // re-attach fresh headers when the caller is saving (secrets are
+      // masked in GET; the console sends them back on save)
+      if (body.headers) server.headers = body.headers;
+      return json(res, 200, await testMcpServer(server));
     }
 
     // ---------- bus ----------

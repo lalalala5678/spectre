@@ -14,6 +14,8 @@ import { Agent } from '@earendil-works/pi-agent-core';
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, TOOLS_GUIDE, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
+import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
 
@@ -140,7 +142,7 @@ export class SessionStore {
     // sees the whole project, it must be able to file leads; live
     // regression proved the static roster lied to it) minus the
     // duplicate spawn_agent; every agent queries intel.
-    const tools = isOrchestrator
+    const base = isOrchestrator
       ? [
         ...buildOrchestratorTools(record, this.caps),
         ...buildChildTools(record, this.caps).filter(t => t.name !== 'spawn_agent'),
@@ -150,12 +152,20 @@ export class SessionStore {
         ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps)]
         : [...buildDirectTools(record, this.caps),
           ...buildIntelTools(record, this.caps)];
+    // Sandbox layer: official bash/read/write/edit (ExecutionEnv-bound,
+    // project cwd) + per-agent MCP tools + per-agent skill index.
+    const mount = mountForSession(record.agentKey, record.workSessionId);
+    const tools = [...base, ...mount.tools];
+    const skills = skillsCached(record.agentKey);
+    const skillIndexBlock = skills.length
+      ? formatSkillsForSystemPrompt(skills) : '';
     const agent = new Agent({
       initialState: {
         // Dynamic tool roster: generated from the ACTUAL registered set —
         // the prompt can never again claim a tool this session lacks.
         systemPrompt: `${isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT}\n\n` +
-          `${TOOLS_GUIDE}\n${tools.map(t => `- ${t.name}`).join('\n')}`,
+          `${TOOLS_GUIDE}\n${tools.map(t => `- ${t.name}`).join('\n')}` +
+          (skillIndexBlock ? `\n\n${skillIndexBlock}` : ''),
         model: this.model,
         tools,
         // GLM always-thinking models reject 'off'; 'low' is the fastest

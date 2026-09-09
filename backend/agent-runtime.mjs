@@ -24,6 +24,8 @@ import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal
 import { Summarizer } from './src/summarizer.mjs';
 import { getSpawnSettings } from './src/settings.mjs';
 import { Wal } from './src/persist.mjs';
+import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
+import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
 
 const { model, streamFn } = buildPi();
@@ -321,6 +323,16 @@ if (replay.records.size || replay.busEvents.length) {
   console.log(`[runtime] recovered ${replay.records.size} sessions, ` +
     `${replay.busEvents.length} bus events from WAL`);
 }
+// ---- sandbox layer boot (driver detect → container/dirs → mounts) ----
+loadSandboxConfig().then(async cfg => {
+  const ensured = await ensureSandbox();
+  console.log(`[sandbox] driver=${cfg.driver} ok=${ensured.ok}`,
+    ensured.error ?? '');
+  const { rebuildMounts } = await import('./src/sandbox/mount.mjs');
+  await rebuildMounts(AGENT_KEYS);
+  console.log('[sandbox] skill/MCP mounts warmed');
+}).catch(err => console.warn('[sandbox] boot degraded:', err.message));
+
 const compactWal = () => wal.compact([
   ...store.snapshotForDisk(),
   ...bus.list().map(e => ({ t: 'bus', d: e })),

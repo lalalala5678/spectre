@@ -1,125 +1,224 @@
-import { useState } from 'react';
-import { Plus } from 'lucide-react';
-import { AGENT_LABEL, MCP_SERVERS } from '../mock/data';
-import { Dot } from '../components/ui/Badge';
+import { useEffect, useState } from 'react';
+import { Globe, PlugZap, Plus, Terminal, Trash2 } from 'lucide-react';
+
+import { api } from '../api/client';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 
-/** MCP Server 管理页：连接状态 + 工具清单 + 挂载矩阵 */
+const AGENTS = ['autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit',
+  'phish', 'c2', 'persistence', 'postex', 'report'];
+
+interface McpServer {
+  name: string;
+  transport: 'stdio' | 'http';
+  agents: string[];
+  enabled: boolean;
+  url?: string;
+  command?: string[];
+  where?: 'sandbox' | 'host';
+}
+
+/** MCP Server 管理页 — 双传输：远程 HTTP（用户自建机器直连）与本地
+ *  stdio（宿主或沙箱内进程）。按 agent 挂载；工具在会话创建时合并。 */
 export function McpPage() {
-  const [selected, setSelected] = useState(MCP_SERVERS[0].id);
-  const sel = MCP_SERVERS.find((m) => m.id === selected)!;
+  const [servers, setServers] = useState<McpServer[]>([]);
+  const [form, setForm] = useState({
+    name: '', transport: 'http' as 'http' | 'stdio',
+    url: '', headersJson: '', commandStr: '',
+    where: 'host' as 'host' | 'sandbox', agents: ['recon'] as string[],
+  });
+  const [testing, setTesting] = useState('');
+  const [results, setResults] = useState<Record<string, string>>({});
+  const [msg, setMsg] = useState('');
+
+  const load = async () => {
+    try { setServers(await api<McpServer[]>('/sandbox/mcp')); }
+    catch (e) { setMsg(String(e)); }
+  };
+  useEffect(() => { void load(); }, []);
+
+  const toggleAgent = (a: string) => {
+    setForm(f => ({ ...f,
+      agents: f.agents.includes(a)
+        ? f.agents.filter(x => x !== a) : [...f.agents, a] }));
+  };
+
+  const create = async () => {
+    if (!form.name.trim()) { setMsg('name 必填'); return; }
+    let headers: Record<string, string> | null = {};
+    if (form.transport === 'http') {
+      try { headers = JSON.parse(form.headersJson || '{}'); }
+      catch { headers = null; setMsg('headers 非法 JSON'); }
+    }
+    if (headers === null) return;
+    const body = form.transport === 'http'
+      ? { name: form.name, transport: 'http', url: form.url,
+          headers, agents: form.agents }
+      : { name: form.name, transport: 'stdio',
+          command: form.commandStr.trim().split(/\s+/).filter(Boolean),
+          where: form.where, agents: form.agents };
+    try {
+      await api('/sandbox/mcp', { method: 'POST', json: body });
+      setMsg(`已注册 ${form.name}`);
+      await load();
+    } catch (e) { setMsg(String(e)); }
+  };
+
+  const test = async (name: string) => {
+    setTesting(name);
+    setResults(r => ({ ...r, [name]: '…' }));
+    try {
+      const res = await api<{ ok: boolean; serverName?: string;
+        tools?: string[]; error?: string }>('/sandbox/mcp/test',
+        { method: 'POST', json: { name } });
+      setResults(r => ({ ...r, [name]: res.ok
+        ? `✓ ${res.serverName} — 工具: ${(res.tools ?? []).join(', ') || '无'}`
+        : `✗ ${res.error}` }));
+    } catch (e) { setResults(r => ({ ...r, [name]: `✗ ${String(e)}` })); }
+    finally { setTesting(''); }
+  };
+
+  const remove = async (name: string) => {
+    await api(`/sandbox/mcp?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+    await load();
+  };
 
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-      {/* server 列表 */}
-      <Panel
-        title="MCP Servers"
-        right={
-          <button className="flex items-center gap-1 rounded-sm bg-orange-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-orange-500">
-            <Plus className="h-3 w-3" /> 接入 Server
-          </button>
-        }
-        bodyClassName="p-0"
-      >
-        <div className="divide-y divide-void-700">
-          {MCP_SERVERS.map((m) => (
-            <button
-              key={m.id}
-              onClick={() => setSelected(m.id)}
-              className={cn(
-                'flex w-full items-center gap-3 px-3 py-2.5 text-left',
-                selected === m.id ? 'bg-void-800' : 'hover:bg-void-800/60',
-              )}
-            >
-              <Dot tone={m.status === 'connected' ? 'green' : m.status === 'error' ? 'red' : 'slate'} />
-              <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-2">
-                  <span className="font-mono text-[12px] font-medium text-zinc-200">{m.name}</span>
-                  <span className="font-mono text-[9.5px] text-zinc-600">{m.transport}</span>
-                </div>
-                <div className="truncate text-[10.5px] text-zinc-600">{m.desc}</div>
-              </div>
-              <span className={cn('text-[10px]',
-                m.status === 'connected' ? 'text-zinc-500' : m.status === 'error' ? 'text-red-400' : 'text-zinc-600')}>
-                {m.status}
-              </span>
+      <Panel title="已注册 MCP Servers" className="xl:col-span-2" bodyClassName="p-0">
+        <table className="w-full text-left">
+          <thead>
+            <tr className="border-b border-void-700 text-[10px] uppercase tracking-wider text-zinc-600">
+              <th className="px-3 py-2 font-semibold">名称</th>
+              <th className="px-3 py-2 font-semibold">传输</th>
+              <th className="px-3 py-2 font-semibold">挂载 Agent</th>
+              <th className="px-3 py-2 font-semibold">连接</th>
+              <th className="px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-void-700">
+            {servers.map(s => (
+              <tr key={s.name} className="hover:bg-void-800/60">
+                <td className="px-3 py-2.5">
+                  <div className="font-mono text-[12px] text-zinc-200">{s.name}</div>
+                  <div className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-zinc-600">
+                    {s.transport === 'http'
+                      ? <><Globe className="h-3 w-3" />{s.url}</>
+                      : <><Terminal className="h-3 w-3" />{(s.command ?? []).join(' ')} @{s.where}</>}
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <span className={cn('rounded-sm px-1.5 py-0.5 font-mono text-[10px]',
+                    s.transport === 'http' ? 'bg-sky-950/60 text-sky-300' : 'bg-void-700 text-zinc-400')}>
+                    {s.transport}
+                  </span>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-wrap gap-1">
+                    {(s.agents ?? []).map(a => (
+                      <span key={a} className="rounded-sm bg-void-700 px-1.5 py-0.5 font-mono text-[10px] text-orange-300/90">{a}</span>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <button
+                    onClick={() => void test(s.name)}
+                    disabled={testing === s.name}
+                    className="flex items-center gap-1 rounded-sm border border-void-600 px-2 py-1 text-[10px] text-zinc-300 hover:border-void-400 disabled:opacity-50"
+                  >
+                    <PlugZap className="h-3 w-3" /> {testing === s.name ? '测试中' : '连通测试'}
+                  </button>
+                  {results[s.name] && (
+                    <div className={cn('mt-1 font-mono text-[9.5px]',
+                      results[s.name].startsWith('✓') ? 'text-emerald-400' : 'text-red-400')}>
+                      {results[s.name]}
+                    </div>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  <button
+                    onClick={() => void remove(s.name)}
+                    className="rounded-sm p-1 text-zinc-600 hover:bg-void-700 hover:text-red-400"
+                  >
+                    <Trash2 className="h-3.5 w-3.5" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {servers.length === 0 && (
+              <tr><td colSpan={5} className="px-3 py-8 text-center text-[11px] text-zinc-600">
+                暂无注册 — 远程 server 填 URL 直连；本地 server 填启动命令
+              </td></tr>
+            )}
+          </tbody>
+        </table>
+      </Panel>
+
+      <Panel title="注册新 Server" bodyClassName="p-3 space-y-2">
+        <input
+          value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
+          placeholder="名称（如 shodan）"
+          className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
+        />
+        <div className="flex gap-2">
+          {(['http', 'stdio'] as const).map(t => (
+            <button key={t} onClick={() => setForm({ ...form, transport: t })}
+              className={cn('flex-1 rounded-sm border px-2 py-1 font-mono text-[11px]',
+                form.transport === t ? 'border-orange-600 bg-orange-950/30 text-orange-300' : 'border-void-600 text-zinc-500')}>
+              {t === 'http' ? '远程 HTTP' : '本地 stdio'}
             </button>
           ))}
         </div>
-      </Panel>
-
-      {/* 详情 */}
-      <Panel title={`Server 详情 · ${sel.name}`} className="xl:col-span-2">
-        <div className="space-y-4">
-          {/* 连接信息 */}
-          <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-            <div className="rounded-sm border border-void-700 bg-void-900 p-2.5">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Endpoint / Command</div>
-              <code className="font-mono text-[11.5px] text-zinc-300">{sel.endpoint}</code>
-            </div>
-            <div className="rounded-sm border border-void-700 bg-void-900 p-2.5">
-              <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">Env Keys（值存于密钥库，不落盘）</div>
-              {sel.envKeys.length ? (
-                <div className="flex gap-1.5">
-                  {sel.envKeys.map((k) => (
-                    <code key={k} className="rounded-sm bg-void-950 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-400">{k}=••••••</code>
-                  ))}
-                </div>
-              ) : (
-                <span className="text-[11px] text-zinc-600">无需凭证</span>
-              )}
-            </div>
-          </div>
-
-          {/* 工具清单 */}
-          <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">暴露工具（{sel.tools.length}）</div>
-            <div className="space-y-1">
-              {sel.tools.map((t) => (
-                <div key={t.name} className="flex items-center gap-3 rounded-sm border border-void-700 bg-void-900 px-2.5 py-2">
-                  <code className="font-mono text-[11.5px] text-zinc-200">{t.name}</code>
-                  <span className="text-[11px] text-zinc-600">{t.desc}</span>
-                </div>
+        {form.transport === 'http' ? (
+          <>
+            <input
+              value={form.url} onChange={e => setForm({ ...form, url: e.target.value })}
+              placeholder="https://your-host/mcp（用户自建机器）"
+              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
+            />
+            <textarea
+              value={form.headersJson} onChange={e => setForm({ ...form, headersJson: e.target.value })}
+              rows={2} placeholder='{"Authorization":"Bearer …"}'
+              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[11px] text-zinc-200 placeholder:text-zinc-600"
+            />
+          </>
+        ) : (
+          <>
+            <input
+              value={form.commandStr} onChange={e => setForm({ ...form, commandStr: e.target.value })}
+              placeholder="启动命令（如 node /opt/mcp-shodan.mjs）"
+              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
+            />
+            <div className="flex gap-2">
+              {(['host', 'sandbox'] as const).map(w => (
+                <button key={w} onClick={() => setForm({ ...form, where: w })}
+                  className={cn('flex-1 rounded-sm border px-2 py-1 font-mono text-[10px]',
+                    form.where === w ? 'border-orange-600 bg-orange-950/30 text-orange-300' : 'border-void-600 text-zinc-500')}>
+                  {w === 'host' ? '宿主进程' : '沙箱内进程'}
+                </button>
               ))}
             </div>
-          </div>
-
-          {/* 挂载矩阵 */}
-          <div>
-            <div className="mb-1.5 text-[10px] font-semibold uppercase tracking-wider text-zinc-600">挂载到 Agent</div>
-            <div className="flex flex-wrap gap-1">
-              {Object.entries(AGENT_LABEL).map(([id, label]) => {
-                const bound = sel.boundAgents.includes(id as never);
-                return (
-                  <button
-                    key={id}
-                    className={cn(
-                      'rounded-sm border px-2 py-1 text-[11px] transition-colors',
-                      bound
-                        ? 'border-orange-700 bg-orange-950/30 text-orange-300'
-                        : 'border-void-600 bg-void-900 text-zinc-600 hover:text-zinc-400',
-                    )}
-                  >
-                    {label}
-                  </button>
-                );
-              })}
-            </div>
-          </div>
-
-          <div className="flex gap-2 border-t border-void-700 pt-3">
-            <button className="rounded-sm border border-void-600 bg-void-800 px-3 py-1.5 text-xs text-zinc-400 hover:bg-void-700">
-              测试连接
-            </button>
-            <button className="rounded-sm border border-void-600 bg-void-800 px-3 py-1.5 text-xs text-zinc-400 hover:bg-void-700">
-              重新发现工具
-            </button>
-            <button className="ml-auto rounded-sm border border-red-900 bg-red-950/40 px-3 py-1.5 text-xs text-red-400 hover:bg-red-950">
-              断开并移除
-            </button>
+          </>
+        )}
+        <div>
+          <p className="mb-1 text-[10px] uppercase tracking-wider text-zinc-600">挂载 Agent</p>
+          <div className="flex flex-wrap gap-1">
+            {AGENTS.map(a => (
+              <button key={a} onClick={() => toggleAgent(a)}
+                className={cn('rounded-sm px-1.5 py-0.5 font-mono text-[10px]',
+                  form.agents.includes(a) ? 'bg-orange-950/60 text-orange-300 border border-orange-800' : 'bg-void-800 text-zinc-500 border border-void-700')}>
+                {a}
+              </button>
+            ))}
           </div>
         </div>
+        <button
+          onClick={() => void create()}
+          className="flex w-full items-center justify-center gap-1 rounded-sm bg-orange-600 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-500"
+        >
+          <Plus className="h-3 w-3" /> 注册并挂载
+        </button>
+        {msg && <p className="font-mono text-[10.5px] text-amber-400">{msg}</p>}
       </Panel>
     </div>
   );
