@@ -6,7 +6,7 @@
 
 ## 核心原则
 
-1. **一个意图一个名字** — 工具名必须反映真实功能(report_to_orchestrator → publish_finding 教训)
+1. **一个意图一个名字** — 工具名必须反映真实功能(report_to_orchestrator → publish_vulnerability 教训(彻底更名不留别名,历史 WAL 用 entryKind 归一))
 2. **宁可不拒,拒则短痛** — 有合理默认值时绝不硬拒;必须拒时错误信息极简、可行动
 3. **静默截断是 bug** — LLM 面向的消息体截断必须附显式标记与补全手段
 4. **空结果必须有诊断信息** — 面对无解释的空,LLM 倾向原样重试
