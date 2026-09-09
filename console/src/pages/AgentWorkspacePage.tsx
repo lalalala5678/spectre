@@ -49,7 +49,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const isAuto = agent.id === 'orchestrator';
   const [bootstrapNonce, setBootstrapNonce] = useState(0);
   const [wsError, setWsError] = useState('');
-  const bootstrappedFor = useRef<string>('');
 
   // Enter workspace (or switch work session / agent): restore the
   // remembered conversation of this agent INSIDE the current work session,
@@ -59,9 +58,13 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // (reachable via drill) and left-sidebar workspaces are independent of
   // AutoPwn and of sibling tasks.
   useEffect(() => {
+    // NOTE: an earlier `bootstrappedFor` ref-guard broke RE-visiting a
+    // project (scope A → B → A skipped the second A entirely: the
+    // transcript stayed on the skeleton/old project forever, no detail
+    // fetch). The cancelled flag below already dedups StrictMode
+    // double-runs; every genuine workSession/liveKey change MUST run.
     const scope = `${workSession.id}:${liveKey}`;
-    if (bootstrappedFor.current === scope) return;
-    bootstrappedFor.current = scope;
+    void scope;
     // Optimistic clear (project-switch perceived latency): the OLD
     // project's transcript used to linger until this async finished —
     // clear the stage synchronously so the skeleton shows immediately.
@@ -194,7 +197,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     localStorage.removeItem(smallSessionSlot(workSession.id, liveKey));
     setDrillSession(null);
     setEntryView(null);
-    bootstrappedFor.current = '';
     setSessionId(null);
     setBootstrapNonce(n => n + 1);
     // Stable identity: LiveSession's fetch effect depends on onGone — a

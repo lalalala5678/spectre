@@ -197,10 +197,19 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       ? '向该子智能体插话(steering)…'
       : `对 ${agentKey} 下令…`;
 
+  // First-paint batching: a long transcript (80+ messages, 285KB detail)
+  // rendered in ONE synchronous commit blocked the main thread for
+  // seconds on project switch. Render the newest WINDOW first; older
+  // history loads on explicit request. Reset per session switch.
+  const [visibleCount, setVisibleCount] = useState(30);
+  useEffect(() => { setVisibleCount(30); }, [sessionId]);
+  const olderCount = Math.max(0, messages.length - visibleCount);
+  const visible = useMemo(() => messages.slice(-visibleCount),
+    [messages, visibleCount]);
   // Hot path: streaming deltas patch `messages` every chunk — the item
   // rebuild is memoized and the bubbles below are memo'd so history
   // entries skip re-render; only the trailing streaming bubble re-renders.
-  const items = useMemo(() => buildItems(messages, busy), [messages, busy]);
+  const items = useMemo(() => buildItems(visible, busy), [visible, busy]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -227,6 +236,28 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       >
         {!loaded && !error && (
           <p className="py-8 text-center text-[11px] text-zinc-700">载入会话…</p>
+        )}
+        {olderCount > 0 && (
+          <button
+            onClick={() => {
+              // Loading older history = reading up: keep the current
+              // viewport anchored instead of following the bottom.
+              const el = scrollRef.current;
+              if (el) {
+                const anchor = el.scrollHeight - el.scrollTop;
+                setVisibleCount(n => n + 60);
+                requestAnimationFrame(() => {
+                  const el2 = scrollRef.current;
+                  if (el2) el2.scrollTop = el2.scrollHeight - anchor;
+                });
+              } else {
+                setVisibleCount(n => n + 60);
+              }
+            }}
+            className="w-full rounded-sm border border-void-700 bg-void-900 px-2 py-1.5 text-[11px] text-zinc-500 hover:border-void-500 hover:text-zinc-300"
+          >
+            ↑ 加载更早的消息（还有 {olderCount} 条）
+          </button>
         )}
         {loaded && messages.length === 0 && (
           <p className="py-8 text-center text-[11px] text-zinc-700">
