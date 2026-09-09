@@ -27,6 +27,14 @@ const stageEnum = Type.Enum(
   Object.fromEntries(STAGE_KEYS.map((key) => [key, key])),
 );
 
+/** Spawnable stage keys — 'report' EXCLUDED: the report writer is a
+ *  platform service woken ONLY via the report_vulnerability tool (and
+ *  by the user from the console nav), never a dispatch-tree child. */
+const SPAWNABLE_KEYS = STAGE_KEYS.filter(k => k !== 'report');
+const spawnStageEnum = Type.Enum(
+  Object.fromEntries(SPAWNABLE_KEYS.map((key) => [key, key])),
+);
+
 /**
  * Shared intel tools — the project intel base every agent reads and
  * writes. Task reports are the PROCESS record (mandatory at every quiet
@@ -344,6 +352,50 @@ export function buildIntelTools(record, caps) {
  * @param {object} record  session record (holds activeEngagement)
  * @param {object} caps    { dispatch, signalEngagement, emitBus }
  */
+
+/**
+ * report_vulnerability — the DISCOVERER-side tool. One sentence in;
+ * a dedicated report-writer session does the rest (reads the caller's
+ * transcript, cross-validates, then publishes or declines). Registered
+ * for child + non-report direct sessions; NOT for the writer itself
+ * (no recursion). Synchronous: the receipt lands when the writer ends.
+ * [side-effects: runs writer session] [synchronous: may take minutes]
+ */
+function buildReportVulnerabilityTool(record, caps) {
+  return {
+    name: 'report_vulnerability',
+    label: '上报漏洞线索',
+    description:
+      '[side-effects: runs writer agent; synchronous — may take minutes] ' +
+      'Report a suspected submittable vulnerability in ONE sentence. A ' +
+      'dedicated report-writer agent will read YOUR conversation context ' +
+      '(and any other sessions / intel it needs), verify the claim, and ' +
+      'either publish the formal vulnerability record (it decides title ' +
+      'and severity) or decline with reasons. You get the verdict in the ' +
+      'tool receipt. Do NOT write the report yourself — the hint sentence ' +
+      'plus your transcript evidence is all the writer needs.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      hint: Type.String({
+        description: 'One sentence describing the vulnerability: target, ' +
+          'flaw, and why it matters, e.g. "Grafana at x.example.com ' +
+          'accepts default admin/admin credentials"',
+      }),
+    }),
+    execute: async (_id, params) => {
+      if (!caps.reportWriter) {
+        return { content: [{ type: 'text',
+          text: '报告撰写服务不可用(capability 缺失)。可用 publish_intel 留存线索。' }] };
+      }
+      const result = await caps.reportWriter(record, params.hint);
+      return {
+        content: [{ type: 'text', text: result.text }],
+        details: result.details ?? {},
+      };
+    },
+  };
+}
+
 /**
  * Shared spawn_agent tool — registered in BOTH the orchestrator and the
  * child tool sets (identical definition; extracted to prevent drift).
@@ -363,10 +415,11 @@ function buildSpawnAgentTool(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       agentKey: Type.Union([
-        stageEnum,
+        spawnStageEnum,
         Type.Literal('autopwn'),
       ], {
-        description: 'Agent to spawn; "autopwn" = sub-orchestrator',
+        description: 'Agent to spawn; "autopwn" = sub-orchestrator ' +
+          '(report agent is not spawnable — use report_vulnerability)',
       }),
       name: Type.String({
         maxLength: 20,
@@ -591,95 +644,6 @@ function entryLabel(e) {
  * @param {object} caps    { signalEngagement, emitBus, followUp }
  */
 export function buildChildTools(record, caps) {
-  const publishVuln = {
-    name: 'publish_vulnerability',
-    label: '发布漏洞',
-    description:
-      '[creates event] Publish a VULNERABILITY to the project intel base — visible ' +
-      'to EVERY agent (query_intel) and the 漏洞 panel; the orchestrator is ' +
-      'notified by DM. Use ONLY when the entry is a confirmed, real-harm, ' +
-      'submittable vulnerability (working PoC or solid evidence). ' +
-      'Speculative leads, useful information, or anything that merely MIGHT ' +
-      'help the task belongs to publish_intel instead — mislabeling pollutes ' +
-      'the vulnerability ledger. Always set severity and title; put ' +
-      'description, evidence, and reproduction steps / PoC in text (markdown). ' +
-      'You cannot message peer agents directly.',
-    parameters: Type.Object({
-      title: Type.String({
-        description: 'One-line vulnerability title, e.g. "Grafana default credentials"',
-      }),
-      severity: Type.Union([
-        Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
-        Type.Literal('high'), Type.Literal('critical'),
-      ], {
-        description: 'Vulnerability severity: info/low/medium/high/critical',
-      }),
-      text: Type.String({
-        description:
-          'Full vulnerability content (markdown): description, evidence, ' +
-          'reproduction steps / PoC, affected assets.',
-      }),
-    }),
-    execute: async (_id, params) => {
-      // Runtime-spawned children have no engagementId — null, never the
-      // string 'autopwn-null' burned into provenance.
-      const engagement = record.engagementId ? `autopwn-${record.engagementId}` : null;
-      caps.emitBus({
-        channel: 'dm', from: record.agentKey, to: 'orchestrator',
-        type: 'vulnerability',
-        severity: params.severity,
-        title: params.title,
-        summary: params.title,
-        detail: params.text,
-        origin: 'engagement',
-        author: caps.authorOf?.(record) ?? null,
-        workSessionId: record.workSessionId ?? null,
-        engagement,
-      });
-      // Fix-I (P12): remember titles so the completion DM can REFERENCE
-      // vulns instead of repeating them (auto-DM already carried the
-      // full text). In-memory only: losing it on restart degrades to the
-      // old verbose DM — cosmetic. Capped to keep DMs bounded.
-      record.publishedVulnTitles = [...(record.publishedVulnTitles ?? []),
-        params.title].slice(-5);
-      // Spawned sub-orchestrators carry no orchestratorSessionId (their
-      // overlord is the SPAWNER) — fall back to parentSessionId so the
-      // DM never targets null and 404s after the bus emit.
-      const dmTarget = record.orchestratorSessionId ?? record.parentSessionId;
-      if (dmTarget) {
-        await caps.followUp(
-          dmTarget,
-          `[DM from ${record.agentKey}] [漏洞|${params.severity}] ${params.title}\n` +
-          `${params.text}\n` +
-          '(如其他智能体需要知情,用 relay_to_agents 转发;否则继续等待产出)',
-        );
-      }
-      // Durable record in the workflow history (passive handler).
-      // Best-effort: a completed engagement no longer accepts signals —
-      // bus + followUp delivery already succeeded at that point.
-      if (engagement) {
-        try {
-          await caps.signalEngagement(engagement, 'agentMessage', {
-            from: record.agentKey,
-            severity: params.severity,
-            title: params.title,
-            text: params.text,
-          });
-        } catch {
-          // engagement already closed — skip the history entry
-        }
-      }
-      return {
-        content: [{
-          type: 'text',
-          text: `漏洞已入库 (${String(params.severity).toLowerCase()}): ${params.title}`,
-        }],
-      };
-    },
-  };
-
-  const spawnAgent = buildSpawnAgentTool(record, caps);
-
   const publishIntel = {
     name: 'publish_intel',
     label: '发布情报',
@@ -728,13 +692,19 @@ export function buildChildTools(record, caps) {
       };
     },
   };
+  const spawnAgent = buildSpawnAgentTool(record, caps);
 
-  return [publishVuln, publishIntel, spawnAgent];
+  return [buildReportVulnerabilityTool(record, caps), publishIntel, spawnAgent];
 }
 
 /**
- * @param {object} record  direct (non-engagement) user session record
- * @param {object} caps    { emitBus }
+ * Direct (non-engagement) user sessions. A 'report' session IS the
+ * writer: it holds publish_vulnerability (plus the user can drive it
+ * from the console nav). Every other direct session delegates
+ * vulnerability writing to the writer via report_vulnerability.
+ *
+ * @param {object} record  direct session record
+ * @param {object} caps    { emitBus, reportWriter, authorOf }
  */
 export function buildDirectTools(record, caps) {
   const publishVuln = {
@@ -754,14 +724,15 @@ export function buildDirectTools(record, caps) {
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
       ], { description: 'Vulnerability severity: info/low/medium/high/critical' }),
-      text: Type.String({
-        description: 'Full content (markdown): description, evidence, PoC.',
-      }),
     }),
     execute: async (_id, params) => {
       caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'user',
         type: 'vulnerability',
+        // Writer provenance: the vuln panel's "撰写对话" button and the
+        // discoverer attribution ride on these two fields.
+        payloadRef: `sess:${record.id}`,
+        ...(record.requester ? { requester: record.requester.author } : {}),
         severity: String(params.severity).toLowerCase(),
         title: params.title,
         summary: params.title,
@@ -810,5 +781,8 @@ export function buildDirectTools(record, caps) {
     },
   };
 
-  return [publishVuln, publishIntel];
+  if (record.agentKey === 'report') {
+    return [publishVuln, publishIntel];
+  }
+  return [buildReportVulnerabilityTool(record, caps), publishIntel];
 }

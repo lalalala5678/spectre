@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { ChevronRight } from 'lucide-react';
+import { ChevronRight, MessageSquareText } from 'lucide-react';
 
 import { api, subscribeSse, type ApiBusEvent } from '../../api/client';
 import { cn } from '../../utils/cn';
@@ -52,10 +52,11 @@ export function StatusBadge({ status }: { status: string }) {
  * `agentKey` scopes the feed to entries authored by that agent only.
  * Clicking opens the full content in the MAIN window (onOpen).
  */
-export function VulnPanel({ agentKey, workSessionId, onOpen }: {
+export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
   agentKey?: string;
   workSessionId?: string;
   onOpen: (event: ApiBusEvent) => void;
+  onOpenSession?: (sessionId: string) => void;
 }) {
   const [events, setEvents] = useState<ApiBusEvent[]>([]);
 
@@ -123,6 +124,18 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
                 <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
                   {title}
                 </span>
+                {event.payloadRef?.startsWith('sess:') && onOpenSession && (
+                  <span
+                    role="button"
+                    tabIndex={0}
+                    title="查看撰写对话（思考 · 工具调用 · 验证过程）"
+                    onClick={e => { e.stopPropagation(); onOpenSession(event.payloadRef!.slice(5)); }}
+                    onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); onOpenSession(event.payloadRef!.slice(5)); } }}
+                    className="shrink-0 rounded-sm p-0.5 text-orange-400/70 hover:text-orange-300"
+                  >
+                    <MessageSquareText className="h-3 w-3" />
+                  </span>
+                )}
                 <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
               </div>
               {a && (

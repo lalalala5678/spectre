@@ -353,7 +353,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {/* 左：运行流（仅此处滚动） */}
           <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded border border-void-700 bg-void-850 p-2.5">
             {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} />
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => { setEntryView(null); setDrillSession(id); }} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2">
                 <button
@@ -386,7 +386,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
                   <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => { setEntryView(null); setDrillSession(id); }} />
-                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} />
+                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} onOpenSession={id => { setEntryView(null); setDrillSession(id); }} />
                   <IntelNotesPanel workSessionId={workSession.id} onOpen={setEntryView} />
                   <TaskReportsPanel workSessionId={workSession.id} onOpen={setEntryView} />
                 </PanelStack>
@@ -402,6 +402,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     agentKey={liveKey}
                     workSessionId={workSession.id}
                     onOpen={setEntryView}
+                    onOpenSession={id => { setEntryView(null); setDrillSession(id); }}
                   />
                   <IntelNotesPanel
                     agentKey={liveKey}

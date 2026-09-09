@@ -74,6 +74,11 @@ export interface ApiBusEvent {
   title?: string | null;
   detail?: string | null;
   status?: string | null;
+  /** discoverer attribution on writer-published vulnerabilities */
+  requester?: {
+    key: string; name: string; typeLabel: string;
+    treePath: string;
+  } | null;
   author?: {
     key: string;
     name: string;

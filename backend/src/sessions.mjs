@@ -468,6 +468,18 @@ export class SessionStore {
   }
 
   /**
+
+  /** Resolve when the session's current run ends (agent_end). Purely
+   *  event-driven — used by the synchronous report_vulnerability tool
+   *  to wait for its writer session. Resolves immediately if idle. */
+  awaitCompletion(record) {
+    if (!record.busy) return Promise.resolve();
+    return new Promise(resolve => {
+      (record.completionWaiters ??= []).push(resolve);
+    });
+  }
+
+  /**
    * Provenance snapshot for intel events (task reports / vulns / notes):
    * author name, stage type, parent agent, tree path. Computed at emit
    * time and frozen into the event — later tree changes never rewrite
@@ -700,6 +712,11 @@ export class SessionStore {
         this.wal?.append({ t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
         this._maybeSummarize(record);
         this._reportSpawnCompletion(record);
+        // Synchronous tool callers (report_vulnerability → writer wait)
+        // resolve here — event-driven, no polling, no timeout (agent_end
+        // always fires, including error paths).
+        for (const fn of record.completionWaiters ?? []) fn();
+        record.completionWaiters = [];
         break;
       case 'tool_execution_start':
         this._journal(record, 'tool_start', {

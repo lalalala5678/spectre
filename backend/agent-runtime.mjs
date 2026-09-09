@@ -160,6 +160,70 @@ const caps = {
       `【派生任务 · ${agentKey}】${instruction}`, 'system');
     return child;
   },
+
+  /**
+   * Vulnerability-writer wake (report_vulnerability tool backing).
+   * Creates a DETACHED writer session — no parentSessionId, no
+   * engagementId, no orchestratorSessionId — so it never joins any
+   * dispatch tree (parentNodeId null ⇒ rootIdOf = itself ⇒ countTree
+   * and DispatchTreePanel ignore it) and never touches spawn quotas.
+   * Synchronous: resolves at the writer's agent_end (event-driven, no
+   * timeout — agent_end always fires, error paths included). Verdict:
+   * the writer's published vulnerability event, or its decline reason.
+   */
+  reportWriter: async (requesterRecord, hint) => {
+    const requesterAuthor = store.authorOf(requesterRecord);
+    const writer = store.create('report', {
+      workSessionId: requesterRecord.workSessionId ?? null,
+      name: `报告:${String(hint).slice(0, 20)}`,
+      description: `漏洞线索:${String(hint).slice(0, 60)}`,
+    });
+    // Frozen requester provenance — rides on the writer's published
+    // vulnerability events (discoverer attribution).
+    writer.requester = { sessionId: requesterRecord.id, author: requesterAuthor };
+    const baseSeq = bus.list().at(-1)?.seq ?? 0;
+    store.prompt(writer,
+      `【漏洞报告撰写】你是报告撰写专职 agent。发现者 ${requesterAuthor.name}` +
+      `(${requesterAuthor.typeLabel})在会话 ${requesterRecord.id} 中上报了漏洞线索:\n` +
+      `「${hint}」\n\n` +
+      `流程:\n` +
+      `1) 用 read_session 读会话 ${requesterRecord.id}(建议 last=30)还原发现过程与证据;\n` +
+      `2) 需要时用 query_intel 交叉验证项目内情报,或 read_session 其它相关会话;\n` +
+      `3) 判定该线索是否构成真实危害、可提交的漏洞;\n` +
+      `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity,` +
+      `正文包含发现过程、证据链、危害分析与复现要点,并注明发现者 ${requesterAuthor.name};\n` +
+      `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
+      `5) 用 submit_task_report 提交任务报告收尾。`, 'system');
+    await store.awaitCompletion(writer);
+    const published = bus.list().find(e => e.seq > baseSeq
+      && e.type === 'vulnerability' && e.author?.sessionId === writer.id);
+    if (published) {
+      return {
+        ok: true,
+        text: `漏洞报告已产出并入库:《${published.title}》` +
+          `(severity=${published.severity},seq=${published.seq})。` +
+          `撰写对话 ${writer.id}(read_session 可复盘其思考与验证过程)。`,
+        details: { sessionId: writer.id, seq: published.seq,
+          title: published.title, severity: published.severity },
+      };
+    }
+    // Declined / failed: relay the writer's final reasoning back.
+    const msgs = writer.agent.state.messages;
+    const textOf = m => typeof m.content === 'string' ? m.content
+      : (m.content?.filter?.(c => c.type === 'text')
+        ?.map(c => c.text)?.join('') ?? '');
+    const last = [...msgs].reverse()
+      .find(m => m.role === 'assistant' && textOf(m).trim());
+    const reply = last ? textOf(last) : '';
+    return {
+      ok: false,
+      text: `报告agent未将此线索立为漏洞。其判定说明:\n` +
+        `${(reply || '(无输出)').slice(0, 600)}\n` +
+        `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
+        `或用 publish_intel 留存线索)`,
+      details: { sessionId: writer.id, declined: true },
+    };
+  },
 };
 
 const store = new SessionStore({ model, streamFn, caps, wal,

@@ -9,9 +9,10 @@ import { SeverityBadge, StatusBadge } from './VulnPanel';
  * conversation window temporarily. Kind badge + title + meta header,
  * then the full markdown content.
  */
-export function EntryDetail({ event, onBack }: {
+export function EntryDetail({ event, onBack, onOpenSession }: {
   event: ApiBusEvent;
   onBack: () => void;
+  onOpenSession?: (sessionId: string) => void;
 }) {
   const isReport = event.type === 'task-report';
   const isNote = event.type === 'intel-note';
@@ -52,7 +53,21 @@ export function EntryDetail({ event, onBack }: {
           )}
           {event.engagement && <span>{event.engagement}</span>}
           {event.payloadRef && <span>{event.payloadRef}</span>}
+          {event.requester && (
+            <span title={event.requester.treePath}>
+              发现者: {event.requester.name}（{event.requester.typeLabel}）
+            </span>
+          )}
         </div>
+        {!isReport && !isNote && event.payloadRef?.startsWith('sess:')
+          && onOpenSession && (
+            <button
+              onClick={() => onOpenSession(event.payloadRef!.slice(5))}
+              className="mb-3 flex w-fit items-center gap-1.5 rounded-sm border border-orange-800/70 bg-orange-950/20 px-2.5 py-1 text-[11px] text-orange-300/90 hover:border-orange-600"
+            >
+              查看撰写对话（思考 · 工具调用 · 验证过程）
+            </button>
+          )}
         {event.detail
           ? <Markdown>{event.detail}</Markdown>
           : (

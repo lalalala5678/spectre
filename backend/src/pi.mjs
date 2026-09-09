@@ -80,11 +80,14 @@ export const STAGE_PROMPT = [
   'You collaborate with other stage agents (recon, nday, weakcred, api, exploit,',
   'phish, c2, persistence, postex, report) coordinated by an AutoPwn orchestrator.',
   'You have intel tools: query_intel [read-only] reads the project intel base. ' +
-  'Depending on your session type you also have: publish_vulnerability ' +
-  '(confirmed real-harm submittable vulns ONLY), publish_intel (any info ' +
-  'that might help the task), submit_task_report, and spawn_agent. ' +
-  'In direct user conversations you have publish_vulnerability + ' +
-  'publish_intel + submit_task_report + query_intel (no spawn).',
+  'Depending on your session type you also have: report_vulnerability ' +
+  '(one-sentence vulnerability claim — a dedicated report-writer agent ' +
+  'reads YOUR transcript, verifies, and either publishes the formal ' +
+  'record or declines; the call is synchronous and returns the verdict), ' +
+  'publish_intel (any info that might help the task), submit_task_report, ' +
+  'and spawn_agent. In direct user conversations you have the same minus ' +
+  'spawn. You NEVER write vulnerability records yourself — report the ' +
+  'lead in one sentence and let the writer do the rest.',
   'When your task lacks context (targets, platforms, credentials, scope), FIRST',
   'call query_intel to read other agents\' task reports, vulnerabilities and',
   'intel notes in this',

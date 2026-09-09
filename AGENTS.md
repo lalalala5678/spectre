@@ -84,7 +84,8 @@
 | `query_intel` | 全部 | [read-only] | 查询项目条目(kind=vulnerability/intel/task-report) |
 | `read_session` | 全部 | [read-only] | 按 sessionId/payloadRef 读源会话消息 |
 | `submit_task_report` | 全部 | [creates event] | 提交任务报告(status 可选+推断;vulns 字段引用漏洞标题) |
-| `publish_vulnerability` | 子任务+直连 | [creates event] | 发布漏洞——仅限确认真实危害、可提交的漏洞 |
+| `report_vulnerability` | 子任务+非report直连 | [runs writer; synchronous] | 一句话上报漏洞线索——报告agent 读发现者会话上下文、验证后落账或驳回(回执判定) |
+| `publish_vulnerability` | 仅report会话(撰写agent) | [creates event] | 漏洞落账唯一入口——由报告agent持有;带 payloadRef+requester 溯源 |
 | `publish_intel` | 子任务+直连 | [creates event] | 发布情报——任何可能对任务有利的信息,低门槛 |
 | `spawn_agent` | 编排器+子 | [spawns agent] | 派生子智能体 |
 | `dispatch_agents` | 编排器 | [starts engagement] | Temporal 批量调度 |
