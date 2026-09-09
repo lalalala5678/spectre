@@ -27,6 +27,11 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   const [error, setError] = useState('');
   const lastSeq = useRef(0);
   const scrollRef = useRef<HTMLDivElement>(null);
+  // Infinite-scroll window state — declared early: handleScroll (below)
+  // freezes the start index when the user leaves the bottom.
+  const [startIdx, setStartIdx] = useState<number | null>(null);
+  const messagesLenRef = useRef(0);
+  messagesLenRef.current = messages.length;
   // Follow intent: the USER decides. At the bottom → stick; scrolled up
   // to read → release; scrolled back down → re-stick. Scroll events are
   // the only source of truth — never a distance probe at event-arrival
@@ -39,8 +44,17 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    stickToBottom.current =
-      el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
+    stickToBottom.current = nearBottom;
+    // Freeze the window start the moment the user leaves the bottom:
+    // streaming arrivals then extend the tail instead of shifting the
+    // history being read (tail-window drift fix). Returning to the
+    // bottom re-enters tail-follow mode (null state is a no-op there).
+    setStartIdx(prev => {
+      if (nearBottom) return null;
+      if (prev !== null) return prev;
+      return Math.max(0, messagesLenRef.current - 30);
+    });
   }, []);
 
   // Follow AFTER commit: this effect runs with the laid-out DOM (and
@@ -197,19 +211,64 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       ? '向该子智能体插话(steering)…'
       : `对 ${agentKey} 下令…`;
 
-  // First-paint batching: a long transcript (80+ messages, 285KB detail)
-  // rendered in ONE synchronous commit blocked the main thread for
-  // seconds on project switch. Render the newest WINDOW first; older
-  // history loads on explicit request. Reset per session switch.
-  const [visibleCount, setVisibleCount] = useState(30);
-  useEffect(() => { setVisibleCount(30); }, [sessionId]);
-  const olderCount = Math.max(0, messages.length - visibleCount);
-  const visible = useMemo(() => messages.slice(-visibleCount),
-    [messages, visibleCount]);
+  // First-paint batching + infinite scroll: a long transcript (80+
+  // messages, 285KB detail) rendered in ONE synchronous commit blocked
+  // the main thread for seconds. The window anchors at START-INDEX (not
+  // the tail): streaming arrivals extend the tail without shifting the
+  // history the user is reading (the old tail-window made the viewport
+  // jump one slot per streamed message while reading up).
+  //  - null  = tail-follow mode (newest WINDOW, streaming follows)
+  //  - number= frozen start (user scrolled up; older history prepends
+  //             via the sentinel's IntersectionObserver, anchored)
+  useEffect(() => { setStartIdx(null); }, [sessionId]);
+  const effectiveStart = startIdx ?? Math.max(0, messages.length - 30);
+  const olderCount = effectiveStart;
+  const visible = useMemo(() => messages.slice(effectiveStart),
+    [messages, effectiveStart]);
   // Hot path: streaming deltas patch `messages` every chunk — the item
   // rebuild is memoized and the bubbles below are memo'd so history
   // entries skip re-render; only the trailing streaming bubble re-renders.
   const items = useMemo(() => buildItems(visible, busy), [visible, busy]);
+
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const olderCountRef = useRef(0);
+  olderCountRef.current = olderCount;
+  const effectiveStartRef = useRef(0);
+  effectiveStartRef.current = effectiveStart;
+
+  // Prepend older history: freeze the viewport via the height-anchor so
+  // the content the user is looking at does not move, then fill-check —
+  // if the sentinel is still on screen (60 short messages may not fill
+  // the viewport), keep loading until it is pushed out or exhausted.
+  const loadOlder = useCallback(() => {
+    if (olderCountRef.current <= 0) return;
+    const el = scrollRef.current;
+    const anchor = el ? el.scrollHeight - el.scrollTop : 0;
+    setStartIdx(Math.max(0, effectiveStartRef.current - 60));
+    requestAnimationFrame(() => {
+      const el2 = scrollRef.current;
+      if (el2 && anchor > 0) el2.scrollTop = el2.scrollHeight - anchor;
+      const s = sentinelRef.current;
+      if (s && s.getBoundingClientRect().top < window.innerHeight) {
+        loadOlder();  // fill-check loop (bounded by olderCount)
+      }
+    });
+  }, []);
+  const loadOlderRef = useRef(loadOlder);
+  loadOlderRef.current = loadOlder;
+
+  // Sentinel: fires ~600px BEFORE the top edge is reached — the load is
+  // done by the time the user gets there (imperceptible).
+  useEffect(() => {
+    const s = sentinelRef.current;
+    const root = scrollRef.current;
+    if (!s || !root || typeof IntersectionObserver === 'undefined') return;
+    const io = new IntersectionObserver(entries => {
+      if (entries.some(e => e.isIntersecting)) loadOlderRef.current();
+    }, { root, rootMargin: '600px 0px 0px 0px' });
+    io.observe(s);
+    return () => io.disconnect();
+  }, [sessionId, loaded]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -237,28 +296,18 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
         {!loaded && !error && (
           <p className="py-8 text-center text-[11px] text-zinc-700">载入会话…</p>
         )}
-        {olderCount > 0 && (
-          <button
-            onClick={() => {
-              // Loading older history = reading up: keep the current
-              // viewport anchored instead of following the bottom.
-              const el = scrollRef.current;
-              if (el) {
-                const anchor = el.scrollHeight - el.scrollTop;
-                setVisibleCount(n => n + 60);
-                requestAnimationFrame(() => {
-                  const el2 = scrollRef.current;
-                  if (el2) el2.scrollTop = el2.scrollHeight - anchor;
-                });
-              } else {
-                setVisibleCount(n => n + 60);
-              }
-            }}
-            className="w-full rounded-sm border border-void-700 bg-void-900 px-2 py-1.5 text-[11px] text-zinc-500 hover:border-void-500 hover:text-zinc-300"
-          >
-            ↑ 加载更早的消息（还有 {olderCount} 条）
-          </button>
-        )}
+        <div ref={sentinelRef} className="py-0.5 text-center">
+          {olderCount > 0 ? (
+            <button
+              onClick={() => loadOlderRef.current()}
+              className="w-full rounded-sm px-2 py-1 text-[10.5px] text-zinc-600 hover:text-zinc-400"
+            >
+              ↑ 还有 {olderCount} 条更早消息（滚动自动加载）
+            </button>
+          ) : loaded && messages.length > 30 ? (
+            <span className="text-[10px] text-zinc-700">已到最早消息</span>
+          ) : null}
+        </div>
         {loaded && messages.length === 0 && (
           <p className="py-8 text-center text-[11px] text-zinc-700">
             会话已就绪 — 向该智能体下达指令
