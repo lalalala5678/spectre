@@ -8,7 +8,8 @@
 
 import { AGENTS, AGENT_KEYS, isAgentKey } from './agents.mjs';
 import { CONFIG } from './config.mjs';
-import { hasInternalToken, json, readJson, sse } from './http.mjs';
+import { hasInternalToken, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
+import * as path_mod from 'node:path';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
 import { injectionOriginOf } from './sessions.mjs';
@@ -244,6 +245,24 @@ export function createRouter({ store, bus, caps, wal }) {
     if (path === '/api/prefs' && method === 'PUT') {
       const body = await readJson(req);
       return json(res, 200, setPrefs(body, wal));
+    }
+
+    // ---------- uploads (files land in the sandbox /opt/uploads) ----------
+    if (path === '/api/sandbox/uploads' && method === 'POST') {
+      const body = await readRawBody(req);
+      const { fields, file } = parseMultipart(body,
+        req.headers['content-type'] ?? '');
+      if (!file) return bad(res, 400, 'file part required');
+      const { mkdir, writeFile } = await import('node:fs/promises');
+      const { HOST } = await import('./sandbox/exec-env.mjs');
+      const safeName = file.filename.slice(0, 120) || `upload-${Date.now()}`;
+      await mkdir(HOST.uploads, { recursive: true });
+      const target = path_mod.join(HOST.uploads, safeName);
+      await writeFile(target, file.data);
+      return json(res, 201, {
+        sandboxPath: `/opt/uploads/${safeName}`,
+        size: file.data.length, note: fields.note ?? null,
+      });
     }
 
     // ---------- sandbox / skills / MCP / CLI management ----------

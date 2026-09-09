@@ -31,11 +31,13 @@ export const HOST = {
   workspace: path.join(SANDBOX_ROOT, 'workspace'),
   skills: path.join(SANDBOX_ROOT, 'skills'),
   tools: path.join(SANDBOX_ROOT, 'tools'),
+  uploads: path.join(SANDBOX_ROOT, 'uploads'),
 };
 export const CONTAINER = {
   workspace: '/workspace',
   skills: '/opt/skills',
   tools: '/opt/tools',
+  uploads: '/opt/uploads',
 };
 
 const ok = value => ({ ok: true, value });
@@ -153,14 +155,14 @@ async function runShell(runner, command, options = {}) {
  *  argv empty = plain local bash -c with the HOST-mapped cwd (container
  *  paths only exist inside the sandbox for the docker driver).
  *  Merged stdout/stderr capture. */
-function spawnShell(argv, command, timeoutSec, cwdContainer) {
+function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
   const argvv = argv.length ? [...argv, 'bash', '-c', command]
     : ['bash', '-lc', command];
   const cwdHost = argv.length ? cwdContainer
     : (containerPathToHost(cwdContainer) ?? cwdContainer);
   return new Promise(resolve => {
     const child = spawn(argvv[0], argvv.slice(1), {
-      env: { ...process.env },
+      env: { ...process.env, ...(extraEnv ?? {}) },
       cwd: cwdHost,
     });
     let text = '';
@@ -274,17 +276,49 @@ function makeFileSystem(cwdContainer) {
  * @param {{driver: 'local'|'docker', container?: string}} cfg
  * @param {string} wsId project id — cwd = /workspace/<wsId>
  */
+/** Local driver: rewrite container-style absolute paths inside bash
+ *  commands to their host mounts — agents reason in CONTAINER paths
+ *  (/workspace /opt/uploads …) regardless of the driver underneath. */
+export function rewritePathsForLocal(command) {
+  let out = command;
+  for (const key of Object.keys(CONTAINER)) {
+    const c = CONTAINER[key];
+    const h = HOST[key];
+    out = out.split(c + '/').join(h + '/');
+    out = out.split(c + ' ').join(h + ' ');
+    out = out.split(c + '\n').join(h + '\n');
+    out = out.split(c + '"').join(h + '"');
+    out = out.split(c + '\'').join(h + '\'');
+  }
+  return out;
+}
+
+/** Shared-tool PATH prefix — injected into EVERY bash invocation so
+ *  /opt-tools installs are environment-level (公理二: CLI 全员共享).
+ *  Prefix dirs: bin (binaries), npm-global/bin (npm -g target),
+ *  py (pip --target scripts live under tools anyway). */
+export function sharedToolPath() {
+  return [
+    `${CONTAINER.tools}/bin`,
+    `${CONTAINER.tools}/npm-global/bin`,
+  ].join(':');
+}
+
 export function makeExecutionEnv(cfg, wsId) {
   const cwdContainer = `${CONTAINER.workspace}/${wsId}`;
   const fsEnv = makeFileSystem(cwdContainer);
+  const toolPath = sharedToolPath();
   const execArgv = cfg.driver === 'docker'
-    ? ['docker', 'exec', '-w', cwdContainer, cfg.container ?? 'spectre-sandbox']
+    ? ['docker', 'exec', '-w', cwdContainer,
+      '-e', `PATH=${toolPath}:$PATH`, cfg.container ?? 'spectre-sandbox']
     : [];
   const shell = {
     exec: (command, options, ctx) => {
       const runner = cfg.driver === 'docker'
         ? (cmd, timeout) => spawnShell(execArgv, cmd, timeout, cwdContainer)
-        : (cmd, timeout) => spawnShell([], cmd, timeout, cwdContainer);
+        : (cmd, timeout) => spawnShell([], rewritePathsForLocal(cmd), timeout, cwdContainer,
+          { PATH: `${containerPathToHost(toolPath.split(':')[0])
+            ?? toolPath.split(':')[0]}:${process.env.PATH}` });
       return runShell(runner, command, { cwd: cwdContainer, ...options });
     },
     cleanup: async ctx => {},

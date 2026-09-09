@@ -95,8 +95,17 @@ class StdioRpc {
   call(method, params) {
     const id = this.nextId++;
     return new Promise((resolve, reject) => {
+      if (!this.child?.stdin?.writable) {
+        reject(new Error('MCP server process not running'));
+        return;
+      }
       this.pending.set(id, { resolve, reject });
-      this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      try {
+        this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
+      } catch (e) {
+        this.pending.delete(id);
+        reject(e);
+      }
     });
   }
   close() {
@@ -228,7 +237,21 @@ export async function mcpToolsFor(agentKey) {
 }
 
 /** Connectivity test used by the console MCP page. */
+/** Bounded wrapper: a hung server must fail fast, never stall the
+ *  calling agent's turn. */
 export async function testMcpServer(server) {
+  try {
+    return await Promise.race([
+      _testMcpServer(server),
+      new Promise(resolve => setTimeout(() =>
+        resolve({ ok: false, error: 'timeout (10s)' }), 10000)),
+    ]);
+  } catch (err) {
+    return { ok: false, error: err.message };
+  }
+}
+
+async function _testMcpServer(server) {
   try {
     const rpc = server.transport === 'http'
       ? await new HttpRpc(server.url, server.headers).start()

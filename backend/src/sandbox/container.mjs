@@ -78,7 +78,8 @@ export async function ensureSandbox() {
     for (const d of Object.values(HOST)) {
       await fsp.mkdir(d, { recursive: true });
     }
-    return { driver: 'local', ok: true };
+    const boot = await bootstrapToolchain();
+    return { driver: 'local', ok: true, ...boot };
   }
   for (const d of Object.values(HOST)) {
     await fsp.mkdir(d, { recursive: true });
@@ -101,13 +102,79 @@ export async function ensureSandbox() {
     '-v', `${HOST.workspace}:/workspace`,
     '-v', `${HOST.skills}:/opt/skills:ro`,
     '-v', `${HOST.tools}:/opt/tools`,
+    '-v', `${HOST.uploads}:/opt/uploads`,
     '-w', '/workspace',
     cfg.image, 'sleep', 'infinity',
   ]);
   if (create.code !== 0) {
     return { driver: 'docker', ok: false, error: create.out.slice(-200) };
   }
-  return { driver: 'docker', ok: true, created: true };
+  const boot = await bootstrapToolchain();
+  return { driver: 'docker', ok: true, created: true, ...boot };
+}
+
+/** install-log: durable record of environment installs; replayed after a
+ *  container rebuild (apt-layer packages live in the container layer and
+ *  are lost — bind-mounted /opt/tools installs survive). */
+export async function appendInstallLog(command) {
+  const file = path.join(HOST.tools, 'install-log');
+  const line = `${new Date().toISOString()}\t${String(command).replace(/\n/g, ' ')}\n`;
+  await fsp.mkdir(HOST.tools, { recursive: true });
+  await fsp.appendFile(file, line, 'utf8');
+}
+
+export async function replayInstallLog() {
+  const file = path.join(HOST.tools, 'install-log');
+  let lines = [];
+  try { lines = (await fsp.readFile(file, 'utf8')).split('\n'); }
+  catch { return { replayed: 0 }; }
+  let n = 0;
+  for (const line of lines) {
+    const cmd = line.split('\t')[1];
+    if (!cmd) continue;
+    const res = cfg.driver === 'docker'
+      ? await run('docker', ['exec', cfg.container, 'bash', '-lc', cmd], 900)
+      : await run('bash', ['-lc', cmd], 900);
+    n += res.code === 0 ? 1 : 0;
+  }
+  return { replayed: n, total: lines.filter(l => l.includes('\t')).length };
+}
+
+/** Toolchain bootstrap — the base image is bare; every scenario of the
+ *  tooling agent (clone/build/test a server) needs node/python/git.
+ *  Idempotent via a marker file on the PERSISTED /opt/tools mount, so a
+ *  container rebuild skips it when the marker survives. */
+function bootstrapScript() {
+  // Container-side base dir for docker; the HOST mount dir for local
+  // (the local driver runs on the host — container paths must not leak).
+  const base = cfg.driver === 'docker' ? '/opt/tools' : HOST.tools;
+  const uploads = cfg.driver === 'docker' ? '/opt/uploads' : HOST.uploads;
+  return [
+    'set -e',
+    'export DEBIAN_FRONTEND=noninteractive',
+    `mkdir -p ${base}/bin ${base}/npm-global ${uploads}`,
+    'if command -v apt-get >/dev/null 2>&1; then '
+    + 'apt-get update -qq && apt-get install -y -qq '
+    + 'nodejs npm python3 python3-pip git curl unzip build-essential jq >/dev/null; fi',
+    `npm config set prefix ${base}/npm-global || true`,
+    `pip3 config set global.target ${base}/py || true`,
+    `date -Iseconds > ${base}/.bootstrapped`,
+  ].join('\n');
+}
+
+async function bootstrapToolchain() {
+  const markerHost = path.join(HOST.tools, '.bootstrapped');
+  const marker = cfg.driver === 'docker'
+    ? await run('docker', ['exec', cfg.container, 'cat', '/opt/tools/.bootstrapped'], 30)
+    : await run('cat', [markerHost], 30);
+  if (marker.code === 0) return { bootstrapped: true, skipped: true };
+  const script = bootstrapScript();
+  const res = cfg.driver === 'docker'
+    ? await run('docker', ['exec', cfg.container, 'bash', '-lc', script], 900)
+    : await run('bash', ['-lc', script], 900);
+  console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}:`,
+    res.out.slice(-200));
+  return { bootstrapped: res.code === 0, output: res.out.slice(-500) };
 }
 
 /** Install shared CLI tooling (runs inside the sandbox for docker
@@ -117,6 +184,7 @@ export async function installCli(command) {
   const res = cfg.driver === 'docker'
     ? await run('docker', ['exec', cfg.container, 'bash', '-lc', safeCmd], 900)
     : await run('bash', ['-lc', safeCmd], 900);
+  if (res.code === 0) await appendInstallLog(safeCmd);
   return { exitCode: res.code, output: res.out.slice(-4000), ok: res.code === 0 };
 }
 

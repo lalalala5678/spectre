@@ -13,7 +13,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, TOOLS_GUIDE, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, TOOLS_GUIDE, TOOLS_AGENT_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools } from './tools.mjs';
@@ -163,7 +163,8 @@ export class SessionStore {
       initialState: {
         // Dynamic tool roster: generated from the ACTUAL registered set —
         // the prompt can never again claim a tool this session lacks.
-        systemPrompt: `${isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT}\n\n` +
+        systemPrompt: `${record.agentKey === 'tools' ? TOOLS_AGENT_PROMPT
+            : isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT}\n\n` +
           `${TOOLS_GUIDE}\n${tools.map(t => `- ${t.name}`).join('\n')}` +
           (skillIndexBlock ? `\n\n${skillIndexBlock}` : ''),
         model: this.model,

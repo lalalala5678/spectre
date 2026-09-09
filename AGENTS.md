@@ -112,6 +112,13 @@
 - 权限:情报/任务报告任意 agent 可改(reason 留审计);漏洞仅 writer(申请-审核制);用户直编=终审
 - 用户界面:详情页对话框(→报告agent)与直接编辑表单(→人工落账)双路径
 
+## 工具配置智能体(tools agent)设计公理
+
+- **配置≠持有**:tools agent 给指定智能体配置 skill/MCP;加载边界=配置的 agents 字段/skill 目录——它在物理上不持有被管理的工具(与"发现者不写漏洞"同源)
+- **CLI=环境级**:装到 /opt/tools(PATH 已含),所有智能体共享;优先 npm --prefix /opt/tools/npm-global、pip --target /opt/tools/py
+- **搜索=能力协商**:垂直通道(MCP registry/GitHub/包管理器)零 key 一等公民;通用 web 搜索可选 provider(默认 none——开源零绑定),未配置时如实声明,绝不假装搜索过
+- **四场景零硬编码流程**:链接/上传/发现/构建全部由提示词方法论+工具组合涌现
+
 ## 沙箱与工具体系(官方优先原则)
 
 - **不改 pi 框架**:优先使用 pi-agent-core 官方机制;自建仅限官方空缺处

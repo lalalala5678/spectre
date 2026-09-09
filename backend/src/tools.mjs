@@ -18,6 +18,7 @@ import { Type } from '@earendil-works/pi-ai';
 import { CONFIG } from './config.mjs';
 import { clipMarked } from './pi.mjs';
 import { foldRevisions } from './revision.mjs';
+import { buildToolingTools } from './sandbox/tooling.mjs';
 
 const STAGE_KEYS = [
   'recon', 'nday', 'weakcred', 'api', 'exploit',
@@ -890,6 +891,9 @@ export function buildDirectTools(record, caps) {
 
   if (record.agentKey === 'report') {
     return [publishVuln, publishIntel];
+  }
+  if (record.agentKey === 'tools') {
+    return buildToolingTools(record, caps);
   }
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
     buildRequestRevisionTool(record, caps)];

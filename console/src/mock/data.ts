@@ -72,6 +72,12 @@ export const AGENTS: AgentMeta[] = [
     status: 'idle', model: 'kimi-k3', version: 'v1.3.1',
     skills: ['report-render', 'cvss-score'], mcpServers: ['evidence-store'],
   },
+  {
+    id: 'tools', name: 'Tooling Agent', codename: '工具配置',
+    desc: '给指定智能体配置 skill/MCP/CLI:链接下载、上传包、联网发现、从零构建。',
+    status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
+    skills: [], mcpServers: [],
+  },
 ];
 
 // ---------------- AutoPwn 默认约束 ----------------
@@ -368,7 +374,7 @@ export const CLI_TOOLS: CliTool[] = [
 export const AGENT_LABEL: Record<AgentId, string> = {
   orchestrator: 'Orchestrator', recon: 'Recon', nday: 'NDay', weakcred: 'WeakCred',
   api: 'API', exploit: 'VulnHunt', phish: 'Phish', c2: 'C2',
-  persistence: 'Persistence', postex: 'PostEx', report: 'Report',
+  persistence: 'Persistence', tools: '工具配置', postex: 'PostEx', report: 'Report',
 };
 
 // ---------------- Span 内部流（L2 下钻内容，数据驱动） ----------------

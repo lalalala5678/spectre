@@ -28,6 +28,8 @@ export const AGENTS = Object.freeze([
     typeLabel: '后渗透agent' },
   { key: 'report', name: 'Report Agent', role: '报告编写',
     typeLabel: '报告agent' },
+  { key: 'tools', name: 'Tooling Agent', role: '工具配置',
+    typeLabel: '工具配置agent' },
 ].map(Object.freeze));
 
 const TYPE_LABELS = Object.freeze(

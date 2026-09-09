@@ -32,7 +32,8 @@ export type AgentId =
   | 'c2'
   | 'persistence'
   | 'postex'
-  | 'report';
+  | 'report'
+  | 'tools';
 
 export type AgentStatus = 'idle' | 'running' | 'waiting_approval' | 'error' | 'offline';
 
