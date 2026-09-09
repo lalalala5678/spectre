@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Package, RefreshCw, Terminal } from 'lucide-react';
 
 import { api } from '../api/client';
+import { ToolingChat } from '../components/ToolingChat';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 
@@ -14,7 +15,7 @@ interface SandboxStatus {
 
 /** CLI 工具页 — 共享工具层：安装一次，全部 agent（全部项目）可用。
  *  安装命令在沙箱内执行并经挂载卷持久化。 */
-export function CliPage() {
+export function CliPage({ wsId }: { wsId: string }) {
   const [status, setStatus] = useState<SandboxStatus | null>(null);
   const [tools, setTools] = useState<string[]>([]);
   const [cmd, setCmd] = useState('');
@@ -43,7 +44,7 @@ export function CliPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
       <Panel
         title="已安装 CLI（共享层）"
         right={
@@ -54,7 +55,7 @@ export function CliPage() {
             <RefreshCw className="h-3 w-3" /> 刷新
           </button>
         }
-        className="xl:col-span-2"
+        className="min-h-0 xl:col-span-2"
         bodyClassName="p-0"
       >
         <div className="max-h-[60vh] overflow-y-auto p-3">
@@ -72,6 +73,7 @@ export function CliPage() {
         </div>
       </Panel>
 
+      <div className="flex min-h-0 flex-col gap-3">
       <Panel title="安装到沙箱" bodyClassName="p-3 space-y-2">
         {status && (
           <p className="flex items-center gap-1.5 font-mono text-[10.5px] text-zinc-500">
@@ -103,6 +105,8 @@ export function CliPage() {
           安装一次，全部项目的全部 agent 共享（环境能力）；项目间的隔离靠各自工作目录，CLI 层刻意共享。
         </p>
       </Panel>
+      <ToolingChat workSessionId={wsId} />
+      </div>
     </div>
   );
 }

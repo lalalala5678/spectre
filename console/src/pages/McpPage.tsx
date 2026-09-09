@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Globe, PlugZap, Plus, Terminal, Trash2 } from 'lucide-react';
 
 import { api } from '../api/client';
+import { ToolingChat } from '../components/ToolingChat';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 
@@ -20,7 +21,7 @@ interface McpServer {
 
 /** MCP Server 管理页 — 双传输：远程 HTTP（用户自建机器直连）与本地
  *  stdio（宿主或沙箱内进程）。按 agent 挂载；工具在会话创建时合并。 */
-export function McpPage() {
+export function McpPage({ wsId }: { wsId: string }) {
   const [servers, setServers] = useState<McpServer[]>([]);
   const [form, setForm] = useState({
     name: '', transport: 'http' as 'http' | 'stdio',
@@ -84,8 +85,8 @@ export function McpPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
-      <Panel title="已注册 MCP Servers" className="xl:col-span-2" bodyClassName="p-0">
+    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
+      <Panel title="已注册 MCP Servers" className="min-h-0 xl:col-span-2" bodyClassName="p-0">
         <table className="w-full text-left">
           <thead>
             <tr className="border-b border-void-700 text-[10px] uppercase tracking-wider text-zinc-600">
@@ -154,6 +155,7 @@ export function McpPage() {
         </table>
       </Panel>
 
+      <div className="flex min-h-0 flex-col gap-3">
       <Panel title="注册新 Server" bodyClassName="p-3 space-y-2">
         <input
           value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
@@ -220,6 +222,8 @@ export function McpPage() {
         </button>
         {msg && <p className="font-mono text-[10.5px] text-amber-400">{msg}</p>}
       </Panel>
+      <ToolingChat workSessionId={wsId} />
+      </div>
     </div>
   );
 }

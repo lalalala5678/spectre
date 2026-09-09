@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { FileCode2, Plus, Search, Trash2 } from 'lucide-react';
 
 import { api } from '../api/client';
+import { ToolingChat } from '../components/ToolingChat';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 
@@ -17,7 +18,7 @@ interface SkillRow {
 
 /** Skill 管理页 — per-agent 挂载（目录即仓库，SKILL.md 官方格式；
  *  会话创建时官方索引注入，模型按需 read 全文）。 */
-export function SkillsPage() {
+export function SkillsPage({ wsId }: { wsId: string }) {
   const [skills, setSkills] = useState<SkillRow[]>([]);
   const [filter, setFilter] = useState('');
   const [creating, setCreating] = useState(false);
@@ -58,7 +59,7 @@ export function SkillsPage() {
   };
 
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
       <Panel
         title="已挂载 Skills（按 Agent）"
         right={
@@ -80,7 +81,7 @@ export function SkillsPage() {
             </button>
           </div>
         }
-        className="xl:col-span-2"
+        className="min-h-0 xl:col-span-2"
         bodyClassName="p-0"
       >
         {creating && (
@@ -164,6 +165,7 @@ export function SkillsPage() {
         </table>
       </Panel>
 
+      <div className="flex min-h-0 flex-col gap-3">
       <Panel title="机制说明" bodyClassName="p-3 space-y-2 text-[11.5px] leading-relaxed text-zinc-400">
         <p className="flex items-start gap-1.5"><FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400/80" />
           存储为 agentskills.io 官方格式（SKILL.md + frontmatter），由 pi 官方加载器解析。</p>
@@ -171,6 +173,8 @@ export function SkillsPage() {
         <p><span className="text-zinc-200">角色挂载：</span>每个 agent 只看到挂给自己的技能目录。</p>
         {msg && <p className={cn('font-mono text-[10.5px]', msg.includes('已') ? 'text-emerald-400' : 'text-amber-400')}>{msg}</p>}
       </Panel>
+      <ToolingChat workSessionId={wsId} />
+      </div>
     </div>
   );
 }

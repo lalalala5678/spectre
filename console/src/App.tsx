@@ -1,10 +1,11 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { AgentWorkspacePage, getAgent } from './pages/AgentWorkspacePage';
 import { SkillsPage } from './pages/SkillsPage';
 import { McpPage } from './pages/McpPage';
 import { CliPage } from './pages/CliPage';
+import { getPrefs } from './api/worksession';
 import { AuditPage } from './pages/AuditPage';
 import type { RouteKey } from './types';
 
@@ -38,6 +39,11 @@ export default function App() {
     window.location.hash = r;
   };
 
+  const [wsId, setWsId] = useState<string | null>(null);
+  useEffect(() => {
+    getPrefs().then(p => setWsId(p.currentWs)).catch(() => {});
+  }, []);
+
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-void-950 font-sans text-slate-200">
       <Sidebar route={route} onRoute={nav} runningCount={1} />
@@ -47,11 +53,11 @@ export default function App() {
           {STAGE_ROUTES.includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(AGENT_OF_ROUTE[route])} />
           ) : route === 'skills' ? (
-            <div className="h-full overflow-y-auto p-4"><SkillsPage /></div>
+            <div className="h-full overflow-hidden p-4"><SkillsPage wsId={wsId ?? ''} /></div>
           ) : route === 'mcp' ? (
-            <div className="h-full overflow-y-auto p-4"><McpPage /></div>
+            <div className="h-full overflow-hidden p-4"><McpPage wsId={wsId ?? ''} /></div>
           ) : route === 'cli' ? (
-            <div className="h-full overflow-y-auto p-4"><CliPage /></div>
+            <div className="h-full overflow-hidden p-4"><CliPage wsId={wsId ?? ''} /></div>
           ) : (
             <div className="h-full overflow-y-auto p-4"><AuditPage /></div>
           )}
