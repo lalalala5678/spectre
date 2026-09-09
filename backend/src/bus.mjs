@@ -33,7 +33,7 @@ export class Bus {
    *          severity?: string|null, title?: string|null,
    *          detail?: string|null}} entry
    *
-   * `severity`/`title`/`detail` carry structured FINDING payloads:
+   * `severity`/`title`/`detail` carry structured vulnerability payloads:
    * the panel lists severity + title and expands the full detail.
    */
   emit(entry) {
@@ -55,7 +55,7 @@ export class Bus {
       author: entry.author ?? null,
       detail: entry.detail ? clipMarked(entry.detail, CONFIG.busDetailMaxChars) : null,
     };
-    // Idempotency for FINDING publications: an agent re-calling the tool
+    // Idempotency for vulnerability publications: an agent re-calling the tool
     // with the same title+severity (receipt-style duplicates) is a no-op.
     if (entry.type === 'intel' && entry.title && entry.severity) {
       const dup = [...this.events].reverse().find(e =>

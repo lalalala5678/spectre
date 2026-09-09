@@ -81,10 +81,11 @@
 
 | 工具 | 会话类型 | 副作用 | 说明 |
 |---|---|---|---|
-| `query_intel` | 全部 | [read-only] | 查询项目情报(FINDING/任务报告) |
+| `query_intel` | 全部 | [read-only] | 查询项目条目(kind=vulnerability/intel/task-report) |
 | `read_session` | 全部 | [read-only] | 按 sessionId/payloadRef 读源会话消息 |
-| `submit_task_report` | 全部 | [creates event] | 提交任务报告(status 可选+推断) |
-| `publish_finding` | 子任务+直连 | [creates event] | 发布 FINDING(旧名 report_to_orchestrator 为废弃别名) |
+| `submit_task_report` | 全部 | [creates event] | 提交任务报告(status 可选+推断;vulns 字段引用漏洞标题) |
+| `publish_vulnerability` | 子任务+直连 | [creates event] | 发布漏洞——仅限确认真实危害、可提交的漏洞 |
+| `publish_intel` | 子任务+直连 | [creates event] | 发布情报——任何可能对任务有利的信息,低门槛 |
 | `spawn_agent` | 编排器+子 | [spawns agent] | 派生子智能体 |
 | `dispatch_agents` | 编排器 | [starts engagement] | Temporal 批量调度 |
 | `relay_to_agents` | 编排器 | [sends DM] | 定向转发情报 |
@@ -95,7 +96,7 @@
 |---|---|---|---|
 | status 遗漏硬拒 | TypeBox Union 必填 + LLM 注意力稀释 | Optional + 推断兜底 | 新枚举字段必配默认值或推断 |
 | 裸 JSON 信封显示 | normalizeMessage 直接 stringify 数组 | toolResultText 拆信封 | 新内容块类型须在前端时间线中渲染 |
-| 悬空 findings 引用 | 报告字段与 FINDING 实体无关联校验 | 模糊匹配警告 + 补救指引 | 新增跨实体引用字段须配校验 |
+| 悬空 vulns 引用 | 报告字段与漏洞实体无关联校验 | 模糊匹配警告 + 补救指引 | 新增跨实体引用字段须配校验 |
 | 静默截断 400 字 | slice 无标记 | 标记 + seq 补全 | 新增截断处必须附标记与补全手段 |
 | query_intel 重复调用 | 不完备计数 + 无诊断 | 总数披露 + 空结果诊断 | 空回执/截断处永远附诊断信息 |
 | engagement 'autopwn-null' | null 模板字符串 | 条件表达式 + 跳过 signal | 字段拼接前检查 null |

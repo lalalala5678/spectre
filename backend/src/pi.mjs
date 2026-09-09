@@ -60,7 +60,7 @@ export const ORCHESTRATOR_PROMPT = [
   'Decompose the user objective, then dispatch stage agents (recon, nday, weakcred,',
   'api, exploit, phish, c2, persistence, postex, report) with the dispatch_agents',
   'tool — it starts a durable Temporal engagement where the selected agents work',
-  'in parallel and share findings over the bus.',
+  'in parallel and share results over the bus.',
   'Never claim to be a mere operator agent: you hold the scheduling authority.',
   'After dispatching, report the engagement id, then summarize agent outputs as',
   'they arrive on the bus. Do not invent results you have not received.',
@@ -80,16 +80,18 @@ export const STAGE_PROMPT = [
   'You collaborate with other stage agents (recon, nday, weakcred, api, exploit,',
   'phish, c2, persistence, postex, report) coordinated by an AutoPwn orchestrator.',
   'You have intel tools: query_intel [read-only] reads the project intel base. ' +
-  'Depending on your session type you also have: publish_finding (publish a ' +
-  'FINDING — the old name report_to_orchestrator is a deprecated alias), ' +
-  'submit_task_report, and spawn_agent. In direct user conversations you ' +
-  'have publish_finding + submit_task_report + query_intel (no spawn).',
+  'Depending on your session type you also have: publish_vulnerability ' +
+  '(confirmed real-harm submittable vulns ONLY), publish_intel (any info ' +
+  'that might help the task), submit_task_report, and spawn_agent. ' +
+  'In direct user conversations you have publish_vulnerability + ' +
+  'publish_intel + submit_task_report + query_intel (no spawn).',
   'When your task lacks context (targets, platforms, credentials, scope), FIRST',
-  'call query_intel to read other agents\' task reports and FINDINGs in this',
+  'call query_intel to read other agents\' task reports, vulnerabilities and',
+  'intel notes in this',
   'project instead of guessing or refusing.',
   'Dispatched tasks (instruction prefixed 【派生任务】or【AutoPwn 任务】) MUST',
   'file at least one task report via submit_task_report before finishing —',
-  'even with zero findings; multiple reports are fine for multi-stage work.',
+  'even with zero vulns; multiple reports are fine for multi-stage work.',
   'In direct conversation with the user, submit a report when appropriate —',
   'e.g. when the user asks or when a meaningful unit of work concludes.',
   'Report content: what you did, the outcome or why it failed, and everything',
@@ -243,7 +245,7 @@ export function truncateText(value, max = 2000) {
 
 /**
  * Clip with an explicit inline marker: LLM-facing message bodies (DM
- * reports, bus FINDING details) must never be cut silently — the receiver
+ * reports, bus vulnerability/intel details) must never be cut silently — the receiver
  * needs to know how much was dropped and, via `note`, where the full text
  * lives. Inline form so it stays valid inside bullet lists.
  */

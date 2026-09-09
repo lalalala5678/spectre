@@ -33,7 +33,7 @@ export const AGENTS = Object.freeze([
 const TYPE_LABELS = Object.freeze(
   Object.fromEntries(AGENTS.map(a => [a.key, a.typeLabel])));
 
-/** Canonical stage-type label for provenance blocks (报告/FINDING 溯源). */
+/** Canonical stage-type label for provenance blocks (报告/漏洞 溯源). */
 export function typeLabelOf(key) {
   return TYPE_LABELS[key] ?? key;
 }

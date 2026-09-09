@@ -53,7 +53,7 @@ export const CONFIG = Object.freeze({
    * LLM-facing messages must never be cut silently.
    */
   dmReportMaxChars: 4_000,
-  /** Bus FINDING detail cap (FINDINGS panel expand view), marker-clipped. */
+  /** Bus vulnerability detail cap (漏洞 panel expand view), marker-clipped. */
   busDetailMaxChars: 4_000,
   /** Completion-DM digest cap (full text lives in the task report). */
   dmDigestChars: 400,

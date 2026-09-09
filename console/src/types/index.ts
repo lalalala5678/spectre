@@ -57,7 +57,8 @@ export type EventKind =
   | 'tool_result'   // 工具结果（结构化）
   | 'approval'      // 危险操作审批请求
   | 'handoff'       // agent 间移交
-  | 'finding'       // 发现（资产/漏洞/凭据）
+  | 'vulnerability'  // 漏洞（确定真实危害、可提交）
+  | 'intel-note'     // 情报（可能对任务有利的信息）
   | 'file'          // 产物文件
   | 'system'        // 系统提示
   // ---- span 内部流（L2 下钻视图） ----
@@ -196,7 +197,7 @@ export interface Asset {
   source: AgentId;
 }
 
-export interface Finding {
+export interface Finding {  // legacy type name (mock data only)
   id: string;
   severity: 'critical' | 'high' | 'medium' | 'low' | 'info';
   title: string;

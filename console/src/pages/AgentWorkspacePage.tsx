@@ -9,11 +9,12 @@ import { Dot, statusTone } from '../components/ui/Badge';
 import { Panel } from '../components/ui/Panel';
 import { PanelStack } from '../components/ui/PanelStack';
 import { LiveSession } from '../components/session/LiveSession';
-import { FindingsPanel } from '../components/session/FindingsPanel';
+import { VulnPanel } from '../components/session/VulnPanel';
 import { SessionsPanel } from '../components/session/SessionsPanel';
-import { FindingDetail } from '../components/session/FindingDetail';
+import { EntryDetail } from '../components/session/EntryDetail';
 import { DispatchTreePanel } from '../components/session/DispatchTreePanel';
 import { TaskReportsPanel } from '../components/session/TaskReportsPanel';
+import { IntelNotesPanel } from '../components/session/IntelNotesPanel';
 import { BusView } from './BusView';
 import { cn } from '../utils/cn';
 
@@ -40,7 +41,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);
-  const [findingView, setFindingView] = useState<ApiBusEvent | null>(null);
+  const [entryView, setEntryView] = useState<ApiBusEvent | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
 
@@ -63,7 +64,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     bootstrappedFor.current = scope;
     setDrillSession(null);
     setWsError('');
-    setFindingView(null);
+    setEntryView(null);
     (async () => {
       const all = await api<ApiSessionSummary[]>('/sessions');
       const mine = all.filter(s =>
@@ -127,7 +128,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const switchSession = (id: string) => {
     setSessionId(id);
     setDrillSession(null);
-    setFindingView(null);
+    setEntryView(null);
     setSwitcherOpen(false);
     localStorage.setItem(smallSessionSlot(workSession.id, liveKey), id);
   };
@@ -179,7 +180,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const handleSessionGone = useCallback(() => {
     localStorage.removeItem(smallSessionSlot(workSession.id, liveKey));
     setDrillSession(null);
-    setFindingView(null);
+    setEntryView(null);
     bootstrappedFor.current = '';
     setSessionId(null);
     setBootstrapNonce(n => n + 1);
@@ -351,8 +352,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         <div className="flex min-h-0 flex-1 gap-3 overflow-hidden p-3.5 pb-0">
           {/* 左：运行流（仅此处滚动） */}
           <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded border border-void-700 bg-void-850 p-2.5">
-            {findingView ? (
-              <FindingDetail event={findingView} onBack={() => setFindingView(null)} />
+            {entryView ? (
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2">
                 <button
@@ -368,7 +369,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             )}
           </section>
 
-          {/* 右栏：AutoPwn = 子Agent + 全量FINDINGS;stage agent = 会话面板 + 自己的FINDINGS */}
+          {/* 右栏：AutoPwn = 子Agent + 全量漏洞/情报;stage agent = 会话面板 + 自己的漏洞/情报 */}
           <div
             className="relative hidden min-h-0 shrink-0 xl:block"
             style={{ width: `${(rightRatio * 100).toFixed(2)}vw` }}
@@ -384,9 +385,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <div className="h-full pb-3.5">
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
-                  <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => { setFindingView(null); setDrillSession(id); }} />
-                  <FindingsPanel workSessionId={workSession.id} onOpen={setFindingView} />
-                  <TaskReportsPanel workSessionId={workSession.id} onOpen={setFindingView} />
+                  <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => { setEntryView(null); setDrillSession(id); }} />
+                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} />
+                  <IntelNotesPanel workSessionId={workSession.id} onOpen={setEntryView} />
+                  <TaskReportsPanel workSessionId={workSession.id} onOpen={setEntryView} />
                 </PanelStack>
               ) : (
                 <PanelStack storageKey="spectre.panel.stackRatios.stage">
@@ -396,10 +398,15 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     onSelect={switchSession}
                     onNew={newConversation}
                   />
-                  <FindingsPanel
+                  <VulnPanel
                     agentKey={liveKey}
                     workSessionId={workSession.id}
-                    onOpen={setFindingView}
+                    onOpen={setEntryView}
+                  />
+                  <IntelNotesPanel
+                    agentKey={liveKey}
+                    workSessionId={workSession.id}
+                    onOpen={setEntryView}
                   />
                 </PanelStack>
               )}

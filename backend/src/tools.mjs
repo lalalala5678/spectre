@@ -9,8 +9,8 @@
  * Tool matrix (LLM-facing; usability rule: one obvious tool per intent,
  * never a hard reject when a sensible default exists):
  *   orchestrator session  → dispatch_agents, relay_to_agents, spawn_agent, submit/query
- *   engagement/spawn child→ publish_finding, spawn_agent, submit/query
- *   direct user session   → publish_finding, submit/query
+ *   engagement/spawn child→ publish_vulnerability, publish_intel, spawn_agent, submit/query
+ *   direct user session   → publish_vulnerability, publish_intel, submit/query
  */
 
 import { Type } from '@earendil-works/pi-ai';
@@ -30,8 +30,9 @@ const stageEnum = Type.Enum(
 /**
  * Shared intel tools — the project intel base every agent reads and
  * writes. Task reports are the PROCESS record (mandatory at every quiet
- * point, even with zero findings); FINDINGs are the RESULT record,
- * published via publish_finding. Both live on the bus with frozen
+ * point, even with zero vulns); intel notes and vulnerabilities are the
+ * RESULT records, published via publish_intel / publish_vulnerability.
+ * All live on the bus with frozen
  * provenance, readable by any agent in the same work session.
  *
  * @param {object} record  session record (run counters live here)
@@ -45,7 +46,8 @@ export function buildIntelTools(record, caps) {
     name: 'query_intel',
     label: '查询情报',
     description:
-      '[read-only] Read FINDINGs and task reports published by ANY agent in this ' +
+      '[read-only] Read vulnerabilities, intel notes and task reports published ' +
+      'by ANY agent in this ' +
       'project — the orchestrator, siblings, or yourself. Helpful whenever ' +
       'you need context you do not have: targets, platforms, credentials, ' +
       'scope (e.g. before writing platform-specific malware, check the ' +
@@ -54,8 +56,10 @@ export function buildIntelTools(record, caps) {
       'full detail.',
     parameters: Type.Object({
       kind: Type.Optional(Type.Union([
-        Type.Literal('task-report'), Type.Literal('finding'), Type.Literal('both'),
-        Type.Literal('reports'), Type.Literal('findings'), Type.Literal('task_report'),
+        Type.Literal('task-report'), Type.Literal('vulnerability'),
+        Type.Literal('intel'), Type.Literal('both'), Type.Literal('reports'),
+        Type.Literal('vuln'), Type.Literal('vulnerabilities'), Type.Literal('notes'),
+        Type.Literal('task_report'),
       ], { description: 'Intel kind: task-report(=reports) / finding(=findings) / both. Default both' })),
       seq: Type.Optional(Type.Number({
         description: 'Fetch ONE entry in full detail by its seq (from a previous listing)',
@@ -73,7 +77,7 @@ export function buildIntelTools(record, caps) {
       severity: Type.Optional(Type.Union([
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
-      ], { description: 'FINDING severity filter: info/low/medium/high/critical (仅 FINDING 有 severity)' })),
+      ], { description: 'Vulnerability severity filter: info/low/medium/high/critical (仅漏洞有 severity)' })),
       q: Type.Optional(Type.String({
         description: 'Keyword substring matched against title/detail',
       })),
@@ -84,9 +88,12 @@ export function buildIntelTools(record, caps) {
     execute: async (_id, params) => {
       const inWs = (caps.listBus?.() ?? [])
         .filter(e => e.workSessionId === (record.workSessionId ?? null));
+      const isEntry = e => entryKind(e) !== null;
       const normKind = String(params.kind ?? 'both').toLowerCase();
       const kind = normKind === 'both' ? 'both'
-        : (normKind === 'finding' || normKind === 'findings') ? 'finding' : 'task-report';
+        : (normKind === 'vulnerability' || normKind === 'vuln'
+          || normKind === 'vulnerabilities') ? 'vulnerability'
+        : (normKind === 'intel' || normKind === 'notes') ? 'intel-note' : 'task-report';
       const status = params.status ? String(params.status).toLowerCase() : null;
       const severity = params.severity ? String(params.severity).toLowerCase() : null;
       const q = params.q ? params.q.toLowerCase() : null;
@@ -94,8 +101,7 @@ export function buildIntelTools(record, caps) {
       // Single-entry full fetch: no silent truncation anywhere.
       const extraFilters = (params.kind || params.q || params.author || params.agentType || params.status || params.severity) != null;
       if (params.seq != null) {
-        const e = inWs.find(x => x.seq === Number(params.seq)
-          && (x.type === 'intel' || x.type === 'task-report'));
+        const e = inWs.find(x => x.seq === Number(params.seq) && isEntry(x));
         if (!e) {
           return { content: [{ type: 'text', text: `seq=${params.seq} 在本项目内不存在。` }] };
         }
@@ -108,13 +114,13 @@ export function buildIntelTools(record, caps) {
         const note = extraFilters
           ? `(注:seq 模式下其它过滤参数已忽略,本条为 seq=${e.seq} 全文)\n` : '';
         return { content: [{ type: 'text', text:
-          `${note}[seq=${e.seq}] [${e.type === 'task-report' ? `任务报告|${e.status}` : `FINDING|${e.severity}`}] ${prov}\n` +
+          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}\n` +
           `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${e.detail ?? e.summary ?? ''}` }] };
       }
 
       const matched = inWs
-        .filter(e => e.type === 'intel' || e.type === 'task-report')
-        .filter(e => kind === 'both' || e.type === (kind === 'finding' ? 'intel' : 'task-report'))
+        .filter(isEntry)
+        .filter(e => kind === 'both' || entryKind(e) === kind)
         .filter(e => !params.agentType || e.from === params.agentType)
         .filter(e => !status || e.status === status)
         .filter(e => !severity || (e.severity ?? '').toLowerCase() === severity)
@@ -137,12 +143,13 @@ export function buildIntelTools(record, caps) {
         ? `,显示最新 ${hits.length} 条(可用 seq 取单条全文)` : ''}(新→旧,库内最新 seq=${latestSeq}):`;
 
       if (hits.length === 0) {
-        const scope = inWs.filter(e => e.type === 'intel' || e.type === 'task-report');
+        const scope = inWs.filter(isEntry);
         const reports = scope.filter(e => e.type === 'task-report').length;
-        const findings = scope.filter(e => e.type === 'intel').length;
-        let hint = `无匹配情报。当前项目内:任务报告 ${reports} 条 / FINDING ${findings} 条。可尝试放宽 kind/status/author 或去掉 q。`;
-        if (kind === 'finding' && status) {
-          hint += '\n注意:status 仅适用于任务报告;FINDING 请用 severity 过滤。';
+        const vulns = scope.filter(e => entryKind(e) === 'vulnerability').length;
+        const notes = scope.filter(e => entryKind(e) === 'intel-note').length;
+        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条。可尝试放宽 kind/status/author 或去掉 q。`;
+        if (kind === 'vulnerability' && status) {
+          hint += '\n注意:status 仅适用于任务报告;漏洞请用 severity 过滤。';
         }
         return { content: [{ type: 'text', text: hint }] };
       }
@@ -153,7 +160,9 @@ export function buildIntelTools(record, caps) {
           : `${e.from}(溯源缺失)`;
         const head = e.type === 'task-report'
           ? `[seq=${e.seq}][任务报告|${e.status ?? '?'}] ${prov}`
-          : `[seq=${e.seq}][FINDING|${e.severity ?? '?'}] ${prov}`;
+          : entryKind(e) === 'vulnerability'
+            ? `[seq=${e.seq}][漏洞|${e.severity ?? '?'}] ${prov}`
+            : `[seq=${e.seq}][情报] ${prov}`;
         const full = String(e.detail ?? e.summary ?? '');
         const body = full.slice(0, 400);
         // Never cut silently (repo rule): mark per-entry truncation and
@@ -177,7 +186,7 @@ export function buildIntelTools(record, caps) {
     description:
       '[creates event] File a task report into the project intel base. Dispatched tasks ' +
       '(spawn_agent / dispatch_agents) MUST file at least one report ' +
-      'before finishing — even with zero findings; multiple reports are ' +
+      'before finishing — even with zero vulns; multiple reports are ' +
       'fine for long or multi-stage tasks. Direct user conversations: ' +
       'file one when the user asks or when a meaningful unit of work ' +
       'concludes. Field values are MARKDOWN (lists/tables/code blocks ' +
@@ -208,8 +217,8 @@ export function buildIntelTools(record, caps) {
       limits: Type.Optional(Type.String({
         description: 'Tool, permission or environment limitations',
       })),
-      findings: Type.Optional(Type.Array(Type.String(), {
-        description: 'Titles of FINDINGs produced in this run',
+      vulns: Type.Optional(Type.Array(Type.String(), {
+        description: 'Titles of vulnerabilities produced in this run',
       })),
       nextSteps: Type.Optional(Type.String({
         description: 'Suggestions for downstream agents (markdown)',
@@ -237,8 +246,8 @@ export function buildIntelTools(record, caps) {
       // Markdown document: blank-line-separated sections so multi-line
       // field values (tables/lists/code) never run into the next section.
       const section = (head, body) => (body ? `\n\n## ${head}\n${body}` : '');
-      const findingList = params.findings?.length
-        ? `- ${params.findings.join('\n- ')}` : '';
+      const vulnList = params.vulns?.length
+        ? `- ${params.vulns.join('\n- ')}` : '';
       const detail = `**状态**:${status}` +
         section('任务', params.task) +
         section('行动', params.actions) +
@@ -246,7 +255,7 @@ export function buildIntelTools(record, caps) {
         section('证据', params.evidence) +
         section('资产/环境', params.scope) +
         section('限制', params.limits) +
-        section('产出 FINDING', findingList) +
+        section('产出漏洞', vulnList) +
         section('后续建议', params.nextSteps);
       record.taskReportCount += 1;
       record.lastReport = { title: params.title, status };
@@ -261,19 +270,19 @@ export function buildIntelTools(record, caps) {
         workSessionId: record.workSessionId ?? null,
         engagement: record.engagementId ? `autopwn-${record.engagementId}` : null,
       });
-      // Dangling-reference check (warn-only): a findings title with no
-      // matching FINDING entity starves downstream kind=finding queries.
+      // Dangling-reference check (warn-only): a vuln title with no
+      // matching vulnerability entity starves downstream kind=vulnerability queries.
       const warnings = [];
-      if (params.findings?.length) {
+      if (params.vulns?.length) {
         const published = (caps.listBus?.() ?? [])
           .filter(e => e.workSessionId === (record.workSessionId ?? null)
-            && e.type === 'intel')
+            && entryKind(e) === 'vulnerability')
           .map(e => normTitle(e.title));
-        for (const t of params.findings) {
+        for (const t of params.vulns) {
           const nt = normTitle(t);
           const hit = published.some(p => p.includes(nt) || nt.includes(p));
           if (!hit) {
-            warnings.push(`《${t}》在情报库未找到对应 FINDING 实体——若尚未发布请用 publish_finding 发布该发现,或从 findings 中移除该引用`);
+            warnings.push(`《${t}》在情报库未找到对应漏洞实体——若尚未发布请用 publish_vulnerability 发布,或从 vulns 中移除该引用`);
           }
         }
       }
@@ -296,7 +305,8 @@ export function buildIntelTools(record, caps) {
     description:
       '[read-only] Read the last N messages of a session by its ID ' +
       '(from payloadRef in intel results, or a sessionId from spawn_agent). ' +
-      'Useful for reading the full original context behind a FINDING or ' +
+      'Useful for reading the full original context behind a vulnerability ' +
+      'or intel note or ' +
       'task report when the intel summary is not enough.',
     executionMode: 'sequential',
     parameters: Type.Object({
@@ -414,7 +424,7 @@ export function buildOrchestratorTools(record, caps) {
     label: '调度子智能体',
     description:
       '[side-effects: starts engagement] Dispatch a pentest objective to stage agents. They run in parallel ' +
-      'inside a durable Temporal engagement and share findings over the bus.',
+      'inside a durable Temporal engagement and share results over the bus.',
     executionMode: 'sequential',
     parameters: Type.Object({
       instruction: Type.String({
@@ -447,7 +457,7 @@ export function buildOrchestratorTools(record, caps) {
         content: [{
           type: 'text',
           text: `Engagement ${started.engagementId} started; agents ` +
-            `${started.agents.join(', ')} running. Findings will be ` +
+            `${started.agents.join(', ')} running. Results will be ` +
             `reported to you as [DM] messages — relay them with ` +
             `relay_to_agents when other agents need to know.`,
         }],
@@ -555,34 +565,58 @@ export function buildOrchestratorTools(record, caps) {
   return [dispatchAgents, relayToAgents, spawnAgent];
 }
 
+
+/**
+ * Bus-entry kind normalization. Legacy WAL data carries vulnerability events
+ * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
+ * intel notes use 'intel-note' to avoid the collision.
+ */
+function entryKind(e) {
+  if (e.type === 'vulnerability' || e.type === 'intel') return 'vulnerability';
+  if (e.type === 'intel-note') return 'intel-note';
+  if (e.type === 'task-report') return 'task-report';
+  return null;
+}
+
+function entryLabel(e) {
+  const k = entryKind(e);
+  if (k === 'vulnerability') return `漏洞|${e.severity ?? '?'}`;
+  if (k === 'intel-note') return '情报';
+  if (k === 'task-report') return `任务报告|${e.status ?? '?'}`;
+  return e.type ?? '?';
+}
+
 /**
  * @param {object} record  engagement child session record
  * @param {object} caps    { signalEngagement, emitBus, followUp }
  */
 export function buildChildTools(record, caps) {
-  const publishFinding = {
-    name: 'publish_finding',
-    label: '发布发现',
+  const publishVuln = {
+    name: 'publish_vulnerability',
+    label: '发布漏洞',
     description:
-      '[creates event] Publish a FINDING to the project intel base — visible to EVERY ' +
-      'agent (query_intel) and the FINDINGS panel; the orchestrator is ' +
-      'notified by DM. Use whenever a concrete discovery exists at any ' +
-      'point mid-task. Always set severity and title; put description, ' +
-      'evidence, and reproduction steps / PoC in text (markdown). ' +
+      '[creates event] Publish a VULNERABILITY to the project intel base — visible ' +
+      'to EVERY agent (query_intel) and the 漏洞 panel; the orchestrator is ' +
+      'notified by DM. Use ONLY when the entry is a confirmed, real-harm, ' +
+      'submittable vulnerability (working PoC or solid evidence). ' +
+      'Speculative leads, useful information, or anything that merely MIGHT ' +
+      'help the task belongs to publish_intel instead — mislabeling pollutes ' +
+      'the vulnerability ledger. Always set severity and title; put ' +
+      'description, evidence, and reproduction steps / PoC in text (markdown). ' +
       'You cannot message peer agents directly.',
     parameters: Type.Object({
       title: Type.String({
-        description: 'One-line finding title, e.g. "Grafana default credentials"',
+        description: 'One-line vulnerability title, e.g. "Grafana default credentials"',
       }),
       severity: Type.Union([
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
       ], {
-        description: 'Finding severity: info/low/medium/high/critical',
+        description: 'Vulnerability severity: info/low/medium/high/critical',
       }),
       text: Type.String({
         description:
-          'Full finding content (markdown): description, evidence, ' +
+          'Full vulnerability content (markdown): description, evidence, ' +
           'reproduction steps / PoC, affected assets.',
       }),
     }),
@@ -592,7 +626,7 @@ export function buildChildTools(record, caps) {
       const engagement = record.engagementId ? `autopwn-${record.engagementId}` : null;
       caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'orchestrator',
-        type: 'intel',
+        type: 'vulnerability',
         severity: params.severity,
         title: params.title,
         summary: params.title,
@@ -603,10 +637,10 @@ export function buildChildTools(record, caps) {
         engagement,
       });
       // Fix-I (P12): remember titles so the completion DM can REFERENCE
-      // findings instead of repeating them (auto-DM already carried the
+      // vulns instead of repeating them (auto-DM already carried the
       // full text). In-memory only: losing it on restart degrades to the
       // old verbose DM — cosmetic. Capped to keep DMs bounded.
-      record.publishedFindingTitles = [...(record.publishedFindingTitles ?? []),
+      record.publishedVulnTitles = [...(record.publishedVulnTitles ?? []),
         params.title].slice(-5);
       // Spawned sub-orchestrators carry no orchestratorSessionId (their
       // overlord is the SPAWNER) — fall back to parentSessionId so the
@@ -615,7 +649,7 @@ export function buildChildTools(record, caps) {
       if (dmTarget) {
         await caps.followUp(
           dmTarget,
-          `[DM from ${record.agentKey}] [${params.severity}] ${params.title}\n` +
+          `[DM from ${record.agentKey}] [漏洞|${params.severity}] ${params.title}\n` +
           `${params.text}\n` +
           '(如其他智能体需要知情,用 relay_to_agents 转发;否则继续等待产出)',
         );
@@ -638,7 +672,7 @@ export function buildChildTools(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `FINDING published (${String(params.severity).toLowerCase()}): ${params.title}`,
+          text: `漏洞已入库 (${String(params.severity).toLowerCase()}): ${params.title}`,
         }],
       };
     },
@@ -646,17 +680,56 @@ export function buildChildTools(record, caps) {
 
   const spawnAgent = buildSpawnAgentTool(record, caps);
 
-  // Deprecated alias: old transcripts may still carry this tool name.
-  // Same handler; description steers to the canonical name. Remove after
-  // one version of clean transcripts (MCP filesystem read_file precedent).
-  const reportAlias = {
-    ...publishFinding,
-    name: 'report_to_orchestrator',
-    label: '上报主控(废弃)',
-    description: 'DEPRECATED: Use publish_finding instead. ' + publishFinding.description,
+  const publishIntel = {
+    name: 'publish_intel',
+    label: '发布情报',
+    description:
+      '[creates event] Publish an INTEL NOTE — any information that might help ' +
+      'the task: observed behavior, credentials/leaks worth trying, ' +
+      'interesting endpoints, environment details, partial leads, ' +
+      'attack-surface hypotheses. Low bar by design: if it could plausibly ' +
+      'help ANY agent in this project, publish it. Confirmed real-harm ' +
+      'submittable vulnerabilities go to publish_vulnerability, NOT here. ' +
+      'Visible to every agent (query_intel kind=intel) and the 情报 panel.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      title: Type.String({ description: 'One-line intel title' }),
+      text: Type.String({
+        description: 'Intel content (markdown): what was observed, why it may matter.',
+      }),
+    }),
+    execute: async (_id, params) => {
+      const engagement = record.engagementId ? `autopwn-${record.engagementId}` : null;
+      caps.emitBus({
+        channel: 'dm', from: record.agentKey, to: 'orchestrator',
+        type: 'intel-note',
+        title: params.title,
+        summary: params.title,
+        detail: params.text,
+        origin: 'engagement',
+        author: caps.authorOf?.(record) ?? null,
+        workSessionId: record.workSessionId ?? null,
+        engagement,
+      });
+      const dmTarget = record.orchestratorSessionId ?? record.parentSessionId;
+      if (dmTarget) {
+        await caps.followUp(
+          dmTarget,
+          `[DM from ${record.agentKey}] [情报] ${params.title}\n` +
+          `${params.text}\n` +
+          '(如其他智能体需要知情,用 relay_to_agents 转发;否则继续等待产出)',
+        );
+      }
+      return {
+        content: [{
+          type: 'text',
+          text: `情报已入库: ${params.title}`,
+        }],
+      };
+    },
   };
 
-  return [publishFinding, reportAlias, spawnAgent];
+  return [publishVuln, publishIntel, spawnAgent];
 }
 
 /**
@@ -664,19 +737,19 @@ export function buildChildTools(record, caps) {
  * @param {object} caps    { emitBus }
  */
 export function buildDirectTools(record, caps) {
-  const publishFinding = {
-    name: 'publish_finding',
-    label: '发布发现',
+  const publishVuln = {
+    name: 'publish_vulnerability',
+    label: '发布漏洞',
     description:
-      '[creates event] Record a FINDING from this conversation into the ' +
-      'FINDINGS panel (visible to every agent via query_intel). Call ' +
-      'once per distinct finding — do not re-publish the same finding. ' +
-      'You may still submit task reports separately; this tool only ' +
-      'records findings. Use when the user asks or when a significant ' +
-      'conclusion worth tracking emerges.',
+      '[creates event] Record a VULNERABILITY from this conversation into ' +
+      'the 漏洞 panel (visible to every agent via query_intel). ONLY ' +
+      'confirmed, real-harm, submittable vulnerabilities — speculative or ' +
+      'merely useful info goes to publish_intel. Call once per distinct ' +
+      'vulnerability — do not re-publish. You may still submit task ' +
+      'reports separately; this tool only records vulnerabilities.',
     executionMode: 'sequential',
     parameters: Type.Object({
-      title: Type.String({ description: 'One-line finding title' }),
+      title: Type.String({ description: 'One-line vulnerability title' }),
       severity: Type.Union([
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
@@ -700,11 +773,42 @@ export function buildDirectTools(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `FINDING published (${String(params.severity).toLowerCase()}): ${params.title}`,
+          text: `漏洞已入库 (${String(params.severity).toLowerCase()}): ${params.title}`,
         }],
       };
     },
   };
 
-  return [publishFinding];
+
+  const publishIntel = {
+    name: 'publish_intel',
+    label: '发布情报',
+    description:
+      '[creates event] Record an INTEL NOTE from this conversation into the ' +
+      '情报 panel — any information that might help the task (leads, ' +
+      'observations, environment details, hypotheses). Confirmed submittable ' +
+      'vulnerabilities go to publish_vulnerability instead.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      title: Type.String({ description: 'One-line intel title' }),
+      text: Type.String({ description: 'Intel content (markdown)' }),
+    }),
+    execute: async (_id, params) => {
+      caps.emitBus({
+        channel: 'dm', from: record.agentKey, to: 'user',
+        type: 'intel-note',
+        title: params.title,
+        summary: params.title,
+        detail: params.text,
+        origin: 'direct',
+        author: caps.authorOf?.(record) ?? null,
+        workSessionId: record.workSessionId ?? null,
+      });
+      return {
+        content: [{ type: 'text', text: `情报已入库: ${params.title}` }],
+      };
+    },
+  };
+
+  return [publishVuln, publishIntel];
 }

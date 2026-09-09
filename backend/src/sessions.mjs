@@ -61,7 +61,7 @@ export class SessionStore {
    * @param {string} agentKey
    * @param {{engagementId?: string, orchestratorSessionId?: string}} [opts]
    *   engagement metadata marks the session as an AutoPwn child; those
-   *   sessions carry the publish_finding tool.
+   *   sessions carry the publish_vulnerability / publish_intel tools.
    */
   create(agentKey, opts = {}) {
     const id = `sess-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
@@ -468,7 +468,7 @@ export class SessionStore {
   }
 
   /**
-   * Provenance snapshot for intel events (task reports / FINDINGs):
+   * Provenance snapshot for intel events (task reports / vulns / notes):
    * author name, stage type, parent agent, tree path. Computed at emit
    * time and frozen into the event — later tree changes never rewrite
    * published provenance.
@@ -552,13 +552,13 @@ export class SessionStore {
         .map(m => m.errorMessage || '');
       return errs.length ? `\n⚠️ 该智能体运行出错:${errs[0].slice(0, 160) || '未知错误(见会话)'}` : '';
     })();
-    // Fix-I (P12): when FINDINGs were published this run, the spawner
+    // Fix-I (P12): when vulnerabilities were published this run, the spawner
     // already got their full text via auto-DM — reference them instead
     // of letting the reply repeat the content (dual-channel redundancy
     // burned 1-2 turns per spawn in project-3).
-    const findingNote = record.publishedFindingTitles?.length
-      ? `\n已发布 ${record.publishedFindingTitles.length} 条 FINDING:` +
-        `${record.publishedFindingTitles.map(t => `《${clipMarked(t, 40)}》`).join('')}` +
+    const findingNote = record.publishedVulnTitles?.length
+      ? `\n已发布 ${record.publishedVulnTitles.length} 条漏洞:` +
+        `${record.publishedVulnTitles.map(t => `《${clipMarked(t, 40)}》`).join('')}` +
         `,全文经 query_intel 检索。\n`
       : '';
     this.caps.followUp(

@@ -2,18 +2,19 @@ import { CornerUpLeft } from 'lucide-react';
 
 import type { ApiBusEvent } from '../../api/client';
 import { Markdown } from './Markdown';
-import { SeverityBadge, StatusBadge } from './FindingsPanel';
+import { SeverityBadge, StatusBadge } from './VulnPanel';
 
 /**
- * FINDING detail view — replaces the main conversation window temporarily.
- * Severity + title + meta header, then the full markdown content
- * (description, evidence, reproduction steps / PoC).
+ * Entry detail view (漏洞 / 情报 / 任务报告) — replaces the main
+ * conversation window temporarily. Kind badge + title + meta header,
+ * then the full markdown content.
  */
-export function FindingDetail({ event, onBack }: {
+export function EntryDetail({ event, onBack }: {
   event: ApiBusEvent;
   onBack: () => void;
 }) {
   const isReport = event.type === 'task-report';
+  const isNote = event.type === 'intel-note';
   const severity = event.severity ?? (event.type === 'result' ? 'INFO' : 'RAW');
   const title = event.title
     ?? event.summary.replace(/^(情报上报|产出)[:：]?/, '');
@@ -27,11 +28,15 @@ export function FindingDetail({ event, onBack }: {
       </button>
       <div className="min-h-0 flex-1 overflow-y-auto rounded border border-void-700 bg-void-950 p-4">
         <div className="mb-1 flex items-center gap-2">
-          {isReport
-            ? <StatusBadge status={event.status ?? 'no-result'} />
-            : <SeverityBadge severity={severity} />}
+          {isReport && <StatusBadge status={event.status ?? 'no-result'} />}
+          {isNote && (
+            <span className="rounded-sm border border-teal-700 bg-teal-950/60 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-widest text-teal-300">
+              情报
+            </span>
+          )}
+          {!isReport && !isNote && <SeverityBadge severity={severity} />}
           <h2 className="text-[15px] font-semibold text-zinc-100">
-            {isReport ? `任务报告 · ${title}` : title}
+            {isReport ? `任务报告 · ${title}` : isNote ? `情报 · ${title}` : title}
           </h2>
         </div>
         <div className="mb-3 flex flex-wrap items-center gap-3 border-b border-void-700 pb-2 font-mono text-[10.5px] text-zinc-600">

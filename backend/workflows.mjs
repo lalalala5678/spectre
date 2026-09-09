@@ -5,7 +5,7 @@
  *   - announces the engagement (公告) and dispatches one agentTaskWorkflow
  *     child per selected stage agent (私信 dispatch)
  *   - message policy (per product decision):
- *       · child → orchestrator: publish_finding tool → bus 私信(intel)
+ *       · child → orchestrator: publish_vulnerability/publish_intel tool → bus 私信
  *         + followUp into the orchestrator pi session (LLM decides relays)
  *       · orchestrator → children: relay_to_agents tool → orchestratorRelay
  *         signal → targeted dm into child pi sessions
@@ -88,7 +88,7 @@ export async function autoPwnWorkflow(input) {
   const engagement = `autopwn-${engagementId}`;
   const children = new Map();     // agentKey -> child handle
   const inbox = [];               // {kind, from, to, text, summary, payloadRef}
-  const publishedFindings = new Set();  // agentKeys that emitted intel
+  const publishedVulns = new Set();  // agentKeys that emitted intel
   let open = true;
 
   setHandler(signals.agentShare, (msg) => {
@@ -105,10 +105,10 @@ export async function autoPwnWorkflow(input) {
   });
   // child → orchestrator intel: bus journal + followUp happen runtime-side
   // (the tool); the signal also marks the child so its completion share is
-  // skipped — the finding events already represent that output (prevents
-  // the "two FINDINGS for one request" duplication).
+  // skipped — the vuln/intel events already represent that output (prevents
+  // the "two entries for one request" duplication).
   setHandler(signals.agentMessage, (msg) => {
-    publishedFindings.add(msg.from);
+    publishedVulns.add(msg.from);
   });
 
   // Single drain task: journal events + route dms per policy above.
@@ -173,7 +173,7 @@ export async function autoPwnWorkflow(input) {
     try {
       const result = await handle.result();
       results.set(agentKey, result);
-      if (!publishedFindings.has(agentKey)) {
+      if (!publishedVulns.has(agentKey)) {
         await quick.busEmit({
           channel: 'share', from: agentKey, type: 'result',
           title: `${agentKey} 产出`,

@@ -47,12 +47,12 @@ export function StatusBadge({ status }: { status: string }) {
 }
 
 /**
- * FINDINGS list panel: severity badge + one-line title + provenance per
- * entry. SSE-driven (initial snapshot + live events — no polling);
- * `agentKey` scopes the feed to findings authored by that agent only.
+ * VULNERABILITY list panel: severity badge + one-line title + provenance
+ * per entry. SSE-driven (initial snapshot + live events — no polling);
+ * `agentKey` scopes the feed to entries authored by that agent only.
  * Clicking opens the full content in the MAIN window (onOpen).
  */
-export function FindingsPanel({ agentKey, workSessionId, onOpen }: {
+export function VulnPanel({ agentKey, workSessionId, onOpen }: {
   agentKey?: string;
   workSessionId?: string;
   onOpen: (event: ApiBusEvent) => void;
@@ -63,12 +63,13 @@ export function FindingsPanel({ agentKey, workSessionId, onOpen }: {
     let stopped = false;
     const cursor = { v: 0 };
     const accept = (e: ApiBusEvent) => {
-      if (e.type !== 'intel') return false;
+      // 'intel' = legacy pre-rename events — they ARE vulnerabilities
+      if (e.type !== 'vulnerability' && e.type !== 'intel') return false;
       if (!agentKey) {
-        // AutoPwn feed: engagement findings of this project
+        // AutoPwn feed: engagement vulnerabilities of this project
         return e.workSessionId === workSessionId;
       }
-      // direct workspace: own findings from own conversations only
+      // direct workspace: own vulnerabilities from own conversations only
       return e.from === agentKey
         && e.origin === 'direct'
         && e.workSessionId === workSessionId;
@@ -98,13 +99,13 @@ export function FindingsPanel({ agentKey, workSessionId, onOpen }: {
     <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">
       <header className="flex items-center justify-between border-b border-void-700 px-3 py-1.5">
         <h3 className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
-          发现 FINDINGS
+          漏洞 VULNS
         </h3>
         <span className="font-mono text-[10px] text-zinc-600">{events.length}</span>
       </header>
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {events.length === 0 && (
-          <p className="py-3 text-center text-[11px] text-zinc-700">暂无发现</p>
+          <p className="py-3 text-center text-[11px] text-zinc-700">暂无漏洞</p>
         )}
         {events.map(event => {
           const severity = event.severity ?? 'INFO';
