@@ -50,7 +50,7 @@ test('uninstall of an unknown name is a clean no-op', async () => {
   await rmAll();
   await fsp.mkdir(TOOLS, { recursive: true });
   const r = await uninstallCliTool('nonexistent-tool');
-  assert.deepEqual(r, { removed: [], clearedLog: [] });
+  assert.deepEqual(r, { removed: [], aptRemoved: [], clearedLog: [], rewritten: [] });
   await rmAll();
 });
 

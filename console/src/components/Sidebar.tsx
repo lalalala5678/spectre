@@ -18,6 +18,7 @@ export const NAV: { key: RouteKey; label: string; sub: string; icon: React.Eleme
   { key: 'persistence', label: '权限维持', sub: 'Persistence Agent', icon: Anchor, group: 'stage' },
   { key: 'postex', label: '后渗透', sub: 'PostEx Agent', icon: Network, group: 'stage' },
   { key: 'report', label: '报告编写', sub: 'Report Agent', icon: FileText, group: 'stage' },
+  { key: 'reports', label: '任务报告', sub: '闭环交付记录', icon: ClipboardList, group: 'system' },
   { key: 'skills', label: 'Skill 管理', sub: '自定义导入', icon: Puzzle, group: 'system' },
   { key: 'mcp', label: 'MCP Server', sub: '工具链接入', icon: Plug, group: 'system' },
   { key: 'cli', label: 'CLI 工具', sub: '二进制导入', icon: TerminalSquare, group: 'system' },

@@ -198,10 +198,56 @@ export async function listInstalledTools() {
   return res.code === 0 ? res.out.split('\n').filter(Boolean) : [];
 }
 
+/** An install verb must sit at a COMMAND position (segment start, or
+ *  right after && ; | ( ) — a substring match once let a quoted
+ *  `grep -c "apt-get install"` row count as an install row (round-4). */
+const APT_CMD_POS = /(?:^|&&|;|\|\||\||\()\s*(?:sudo\s+)?apt(?:-get)?\s+install\b/;
+/** Rewrite an apt ledger line WITHOUT one package — keeps the row's
+ *  replay value for sibling packages when only one is uninstalled
+ *  (round-4: deleting the whole row orphaned the siblings' replay). */
+export function rewriteAptLineWithout(line, pkg) {
+  // Token-level removal INSIDE the package segment only — a rebuild
+  // from captured pieces once amputated a `2>` redirect (round-5:
+  // replayed row became `jq&1`, backgrounded apt + dpkg lock races).
+  const m = String(line).match(/(apt(?:-get)?\s+install\s+)((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
+  if (!m) return null;
+  const seg = m[3];
+  const cleaned = seg.replace(new RegExp(`(^|\\s)${pkg}(?=\\s|$)`), ' ');
+  if (cleaned === seg) return null;
+  return line.slice(0, m.index) + m[1] + m[2] + cleaned
+    + line.slice(m.index + m[0].length);
+}
+
+export function isAptInstallRow(cmd) {
+  return APT_CMD_POS.test(String(cmd));
+}
+
+/** Heuristic: does this bash command install into the shared layer?
+ *  bash-side installs bypass the install REST, so the adapter layer
+ *  calls this to keep the ledger complete (round-3 review: the ledger
+ *  was write-starved for npm/pip installs). */
+const INSTALL_CMD_RE
+  = /(npm[^|;&]*--prefix[^|;&]*opt\/tools|pip\d?[^|;&]*--target[^|;&]*opt\/tools)/;
+export function looksLikeInstall(command) {
+  return INSTALL_CMD_RE.test(String(command)) || isAptInstallRow(command);
+}
+
+/** List recorded install commands (the shared-layer ledger). */
+export async function readInstallLog() {
+  const file = path.join(HOST.tools, 'install-log');
+  try {
+    const lines = (await fsp.readFile(file, 'utf8')).split('\n');
+    // TSV rows use column 2; a hand-written bare line IS the command
+    // (lenient parse — round-3 review: strict TSV dropped such rows).
+    return lines.map(l => l.includes('\t') ? l.split('\t')[1] : l.trim())
+      .filter(Boolean);
+  } catch { return []; }
+}
+
 /** Remove install-log lines whose command contains `match` — prevents a
  *  container rebuild from resurrecting an uninstalled tool. Returns the
  *  removed command strings. */
-export async function removeInstallLogEntries(match) {
+export async function removeInstallLogEntries(match, keepCmds = new Set()) {
   const file = path.join(HOST.tools, 'install-log');
   let lines;
   try { lines = (await fsp.readFile(file, 'utf8')).split('\n'); }
@@ -209,8 +255,14 @@ export async function removeInstallLogEntries(match) {
   const removed = [];
   const keep = [];
   for (const line of lines) {
-    const cmd = line.split('\t')[1];
-    if (cmd && cmd.includes(match)) removed.push(cmd);
+    const cmd = line.includes('\t') ? line.split('\t')[1] : line.trim();
+    // only real package-manager rows are eligible — a bare
+    // includes(match) once ate unrelated lines that merely mention the
+    // name (a sed cleanup row, round-3 review)
+    const isInstallRow = cmd && cmd.includes(match) && !keepCmds.has(cmd)
+      && (isAptInstallRow(cmd)
+        || /(npm|pip\d?|yarn|pnpm|curl|wget|git clone|make)/.test(cmd));
+    if (isInstallRow) removed.push(cmd);
     else keep.push(line);
   }
   await fsp.writeFile(file, keep.join('\n'), 'utf8');
@@ -218,7 +270,10 @@ export async function removeInstallLogEntries(match) {
 }
 
 async function rmIfFound(p) {
-  try { await fsp.stat(p); } catch { return false; }
+  // lstat, NOT stat: stat FOLLOWS symlinks, so a dangling bin link
+  // (its package dir just removed) reads as ENOENT and could never be
+  // cleaned — the exact bug the round-3 review caught twice.
+  try { await fsp.lstat(p); } catch { return false; }
   await fsp.rm(p, { recursive: true, force: true });
   return true;
 }
@@ -248,8 +303,102 @@ export async function uninstallCliTool(name) {
   } catch { /* py/ absent */ }
   await tryRm(`${HOST.tools}/npm-global/lib/node_modules/${name}`);
   await tryRm(`${HOST.tools}/npm-global/bin/${name}`);
-  const clearedLog = await removeInstallLogEntries(name);
-  return { removed, clearedLog };
+  // sweep bin links that pointed into the removed package dir —
+  // robust against pre-deleted package dirs and non-matching link
+  // names (round-3 review: dangling links survived, exit 127)
+  try {
+    const binDir = `${HOST.tools}/npm-global/bin`;
+    for (const ent of await fsp.readdir(binDir)) {
+      const p = `${binDir}/${ent}`;
+      let target;
+      try { target = await fsp.readlink(p); } catch { continue; }
+      if (target.includes(`node_modules/${name}/`)
+        || target.includes(`node_modules/${name}`) && !/[\w.-]/.test(target.split(`node_modules/${name}`)[1]?.[0] ?? '')) {
+        await tryRm(p);
+      }
+    }
+  } catch { /* bin/ absent */ }
+  // apt-layer uninstall: the ledger accepts apt installs (container-
+  // layer packages NEED replay after rebuild), so removal must be
+  // symmetric — otherwise the ledger row vanishes while the package
+  // stays (round-3 review: audit-chain break, permanent inconsistency).
+  const aptRemoved = [];
+  const ledger = await readInstallLog();
+  const aptLines = ledger.filter(l => isAptInstallRow(l) && l.includes(name));
+  if (aptLines.length) {
+    // Extract ONLY the tokens after `apt(-get) install [flags]`, up to
+    // the next shell control token — real hand-installed ledger lines
+    // are compound commands (`export X=1 && apt-get install -y figlet`);
+    // a naive whitespace split once fed `export`, `&&`, env assignments
+    // to apt-get as package names (round-3 review).
+    const pkgs = [...new Set(aptLines.flatMap(l => {
+      const m = l.match(/apt(?:-get)?\s+(?:install|remove)\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
+      return m ? m[2].trim().split(/\s+/)
+        // strict package-name shape: redirects (2>/dev/null), env
+        // assignments and shell tokens can never look like this
+        .filter(w => /^[\w.+:~-]+$/.test(w)) : [];
+    }))];
+    // P0: zero extracted names must ABORT — a bare `apt-get remove
+    // --purge` exits 0 having removed nothing, the receipt would then
+    // claim success while packages stay (round-3 review).
+    if (!pkgs.length) {
+      aptRemoved.push(`ABORTED: 账本有 apt 行但提取到 0 个包名`
+        + `(行:${aptLines[0].slice(0, 120)});请 bash 手动 apt-get purge ${name}`);
+    } else {
+      // No collateral removal (round-4 review): uninstall ONLY the
+      // requested name; same-row siblings stay (receipt says so).
+      const siblings = pkgs.filter(p => p !== name);
+      const targets = pkgs.includes(name) ? [name] : pkgs;
+      const rmCmd = `apt-get remove -y --purge ${targets.join(' ')}`;
+      const res = cfg.driver === 'docker'
+        ? await run('docker', ['exec', cfg.container, 'bash', '-lc', rmCmd], 120)
+        : await run('bash', ['-lc', rmCmd], 120);
+      // P0: exit 0 is NOT proof — dpkg -l must show no 'ii' rows for
+      // the packages before this counts as removed.
+      let verified = res.code === 0;
+      if (verified) {
+        const chk = await run('bash', ['-lc',
+          `dpkg -l ${targets.join(' ')} 2>/dev/null | grep -c '^ii' || true`], 60);
+        verified = String(chk.out ?? '').trim() === '0';
+      }
+      const noteTail = (siblings.length
+        ? `(同账本行还装了 ${siblings.join(',')},未动——如需一并卸载请分别 uninstall)` : '')
+        + (verified ? `(dpkg -l 复验:${targets.join(',')} 已无 ii 行)` : '');
+      if (verified) {
+        // alternatives awareness: `which figlet` can still hit a
+        // symlink owned by another package (toilet's figlet) — the
+        // receipt must not read as failure, nor stay silent (round-5)
+        const alt = await run('bash', ['-lc',
+          `command -v ${name} || true`], 30);
+        const altNote = String(alt.out ?? '').trim()
+          ? `(注:command -v ${name} 仍命中——dpkg 层已移除,命令可能来自 alternatives/系统其它包提供)` : '';
+        aptRemoved.push(rmCmd + noteTail + altNote);
+      }
+      else aptRemoved.push(`FAILED(${res.code}): ${rmCmd}`
+        + `(包可能残留,请 bash dpkg -l 复核并手动处理)`);
+    }
+  }
+  // ABORT keeps its ledger rows — deleting them would orphan really
+  // installed packages (ghost window, round-4 P2)
+  const aborted = aptRemoved.some(a => a.startsWith('ABORTED'));
+  const abortKeep = new Set(aborted ? aptLines : []);
+  const clearedLog = await removeInstallLogEntries(name, abortKeep);
+  // Sibling-preserving rewrite: a row that installed figlet+jq loses
+  // only figlet — the rewritten row keeps jq's replay value intact.
+  if (!aborted) {
+    const rewrites = [];
+    for (const line of aptLines) {
+      const m = String(line).match(/apt(?:-get)?\s+install\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
+      const pkgs2 = m ? m[2].trim().split(/\s+/).filter(w => /^[\w.+:~-]+$/.test(w)) : [];
+      if (pkgs2.length > 1 && pkgs2.includes(name)) {
+        const rw = rewriteAptLineWithout(line, name);
+        if (rw && /\binstall\b/.test(rw)) rewrites.push(rw);
+      }
+    }
+    for (const rw of rewrites) await appendInstallLog(rw);
+    return { removed, aptRemoved, clearedLog, rewritten: rewrites };
+  }
+  return { removed, aptRemoved, clearedLog, rewritten: [] };
 }
 
 export { ensureWorkspace };

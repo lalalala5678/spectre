@@ -51,6 +51,15 @@ export function mcpServersFor(agentKey) {
 
 // ------------------------------------------------------- JSON-RPC stdio
 
+/** Keep the HEAD of stderr (the `Error: ...` first line lives there —
+ *  a tail-only clip once amputated exactly that line; review round 1). */
+function clipStderr(t) {
+  if (!t) return '';
+  const flat = String(t).replace(/\s+$/g, '');
+  return flat.length <= 600 ? flat
+    : flat.slice(0, 400) + '\n…(中段省略)…\n' + flat.slice(-200);
+}
+
 class StdioRpc {
   constructor(argv, env) {
     this.argv = argv;
@@ -66,9 +75,21 @@ class StdioRpc {
     });
     this.child.stdout.on('data', d => this._onData(d));
     this.child.stderr.on('data', d => { this.stderr = (this.stderr ?? '') + d; });
-    this.child.on('close', () => {
+    // spawn failures (ENOENT etc) emit 'error', NOT 'close' — an
+    // unhandled 'error' once crashed the whole runtime (round-2 review
+    // hit it with a nonexistent command). Drain it into the same
+    // pending-rejection path as 'close'.
+    this.child.on('error', e => {
+      this.spawnError = `spawn ${this.argv[0]}: ${e.message}`;
       for (const p of this.pending.values()) {
-        p.reject(new Error(`MCP server exited: ${this.stderr?.slice(-300) ?? ''}`));
+        p.reject(new Error(`${this.spawnError} ${clipStderr(this.stderr)}`));
+      }
+      this.pending.clear();
+    });
+    this.child.on('close', code => {
+      for (const p of this.pending.values()) {
+        p.reject(new Error(`MCP server exited (code=${code}):`
+          + ` ${clipStderr(this.stderr)}`));
       }
       this.pending.clear();
     });
@@ -160,17 +181,23 @@ class HttpRpc {
   async start() { return this; }
   async call(method, params) {
     const id = this.nextId++;
-    const res = await fetch(this.url, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json, text/event-stream',
-        'MCP-Protocol-Version': '2025-06-18',
-        ...(this.sessionId ? { 'Mcp-Session-Id': this.sessionId } : {}),
-        ...this.headers,
-      },
-      body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
-    });
+    let res;
+    try {
+      res = await fetch(this.url, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Accept': 'application/json, text/event-stream',
+          'MCP-Protocol-Version': '2025-06-18',
+          ...(this.sessionId ? { 'Mcp-Session-Id': this.sessionId } : {}),
+          ...this.headers,
+        },
+        body: JSON.stringify({ jsonrpc: '2.0', id, method, params }),
+      });
+    } catch (e) {
+      const c = e?.cause ? ` (cause: ${e.cause.code ?? e.cause.message ?? e.cause})` : '';
+      throw new Error(`MCP HTTP 连接失败:${e.message}${c} — url=${this.url}`);
+    }
     const sid = res.headers.get('mcp-session-id');
     if (sid) this.sessionId = sid;
     if (!res.ok) throw new Error(`MCP HTTP ${res.status}`);
@@ -304,6 +331,7 @@ async function _testMcpServer(server) {
     const { tools } = await rpc.call('tools/list', {});
     rpc.close();
     return { ok: true, serverName: init?.serverInfo?.name ?? '?',
+      protocol: init?.protocolVersion ?? '?',
       tools: (tools ?? []).map(t => t.name) };
   } catch (err) {
     return { ok: false, error: err.message };

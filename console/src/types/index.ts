@@ -16,6 +16,7 @@ export type RouteKey =
   | 'persistence'    // 权限维持（隧道搭建等）
   | 'postex'         // 后渗透测试
   | 'report'         // 报告编写
+  | 'reports'        // 任务报告(配置/任务闭环交付)
   | 'skills'         // Skill 管理
   | 'mcp'            // MCP Server 管理
   | 'cli'            // CLI 工具导入

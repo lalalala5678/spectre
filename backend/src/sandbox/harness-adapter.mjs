@@ -5,6 +5,7 @@
  * keeping the official schema, description, truncation and spill
  * semantics byte-for-byte. Zero pi modifications.
  */
+import { looksLikeInstall, appendInstallLog } from './container.mjs';
 import {
   createBashTool, createReadTool, createWriteTool, createEditTool,
 } from '@earendil-works/pi-agent-core';
@@ -43,8 +44,22 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
     execute: async (toolCallId, params, _signal, onUpdate) => {
       const toolContext = { env, ...extraContext };
       const update = typeof onUpdate === 'function' ? onUpdate : () => {};
-      return tool.execute(toolCallId, params, update,
+      // Official bash has NO default timeout by contract; an unset
+      // timeout here has hung whole agent turns (review round 1). The
+      // adapter fills a 300s default WITHOUT touching the official
+      // schema — agents can still pass a larger explicit value.
+      const finalParams = tool.name === 'bash' && params.timeout === undefined
+        ? { ...params, timeout: 300 } : params;
+      // Shared-layer install bookkeeping: bash-side installs bypass the
+      // install REST, so record them into the install-log ledger here
+      // (idempotent dedupe via last-line check).
+      const out = await tool.execute(toolCallId, finalParams, update,
         toolContext, stubInvocation(toolCallId), PI_CONTEXT);
+      if (tool.name === 'bash' && typeof params.command === 'string'
+        && looksLikeInstall(params.command)) {
+        appendInstallLog(params.command).catch(() => {});
+      }
+      return out;
     },
   };
 }

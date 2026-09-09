@@ -232,6 +232,36 @@ const caps = {
     };
   },
 
+  /** wake_agent tool backing — the mandatory post-config verification
+   *  step: spawn a DETACHED business-agent session (no dispatch tree,
+   *  no quota — same detach rules as the report writer), ask it to
+   *  confirm its own toolface state, await its reply, return it. */
+  wakeAgent: async (requesterRecord, agentKey, question) => {
+    const target = store.create(agentKey, {
+      workSessionId: requesterRecord.workSessionId ?? null,
+      name: `唤醒验证:${agentKey}`,
+      description: `配置验证:${String(question).slice(0, 60)}`,
+    });
+    store.prompt(target,
+      `【配置验证】配置智能体 ${requesterRecord.agentKey} 刚完成了工具配置变更,需要你从自己的工具面确认状态。\n` +
+      `问题:${question}\n\n` +
+      `要求:只做验证本身——检查你的技能索引/工具清单,必要时实际调用一次,` +
+      `把回执要点如实报告。不要展开其它任务。完成后一句话结论即可。`, 'system');
+    await store.awaitCompletion(target);
+    const msgs = target.agent.state.messages;
+    const textOf = m => typeof m.content === 'string' ? m.content
+      : (m.content?.filter?.(c => c.type === 'text')
+        ?.map(c => c.text)?.join('') ?? '');
+    const last = [...msgs].reverse()
+      .find(m => m.role === 'assistant' && textOf(m).trim());
+    const reply = last ? textOf(last) : '(无输出)';
+    return {
+      ok: Boolean(last),
+      text: `${agentKey} 的验证答复:\n${reply.slice(0, 1200)}\n` +
+        `(验证会话 ${target.id},read_session 可复盘)`,
+    };
+  },
+
   /** revise_entry tool backing. Vuln targets: writer sessions only
    *  (enforcement point for the review mandate); notes/reports: any
    *  agent (shared working records — reason rides for audit). */

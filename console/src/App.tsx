@@ -7,6 +7,7 @@ import { McpPage } from './pages/McpPage';
 import { CliPage } from './pages/CliPage';
 import { getPrefs } from './api/worksession';
 import { AuditPage } from './pages/AuditPage';
+import { TaskReportsPage } from './pages/TaskReportsPage';
 import type { RouteKey } from './types';
 
 const STAGE_ROUTES: RouteKey[] = [
@@ -30,7 +31,7 @@ const AGENT_OF_ROUTE: Record<string, string> = {
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
     const h = window.location.hash.replace('#', '') as RouteKey;
-    const valid: RouteKey[] = [...STAGE_ROUTES, 'skills', 'mcp', 'cli', 'audit'];
+    const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit'];
     return valid.includes(h) ? h : 'autopwn';
   });
 
@@ -58,6 +59,8 @@ export default function App() {
             <div className="h-full overflow-hidden p-4"><McpPage wsId={wsId ?? ''} /></div>
           ) : route === 'cli' ? (
             <div className="h-full overflow-hidden p-4"><CliPage wsId={wsId ?? ''} /></div>
+          ) : route === 'reports' ? (
+            <div className="h-full overflow-hidden p-4"><TaskReportsPage /></div>
           ) : (
             <div className="h-full overflow-y-auto p-4"><AuditPage /></div>
           )}

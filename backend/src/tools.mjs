@@ -298,7 +298,7 @@ export function buildIntelTools(record, caps) {
         section('后续建议', params.nextSteps);
       record.taskReportCount += 1;
       record.lastReport = { title: params.title, status };
-      caps.emitBus({
+      const ev = caps.emitBus({
         channel: 'share', from: record.agentKey, type: 'task-report',
         author: caps.authorOf?.(record) ?? null,
         status,
@@ -331,7 +331,7 @@ export function buildIntelTools(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `任务报告已入库(${status})${note}:《${params.title}》。全项目智能体可经 query_intel 读取。${warnText}`,
+          text: `任务报告已入库(seq=${ev?.seq ?? '?'})(${status})${note}:《${params.title}》。全项目智能体可经 query_intel 读取,revise_entry 修订请用此 seq。${warnText}`,
         }],
       };
     },
