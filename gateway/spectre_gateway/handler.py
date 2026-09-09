@@ -117,6 +117,32 @@ class GatewayHandler(BaseHTTPRequestHandler):
 
     # ---------- POST ----------
 
+    def do_PUT(self):
+        # API mutations (projects/prefs/revise…) ride PUT through the
+        # same authenticated proxy path as POST.
+        path = urllib.parse.urlsplit(self.path).path
+        if not path.startswith(config.PREFIX):
+            return self._send(404, b"not found")
+        rel = path[len(config.PREFIX):]
+        if rel.startswith("/api/"):
+            if not self._session():
+                audit("auth_redirect", ip=self.client_ip(), path=rel)
+                return self._redirect(config.PREFIX + "/login")
+            return self._proxy(rel)
+        return self._send(405, b"method not allowed")
+
+    def do_DELETE(self):
+        path = urllib.parse.urlsplit(self.path).path
+        if not path.startswith(config.PREFIX):
+            return self._send(404, b"not found")
+        rel = path[len(config.PREFIX):]
+        if rel.startswith("/api/"):
+            if not self._session():
+                audit("auth_redirect", ip=self.client_ip(), path=rel)
+                return self._redirect(config.PREFIX + "/login")
+            return self._proxy(rel)
+        return self._send(405, b"method not allowed")
+
     def do_POST(self):
         path = urllib.parse.urlsplit(self.path).path
         if not path.startswith(config.PREFIX):

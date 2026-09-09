@@ -17,17 +17,15 @@ import { TaskReportsPanel } from '../components/session/TaskReportsPanel';
 import { IntelNotesPanel } from '../components/session/IntelNotesPanel';
 import { BusView } from './BusView';
 import { cn } from '../utils/cn';
-
 import {
-  ensureWorkSession, listWorkSessions, newWorkSession, smallSessionSlot,
-  switchWorkSession, cnNumber, type WorkSession,
+  ensureWorkSession, listWorkSessions, newWorkSession, switchWorkSession,
+  setLastSession, putPrefsSync, getPrefs, cnNumber, type WorkSession,
 } from '../api/worksession';
 
 // Right column: proportional width (vw), never a fixed pixel band — adapts
 // to any screen. The user preference is a RATIO, so a width dragged on one
 // monitor re-proportions on another. No artificial limits: only a physical
 // guard so elements stay interactive.
-const RIGHT_RATIO_KEY = 'spectre.panel.rightRatio';
 const DEFAULT_RIGHT_RATIO = 0.24;
 
 const errText = (e: unknown) => String(e instanceof Error ? e.message : e);
@@ -37,7 +35,24 @@ const errText = (e: unknown) => String(e instanceof Error ? e.message : e);
 export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const liveKey = agent.id === 'orchestrator' ? 'autopwn' : agent.id;
   const [tab, setTab] = useState<'session' | 'bus' | 'config' | 'history'>('session');
-  const [workSession, setWorkSession] = useState<WorkSession>(() => ensureWorkSession());
+  const [workSession, setWorkSession] = useState<WorkSession | null>(null);
+  const [projects, setProjects] = useState<WorkSession[]>([]);
+  // Server-side UI prefs mirror (panel ratios) — filled at boot.
+  const uiPrefsRef = useRef<{ rightRatio?: number } | null>(null);
+  // Boot: resolve the active project from the SERVER (prefs+registry);
+  // the browser knows nothing. null → full-workspace loading skeleton.
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([ensureWorkSession(), getPrefs()]).then(async ([ws, prefs]) => {
+      if (cancelled) return;
+      uiPrefsRef.current = prefs.ui ?? {};
+      setWorkSession(ws);
+      setUiReady(true);
+      setProjects(await listWorkSessions());
+    }).catch(err => setWsError(errText(err)));
+    return () => { cancelled = true; };
+  }, []);
+  const [uiReady, setUiReady] = useState(false);
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);
@@ -58,12 +73,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // (reachable via drill) and left-sidebar workspaces are independent of
   // AutoPwn and of sibling tasks.
   useEffect(() => {
-    // NOTE: an earlier `bootstrappedFor` ref-guard broke RE-visiting a
-    // project (scope A → B → A skipped the second A entirely: the
-    // transcript stayed on the skeleton/old project forever, no detail
-    // fetch). The cancelled flag below already dedups StrictMode
-    // double-runs; every genuine workSession/liveKey change MUST run.
-    const scope = `${workSession.id}:${liveKey}`;
+    if (!workSession) return;  // still resolving the project (server boot)
+    const ws = workSession;
+    const scope = `${ws.id}:${liveKey}`;
     void scope;
     // Optimistic clear (project-switch perceived latency): the OLD
     // project's transcript used to linger until this async finished —
@@ -81,10 +93,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       if (cancelled) return;
       const mine = all.filter(s =>
         s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
-        && s.workSessionId === workSession.id,
+        && s.workSessionId === ws.id,
       );
-      const slot = smallSessionSlot(workSession.id, liveKey);
-      const remembered = localStorage.getItem(slot);
+      // remembered conversation lives on the project record (server)
+      const remembered = ws.lastSessions?.[liveKey] ?? null;
       const restored = remembered && mine.find(s => s.id === remembered);
       if (restored) {
         if (cancelled) return;
@@ -93,16 +105,16 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       } else if (mine.length > 0) {
         if (cancelled) return;
         const latest = mine[mine.length - 1].id;
-        localStorage.setItem(slot, latest);  // heal empty/stale slot
+        void setLastSession(ws.id, liveKey, latest); // heal stale
         setMySessions(mine);
         setSessionId(latest);
       } else {
         const created = await api<ApiSessionSummary>('/sessions', {
           method: 'POST',
-          json: { agentKey: liveKey, workSessionId: workSession.id },
+          json: { agentKey: liveKey, workSessionId: ws.id },
         });
         if (cancelled) return;
-        localStorage.setItem(slot, created.id);
+        void setLastSession(ws.id, liveKey, created.id);
         setMySessions([created]);
         setSessionId(created.id);
       }
@@ -118,6 +130,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // seconds after each exchange — without polling the panel stays on the
   // bootstrap snapshot forever.
   useEffect(() => {
+    if (!workSession) return;
+    const wsId = workSession.id;
     let stopped = false;
     const load = async () => {
       try {
@@ -125,7 +139,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         const all = await api<ApiSessionSummary[]>('/sessions');
         const mine = all.filter(s =>
           s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
-          && s.workSessionId === workSession.id,
+          && s.workSessionId === wsId,
         );
         // Dedup: identical content must not create a new array — poll
         // re-renders were the trigger of the scroll-jump class of bugs.
@@ -139,14 +153,14 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     };
     const timer = setInterval(load, 4000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [liveKey, workSession.id]);
+  }, [liveKey, workSession?.id]);
 
   const switchSession = (id: string) => {
     setSessionId(id);
     setDrillSession(null);
     setEntryView(null);
     setSwitcherOpen(false);
-    localStorage.setItem(smallSessionSlot(workSession.id, liveKey), id);
+    void setLastSession(workSession!.id, liveKey, id);
   };
 
   /** New conversation ("会话N+1") for THIS agent inside the current task. */
@@ -154,7 +168,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     try {
       const created = await api<ApiSessionSummary>('/sessions', {
         method: 'POST',
-        json: { agentKey: liveKey, workSessionId: workSession.id },
+        json: { agentKey: liveKey, workSessionId: workSession!.id },
       });
       setMySessions(prev => [...prev, created]);
       switchSession(created.id);
@@ -168,7 +182,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const startNewProject = () => {
     const name = projectName.trim();
     if (!name) return;
-    setWorkSession(newWorkSession(name));
+    void newWorkSession(name).then(ws2 => setWorkSession(ws2));
     setProjectName('');
     setNaming(false);
     setSwitcherOpen(false);
@@ -178,7 +192,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // Right column width as a viewport ratio: user-draggable, persisted as a
   // ratio (adapts across monitors), CSS does all the math on resize.
   const [rightRatio, setRightRatio] = useState<number>(() => {
-    const saved = Number(localStorage.getItem(RIGHT_RATIO_KEY));
+    const saved = Number(uiPrefsRef.current?.rightRatio);
     return saved > 0.02 && saved < 0.98 ? saved : DEFAULT_RIGHT_RATIO;
   });
   const dragW = useRef<{ startX: number; startW: number; moved: boolean } | null>(null);
@@ -194,7 +208,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   /** A held session id died (runtime restart — known limitation #1).
    *  Drop the stale slot and re-bootstrap this workspace. */
   const handleSessionGone = useCallback(() => {
-    localStorage.removeItem(smallSessionSlot(workSession.id, liveKey));
+            // server-side slot heals itself (bootstrap falls back to latest)
     setDrillSession(null);
     setEntryView(null);
     setSessionId(null);
@@ -202,7 +216,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // Stable identity: LiveSession's fetch effect depends on onGone — a
     // fresh function per render made it refetch (and scroll to bottom)
     // on every poll tick.
-  }, [workSession.id, liveKey]);
+  }, [workSession?.id, liveKey]);
   const closeDrill = useCallback(() => setDrillSession(null), []);
   const onResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragW.current) return;
@@ -214,17 +228,21 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   };
   const onResizeUp = () => {
     if (dragW.current?.moved) {
-      localStorage.setItem(RIGHT_RATIO_KEY, rightRatio.toFixed(3));
+      void putPrefsSync({ ui: { rightRatio } });
     }
     dragW.current = null;
   };
   const resetRightW = () => {
-    localStorage.removeItem(RIGHT_RATIO_KEY);
+    void putPrefsSync({ ui: { rightRatio: 0.3 } });
     setRightRatio(DEFAULT_RIGHT_RATIO);
   };
   const pickWorkSession = (id: string) => {
-    const next = switchWorkSession(id);
-    if (next) setWorkSession(next);
+    void switchWorkSession(id).then(async next => {
+      if (next) {
+        setWorkSession(next);
+        setProjects(await listWorkSessions());
+      }
+    });
     setSwitcherOpen(false);
   };
 
@@ -234,6 +252,16 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
     .map((s, i) => ({ ...s, name: `会话${cnNumber(i + 1)}` }));
   const current = mySessions.find(s => s.id === (drillSession ?? sessionId));
+
+  if (!workSession || !uiReady) {
+    return (
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
+        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" />
+        <p className="animate-pulse text-[11.5px] text-zinc-500">正在载入项目…（服务端）</p>
+        {wsError && <p className="text-[11px] text-red-400">{wsError}</p>}
+      </div>
+    );
+  }
 
   return (
     <div className="flex h-full min-h-0 flex-col">
@@ -296,7 +324,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                 </button>
               )}
               <div className="max-h-64 overflow-y-auto">
-                {listWorkSessions().slice().reverse().map(ws => (
+                {projects.slice().reverse().map((ws: WorkSession) => (
                   <button
                     key={ws.id}
                     onClick={() => pickWorkSession(ws.id)}

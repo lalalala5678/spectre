@@ -15,6 +15,7 @@ import { injectionOriginOf } from './sessions.mjs';
 import { entryKind as entryKindOf } from './tools.mjs';
 import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
+import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
 import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 
@@ -38,7 +39,7 @@ function requireFields(res, body, fields) {
  * @param {{store: import('./sessions.mjs').SessionStore,
  *          bus: import('./bus.mjs').Bus}} deps
  */
-export function createRouter({ store, bus, caps }) {
+export function createRouter({ store, bus, caps, wal }) {
   return async function route(req, res, url) {
     const path = url.pathname;
     const method = req.method;
@@ -103,6 +104,9 @@ export function createRouter({ store, bus, caps }) {
       }
       if (body.workSessionId) {
         opts.workSessionId = String(body.workSessionId).slice(0, 64);
+        // auto-register unknown project ids (sessions may arrive before
+        // the console ever created the project)
+        ensureProject(opts.workSessionId, wal);
       }
       if (body.parentSessionId) {
         opts.parentSessionId = String(body.parentSessionId).slice(0, 64);
@@ -200,6 +204,46 @@ export function createRouter({ store, bus, caps }) {
         store.markReportSynthesized(record, meta);
         return json(res, 200, { count: record.taskReportCount });
       }
+    }
+
+    // ---------- projects & prefs (server-side; browser stores nothing) ----------
+    if (path === '/api/projects' && method === 'GET') {
+      return json(res, 200, listProjects());
+    }
+    if (path === '/api/projects' && method === 'POST') {
+      const body = await readJson(req);
+      // migration batch: {projects: [...]} registers legacy browser-side
+      // entries verbatim (keeps ids so existing sessions stay grouped)
+      if (Array.isArray(body.projects)) {
+        for (const p of body.projects) {
+          if (p?.id && !getProject(p.id)) {
+            ensureProject(p.id, wal, String(p.label ?? '').slice(0, 60));
+          }
+        }
+        return json(res, 201, listProjects());
+      }
+      const created = createProject(String(body.label ?? ''), wal);
+      setPrefs({ currentWs: created.id }, wal);
+      return json(res, 201, created);
+    }
+    const projMatch = path.match(/^\/api\/projects\/([a-z0-9-]+)$/);
+    if (projMatch && method === 'PUT') {
+      const pid = projMatch[1];
+      const body = await readJson(req);
+      const p = getProject(pid);
+      if (!p) return bad(res, 404, 'project not found');
+      if (body.label !== undefined) renameProject(pid, body.label, wal);
+      if (body.agentKey && body.sessionId) {
+        setLastSession(pid, body.agentKey, body.sessionId, wal);
+      }
+      return json(res, 200, getProject(pid));
+    }
+    if (path === '/api/prefs' && method === 'GET') {
+      return json(res, 200, getPrefs());
+    }
+    if (path === '/api/prefs' && method === 'PUT') {
+      const body = await readJson(req);
+      return json(res, 200, setPrefs(body, wal));
     }
 
     // ---------- sandbox / skills / MCP / CLI management ----------

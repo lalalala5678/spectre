@@ -1,4 +1,6 @@
-import { Fragment, useRef, useState, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+
+import { getPrefs, putPrefsSync } from '../../api/worksession';
 
 /**
  * Vertical panel stack with draggable dividers: each child gets a share of
@@ -15,17 +17,22 @@ export function PanelStack({ storageKey, children }: {
 }) {
   const n = children.length;
   const stackRef = useRef<HTMLDivElement>(null);
-  const [ratios, setRatios] = useState<number[]>(() => {
-    try {
-      const saved = JSON.parse(localStorage.getItem(storageKey) ?? 'null');
+  // Server-side persistence (prefs.ui.stackRatios[storageKey]) — the
+  // browser keeps nothing. Loads async; even split until then.
+  const [ratios, setRatios] = useState<number[]>(() => Array(n).fill(1 / n));
+  useEffect(() => {
+    let cancelled = false;
+    getPrefs().then(prefs => {
+      if (cancelled) return;
+      const saved = prefs.ui?.stackRatios?.[storageKey];
       if (Array.isArray(saved) && saved.length === n
-        && saved.every(v => v > 0 && v < 1)
-        && Math.abs(saved.reduce((a, b) => a + b, 0) - 1) < 0.02) {
-        return saved;
+        && saved.every((v: number) => v > 0 && v < 1)
+        && Math.abs(saved.reduce((a: number, b: number) => a + b, 0) - 1) < 0.02) {
+        setRatios(saved);
       }
-    } catch { /* fall through to even split */ }
-    return Array(n).fill(1 / n);
-  });
+    }).catch(() => { /* even split stays */ });
+    return () => { cancelled = true; };
+  }, [storageKey, n]);
   const drag = useRef<{ i: number; startY: number; a: number; b: number; moved: boolean } | null>(null);
 
   const dividerDown = (e: React.PointerEvent<HTMLDivElement>, i: number) => {
@@ -49,12 +56,12 @@ export function PanelStack({ storageKey, children }: {
   };
   const dividerUp = () => {
     if (drag.current?.moved) {
-      localStorage.setItem(storageKey, JSON.stringify(ratios));
+      void putPrefsSync({ ui: { stackRatios: { [storageKey]: ratios } } });
     }
     drag.current = null;
   };
   const evenSplit = () => {
-    localStorage.removeItem(storageKey);
+    void putPrefsSync({ ui: { stackRatios: { [storageKey]: null } } });
     setRatios(Array(n).fill(1 / n));
   };
 

@@ -25,6 +25,7 @@ import { Summarizer } from './src/summarizer.mjs';
 import { getSpawnSettings } from './src/settings.mjs';
 import { Wal } from './src/persist.mjs';
 import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
+import { projectsFromWal, listProjects, getPrefs } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
 
@@ -55,6 +56,8 @@ for (const e of entries) {
     replay.busEvents.push(e.d);
   }
 }
+// project registry + prefs (server-side, browser stores nothing)
+projectsFromWal(entries);
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
 
@@ -336,6 +339,8 @@ loadSandboxConfig().then(async cfg => {
 const compactWal = () => wal.compact([
   ...store.snapshotForDisk(),
   ...bus.list().map(e => ({ t: 'bus', d: e })),
+  ...listProjects().map(p => ({ t: 'proj', d: p })),
+  { t: 'pref', d: getPrefs() },
 ]);
 compactWal();
 process.on('SIGTERM', () => {
@@ -343,7 +348,7 @@ process.on('SIGTERM', () => {
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 1500).unref();
 });
-const route = createRouter({ store, bus, caps });
+const route = createRouter({ store, bus, caps, wal });
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');

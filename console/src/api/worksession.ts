@@ -1,14 +1,10 @@
 /**
- * Work-session ("大会话") registry — client-side grouping key.
- *
- * One work session is a task container (任务一/任务二…). Inside it, every
- * agent owns its own numbered conversations (会话一/会话二…); numbering is
- * per (work session, agent) and fully independent across agents. The
- * current selection survives navigation and reloads via localStorage.
+ * Work-session ("大会话") — SERVER-SIDE registry. The browser keeps
+ * nothing except the auth cookie: projects, the current selection and
+ * per-agent remembered conversations all live on the runtime (WAL).
+ * Multi-device safe; clearing browser storage loses nothing.
  */
-
-const CURRENT_KEY = 'spectre.ws.current';
-const REGISTRY_KEY = 'spectre.ws.registry';
+import { api } from './client';
 
 const CN_DIGITS = ['零', '一', '二', '三', '四', '五', '六', '七', '八', '九'];
 
@@ -26,65 +22,97 @@ export interface WorkSession {
   id: string;
   label: string;
   createdAt: string;
+  lastSessions?: Record<string, string>;
 }
 
-function readRegistry(): WorkSession[] {
-  try {
-    return JSON.parse(localStorage.getItem(REGISTRY_KEY) ?? '[]');
-  } catch {
-    return [];
-  }
+interface Prefs {
+  currentWs: string | null;
+  ui?: { rightRatio?: number;
+    stackRatios?: Record<string, number[] | null> };
 }
 
-function writeRegistry(entries: WorkSession[]) {
-  localStorage.setItem(REGISTRY_KEY, JSON.stringify(entries));
+export async function listWorkSessions(): Promise<WorkSession[]> {
+  return api<WorkSession[]>('/projects');
 }
 
-/**
- * The active work session, creating the first one (unnamed fallback) when
- * none exists. Projects are always user-named on creation — see
- * newWorkSession(name).
- */
-export function ensureWorkSession(): WorkSession {
-  const id = localStorage.getItem(CURRENT_KEY);
-  const registry = readRegistry();
-  if (id) {
-    const found = registry.find(ws => ws.id === id);
-    if (found) return found;
-  }
-  const created = makeWorkSession('');
-  writeRegistry([...registry, created]);
-  localStorage.setItem(CURRENT_KEY, created.id);
-  return created;
+export async function getPrefs(): Promise<Prefs> {
+  return api<Prefs>('/prefs');
 }
 
-function makeWorkSession(name: string): WorkSession {
-  return {
-    id: `ws-${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 6)}`,
-    label: name.trim() || '未命名项目',
-    createdAt: new Date().toISOString(),
-  };
+export async function putPrefs(patch: Partial<Prefs>): Promise<Prefs> {
+  return api<Prefs>('/prefs', { method: 'PUT', json: patch });
 }
 
-export function listWorkSessions(): WorkSession[] {
-  return readRegistry();
+/** Fire-and-forget UI pref write (panel ratios etc.). */
+export async function putPrefsSync(
+  patch: Partial<Prefs> & { ui?: Record<string, unknown> },
+): Promise<void> {
+  try { await api('/prefs', { method: 'PUT', json: patch }); }
+  catch { /* UI prefs are best-effort */ }
 }
 
-export function switchWorkSession(id: string): WorkSession | null {
-  const found = readRegistry().find(ws => ws.id === id);
-  if (found) localStorage.setItem(CURRENT_KEY, id);
-  return found ?? null;
+export type UiPrefs = Prefs['ui'];
+
+/** Switch the active project (server-side preference). */
+export async function switchWorkSession(id: string): Promise<WorkSession | null> {
+  const all = await listWorkSessions();
+  const found = all.find(ws => ws.id === id) ?? null;
+  if (found) await putPrefs({ currentWs: id });
+  return found;
 }
 
 /** Create a user-named project and make it current. */
-export function newWorkSession(name: string): WorkSession {
-  const registry = readRegistry();
-  const created = makeWorkSession(name);
-  writeRegistry([...registry, created]);
-  localStorage.setItem(CURRENT_KEY, created.id);
-  return created;
+export async function newWorkSession(name: string): Promise<WorkSession> {
+  return api<WorkSession>('/projects', { method: 'POST', json: { label: name } });
 }
 
-/** localStorage slot for the active conversation of one agent in one work session. */
-export const smallSessionSlot = (wsId: string, agentKey: string) =>
-  `spectre.session.${wsId}.${agentKey}`;
+/**
+ * Resolve the active project at boot: current pref → its project →
+ * latest project → (none yet) create the first unnamed one. Also runs
+ * the ONE-TIME migration: legacy browser-side registry entries are
+ * uploaded verbatim (ids preserved so existing sessions stay grouped),
+ * then every spectre.* storage key is wiped — the browser keeps nothing.
+ */
+export async function ensureWorkSession(): Promise<WorkSession> {
+  await migrateLegacyStorage();
+  const [prefs, all] = await Promise.all([getPrefs(), listWorkSessions()]);
+  if (prefs.currentWs) {
+    const found = all.find(p => p.id === prefs.currentWs);
+    if (found) return found;
+  }
+  if (all.length > 0) return all[all.length - 1];
+  return newWorkSession('');
+}
+
+let migrated = false;
+async function migrateLegacyStorage() {
+  if (migrated) return;
+  migrated = true;
+  try {
+    const raw = localStorage.getItem('spectre.ws.registry');
+    if (raw) {
+      const legacy = JSON.parse(raw) as Array<{ id: string; label?: string }>;
+      if (Array.isArray(legacy) && legacy.length) {
+        await api('/projects', { method: 'POST',
+          json: { projects: legacy.map(p => ({ id: p.id, label: p.label })) } });
+      }
+    }
+  } catch { /* registry unreadable — server data wins */ }
+  // Wipe every spectre.* key: browser is cookie-only now.
+  for (const key of Object.keys(localStorage)) {
+    if (key.startsWith('spectre.')) localStorage.removeItem(key);
+  }
+}
+
+/** Remembered conversation of one agent in one project (server-side). */
+export async function setLastSession(wsId: string, agentKey: string,
+  sessionId: string): Promise<void> {
+  await api(`/projects/${wsId}`, { method: 'PUT',
+    json: { agentKey, sessionId } });
+}
+
+export async function getLastSession(wsId: string,
+  agentKey: string): Promise<string | null> {
+  const all = await listWorkSessions();
+  return all.find(p => p.id === wsId)?.lastSessions?.[agentKey] ?? null;
+}
