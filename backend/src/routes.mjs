@@ -362,6 +362,8 @@ export function createRouter({ store, bus, caps, wal }) {
       const name = url2.searchParams.get('name');
       const next = (await loadMcpConfig()).filter(s => s.name !== name);
       await saveMcpConfig(next);
+      const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
+      closeMcpConnection(name);
       const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 200, { deleted: true });

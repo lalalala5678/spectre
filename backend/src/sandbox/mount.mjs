@@ -27,7 +27,11 @@ export async function rebuildMounts(agentKeys) {
     // failures degrade to no-tools (mcpToolsFor already warns), never block
     mcpToolCache.set(key, await mcpToolsFor(key));
   }
-  return { agents: agentKeys.length };
+  // reconcile the connection pool: a server deleted mid-flight must not
+  // leave an orphaned stdio child under the runtime process
+  const { purgeStaleMcpConnections } = await import('./mcp.mjs');
+  const closed = await purgeStaleMcpConnections();
+  return { agents: agentKeys.length, closedConnections: closed };
 }
 
 export function mcpToolsCached(agentKey) {

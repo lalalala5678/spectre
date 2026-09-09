@@ -13,7 +13,7 @@
 import { Type } from '@earendil-works/pi-ai';
 
 import { saveSkill, deleteSkill, listSkillsTree } from './skills.mjs';
-import { saveMcpConfig, loadMcpConfig, testMcpServer } from './mcp.mjs';
+import { saveMcpConfig, loadMcpConfig, testMcpServer, closeMcpConnection } from './mcp.mjs';
 import { listInstalledTools, sandboxConfig, uninstallCliTool } from './container.mjs';
 import { AGENT_KEYS } from '../agents.mjs';
 import { makeExecutionEnv, ensureWorkspaceSync } from './exec-env.mjs';
@@ -207,6 +207,7 @@ function buildAllToolingTools(caps) {
         Type.Literal('sandbox')])),
     }),
     execute: async (_id, p) => {
+      closeMcpConnection(p.name); // re-config: drop the stale connection
       const list = (await loadMcpConfig()).filter(s => s.name !== p.name);
       await saveMcpConfig([...list, p]);
       await rebuildMounts();
@@ -374,7 +375,8 @@ function buildAllToolingTools(caps) {
       const next = (await loadMcpConfig()).filter(s => s.name !== p.name);
       await saveMcpConfig(next);
       await rebuildMounts();
-      return okText(`已注销 MCP server ${p.name}(对新会话生效)。`);
+      closeMcpConnection(p.name); // kill the pooled stdio child, if any
+      return okText(`已注销 MCP server ${p.name}(对新会话生效,后台连接已关闭)。`);
     },
   };
 

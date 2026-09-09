@@ -122,10 +122,30 @@ async function connectStdio(server) {
     const argv = ['docker', 'exec', '-i',
       server.container ?? 'spectre-sandbox', ...server.command];
     const rpc = new StdioRpc(argv, server.env);
-    return rpc.start();
+    const conn = await rpc.start();
+    tieToParentExit(conn);
+    return conn;
   }
   const rpc = new StdioRpc(server.command, server.env);
-  return rpc.start();
+  const conn = await rpc.start();
+  tieToParentExit(conn);
+  return conn;
+}
+
+/** Orphan prevention: a stdio child survives its parent by default
+ *  (reparented to init). 'exit' fires only on normal shutdown — node
+ *  terminates on SIGTERM/SIGINT WITHOUT running exit handlers, so both
+ *  paths are covered explicitly (SIGKILL is systemd's cgroup job). */
+const exitTied = new Set();
+let handlersArmed = false;
+function tieToParentExit(rpc) {
+  exitTied.add(rpc);
+  if (handlersArmed) return;
+  handlersArmed = true;
+  const killAll = () => { for (const r of exitTied) { try { r.close(); } catch {} } };
+  process.once('exit', killAll);
+  process.once('SIGTERM', () => { killAll(); process.exit(0); });
+  process.once('SIGINT', () => { killAll(); process.exit(0); });
 }
 
 // -------------------------------------------------- JSON-RPC over HTTP
@@ -198,6 +218,27 @@ async function connection(server) {
   rpc.call('notifications/initialized', {}).catch(() => {});
   running.set(server.name, rpc);
   return rpc;
+}
+
+/** Close and drop a pooled connection — the config was removed or
+ *  changed, so the child process (stdio) must not outlive it. */
+export function closeMcpConnection(name) {
+  const rpc = running.get(name);
+  if (!rpc) return false;
+  running.delete(name);
+  try { rpc.close(); } catch { /* already gone */ }
+  return true;
+}
+
+/** Reconcile the pool against the config: close connections whose
+ *  server no longer exists (called after every rebuildMounts). */
+export async function purgeStaleMcpConnections() {
+  const names = new Set((await loadMcpConfig()).map(s => s.name));
+  const closed = [];
+  for (const n of [...running.keys()]) {
+    if (!names.has(n) && closeMcpConnection(n)) closed.push(n);
+  }
+  return closed;
 }
 
 /** pi Tool wrappers for one MCP server's tools (schema from listTools). */
