@@ -18,6 +18,7 @@ import { Bus } from './src/bus.mjs';
 import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
 import { entryKind as entryKindOf } from './src/tools.mjs';
+import { emitRevision } from './src/revision.mjs';
 import { buildPi } from './src/pi.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
@@ -226,39 +227,6 @@ const caps = {
     };
   },
 
-  /** Shared revision emitter: append-only — a revision is a NEW event
-   *  (revises: original seq, revision: {n, reason, ...}) never an
-   *  in-place mutation. Callers: agent revise_entry, writer review
-   *  flow, and the console's direct user edit. */
-  emitRevision: ({ target, fields, reason, requestedBy, approvedBy, origin }) => {
-    const chain = bus.list().filter(e => e.revises === target.seq);
-    const n = Math.max(0, ...chain.map(e => e.revision?.n ?? 0)) + 1;
-    const current = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
-    const base = current ?? target;
-    const event = {
-      channel: 'dm',
-      from: target.from,
-      to: target.to,
-      type: target.type,
-      revises: target.seq,
-      title: fields.title ?? base.title,
-      summary: fields.title ?? base.summary,
-      severity: fields.severity !== undefined ? fields.severity : base.severity,
-      status: fields.status !== undefined ? fields.status : base.status,
-      detail: fields.text ?? base.detail,
-      origin: origin ?? 'agent',
-      author: target.author,
-      workSessionId: target.workSessionId ?? null,
-      engagement: target.engagement ?? null,
-      payloadRef: target.payloadRef ?? null,
-      requester: target.requester ?? null,
-      revision: { n, reason, requestedBy: requestedBy ?? null,
-        approvedBy: approvedBy ?? null },
-    };
-    bus.emit(event);
-    return { ...event };
-  },
-
   /** revise_entry tool backing. Vuln targets: writer sessions only
    *  (enforcement point for the review mandate); notes/reports: any
    *  agent (shared working records — reason rides for audit). */
@@ -277,7 +245,7 @@ const caps = {
     // Writer reviewing a REQUEST carries the requester's provenance on its
     // record (revisionWriter sets it) — credit the requester, not the pen.
     const requestedBy = callerRecord.requester?.author ?? authorOfCaller;
-    const event = caps.emitRevision({
+    const event = emitRevision(bus, {
       target, fields: params, reason: params.reason,
       requestedBy, approvedBy: authorOfCaller,
       origin: callerRecord.agentKey === 'report' ? 'writer' : 'agent',

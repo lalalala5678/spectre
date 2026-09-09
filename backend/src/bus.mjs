@@ -57,6 +57,7 @@ export class Bus {
       // at the original seq) + discoverer attribution on writer-published
       // vulnerabilities — previously silently dropped by this whitelist.
       revises: entry.revises ?? null,
+      void: entry.void ?? null,
       revision: entry.revision ?? null,
       requester: entry.requester ?? null,
       detail: entry.detail ? clipMarked(entry.detail, CONFIG.busDetailMaxChars) : null,

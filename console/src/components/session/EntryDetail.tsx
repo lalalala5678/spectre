@@ -33,6 +33,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   const [chain, setChain] = useState<ApiBusEvent[]>([]);
   const [dialogText, setDialogText] = useState('');
   const [dialogBusy, setDialogBusy] = useState(false);
+  const [writerSessionId, setWriterSessionId] = useState<string | null>(null);
   const [dialogDone, setDialogDone] = useState('');
   const [editing, setEditing] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
@@ -70,8 +71,10 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
     if (!dialogText.trim()) return;
     setDialogBusy(true); setDialogDone('');
     try {
-      await reviseEntryViaAgent(event.seq, dialogText.trim());
-      setDialogDone('已提交报告智能体，撰写中…（落账后自动刷新）');
+      const r = await reviseEntryViaAgent(event.seq, dialogText.trim());
+      setDialogDone(`已提交报告智能体，撰写中…（落账后自动刷新；若被驳回，` +
+        `点此查看撰写对话的判定理由）`);
+      setWriterSessionId(r.sessionId);
     } catch (err) {
       setDialogDone(`提交失败:${String(err)}`);
       setDialogBusy(false);
@@ -95,9 +98,14 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             </span>
           )}
           {isVuln && <SeverityBadge severity={severity} />}
-          <h2 className="text-[15px] font-semibold text-zinc-100">
+          <h2 className={cn('text-[15px] font-semibold text-zinc-100', folded.current.void && 'text-zinc-500 line-through')}>
             {isReport ? `任务报告 · ${title}` : isNote ? `情报 · ${title}` : title}
           </h2>
+          {Boolean(folded.current.void) && (
+            <span className="rounded-sm border border-zinc-600 bg-void-800 px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-zinc-500 line-through">
+              已作废
+            </span>
+          )}
           {folded.revisedCount > 0 && (
             <span className="rounded-sm border border-sky-800 bg-sky-950/40 px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-sky-300">
               ⟳ 已修订 {folded.revisedCount} 次
@@ -235,10 +243,19 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             </button>
           </div>
           {dialogDone && (
-            <p className={cn('mt-1.5 text-[11px]',
-              dialogDone.includes('失败') ? 'text-red-400' : 'text-sky-400')}>
-              {dialogDone}
-            </p>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
+              <p className={cn(dialogDone.includes('失败') ? 'text-red-400' : 'text-sky-400')}>
+                {dialogDone}
+              </p>
+              {writerSessionId && onOpenSession && (
+                <button
+                  onClick={() => onOpenSession(writerSessionId)}
+                  className="rounded-sm border border-orange-800/70 bg-orange-950/20 px-2 py-0.5 text-[10px] text-orange-300/90 hover:border-orange-600"
+                >
+                  打开撰写对话
+                </button>
+              )}
+            </div>
           )}
         </div>
       </div>

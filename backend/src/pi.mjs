@@ -79,18 +79,9 @@ export const STAGE_PROMPT = [
   'You are an operator agent inside SPECTRE, a blackbox pentest console.',
   'You collaborate with other stage agents (recon, nday, weakcred, api, exploit,',
   'phish, c2, persistence, postex, report) coordinated by an AutoPwn orchestrator.',
-  'You have intel tools: query_intel [read-only] reads the project intel base. ' +
-  'Depending on your session type you also have: report_vulnerability ' +
-  '(one-sentence vulnerability claim — a dedicated report-writer agent ' +
-  'reads YOUR transcript, verifies, and either publishes the formal ' +
-  'record or declines; the call is synchronous and returns the verdict), ' +
-  'publish_intel (any info that might help the task), submit_task_report, ' +
-  'and spawn_agent. In direct user conversations you have the same minus ' +
-  'spawn. You NEVER write vulnerability records yourself — report the ' +
-  'lead in one sentence and let the writer do the rest. To correct a ' +
-  'published intel note or task report use revise_entry (reason is ' +
-  'audited); to correct a published vulnerability use ' +
-  'request_vulnerability_revision (writer-reviewed).',
+  'Your registered tool list is appended at the end of this prompt — it is ' +
+  'generated from the ACTUAL tools of this session; when in doubt trust ' +
+  'the list, never assume a tool exists.',
   'When your task lacks context (targets, platforms, credentials, scope), FIRST',
   'call query_intel to read other agents\' task reports, vulnerabilities and',
   'intel notes in this',
@@ -271,3 +262,25 @@ function textOf(content) {
   }
   return '';
 }
+
+/**
+ * Tool-usage guidance injected together with the DYNAMIC tool list
+ * (appended to every session's system prompt by _buildAgent). Keeping
+ * the guidance next to the generated list (instead of a static roster
+ * inside STAGE_PROMPT) kills the prompt/matrix drift that made the
+ * root orchestrator believe it had tools it didn't (live regression
+ * finding) — the list is now generated from the registered tools.
+ */
+export const TOOLS_GUIDE = [
+  '## 本会话注册工具(以此清单为准,描述见各工具 schema)',
+  '- query_intel: [read-only] 查项目情报库(漏洞/情报/任务报告,折叠显示现行版)',
+  '- read_session: [read-only] 按 sessionId/payloadRef 读源会话',
+  '- submit_task_report: 派发任务结束前必交(status 可推断;vulns 引用漏洞标题)',
+  '- report_vulnerability: 一句话上报漏洞线索——报告agent 读你的会话上下文、',
+  '  独立验证后落账或驳回,同步回执判定。你绝不自己写漏洞记录。',
+  '- publish_intel: 任何可能对任务有利的信息,低门槛,直接发布',
+  '- revise_entry: 修订情报/任务报告(任意agent,reason留审计);writer 可修订漏洞',
+  '- request_vulnerability_revision: 漏洞修订申请——writer 审核必要性与正确性',
+  '- spawn_agent / dispatch_agents / relay_to_agents: 派生/批量调度/定向转发',
+  '- publish_vulnerability: 仅报告agent会话持有——漏洞落账唯一入口',
+].join('\n');

@@ -13,7 +13,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, TOOLS_GUIDE, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
 
@@ -135,25 +135,29 @@ export class SessionStore {
   _buildAgent(record, messages = []) {
     const isOrchestrator = record.agentKey === ORCHESTRATOR_KEY;
     const hasParent = Boolean(record.engagementId || record.parentSessionId);
+    // Tool matrix: orchestrators stack child OUTPUT tools (report/
+    // publish/revise-request — the orchestrator is the one agent that
+    // sees the whole project, it must be able to file leads; live
+    // regression proved the static roster lied to it) minus the
+    // duplicate spawn_agent; every agent queries intel.
+    const tools = isOrchestrator
+      ? [
+        ...buildOrchestratorTools(record, this.caps),
+        ...buildChildTools(record, this.caps).filter(t => t.name !== 'spawn_agent'),
+        ...buildIntelTools(record, this.caps),
+      ]
+      : hasParent
+        ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps)]
+        : [...buildDirectTools(record, this.caps),
+          ...buildIntelTools(record, this.caps)];
     const agent = new Agent({
       initialState: {
-        systemPrompt: isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT,
+        // Dynamic tool roster: generated from the ACTUAL registered set —
+        // the prompt can never again claim a tool this session lacks.
+        systemPrompt: `${isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT}\n\n` +
+          `${TOOLS_GUIDE}\n${tools.map(t => `- ${t.name}`).join('\n')}`,
         model: this.model,
-        // Tool matrix: sub-orchestrators (spawned autopwn) stack child
-        // powers minus their duplicate spawn_agent; every agent can query
-        // intel; only task-executing sessions can submit reports.
-        tools: isOrchestrator
-          ? [
-            ...buildOrchestratorTools(record, this.caps),
-            ...(hasParent
-              ? buildChildTools(record, this.caps).filter(t => t.name !== 'spawn_agent')
-              : []),
-            ...buildIntelTools(record, this.caps),
-          ]
-          : hasParent && !isOrchestrator
-            ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps)]
-            : [...buildDirectTools(record, this.caps),
-              ...buildIntelTools(record, this.caps)],
+        tools,
         // GLM always-thinking models reject 'off'; 'low' is the fastest
         // supported tier (see thinkingLevelMap in pi.mjs).
         thinkingLevel: 'low',

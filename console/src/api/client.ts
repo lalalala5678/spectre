@@ -76,6 +76,7 @@ export interface ApiBusEvent {
   status?: string | null;
   /** revision chain: this event revises the entry with that seq */
   revises?: number | null;
+  void?: boolean | null;
   revision?: {
     n: number;
     reason: string;
@@ -200,24 +201,33 @@ export function subscribeSse(
 export function foldEntries(events: ApiBusEvent[]): Array<ApiBusEvent & {
   current: ApiBusEvent;
   revisedCount: number;
+  orphaned?: boolean;
 }> {
   const byOriginal = new Map<number, ApiBusEvent>();
+  const counts = new Map<number, number>();
+  const known = new Set(events.filter(e => !e.revises).map(e => e.seq));
   for (const e of events) {
     if (!e.revises) continue;
     const cur = byOriginal.get(e.revises);
     if (!cur || (e.revision?.n ?? 0) >= (cur.revision?.n ?? 0)) {
       byOriginal.set(e.revises, e);
     }
-  }
-  const counts = new Map<number, number>();
-  for (const e of events) {
-    if (!e.revises) continue;
     counts.set(e.revises, Math.max(counts.get(e.revises) ?? 0, e.revision?.n ?? 0));
   }
-  return events
-    .filter((e): boolean => !e.revises)
-    .map(e => ({ ...e, current: byOriginal.get(e.seq) ?? e,
-      revisedCount: counts.get(e.seq) ?? 0 }));
+  const out: Array<ApiBusEvent & { current: ApiBusEvent; revisedCount: number; orphaned?: boolean }> = [];
+  const orphans = new Set<number>();
+  for (const e of events) {
+    if (!e.revises) {
+      out.push({ ...e, current: byOriginal.get(e.seq) ?? e,
+        revisedCount: counts.get(e.seq) ?? 0 });
+    } else if (!known.has(e.revises) && !orphans.has(e.revises)) {
+      // original trimmed past the bus journal — surface standalone
+      orphans.add(e.revises);
+      out.push({ ...e, current: e, revisedCount: counts.get(e.revises) ?? 0,
+        orphaned: true });
+    }
+  }
+  return out;
 }
 
 /** Direct user edit — human is the final authority, lands immediately. */

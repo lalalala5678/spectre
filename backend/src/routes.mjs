@@ -13,6 +13,7 @@ import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
 import { injectionOriginOf } from './sessions.mjs';
 import { entryKind as entryKindOf } from './tools.mjs';
+import { emitRevision } from './revision.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 
@@ -221,7 +222,7 @@ export function createRouter({ store, bus, caps }) {
       if (!Object.keys(fields).length) {
         return bad(res, 400, 'nothing to revise');
       }
-      const event = caps.emitRevision({
+      const event = emitRevision(bus, {
         target, fields, reason: String(body.reason || '用户直接编辑'),
         requestedBy: { key: 'user', name: '用户', typeLabel: '人工',
           treePath: '用户', depth: 0 },

@@ -17,6 +17,7 @@ import { Type } from '@earendil-works/pi-ai';
 
 import { CONFIG } from './config.mjs';
 import { clipMarked } from './pi.mjs';
+import { foldRevisions } from './revision.mjs';
 
 const STAGE_KEYS = [
   'recon', 'nday', 'weakcred', 'api', 'exploit',
@@ -35,34 +36,6 @@ const spawnStageEnum = Type.Enum(
   Object.fromEntries(SPAWNABLE_KEYS.map((key) => [key, key])),
 );
 
-
-/**
- * Revision folding (backend twin of the console's foldEntries). Bus is
- * append-only: a revision is a NEW event carrying `revises: <original
- * seq>` + full replacement content. Fold = originals keep their slot;
- * the newest revision (max revision.n) is the CURRENT version; the
- * chain stays auditable. Matching/counting run on CURRENT versions.
- */
-function foldRevisions(events) {
-  const byOriginal = new Map(); // originalSeq -> newest revision event
-  for (const e of events) {
-    if (!e.revises) continue;
-    const cur = byOriginal.get(e.revises);
-    if (!cur || (e.revision?.n ?? 0) >= (cur.revision?.n ?? 0)) {
-      byOriginal.set(e.revises, e);
-    }
-  }
-  return events.map(e => {
-    const rev = byOriginal.get(e.seq);
-    if (!rev || e.revises) return null; // revisions don't stand alone
-    return {
-      ...e,
-      current: rev,
-      revisedCount: Math.max(0, ...(events.filter(x => x.revises === e.seq)
-        .map(x => x.revision?.n ?? 0))),
-    };
-  }).filter(Boolean);
-}
 
 /**
  * Shared intel tools — the project intel base every agent reads and
@@ -135,6 +108,8 @@ export function buildIntelTools(record, caps) {
         status: e.current.status ?? e.status,
         detail: e.current.detail ?? e.detail,
         summary: e.current.summary ?? e.summary,
+        void: Boolean(e.current.void),
+        orphaned: Boolean(e.orphaned),
         revisedCount: e.revisedCount,
       }));
       const normKind = String(params.kind ?? 'both').toLowerCase();
@@ -167,13 +142,16 @@ export function buildIntelTools(record, caps) {
         // agents burned a second call to actually fetch it).
         const note = extraFilters
           ? `(注:seq 模式下其它过滤参数已忽略,本条为 seq=${e.seq} 全文)\n` : '';
+        const voidNote = e.void
+          ? `\n[已作废——本条不再出现在常规查询中,仅存档审计]\n` : '';
         return { content: [{ type: 'text', text:
-          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}\n` +
+          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}${voidNote}\n` +
           `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${e.detail ?? e.summary ?? ''}` }] };
       }
 
       const matched = inWs
         .filter(isEntry)
+        .filter(e => !e.void)  // voided entries: audit-only, not for queries
         .filter(e => kind === 'both' || entryKind(e) === kind)
         .filter(e => !params.agentType || e.from === params.agentType)
         .filter(e => !status || e.status === status)
@@ -197,7 +175,7 @@ export function buildIntelTools(record, caps) {
         ? `,显示最新 ${hits.length} 条(可用 seq 取单条全文)` : ''}(新→旧,库内最新 seq=${latestSeq}):`;
 
       if (hits.length === 0) {
-        const scope = inWs.filter(isEntry);
+        const scope = inWs.filter(e => isEntry(e) && !e.void);
         const reports = scope.filter(e => e.type === 'task-report').length;
         const vulns = scope.filter(e => entryKind(e) === 'vulnerability').length;
         const notes = scope.filter(e => entryKind(e) === 'intel-note').length;
@@ -222,9 +200,10 @@ export function buildIntelTools(record, caps) {
         // Never cut silently (repo rule): mark per-entry truncation and
         const mark = full.length > 400
           ? `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)` : '';
+        const voidTag = e.void ? '[已作废——本条不再出现在常规查询中]' : '';
         const revTag = e.revisedCount
           ? ` ⟳已修订${e.revisedCount}次(seq=${e.seq} 为原始条目,现行版为修订后的内容)` : '';
-        return `${head}${revTag}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${mark}`;
+        return `${head}${revTag}${voidTag}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${mark}`;
       });
       return {
         content: [{
@@ -380,6 +359,10 @@ export function buildIntelTools(record, caps) {
         Type.Literal('success'), Type.Literal('partial'), Type.Literal('failed'),
         Type.Literal('no-result'),
       ], { description: 'New status, task reports only (omit = keep)' })),
+      void: Type.Optional(Type.Boolean({
+        description: 'Mark the entry OBSOLETE — downstream queries exclude ' +
+          'it by default; the chain stays visible for audit',
+      })),
     }),
     execute: async (_id, params) => {
       const result = caps.reviseEntry?.(record, params);
