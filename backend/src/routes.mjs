@@ -72,6 +72,19 @@ export function createRouter({ store, bus, caps }) {
     if (path === '/api/sessions' && method === 'GET') {
       return json(res, 200, store.list());
     }
+    // Tree-only projection: the dispatch panel polls every 4s and only
+    // needs topology/state fields — 41KB full list → ~6KB per poll.
+    if (path === '/api/sessions/tree' && method === 'GET') {
+      return json(res, 200, store.list().map(s => ({
+        id: s.id, agentKey: s.agentKey, title: s.title,
+        createdAt: s.createdAt,
+        engagementId: s.engagementId,
+        orchestratorSessionId: s.orchestratorSessionId,
+        parentSessionId: s.parentSessionId,
+        workSessionId: s.workSessionId,
+        spawnName: s.spawnName, busy: s.busy,
+      })));
+    }
     if (path === '/api/sessions' && method === 'POST') {
       const body = await readJson(req);
       if (!requireFields(res, body, ['agentKey']) || !isAgentKey(body.agentKey)) {

@@ -123,16 +123,22 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const lastSig = useRef('');
 
+  const [connError, setConnError] = useState(false);
   useEffect(() => {
     // Project switch: the OLD project's tree must vanish immediately —
     // stale topology lingering behind a switched header is exactly the
     // "still showing project four" confusion.
     setTree(null);
+    setConnError(false);
     let stopped = false;
+    let retryMs = 500;  // fast backoff: a transient failure must not
+    // cost a full 4s tick (3 silent misses = the reported 12s stall).
     const load = async () => {
       try {
-        const all = await api<ApiSessionSummary[]>('/sessions');
+        const all = await api<ApiSessionSummary[]>('/sessions/tree');
         if (stopped) return;
+        setConnError(false);
+        retryMs = 500;
         // Dedup: identical topology/state must not rebuild the tree —
         // poll re-renders are pure waste. rootId is part of the
         // signature: the mount-time load runs with rootId='' (bootstrap
@@ -141,9 +147,15 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
           + `:${s.spawnName ?? ''}:${s.messages}:${s.title ?? ''}`).join('|');
         lastSig.current = sig;
         setTree(buildTree(all, rootId ?? ''));
-      } catch { /* retry next tick */ }
+      } catch {
+        if (stopped) return;
+        setConnError(true);
+        setTimeout(() => { if (!stopped) void load(); }, retryMs);
+        retryMs = Math.min(retryMs * 2, 4000);
+        return;
+      }
     };
-    load();
+    void load();
     const timer = setInterval(load, 4000);
     return () => { stopped = true; clearInterval(timer); };
   }, [rootId]);
@@ -160,8 +172,10 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
       </header>
       <div className="flex-1 overflow-y-auto p-1.5">
         {!tree && (
-          <p className="py-3 text-center text-[11px] text-zinc-700">
-            {rootId ? '载入中…' : '无主控会话'}
+          <p className={cn('py-3 text-center text-[11px]',
+            connError ? 'animate-pulse text-amber-400' : 'text-zinc-700')}>
+            {connError ? '连接中断，重试中…'
+              : rootId ? '载入中…' : '无主控会话'}
           </p>
         )}
         {tree && (
