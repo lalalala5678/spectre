@@ -198,4 +198,58 @@ export async function listInstalledTools() {
   return res.code === 0 ? res.out.split('\n').filter(Boolean) : [];
 }
 
+/** Remove install-log lines whose command contains `match` — prevents a
+ *  container rebuild from resurrecting an uninstalled tool. Returns the
+ *  removed command strings. */
+export async function removeInstallLogEntries(match) {
+  const file = path.join(HOST.tools, 'install-log');
+  let lines;
+  try { lines = (await fsp.readFile(file, 'utf8')).split('\n'); }
+  catch { return []; }
+  const removed = [];
+  const keep = [];
+  for (const line of lines) {
+    const cmd = line.split('\t')[1];
+    if (cmd && cmd.includes(match)) removed.push(cmd);
+    else keep.push(line);
+  }
+  await fsp.writeFile(file, keep.join('\n'), 'utf8');
+  return removed;
+}
+
+async function rmIfFound(p) {
+  try { await fsp.stat(p); } catch { return false; }
+  await fsp.rm(p, { recursive: true, force: true });
+  return true;
+}
+
+/** Uninstall a CLI from the shared layer. Probes the install layouts
+ *  (bare binary in bin/, pip --target dir + versioned dist-info,
+ *  npm --prefix node_modules + bin link), removes what it finds, then
+ *  clears matching install-log entries. Host paths are bind-mounted
+ *  into the sandbox, so host-side removal works for every driver. */
+export async function uninstallCliTool(name) {
+  // reject path traversal: '..' anywhere would let a name like '..' or
+  // '../x' escape the layout root (tools/bin/.. == tools itself)
+  if (!/^(?!.*\.\.)[a-zA-Z0-9_@/.-]+$/.test(name)) {
+    throw new Error(`invalid tool name: ${name}`);
+  }
+  const removed = [];
+  const tryRm = async p => { if (await rmIfFound(p)) removed.push(p); };
+  await tryRm(`${HOST.tools}/bin/${name}`);
+  await tryRm(`${HOST.tools}/py/${name}`);
+  // pip versioned dist-info siblings (<name>-<ver>.dist-info)
+  try {
+    for (const ent of await fsp.readdir(`${HOST.tools}/py`)) {
+      if (ent.startsWith(`${name}-`) && ent.endsWith('.dist-info')) {
+        await tryRm(`${HOST.tools}/py/${ent}`);
+      }
+    }
+  } catch { /* py/ absent */ }
+  await tryRm(`${HOST.tools}/npm-global/lib/node_modules/${name}`);
+  await tryRm(`${HOST.tools}/npm-global/bin/${name}`);
+  const clearedLog = await removeInstallLogEntries(name);
+  return { removed, clearedLog };
+}
+
 export { ensureWorkspace };

@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Package, RefreshCw, Terminal } from 'lucide-react';
+import { Package, RefreshCw, Terminal, Trash2 } from 'lucide-react';
 
 import { api } from '../api/client';
 import { ToolingChat } from '../components/ToolingChat';
@@ -43,6 +43,18 @@ export function CliPage({ wsId }: { wsId: string }) {
     } catch (e) { setMsg(String(e)); } finally { setBusy(false); }
   };
 
+  const uninstall = async (name: string) => {
+    if (!window.confirm(`卸载 ${name}?(删除共享层文件并清除安装记录)`)) return;
+    try {
+      const r = await api<{ removed: string[]; clearedLog: string[] }>(
+        `/sandbox/cli?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+      setMsg(r.removed.length
+        ? `已卸载 ${name}(清除记录 ${r.clearedLog.length} 条)`
+        : `未找到 ${name} 的安装痕迹`);
+      setTools(await api<string[]>('/sandbox/tools'));
+    } catch (e) { setMsg(String(e)); }
+  };
+
   return (
     <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
       <Panel
@@ -62,8 +74,15 @@ export function CliPage({ wsId }: { wsId: string }) {
           <div className="flex flex-wrap gap-1">
             {tools.map(t => (
               <span key={t}
-                className="rounded-sm border border-void-700 bg-void-900 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-400">
+                className="group flex items-center gap-1 rounded-sm border border-void-700 bg-void-900 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-400">
                 {t}
+                <button
+                  onClick={() => void uninstall(t)}
+                  title={`卸载 ${t}`}
+                  className="hidden text-zinc-600 hover:text-red-400 group-hover:inline"
+                >
+                  <Trash2 className="h-3 w-3" />
+                </button>
               </span>
             ))}
             {tools.length === 0 && (

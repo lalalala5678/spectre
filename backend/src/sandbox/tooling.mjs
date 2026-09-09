@@ -14,7 +14,7 @@ import { Type } from '@earendil-works/pi-ai';
 
 import { saveSkill, deleteSkill, listSkillsTree } from './skills.mjs';
 import { saveMcpConfig, loadMcpConfig, testMcpServer } from './mcp.mjs';
-import { listInstalledTools, sandboxConfig } from './container.mjs';
+import { listInstalledTools, sandboxConfig, uninstallCliTool } from './container.mjs';
 import { AGENT_KEYS } from '../agents.mjs';
 import { makeExecutionEnv, ensureWorkspaceSync } from './exec-env.mjs';
 import { getPrefs } from '../projects.mjs';
@@ -140,11 +140,14 @@ export function buildToolingTools(record, caps) {
   const all = buildAllToolingTools(caps);
   switch (record.agentKey) {
     case 'skill-config':
-      return [all.configureSkill, all.listToolConfig, all.searchWeb, all.fetchUrl];
+      return [all.configureSkill, all.deleteSkillTool, all.listToolConfig,
+        all.searchWeb, all.fetchUrl];
     case 'mcp-config':
-      return [all.configureMcp, all.listToolConfig, all.testMcp, all.searchWeb, all.fetchUrl];
+      return [all.configureMcp, all.removeMcpServer, all.listToolConfig,
+        all.testMcp, all.searchWeb, all.fetchUrl];
     case 'cli-config':
-      return [all.listToolConfig, all.searchWeb, all.fetchUrl];
+      return [all.listToolConfig, all.uninstallCli,
+        all.searchWeb, all.fetchUrl];
     default:
       return [];
   }
@@ -333,8 +336,72 @@ function buildAllToolingTools(caps) {
     },
   };
 
+  const deleteSkillTool = {
+    name: 'delete_skill',
+    label: '卸载技能',
+    description:
+      '[destructive] Unmount a skill from ONE named agent (removes its '
+      + 'skill directory). Takes effect for that agent\'s NEW sessions. '
+      + 'Only run on explicit user instruction; restate the target '
+      + '(agent + skill name) before deleting.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      agentKey: Type.String({ description: 'Agent key (e.g. "recon")' }),
+      name: Type.String({ description: 'Skill name to remove' }),
+    }),
+    execute: async (_id, p) => {
+      if (!AGENT_KEYS.includes(p.agentKey)) {
+        return okText(`未知智能体 ${p.agentKey};合法值:${AGENT_KEYS.join(',')}`);
+      }
+      await deleteSkill(p.agentKey, p.name);
+      await rebuildMounts();
+      return okText(`已从 ${p.agentKey} 卸载技能 ${p.name}(对其新会话生效)。`);
+    },
+  };
+
+  const removeMcpServer = {
+    name: 'remove_mcp_server',
+    label: '注销 MCP',
+    description:
+      '[destructive] Unregister an MCP server (all mounts). Takes '
+      + 'effect for NEW sessions. Only run on explicit user '
+      + 'instruction; restate the server name before deleting.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      name: Type.String({ description: 'Server name to remove' }),
+    }),
+    execute: async (_id, p) => {
+      const next = (await loadMcpConfig()).filter(s => s.name !== p.name);
+      await saveMcpConfig(next);
+      await rebuildMounts();
+      return okText(`已注销 MCP server ${p.name}(对新会话生效)。`);
+    },
+  };
+
+  const uninstallCli = {
+    name: 'uninstall_cli',
+    label: '卸载 CLI',
+    description:
+      '[destructive] Uninstall a CLI from the shared layer (/opt/tools): '
+      + 'probes binary, pip --target and npm --prefix layouts, removes '
+      + 'files AND matching install-log entries (a rebuild would '
+      + 'otherwise resurrect it). Only run on explicit user instruction.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      name: Type.String({ description: 'Package or command name' }),
+    }),
+    execute: async (_id, p) => {
+      const r = await uninstallCliTool(p.name);
+      if (!r.removed.length && !r.clearedLog.length) {
+        return okText(`未找到 ${p.name} 的安装痕迹;可用 bash 探测实际安装路径后重试。`);
+      }
+      return okText(`已卸载 ${p.name}:删除 ${r.removed.length} 个路径;`
+        + `install-log 清除 ${r.clearedLog.length} 条(${r.clearedLog.join(' | ')})。`);
+    },
+  };
+
   return { configureSkill, configureMcp, listToolConfig, testMcp,
-    searchWeb, fetchUrl };
+    searchWeb, fetchUrl, deleteSkillTool, removeMcpServer, uninstallCli };
 }
 
 /** Minimal rule-based HTML→text (zero deps; strips nav/script/style,
