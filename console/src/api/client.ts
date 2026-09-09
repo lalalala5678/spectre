@@ -74,6 +74,14 @@ export interface ApiBusEvent {
   title?: string | null;
   detail?: string | null;
   status?: string | null;
+  /** revision chain: this event revises the entry with that seq */
+  revises?: number | null;
+  revision?: {
+    n: number;
+    reason: string;
+    requestedBy?: { key: string; name: string; typeLabel: string } | null;
+    approvedBy?: { key: string; name: string; typeLabel: string } | null;
+  } | null;
   /** discoverer attribution on writer-published vulnerabilities */
   requester?: {
     key: string; name: string; typeLabel: string;
@@ -180,4 +188,51 @@ export function subscribeSse(
     closed = true;
     source?.close();
   };
+}
+
+/**
+ * Revision folding — console twin of backend foldRevisions. A revision
+ * is a NEW event (revises: original seq) with full replacement content;
+ * the newest revision (max revision.n) is the CURRENT version. Returns
+ * originals carrying `current` + `revisedCount`; standalone revisions
+ * are folded away.
+ */
+export function foldEntries(events: ApiBusEvent[]): Array<ApiBusEvent & {
+  current: ApiBusEvent;
+  revisedCount: number;
+}> {
+  const byOriginal = new Map<number, ApiBusEvent>();
+  for (const e of events) {
+    if (!e.revises) continue;
+    const cur = byOriginal.get(e.revises);
+    if (!cur || (e.revision?.n ?? 0) >= (cur.revision?.n ?? 0)) {
+      byOriginal.set(e.revises, e);
+    }
+  }
+  const counts = new Map<number, number>();
+  for (const e of events) {
+    if (!e.revises) continue;
+    counts.set(e.revises, Math.max(counts.get(e.revises) ?? 0, e.revision?.n ?? 0));
+  }
+  return events
+    .filter((e): boolean => !e.revises)
+    .map(e => ({ ...e, current: byOriginal.get(e.seq) ?? e,
+      revisedCount: counts.get(e.seq) ?? 0 }));
+}
+
+/** Direct user edit — human is the final authority, lands immediately. */
+export async function reviseEntryDirect(seq: number,
+  fields: { title?: string; severity?: string; status?: string; text?: string },
+  reason: string, workSessionId: string): Promise<ApiBusEvent> {
+  return api<ApiBusEvent>('/bus/revise', {
+    method: 'POST', json: { seq, ...fields, reason, workSessionId },
+  });
+}
+
+/** Dialog revision — routes to the writer (original vuln writer or fresh). */
+export async function reviseEntryViaAgent(seq: number,
+  instruction: string): Promise<{ mode: string; sessionId: string }> {
+  return api<{ mode: string; sessionId: string }>('/bus/revise-request', {
+    method: 'POST', json: { seq, instruction },
+  });
 }

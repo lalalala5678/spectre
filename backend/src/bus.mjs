@@ -53,12 +53,18 @@ export class Bus {
       workSessionId: entry.workSessionId ?? null,
       status: entry.status ?? null,
       author: entry.author ?? null,
+      // revision chain (append-only: a revision is a NEW event pointing
+      // at the original seq) + discoverer attribution on writer-published
+      // vulnerabilities — previously silently dropped by this whitelist.
+      revises: entry.revises ?? null,
+      revision: entry.revision ?? null,
+      requester: entry.requester ?? null,
       detail: entry.detail ? clipMarked(entry.detail, CONFIG.busDetailMaxChars) : null,
     };
     // Idempotency for vulnerability publications: an agent re-calling the tool
     // with the same title+severity (receipt-style duplicates) is a no-op.
     if ((entry.type === 'vulnerability' || entry.type === 'intel')
-      && entry.title && entry.severity) {
+      && entry.title && entry.severity && !entry.revises) {
       const dup = [...this.events].reverse().find(e =>
         (e.type === 'vulnerability' || e.type === 'intel') && e.from === entry.from
         && e.title === entry.title && e.severity === entry.severity);

@@ -85,6 +85,8 @@
 | `read_session` | 全部 | [read-only] | 按 sessionId/payloadRef 读源会话消息 |
 | `submit_task_report` | 全部 | [creates event] | 提交任务报告(status 可选+推断;vulns 字段引用漏洞标题) |
 | `report_vulnerability` | 子任务+非report直连 | [runs writer; synchronous] | 一句话上报漏洞线索——报告agent 读发现者会话上下文、验证后落账或驳回(回执判定) |
+| `revise_entry` | 全部(writer 全类型;其它仅情报/任务报告) | [creates event] | 修订条目——append-only 修订链(revises+revision.n),现行版=最新修订;漏洞仅 writer 可改 |
+| `request_vulnerability_revision` | 子任务+非report直连 | [runs writer; synchronous] | 漏洞修订申请——writer 审核必要性+正确性后落账或驳回(回执判定) |
 | `publish_vulnerability` | 仅report会话(撰写agent) | [creates event] | 漏洞落账唯一入口——由报告agent持有;带 payloadRef+requester 溯源 |
 | `publish_intel` | 子任务+直连 | [creates event] | 发布情报——任何可能对任务有利的信息,低门槛 |
 | `spawn_agent` | 编排器+子 | [spawns agent] | 派生子智能体 |
@@ -102,3 +104,10 @@
 | query_intel 重复调用 | 不完备计数 + 无诊断 | 总数披露 + 空结果诊断 | 空回执/截断处永远附诊断信息 |
 | engagement 'autopwn-null' | null 模板字符串 | 条件表达式 + 跳过 signal | 字段拼接前检查 null |
 | 系统注入伪装成用户发言 | followUp/steer 全部注入 role:'user',前端仅凭文本前缀分类 | 注入消息携带 source:'system'/'agent' 元数据,前端按 source 分类(旧数据用前缀回退) | 新增注入路径必须传 source;前端新增消息类型禁止只靠文本前缀识别 |
+
+## 修订模型(append-only)
+
+- 修订=新事件(revises: 原seq, revision: {n, reason, requestedBy, approvedBy}),永不改写历史
+- 现行版=修订链上 revision.n 最大者;query_intel 与前端面板同语义折叠
+- 权限:情报/任务报告任意 agent 可改(reason 留审计);漏洞仅 writer(申请-审核制);用户直编=终审
+- 用户界面:详情页对话框(→报告agent)与直接编辑表单(→人工落账)双路径

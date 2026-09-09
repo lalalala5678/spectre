@@ -12,6 +12,7 @@ import { hasInternalToken, json, readJson, sse } from './http.mjs';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
 import { injectionOriginOf } from './sessions.mjs';
+import { entryKind as entryKindOf } from './tools.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 
@@ -33,7 +34,7 @@ function requireFields(res, body, fields) {
  * @param {{store: import('./sessions.mjs').SessionStore,
  *          bus: import('./bus.mjs').Bus}} deps
  */
-export function createRouter({ store, bus }) {
+export function createRouter({ store, bus, caps }) {
   return async function route(req, res, url) {
     const path = url.pathname;
     const method = req.method;
@@ -202,6 +203,78 @@ export function createRouter({ store, bus }) {
         return;
       }
       return json(res, 201, bus.emit(body));
+    }
+
+    // ---------- entry revision (console) ----------
+    // Direct user edit: human is the final authority — lands immediately.
+    if (path === '/api/bus/revise' && method === 'POST') {
+      const body = await readJson(req);
+      const target = bus.list().find(e => e.seq === Number(body.seq)
+        && !e.revises && e.workSessionId === (body.workSessionId ?? e.workSessionId));
+      if (!target) {
+        return bad(res, 404, 'entry not found');
+      }
+      const fields = {};
+      for (const k of ['title', 'severity', 'status', 'text']) {
+        if (body[k] !== undefined) fields[k] = body[k];
+      }
+      if (!Object.keys(fields).length) {
+        return bad(res, 400, 'nothing to revise');
+      }
+      const event = caps.emitRevision({
+        target, fields, reason: String(body.reason || '用户直接编辑'),
+        requestedBy: { key: 'user', name: '用户', typeLabel: '人工',
+          treePath: '用户', depth: 0 },
+        approvedBy: { key: 'user', name: '用户', typeLabel: '人工',
+          treePath: '用户', depth: 0 },
+        origin: 'user',
+      });
+      return json(res, 201, event);
+    }
+    // Dialog revision: route to the writer. Vulns → the ORIGINAL writer
+    // session (payloadRef, keeps its verification context); notes and
+    // reports → a fresh report agent.
+    if (path === '/api/bus/revise-request' && method === 'POST') {
+      const body = await readJson(req);
+      const instruction = String(body.instruction || '').slice(0, 2000);
+      if (!instruction) {
+        return bad(res, 400, 'instruction required');
+      }
+      const target = bus.list().find(e => e.seq === Number(body.seq) && !e.revises);
+      if (!target) {
+        return bad(res, 404, 'entry not found');
+      }
+      const kind = entryKindOf(target);
+      if (kind === 'vulnerability' && target.payloadRef?.startsWith('sess:')) {
+        const writerId = target.payloadRef.slice(5);
+        try {
+          store.followUp(store.get(writerId),
+            `【用户修订请求 · seq=${target.seq}】用户要求修订你撰写的漏洞` +
+            `《${target.title}》:\n『${instruction}』\n` +
+            `请审核该请求的必要性与正确性(可用 read_session/query_intel 求证),` +
+            `认可后调用 revise_entry(seq=${target.seq}, reason=..., ` +
+            `title/severity/text 按核定结果)落账;不认可则在回复中说明理由。`, 'system');
+          return json(res, 202, { mode: 'original-writer', sessionId: writerId });
+        } catch {
+          // original writer session gone — fall through to fresh writer
+        }
+      }
+      // Fresh writer for notes / reports / fallback.
+      const writer = store.create('report', {
+        workSessionId: target.workSessionId ?? null,
+        name: `修订:${String(target.title ?? '').slice(0, 20)}`,
+        description: `用户对话框修订:${instruction.slice(0, 60)}`,
+      });
+      store.prompt(writer,
+        `【条目修订 · seq=${target.seq}】你是报告撰写专职 agent。用户要求修订以下` +
+        `${kind === 'task-report' ? '任务报告' : kind === 'vulnerability' ? '漏洞' : '情报'}:` +
+        `\n《${target.title}》\n现行内容:\n${target.detail ?? target.summary ?? '(空)'}\n\n` +
+        `用户指令:『${instruction}』\n` +
+        `请先判断指令是否清晰合理(需要时 query_intel/read_session 求证),` +
+        `然后调用 revise_entry(seq=${target.seq}, reason='用户指令:...', ` +
+        `按指令核定 title/text 等字段)落账;若指令不可执行或不合理,` +
+        `在回复中说明。最后提交任务报告。`, 'system');
+      return json(res, 202, { mode: 'fresh-writer', sessionId: writer.id });
     }
 
     // ---------- autopwn ----------

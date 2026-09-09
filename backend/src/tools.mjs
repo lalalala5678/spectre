@@ -35,6 +35,35 @@ const spawnStageEnum = Type.Enum(
   Object.fromEntries(SPAWNABLE_KEYS.map((key) => [key, key])),
 );
 
+
+/**
+ * Revision folding (backend twin of the console's foldEntries). Bus is
+ * append-only: a revision is a NEW event carrying `revises: <original
+ * seq>` + full replacement content. Fold = originals keep their slot;
+ * the newest revision (max revision.n) is the CURRENT version; the
+ * chain stays auditable. Matching/counting run on CURRENT versions.
+ */
+function foldRevisions(events) {
+  const byOriginal = new Map(); // originalSeq -> newest revision event
+  for (const e of events) {
+    if (!e.revises) continue;
+    const cur = byOriginal.get(e.revises);
+    if (!cur || (e.revision?.n ?? 0) >= (cur.revision?.n ?? 0)) {
+      byOriginal.set(e.revises, e);
+    }
+  }
+  return events.map(e => {
+    const rev = byOriginal.get(e.seq);
+    if (!rev || e.revises) return null; // revisions don't stand alone
+    return {
+      ...e,
+      current: rev,
+      revisedCount: Math.max(0, ...(events.filter(x => x.revises === e.seq)
+        .map(x => x.revision?.n ?? 0))),
+    };
+  }).filter(Boolean);
+}
+
 /**
  * Shared intel tools — the project intel base every agent reads and
  * writes. Task reports are the PROCESS record (mandatory at every quiet
@@ -94,9 +123,20 @@ export function buildIntelTools(record, caps) {
       })),
     }),
     execute: async (_id, params) => {
-      const inWs = (caps.listBus?.() ?? [])
+      const rawWs = (caps.listBus?.() ?? [])
         .filter(e => e.workSessionId === (record.workSessionId ?? null));
       const isEntry = e => entryKind(e) !== null;
+      // Fold: originals + their CURRENT (newest revision) versions.
+      // Filters below see current titles/severities/status/detail.
+      const inWs = foldRevisions(rawWs.filter(isEntry)).map(e => ({
+        ...e,
+        title: e.current.title ?? e.title,
+        severity: e.current.severity ?? e.severity,
+        status: e.current.status ?? e.status,
+        detail: e.current.detail ?? e.detail,
+        summary: e.current.summary ?? e.summary,
+        revisedCount: e.revisedCount,
+      }));
       const normKind = String(params.kind ?? 'both').toLowerCase();
       const kind = normKind === 'both' ? 'both'
         : (normKind === 'vulnerability' || normKind === 'vuln'
@@ -109,7 +149,13 @@ export function buildIntelTools(record, caps) {
       // Single-entry full fetch: no silent truncation anywhere.
       const extraFilters = (params.kind || params.q || params.author || params.agentType || params.status || params.severity) != null;
       if (params.seq != null) {
-        const e = inWs.find(x => x.seq === Number(params.seq) && isEntry(x));
+        const target = Number(params.seq);
+        // A revision seq or its original both resolve to the CURRENT view.
+        const orig = rawWs.find(x => x.seq === target);
+        const viaRev = orig?.revises ? rawWs.find(x => x.seq === orig.revises) : null;
+        const rootEntry = viaRev ?? orig;
+        const e = rootEntry
+          ? inWs.find(x => x.seq === rootEntry.seq) : null;
         if (!e) {
           return { content: [{ type: 'text', text: `seq=${params.seq} 在本项目内不存在。` }] };
         }
@@ -176,7 +222,9 @@ export function buildIntelTools(record, caps) {
         // Never cut silently (repo rule): mark per-entry truncation and
         const mark = full.length > 400
           ? `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)` : '';
-        return `${head}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${mark}`;
+        const revTag = e.revisedCount
+          ? ` ⟳已修订${e.revisedCount}次(seq=${e.seq} 为原始条目,现行版为修订后的内容)` : '';
+        return `${head}${revTag}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${mark}`;
       });
       return {
         content: [{
@@ -306,6 +354,41 @@ export function buildIntelTools(record, caps) {
     },
   };
 
+  const reviseEntry = {
+    name: 'revise_entry',
+    label: '修订条目',
+    description:
+      '[creates event] Revise an intel note or task report by seq — ' +
+      'any agent may revise any entry (shared working record); `reason` ' +
+      'is mandatory and rides on the revision for audit. Only the ' +
+      'fields you pass change; omitted fields keep their current ' +
+      'values. The original is never overwritten (append-only chain, ' +
+      'query_intel shows the current version). VULNERABILITY targets ' +
+      'are rejected for non-writer agents — use ' +
+      'request_vulnerability_revision (writer review) instead.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      seq: Type.Number({ description: 'Original entry seq to revise' }),
+      reason: Type.String({ description: 'Why this revision (audited)' }),
+      title: Type.Optional(Type.String({ description: 'New title (omit = keep)' })),
+      severity: Type.Optional(Type.Union([
+        Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
+        Type.Literal('high'), Type.Literal('critical'),
+      ], { description: 'New severity, vulnerabilities only (omit = keep)' })),
+      text: Type.Optional(Type.String({ description: 'New full content (omit = keep)' })),
+      status: Type.Optional(Type.Union([
+        Type.Literal('success'), Type.Literal('partial'), Type.Literal('failed'),
+        Type.Literal('no-result'),
+      ], { description: 'New status, task reports only (omit = keep)' })),
+    }),
+    execute: async (_id, params) => {
+      const result = caps.reviseEntry?.(record, params);
+      return { content: [{ type: 'text', text: result.text }],
+        details: result.details ?? {} };
+    },
+  };
+
+
 
   const readSession = {
     name: 'read_session',
@@ -345,7 +428,7 @@ export function buildIntelTools(record, caps) {
     },
   };
 
-  return [submitTaskReport, queryIntel, readSession];
+  return [submitTaskReport, queryIntel, readSession, reviseEntry];
 }
 
 /**
@@ -392,6 +475,46 @@ function buildReportVulnerabilityTool(record, caps) {
         content: [{ type: 'text', text: result.text }],
         details: result.details ?? {},
       };
+    },
+  };
+}
+
+
+/**
+ * request_vulnerability_revision — writer-reviewed vulnerability
+ * revision request (child + non-report direct sessions). Synchronous,
+ * same wake/wait/verdict pattern as report_vulnerability.
+ */
+function buildRequestRevisionTool(record, caps) {
+  return {
+    name: 'request_vulnerability_revision',
+    label: '申请漏洞修订',
+    description:
+      '[side-effects: runs writer agent; synchronous — may take minutes] ' +
+      'Request a revision of a PUBLISHED vulnerability. A writer agent ' +
+      'reviews the original report plus your request, verifies necessity ' +
+      'AND correctness, then either lands the revision (it decides the ' +
+      'final fields) or declines with reasons. The verdict returns in ' +
+      'this receipt. Vulnerabilities are never revised without writer ' +
+      'review.',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      seq: Type.Number({ description: 'Original vulnerability seq' }),
+      reason: Type.String({ description: 'Why the revision is necessary' }),
+      changes: Type.String({
+        description: 'What should change and to what (free text — the ' +
+          'writer constructs the final fields)',
+      }),
+    }),
+    execute: async (_id, params) => {
+      if (!caps.revisionWriter) {
+        return { content: [{ type: 'text',
+          text: '漏洞修订服务不可用(capability 缺失)。' }] };
+      }
+      const result = await caps.revisionWriter(record, params.seq,
+        params.reason, params.changes);
+      return { content: [{ type: 'text', text: result.text }],
+        details: result.details ?? {} };
     },
   };
 }
@@ -624,7 +747,7 @@ export function buildOrchestratorTools(record, caps) {
  * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
  * intel notes use 'intel-note' to avoid the collision.
  */
-function entryKind(e) {
+export function entryKind(e) {
   if (e.type === 'vulnerability' || e.type === 'intel') return 'vulnerability';
   if (e.type === 'intel-note') return 'intel-note';
   if (e.type === 'task-report') return 'task-report';
@@ -694,7 +817,8 @@ export function buildChildTools(record, caps) {
   };
   const spawnAgent = buildSpawnAgentTool(record, caps);
 
-  return [buildReportVulnerabilityTool(record, caps), publishIntel, spawnAgent];
+  return [buildReportVulnerabilityTool(record, caps), publishIntel,
+    buildRequestRevisionTool(record, caps), spawnAgent];
 }
 
 /**
@@ -784,5 +908,6 @@ export function buildDirectTools(record, caps) {
   if (record.agentKey === 'report') {
     return [publishVuln, publishIntel];
   }
-  return [buildReportVulnerabilityTool(record, caps), publishIntel];
+  return [buildReportVulnerabilityTool(record, caps), publishIntel,
+    buildRequestRevisionTool(record, caps)];
 }

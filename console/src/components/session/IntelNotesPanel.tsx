@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
-import { api, subscribeSse, type ApiBusEvent } from '../../api/client';
+import { api, foldEntries, subscribeSse, type ApiBusEvent } from '../../api/client';
+
+type FoldedEntry = ApiBusEvent & { current: ApiBusEvent; revisedCount: number };
 
 /**
  * INTEL-NOTE list panel: any information that might help the task
@@ -14,7 +16,7 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
   workSessionId?: string;
   onOpen: (event: ApiBusEvent) => void;
 }) {
-  const [events, setEvents] = useState<ApiBusEvent[]>([]);
+  const [events, setEvents] = useState<FoldedEntry[]>([]);
 
   useEffect(() => {
     let stopped = false;
@@ -34,7 +36,7 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
       try {
         const all = await api<ApiBusEvent[]>('/bus');
         if (stopped) return;
-        setEvents(all.filter(accept).slice(-20).reverse());
+        setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
         cursor.v = all.at(-1)?.seq ?? 0;
       } catch { /* SSE reconnect will heal */ }
     })();
@@ -43,9 +45,19 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
       const e = raw as ApiBusEvent;
       if (e.seq <= cursor.v) return;
       cursor.v = e.seq;
+      if (e.revises) {
+        // revision landed — refetch to fold the new current version
+        void (async () => {
+          try {
+            const all = await api<ApiBusEvent[]>('/bus');
+            setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+          } catch { /* next event heals */ }
+        })();
+        return;
+      }
       if (!accept(e)) return;
       setEvents(prev => prev.some(x => x.seq === e.seq)
-        ? prev : [e, ...prev].slice(0, 20));
+        ? prev : [{ ...e, current: e, revisedCount: 0 } as FoldedEntry, ...prev].slice(0, 20));
     }, () => cursor.v);
     return () => { stopped = true; off(); };
   }, [agentKey, workSessionId]);
@@ -63,7 +75,7 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
           <p className="py-3 text-center text-[11px] text-zinc-700">暂无情报</p>
         )}
         {events.map(event => {
-          const title = event.title
+          const title = event.current.title ?? event.title
             ?? event.summary.replace(/^(情报)[:：]?/, '').slice(0, 60);
           const a = event.author;
           return (
@@ -79,6 +91,11 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
                 <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
                   {title}
                 </span>
+                {event.revisedCount > 0 && (
+                  <span className="shrink-0 rounded-sm border border-sky-800 bg-sky-950/40 px-1 py-0.5 font-mono text-[8.5px] tracking-widest text-sky-300">
+                    ⟳{event.revisedCount}
+                  </span>
+                )}
                 <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
               </div>
               {a && (

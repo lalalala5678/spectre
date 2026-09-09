@@ -17,6 +17,7 @@ import { CONFIG } from './src/config.mjs';
 import { Bus } from './src/bus.mjs';
 import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
+import { entryKind as entryKindOf } from './src/tools.mjs';
 import { buildPi } from './src/pi.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
@@ -224,6 +225,125 @@ const caps = {
       details: { sessionId: writer.id, declined: true },
     };
   },
+
+  /** Shared revision emitter: append-only — a revision is a NEW event
+   *  (revises: original seq, revision: {n, reason, ...}) never an
+   *  in-place mutation. Callers: agent revise_entry, writer review
+   *  flow, and the console's direct user edit. */
+  emitRevision: ({ target, fields, reason, requestedBy, approvedBy, origin }) => {
+    const chain = bus.list().filter(e => e.revises === target.seq);
+    const n = Math.max(0, ...chain.map(e => e.revision?.n ?? 0)) + 1;
+    const current = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
+    const base = current ?? target;
+    const event = {
+      channel: 'dm',
+      from: target.from,
+      to: target.to,
+      type: target.type,
+      revises: target.seq,
+      title: fields.title ?? base.title,
+      summary: fields.title ?? base.summary,
+      severity: fields.severity !== undefined ? fields.severity : base.severity,
+      status: fields.status !== undefined ? fields.status : base.status,
+      detail: fields.text ?? base.detail,
+      origin: origin ?? 'agent',
+      author: target.author,
+      workSessionId: target.workSessionId ?? null,
+      engagement: target.engagement ?? null,
+      payloadRef: target.payloadRef ?? null,
+      requester: target.requester ?? null,
+      revision: { n, reason, requestedBy: requestedBy ?? null,
+        approvedBy: approvedBy ?? null },
+    };
+    bus.emit(event);
+    return { ...event };
+  },
+
+  /** revise_entry tool backing. Vuln targets: writer sessions only
+   *  (enforcement point for the review mandate); notes/reports: any
+   *  agent (shared working records — reason rides for audit). */
+  reviseEntry: (callerRecord, params) => {
+    const target = bus.list().find(e => e.seq === Number(params.seq)
+      && entryKindOf(e) !== null && !e.revises);
+    if (!target) {
+      return { text: `seq=${params.seq} 不是可修订的原始条目(不存在/已折叠)。` };
+    }
+    const kind = entryKindOf(target);
+    if (kind === 'vulnerability' && callerRecord.agentKey !== 'report') {
+      return { text: `seq=${params.seq} 是漏洞——漏洞修订必须经撰写agent审核。` +
+        `请改用 request_vulnerability_revision(seq, reason, changes)提交申请。` };
+    }
+    const authorOfCaller = store.authorOf(callerRecord);
+    // Writer reviewing a REQUEST carries the requester's provenance on its
+    // record (revisionWriter sets it) — credit the requester, not the pen.
+    const requestedBy = callerRecord.requester?.author ?? authorOfCaller;
+    const event = caps.emitRevision({
+      target, fields: params, reason: params.reason,
+      requestedBy, approvedBy: authorOfCaller,
+      origin: callerRecord.agentKey === 'report' ? 'writer' : 'agent',
+    });
+    return {
+      text: `修订已入库(seq=${target.seq} 第 ${event.revision.n} 次修订):` +
+        `《${event.title ?? ''}》。原版保留在链上,query_intel 显示现行版。`,
+      details: { revises: target.seq, n: event.revision.n },
+    };
+  },
+
+  /** request_vulnerability_revision backing — writer review wake.
+   *  Same detached-session + event-driven-wait pattern as reportWriter. */
+  revisionWriter: async (requesterRecord, targetSeq, reason, changes) => {
+    const target = bus.list().find(e => e.seq === Number(targetSeq)
+      && entryKindOf(e) === 'vulnerability' && !e.revises);
+    if (!target) {
+      return { text: `seq=${targetSeq} 不是漏洞原始条目,无法申请修订。` };
+    }
+    const chain = bus.list().filter(e => e.revises === target.seq);
+    const current = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
+    const requesterAuthor = store.authorOf(requesterRecord);
+    const writer = store.create('report', {
+      workSessionId: requesterRecord.workSessionId ?? null,
+      name: `修订:${String(target.title ?? '').slice(0, 20)}`,
+      description: `漏洞修订申请:${reason.slice(0, 60)}`,
+    });
+    writer.requester = { sessionId: requesterRecord.id, author: requesterAuthor };
+    writer.revisionTarget = target.seq;
+    store.prompt(writer,
+      `【漏洞修订审核 · seq=${target.seq}】你是报告撰写专职 agent。` +
+      `${requesterAuthor.name}(${requesterAuthor.typeLabel})申请修订漏洞:\n` +
+      `『${target.title}』(severity=${target.severity ?? '?'},现行版内容如下)\n` +
+      `---现行内容---\n${(current ?? target).detail ?? target.summary ?? '(空)'}\n---\n` +
+      `申请理由:${reason}\n要求更改:${changes}\n\n` +
+      `你的职责:\n` +
+      `1) 判定必要性:该理由是否成立(可用 read_session 读申请者会话 ${requesterRecord.id} 求证);\n` +
+      `2) 判定正确性:要求的内容是否准确、不会引入错误;\n` +
+      `3) 两关都过 → 调用 revise_entry(seq=${target.seq}, reason=..., title/severity/text 按核定结果)落账修订;\n` +
+      `   任一关不过 → 不落账,在最终回复中明确说明驳回理由(将回执给申请者);\n` +
+      `4) 提交任务报告收尾。`, 'system');
+    await store.awaitCompletion(writer);
+    const landed = bus.list().find(e => e.revises === target.seq
+      && (e.revision?.n ?? 0) > ((current?.revision?.n) ?? 0));
+    if (landed) {
+      return {
+        ok: true,
+        text: `修订已获核准并入库:《${landed.title}》(severity=${landed.severity},` +
+          `第 ${landed.revision.n} 次修订,seq=${target.seq})。` +
+          `审核对话 ${writer.id}。`,
+        details: { sessionId: writer.id, revises: target.seq, n: landed.revision.n },
+      };
+    }
+    const textOf = m => typeof m.content === 'string' ? m.content
+      : (m.content?.filter?.(c => c.type === 'text')
+        ?.map(c => c.text)?.join('') ?? '');
+    const last = [...writer.agent.state.messages].reverse()
+      .find(m => m.role === 'assistant' && textOf(m).trim());
+    return {
+      ok: false,
+      text: `撰写agent驳回了该修订申请。其说明:\n` +
+        `${((last && textOf(last)) || '(无输出)').slice(0, 600)}\n` +
+        `(审核对话 ${writer.id})`,
+      details: { sessionId: writer.id, declined: true },
+    };
+  },
 };
 
 const store = new SessionStore({ model, streamFn, caps, wal,
@@ -243,7 +363,7 @@ process.on('SIGTERM', () => {
   server.close(() => process.exit(0));
   setTimeout(() => process.exit(0), 1500).unref();
 });
-const route = createRouter({ store, bus });
+const route = createRouter({ store, bus, caps });
 
 const server = http.createServer(async (req, res) => {
   const url = new URL(req.url, 'http://localhost');

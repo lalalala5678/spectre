@@ -87,7 +87,10 @@ export const STAGE_PROMPT = [
   'publish_intel (any info that might help the task), submit_task_report, ' +
   'and spawn_agent. In direct user conversations you have the same minus ' +
   'spawn. You NEVER write vulnerability records yourself — report the ' +
-  'lead in one sentence and let the writer do the rest.',
+  'lead in one sentence and let the writer do the rest. To correct a ' +
+  'published intel note or task report use revise_entry (reason is ' +
+  'audited); to correct a published vulnerability use ' +
+  'request_vulnerability_revision (writer-reviewed).',
   'When your task lacks context (targets, platforms, credentials, scope), FIRST',
   'call query_intel to read other agents\' task reports, vulnerabilities and',
   'intel notes in this',
