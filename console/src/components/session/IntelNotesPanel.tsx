@@ -34,7 +34,8 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
     };
     (async () => {
       try {
-        const all = await api<ApiBusEvent[]>('/bus');
+        const all = await api<ApiBusEvent[]>('/bus'
+          + (workSessionId ? `?ws=${workSessionId}` : ''));
         if (stopped) return;
         setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
         cursor.v = all.at(-1)?.seq ?? 0;
@@ -49,7 +50,8 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
         // revision landed — refetch to fold the new current version
         void (async () => {
           try {
-            const all = await api<ApiBusEvent[]>('/bus');
+            const all = await api<ApiBusEvent[]>('/bus'
+          + (workSessionId ? `?ws=${workSessionId}` : ''));
             setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
           } catch { /* next event heals */ }
         })();

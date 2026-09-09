@@ -40,7 +40,8 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
 
   const loadChain = async () => {
     try {
-      const all = await api<ApiBusEvent[]>('/bus');
+      const all = await api<ApiBusEvent[]>('/bus'
+        + (event.workSessionId ? `?ws=${event.workSessionId}` : ''));
       setChain(all.filter(e => e.seq === event.seq || e.revises === event.seq));
     } catch { /* SSE will heal */ }
   };

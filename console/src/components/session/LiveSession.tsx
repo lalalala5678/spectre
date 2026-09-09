@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, ChevronDown, Loader2, User, X } from 'lucide-react';
 
 import {
@@ -61,7 +61,14 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   }, []);
 
   useEffect(() => {
-    if (!sessionId) return;
+    if (!sessionId) {
+      // Project switch stage: clear the previous project's transcript so
+      // the skeleton (not stale content) shows while bootstrapping.
+      setMessages([]);
+      setLoaded(false);
+      setBusy(false);
+      return;
+    }
     let cancelled = false;
     setLoaded(false);
     // A fresh session starts in follow mode (also re-arms after the user
@@ -190,7 +197,10 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       ? '向该子智能体插话(steering)…'
       : `对 ${agentKey} 下令…`;
 
-  const items = buildItems(messages, busy);
+  // Hot path: streaming deltas patch `messages` every chunk — the item
+  // rebuild is memoized and the bubbles below are memo'd so history
+  // entries skip re-render; only the trailing streaming bubble re-renders.
+  const items = useMemo(() => buildItems(messages, busy), [messages, busy]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -310,7 +320,7 @@ function buildItems(messages: ApiMessage[], busy: boolean): RenderItem[] {
   return items;
 }
 
-function ToolTimeline({ steps }: { steps: ToolStep[] }) {
+const ToolTimeline = memo(function ToolTimeline({ steps }: { steps: ToolStep[] }) {
   const errorSteps = steps.filter(s => s.result?.isError);
   const anyRunning = steps.some(s => s.running && !s.result);
   const [open, setOpen] = useState(errorSteps.length > 0);
@@ -372,7 +382,7 @@ function ToolTimeline({ steps }: { steps: ToolStep[] }) {
       </div>
     </div>
   );
-}
+});
 
 function ToolStepRow({ step, open, onToggle }: {
   step: ToolStep;
@@ -473,7 +483,7 @@ function classify(message: ApiMessage): MessageKind {
   return 'system';
 }
 
-function MessageBubble({ message }: { message: ApiMessage }) {
+const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMessage }) {
   const kind = classify(message);
 
   if (kind === 'user') {
@@ -565,7 +575,7 @@ function MessageBubble({ message }: { message: ApiMessage }) {
       </div>
     </div>
   );
-}
+});
 
 /**
  * Reasoning panel: fully expanded while streaming (no height cap — a

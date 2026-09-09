@@ -189,7 +189,13 @@ export function createRouter({ store, bus, caps }) {
     // ---------- bus ----------
     if (path === '/api/bus' && method === 'GET') {
       const since = Number(url.searchParams.get('since') || 0);
-      return json(res, 200, bus.list(since));
+      // Server-side project scoping: panels used to fetch the FULL bus
+      // (292KB at 224 events) and filter client-side ×3 panels per switch.
+      // ?ws= cuts the payload to the project's own entries.
+      const ws = url.searchParams.get('ws');
+      const events = bus.list(since);
+      return json(res, 200, ws
+        ? events.filter(e => e.workSessionId === ws) : events);
     }
     if (path === '/api/bus/events' && method === 'GET') {
       const since = Number(url.searchParams.get('since') || 0);

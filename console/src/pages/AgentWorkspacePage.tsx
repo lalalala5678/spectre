@@ -62,11 +62,20 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     const scope = `${workSession.id}:${liveKey}`;
     if (bootstrappedFor.current === scope) return;
     bootstrappedFor.current = scope;
+    // Optimistic clear (project-switch perceived latency): the OLD
+    // project's transcript used to linger until this async finished —
+    // clear the stage synchronously so the skeleton shows immediately.
     setDrillSession(null);
     setWsError('');
     setEntryView(null);
+    setMySessions([]);
+    setSessionId(null);
+    // Race guard: rapid project switches fire overlapping bootstraps;
+    // the stale response must never overwrite the newer one.
+    let cancelled = false;
     (async () => {
       const all = await api<ApiSessionSummary[]>('/sessions');
+      if (cancelled) return;
       const mine = all.filter(s =>
         s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
         && s.workSessionId === workSession.id,
@@ -75,9 +84,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       const remembered = localStorage.getItem(slot);
       const restored = remembered && mine.find(s => s.id === remembered);
       if (restored) {
+        if (cancelled) return;
         setMySessions(mine);
         setSessionId(restored.id);
       } else if (mine.length > 0) {
+        if (cancelled) return;
         const latest = mine[mine.length - 1].id;
         localStorage.setItem(slot, latest);  // heal empty/stale slot
         setMySessions(mine);
@@ -87,6 +98,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           method: 'POST',
           json: { agentKey: liveKey, workSessionId: workSession.id },
         });
+        if (cancelled) return;
         localStorage.setItem(slot, created.id);
         setMySessions([created]);
         setSessionId(created.id);
@@ -94,8 +106,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     })().catch((err: unknown) => {
       // Bootstrap failures (runtime down, auth expired, …) must surface —
       // never a silent empty workspace.
-      setWsError(errText(err));
+      if (!cancelled) setWsError(errText(err));
     });
+    return () => { cancelled = true; };
   }, [workSession, liveKey, bootstrapNonce]);
 
   // Keep the sessions panel live: the runtime generates title/brief a few
