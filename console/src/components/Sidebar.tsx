@@ -1,7 +1,6 @@
 import {
   Radar, Bug, KeyRound, Braces, Swords, Fish, Radio, Anchor, Network, FileText,
-  Puzzle, Plug, Zap, ClipboardList, TerminalSquare,
-} from 'lucide-react';
+  Puzzle, Plug, Zap, ClipboardList, TerminalSquare } from 'lucide-react';
 import type { RouteKey } from '../types';
 import { cn } from '../utils/cn';
 import { Dot } from './ui/Badge';

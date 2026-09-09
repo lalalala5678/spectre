@@ -73,11 +73,24 @@ export const AGENTS: AgentMeta[] = [
     skills: ['report-render', 'cvss-score'], mcpServers: ['evidence-store'],
   },
   {
-    id: 'tools', name: 'Tooling Agent', codename: '工具配置',
-    desc: '给指定智能体配置 skill/MCP/CLI:链接下载、上传包、联网发现、从零构建。',
+    id: 'skill-config', name: 'Skill Config Agent', codename: '技能配置',
+    desc: '为指定智能体配置 skill:链接下载、上传包、从零撰写。',
     status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
     skills: [], mcpServers: [],
   },
+  {
+    id: 'mcp-config', name: 'MCP Config Agent', codename: 'MCP配置',
+    desc: '为指定智能体配置 MCP server:注册、连通测试、挂载。',
+    status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
+    skills: [], mcpServers: [],
+  },
+  {
+    id: 'cli-config', name: 'CLI Config Agent', codename: 'CLI配置',
+    desc: '向共享沙箱环境安装 CLI 工具(装一次全体智能体可用)。',
+    status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
+    skills: [], mcpServers: [],
+  },
+
 ];
 
 // ---------------- AutoPwn 默认约束 ----------------
@@ -374,7 +387,8 @@ export const CLI_TOOLS: CliTool[] = [
 export const AGENT_LABEL: Record<AgentId, string> = {
   orchestrator: 'Orchestrator', recon: 'Recon', nday: 'NDay', weakcred: 'WeakCred',
   api: 'API', exploit: 'VulnHunt', phish: 'Phish', c2: 'C2',
-  persistence: 'Persistence', tools: '工具配置', postex: 'PostEx', report: 'Report',
+  persistence: 'Persistence', postex: 'PostEx', report: 'Report',
+  'skill-config': '技能配置', 'mcp-config': 'MCP配置', 'cli-config': 'CLI配置',
 };
 
 // ---------------- Span 内部流（L2 下钻内容，数据驱动） ----------------

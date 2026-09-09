@@ -105,7 +105,7 @@ export function CliPage({ wsId }: { wsId: string }) {
           安装一次，全部项目的全部 agent 共享（环境能力）；项目间的隔离靠各自工作目录，CLI 层刻意共享。
         </p>
       </Panel>
-      <ToolingChat workSessionId={wsId} />
+      <ToolingChat agentKey="cli-config" workSessionId={wsId} />
       </div>
     </div>
   );

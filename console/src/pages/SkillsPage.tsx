@@ -173,7 +173,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
         <p><span className="text-zinc-200">角色挂载：</span>每个 agent 只看到挂给自己的技能目录。</p>
         {msg && <p className={cn('font-mono text-[10.5px]', msg.includes('已') ? 'text-emerald-400' : 'text-amber-400')}>{msg}</p>}
       </Panel>
-      <ToolingChat workSessionId={wsId} />
+      <ToolingChat agentKey="skill-config" workSessionId={wsId} />
       </div>
     </div>
   );

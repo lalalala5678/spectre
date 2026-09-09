@@ -112,9 +112,11 @@
 - 权限:情报/任务报告任意 agent 可改(reason 留审计);漏洞仅 writer(申请-审核制);用户直编=终审
 - 用户界面:详情页对话框(→报告agent)与直接编辑表单(→人工落账)双路径
 
-## 工具配置智能体(tools agent)设计公理
+## 工具配置三智能体(skill-config/mcp-config/cli-config)设计公理
 
-- **配置≠持有**:tools agent 给指定智能体配置 skill/MCP;加载边界=配置的 agents 字段/skill 目录——它在物理上不持有被管理的工具(与"发现者不写漏洞"同源)
+- **有且只有**(用户铁律):配置 skill 的工具与提示词,有且只有 skill-config 有;MCP 同理 mcp-config;CLI 同理 cli-config。业务智能体(recon/nday/调度等)永不持有任何配置工具,也不受配置智能体提示词/skill 污染
+- **共享工具→各持独立实例**(用户铁律):多智能体都需要的能力(如联网搜索),不是共享一份、更不是新造角色——每个智能体独立持有自己的工具实例。工具配置域=恰好三个智能体,不许第四个
+- **配置≠持有**:配置智能体给指定智能体配置 skill/MCP;加载边界=配置的 agents 字段/skill 目录——它在物理上不持有被管理的工具(与"发现者不写漏洞"同源)
 - **CLI=环境级**:装到 /opt/tools(PATH 已含),所有智能体共享;优先 npm --prefix /opt/tools/npm-global、pip --target /opt/tools/py
 - **搜索=能力协商**:垂直通道(MCP registry/GitHub/包管理器)零 key 一等公民;通用 web 搜索可选 provider(默认 none——开源零绑定),未配置时如实声明,绝不假装搜索过
 - **四场景零硬编码流程**:链接/上传/发现/构建全部由提示词方法论+工具组合涌现

@@ -28,8 +28,12 @@ export const AGENTS = Object.freeze([
     typeLabel: '后渗透agent' },
   { key: 'report', name: 'Report Agent', role: '报告编写',
     typeLabel: '报告agent' },
-  { key: 'tools', name: 'Tooling Agent', role: '工具配置',
-    typeLabel: '工具配置agent' },
+  { key: 'skill-config', name: 'Skill Config Agent', role: '技能配置',
+    typeLabel: '技能配置agent' },
+  { key: 'mcp-config', name: 'MCP Config Agent', role: 'MCP配置',
+    typeLabel: 'MCP配置agent' },
+  { key: 'cli-config', name: 'CLI Config Agent', role: 'CLI配置',
+    typeLabel: 'CLI配置agent' },
 ].map(Object.freeze));
 
 const TYPE_LABELS = Object.freeze(

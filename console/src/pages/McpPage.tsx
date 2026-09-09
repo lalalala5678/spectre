@@ -222,7 +222,7 @@ export function McpPage({ wsId }: { wsId: string }) {
         </button>
         {msg && <p className="font-mono text-[10.5px] text-amber-400">{msg}</p>}
       </Panel>
-      <ToolingChat workSessionId={wsId} />
+      <ToolingChat agentKey="mcp-config" workSessionId={wsId} />
       </div>
     </div>
   );

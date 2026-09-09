@@ -33,7 +33,9 @@ export type AgentId =
   | 'persistence'
   | 'postex'
   | 'report'
-  | 'tools';
+  | 'skill-config'
+  | 'mcp-config'
+  | 'cli-config';
 
 export type AgentStatus = 'idle' | 'running' | 'waiting_approval' | 'error' | 'offline';
 

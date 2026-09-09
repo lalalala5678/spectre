@@ -131,7 +131,27 @@ const PROVIDERS = {
 
 // ------------------------------------------------------- the tools
 
+/**
+ * Per-role toolkits — boundary axiom (AGENTS.md): each config agent
+ * holds EXACTLY its own configuration tools plus its OWN search/fetch
+ * instances (independent per agent — never a 4th role).
+ */
 export function buildToolingTools(record, caps) {
+  const all = buildAllToolingTools(caps);
+  switch (record.agentKey) {
+    case 'skill-config':
+      return [all.configureSkill, all.listToolConfig, all.searchWeb, all.fetchUrl];
+    case 'mcp-config':
+      return [all.configureMcp, all.listToolConfig, all.testMcp, all.searchWeb, all.fetchUrl];
+    case 'cli-config':
+      return [all.listToolConfig, all.searchWeb, all.fetchUrl];
+    default:
+      return [];
+  }
+}
+
+function buildAllToolingTools(caps) {
+  const record = { agentKey: '_all' }; // builders only use caps
   const configureSkill = {
     name: 'configure_skill',
     label: '配置技能',
@@ -313,8 +333,8 @@ export function buildToolingTools(record, caps) {
     },
   };
 
-  return [configureSkill, configureMcp, listToolConfig, testMcp,
-    searchWeb, fetchUrl];
+  return { configureSkill, configureMcp, listToolConfig, testMcp,
+    searchWeb, fetchUrl };
 }
 
 /** Minimal rule-based HTML→text (zero deps; strips nav/script/style,

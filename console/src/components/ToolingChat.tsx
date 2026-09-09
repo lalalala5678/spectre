@@ -19,7 +19,7 @@ interface ApiSessionSummary {
  * continuous context). Mount isolation unchanged: this is a tools-key
  * session; it never appears inside other agents' workspaces.
  */
-export function ToolingChat({ workSessionId }: { workSessionId: string }) {
+export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; workSessionId: string }) {
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [error, setError] = useState('');
 
@@ -28,7 +28,7 @@ export function ToolingChat({ workSessionId }: { workSessionId: string }) {
     setSessionId(null);
     try {
       const all = await api<ApiSessionSummary[]>('/sessions');
-      const mine = all.filter(s => s.agentKey === 'tools'
+      const mine = all.filter(s => s.agentKey === agentKey
         && !s.engagementId && !s.parentSessionId
         && s.workSessionId === workSessionId);
       if (mine.length > 0) {
@@ -36,14 +36,14 @@ export function ToolingChat({ workSessionId }: { workSessionId: string }) {
         return;
       }
       const created = await api<ApiSessionSummary>('/sessions', {
-        method: 'POST', json: { agentKey: 'tools', workSessionId },
+        method: 'POST', json: { agentKey, workSessionId },
       });
       setSessionId(created.id);
     } catch (e) {
       setError(String(e));
     }
   };
-  useEffect(() => { void boot(); }, [workSessionId]);
+  useEffect(() => { void boot(); }, [agentKey, workSessionId]);
 
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
@@ -67,10 +67,10 @@ export function ToolingChat({ workSessionId }: { workSessionId: string }) {
       )}
       <div className={cn('min-h-[420px]', sessionId ? 'flex min-h-0 flex-1' : '')}>
         {sessionId
-          ? <LiveSession agentKey="tools" sessionId={sessionId} />
+          ? <LiveSession agentKey={agentKey} sessionId={sessionId} />
           : !error && (
             <p className="animate-pulse py-8 text-center text-[11px] text-zinc-600">
-              正在连接工具配置智能体…
+              正在连接智能体 会话…
             </p>
           )}
       </div>
