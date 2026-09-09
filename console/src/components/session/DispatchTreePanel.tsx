@@ -124,6 +124,10 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
   const lastSig = useRef('');
 
   useEffect(() => {
+    // Project switch: the OLD project's tree must vanish immediately —
+    // stale topology lingering behind a switched header is exactly the
+    // "still showing project four" confusion.
+    setTree(null);
     let stopped = false;
     const load = async () => {
       try {

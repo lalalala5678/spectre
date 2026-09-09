@@ -294,7 +294,10 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
         className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-void-700 bg-void-950 p-3"
       >
         {!loaded && !error && (
-          <p className="py-8 text-center text-[11px] text-zinc-700">载入会话…</p>
+          <div className="flex flex-col items-center gap-2 py-10">
+            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" />
+            <p className="animate-pulse text-[11.5px] text-zinc-500">正在载入项目内容…</p>
+          </div>
         )}
         <div ref={sentinelRef} className="py-0.5 text-center">
           {olderCount > 0 ? (

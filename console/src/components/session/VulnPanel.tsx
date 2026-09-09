@@ -61,10 +61,16 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
   onOpenSession?: (sessionId: string) => void;
 }) {
   const [events, setEvents] = useState<FoldedEntry[]>([]);
+  // Distinguish LOADING (project switched, fetch in flight) from EMPTY
+  // (project loaded, nothing published) — stale content must never
+  // linger after a project switch, and '暂无' must never flash first.
+  const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
     let stopped = false;
     const cursor = { v: 0 };
+    setEvents([]);
+    setLoaded(false);
     const accept = (e: ApiBusEvent) => {
       // 'intel' = legacy pre-rename events — they ARE vulnerabilities
       if (e.type !== 'vulnerability' && e.type !== 'intel') return false;
@@ -83,6 +89,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
           + (workSessionId ? `?ws=${workSessionId}` : ''));
         if (stopped) return;
         setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+        setLoaded(true);
         cursor.v = all.at(-1)?.seq ?? 0;
       } catch { /* SSE reconnect will heal */ }
     })();
@@ -98,6 +105,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
             const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
             setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+            setLoaded(true);
           } catch { /* next event heals */ }
         })();
         return;
@@ -119,8 +127,9 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
         <span className="font-mono text-[10px] text-zinc-600">{events.length}</span>
       </header>
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
-        {events.length === 0 && (
-          <p className="py-3 text-center text-[11px] text-zinc-700">暂无漏洞</p>
+        {events.length === 0 && (!loaded
+          ? <p className="animate-pulse py-3 text-center text-[11px] text-zinc-600">载入中…</p>
+          : <p className="py-3 text-center text-[11px] text-zinc-700">暂无漏洞</p>
         )}
         {events.map(event => {
           const severity = event.current.severity ?? event.severity ?? 'INFO';
