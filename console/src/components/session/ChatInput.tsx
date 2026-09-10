@@ -13,7 +13,7 @@ export function ChatInput({
 }) {
   const [value, setValue] = useState('');
   const [uploading, setUploading] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   /** Attachment → /opt/uploads (sandbox-visible to every agent). */
@@ -66,19 +66,33 @@ export function ChatInput({
         >
           <FileUp className="h-3.5 w-3.5" />
         </button>
-        <input
+        <textarea
           ref={inputRef}
           value={value}
-          onChange={(e) => setValue(e.target.value)}
+          onChange={(e) => {
+            setValue(e.target.value);
+            const el = e.target as HTMLTextAreaElement;
+            el.style.height = 'auto';
+            el.style.height = Math.min(el.scrollHeight, 160) + 'px';
+          }}
           placeholder={busy ? `${placeholder}(智能体忙碌,将以 steering 插入)` : placeholder}
-          className="min-w-0 flex-1 bg-transparent font-mono text-[13px] text-zinc-200 placeholder:text-zinc-700 outline-none"
+          className="min-h-[20px] min-w-0 flex-1 resize-none bg-transparent font-mono text-[13px] leading-5 text-zinc-200 placeholder:text-zinc-700 outline-none"
+          rows={1}
           onKeyDown={(e) => {
-            if (e.key === 'Enter' && !e.altKey) submit(false);
-            else if (e.key === 'Enter' && e.altKey) submit(true);
+            if (e.key === 'Enter' && e.shiftKey) {
+              return; // plain newline — textarea default, never submits
+            }
+            if (e.key === 'Enter' && !e.altKey) {
+              e.preventDefault();
+              submit(false);
+              (e.target as HTMLTextAreaElement).style.height = 'auto';
+            } else if (e.key === 'Enter' && e.altKey) {
+              submit(true); // steering interjection while busy
+            }
           }}
         />
         <span className="shrink-0 font-mono text-[9.5px] text-zinc-700">
-          {busy ? 'ENTER=插话' : 'ENTER=发送'}
+          {busy ? 'ALT+ENTER=插话' : 'ENTER=发送 · SHIFT+ENTER=换行'}
         </span>
         <button
           onClick={() => submit(false)}

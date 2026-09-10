@@ -23,7 +23,7 @@ export type RouteKey =
   | 'audit';         // 审计与证据链
 
 export type AgentId =
-  | 'orchestrator'
+  | 'autopwn'
   | 'recon'
   | 'nday'
   | 'weakcred'

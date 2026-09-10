@@ -7,7 +7,7 @@ import type {
 
 export const AGENTS: AgentMeta[] = [
   {
-    id: 'orchestrator', name: 'Orchestrator', codename: 'AutoPwn 主控',
+    id: 'autopwn', name: 'Orchestrator', codename: 'AutoPwn 主控',
     desc: '接收目标后自主拆解任务图，调度各阶段 Agent，处理依赖、冲突与审批升级。',
     status: 'idle', model: 'deepseek-v4-pro', version: 'v2.4.1',
     skills: ['task-graph', 'scope-guard', 'debate-verify'], mcpServers: ['task-db', 'evidence-store'],
@@ -236,7 +236,7 @@ export const MCP_SERVERS: McpServer[] = [
       { name: 'evidence_put', desc: '写入证据并返回哈希' },
       { name: 'evidence_chain', desc: '导出完整证据链' },
     ],
-    boundAgents: ['orchestrator', 'report'],
+    boundAgents: ['autopwn', 'report'],
   },
   {
     id: 'bloodhound-api', name: 'bloodhound-api', transport: 'http',
@@ -267,7 +267,7 @@ export const AUDIT_LOG: AuditRecord[] = [
   { id: 'a2', ts: '02:03:12', actor: 'recon', action: 'tool.exec', detail: 'subfinder -d example-corp.com（被动枚举，safe）', approved: true, hash: 'sha256:11bc…' },
   { id: 'a3', ts: '02:07:55', actor: 'nday', action: 'scan.launch', detail: 'nuclei -t cves/ -rl 50（受速率约束）', approved: true, hash: 'sha256:cd04…' },
   { id: 'a4', ts: '02:11:12', actor: 'exploit', action: 'approval.request', detail: '请求对 wiki.example-corp.com 执行真实利用', hash: 'sha256:e7f1…' },
-  { id: 'a5', ts: '02:11:30', actor: 'orchestrator', action: 'task.block', detail: 't4 (C2) 被约束集 allowC2=false 阻塞', hash: 'sha256:3d88…' },
+  { id: 'a5', ts: '02:11:30', actor: 'autopwn', action: 'task.block', detail: 't4 (C2) 被约束集 allowC2=false 阻塞', hash: 'sha256:3d88…' },
 ];
 
 // ---------------- 子 Agent 调用状态（AutoPwn 右侧面板） ----------------
@@ -345,15 +345,15 @@ export const SPANS: Span[] = [
 // ---------------- Agent 间消息总线 ----------------
 
 export const MESSAGES: AgentMessage[] = [
-  { id: 'm0', ts: '02:01:10', from: 'orchestrator', to: 'all', channel: 'announce', type: 'context', summary: '公告：授权范围未锁定前，禁止一切主动发包动作，仅允许被动信息收集。' },
-  { id: 'm1', ts: '02:01:06', from: 'orchestrator', to: 'recon', channel: 'dm', type: 'dispatch', summary: 'orgresolve + 端口测绘（被动优先）', spanId: 'span-a1' },
-  { id: 'm2', ts: '02:06:31', from: 'recon', to: 'orchestrator', channel: 'dm', type: 'result', summary: '攻击面快照 + 建议范围', payloadRef: 'ref:t1', spanId: 'span-a3' },
-  { id: 'm2b', ts: '02:06:40', from: 'orchestrator', to: 'all', channel: 'announce', type: 'context', summary: '公告：范围已锁定。pay.example-corp.com 为第三方支付，全阶段禁止触达。' },
-  { id: 'm3', ts: '02:07:02', from: 'orchestrator', to: 'weakcred', channel: 'dm', type: 'dispatch', summary: '登录口弱口令检测（context: t1 摘要）', spanId: 'span-b' },
-  { id: 'm4', ts: '02:07:05', from: 'orchestrator', to: 'nday', channel: 'dm', type: 'dispatch', summary: 'N-Day 模板匹配（context: 指纹清单）', spanId: 'span-c' },
+  { id: 'm0', ts: '02:01:10', from: 'autopwn', to: 'all', channel: 'announce', type: 'context', summary: '公告：授权范围未锁定前，禁止一切主动发包动作，仅允许被动信息收集。' },
+  { id: 'm1', ts: '02:01:06', from: 'autopwn', to: 'recon', channel: 'dm', type: 'dispatch', summary: 'orgresolve + 端口测绘（被动优先）', spanId: 'span-a1' },
+  { id: 'm2', ts: '02:06:31', from: 'recon', to: 'autopwn', channel: 'dm', type: 'result', summary: '攻击面快照 + 建议范围', payloadRef: 'ref:t1', spanId: 'span-a3' },
+  { id: 'm2b', ts: '02:06:40', from: 'autopwn', to: 'all', channel: 'announce', type: 'context', summary: '公告：范围已锁定。pay.example-corp.com 为第三方支付，全阶段禁止触达。' },
+  { id: 'm3', ts: '02:07:02', from: 'autopwn', to: 'weakcred', channel: 'dm', type: 'dispatch', summary: '登录口弱口令检测（context: t1 摘要）', spanId: 'span-b' },
+  { id: 'm4', ts: '02:07:05', from: 'autopwn', to: 'nday', channel: 'dm', type: 'dispatch', summary: 'N-Day 模板匹配（context: 指纹清单）', spanId: 'span-c' },
   { id: 'm5', ts: '02:10:40', from: 'weakcred', to: 'all', channel: 'share', type: 'handoff', summary: '情报共享：凭据 #c1 grafana admin/admin（后续横向可复用）', payloadRef: 'cred:#c1', sensitive: true, spanId: 'span-b' },
-  { id: 'm6', ts: '02:11:12', from: 'nday', to: 'orchestrator', channel: 'dm', type: 'result', summary: '2 confirmed CVE + PoC 证据', payloadRef: 'ev://a91f…c2', spanId: 'span-c' },
-  { id: 'm7', ts: '02:13:02', from: 'orchestrator', to: 'exploit', channel: 'dm', type: 'dispatch', summary: 'CVE-2023-22515 真实验证（审批 #a4 通过）', spanId: 'span-d' },
+  { id: 'm6', ts: '02:11:12', from: 'nday', to: 'autopwn', channel: 'dm', type: 'result', summary: '2 confirmed CVE + PoC 证据', payloadRef: 'ev://a91f…c2', spanId: 'span-c' },
+  { id: 'm7', ts: '02:13:02', from: 'autopwn', to: 'exploit', channel: 'dm', type: 'dispatch', summary: 'CVE-2023-22515 真实验证（审批 #a4 通过）', spanId: 'span-d' },
 ];
 
 export const fmtTime = '2026-09-06 02:16:12';
@@ -385,7 +385,7 @@ export const CLI_TOOLS: CliTool[] = [
 
 /** Agent 短名（挂载矩阵/归属标签共用） */
 export const AGENT_LABEL: Record<AgentId, string> = {
-  orchestrator: 'Orchestrator', recon: 'Recon', nday: 'NDay', weakcred: 'WeakCred',
+  autopwn: 'Orchestrator', recon: 'Recon', nday: 'NDay', weakcred: 'WeakCred',
   api: 'API', exploit: 'VulnHunt', phish: 'Phish', c2: 'C2',
   persistence: 'Persistence', postex: 'PostEx', report: 'Report',
   'skill-config': '技能配置', 'mcp-config': 'MCP配置', 'cli-config': 'CLI配置',
@@ -402,8 +402,8 @@ export type SpanFlowEvent =
 
 export const SPAN_FLOWS: Record<string, SpanFlowEvent[]> = {
   'span-a1': [
-    { kind: 'xagent', ts: '02:01:10', from: 'orchestrator', to: 'all', channel: 'announce', summary: '公告：授权范围未锁定前，禁止一切主动发包动作，仅允许被动信息收集。' },
-    { kind: 'xagent', ts: '02:01:06', from: 'orchestrator', to: 'recon', channel: 'dm', summary: '对 Example Corp 做组织名解析：工商/WHOIS/crt.sh 三源交叉，被动优先，确定授权范围。' },
+    { kind: 'xagent', ts: '02:01:10', from: 'autopwn', to: 'all', channel: 'announce', summary: '公告：授权范围未锁定前，禁止一切主动发包动作，仅允许被动信息收集。' },
+    { kind: 'xagent', ts: '02:01:06', from: 'autopwn', to: 'recon', channel: 'dm', summary: '对 Example Corp 做组织名解析：工商/WHOIS/crt.sh 三源交叉，被动优先，确定授权范围。' },
     { kind: 'guidance', ts: '02:01:40', body: '范围解析时把子公司和 CDN 共享段排除，只保留自有资产。' },
     { kind: 'thought', ts: '02:01:50', body: '收到。三源交叉时加一步归属校验：证书里的 CDN 泛域名（cloudflare/fastly）剔除，WHOIS 注册人不匹配的关联域剔除。先做纯被动，不碰目标。' },
     { kind: 'action', ts: '02:03:12', agent: 'recon', cmd: 'orgresolve "Example Corp" --crtsh --asn --whois --exclude-cdn', output: `domain   example-corp.com        (whois: 注册人匹配)
@@ -414,16 +414,16 @@ netblock 203.0.113.0/28          (ASN 宣告)
 skipped  example-corp.cdn.cloudflare.net (共享段，按指导排除)` },
   ],
   'span-a2': [
-    { kind: 'xagent', ts: '02:04:02', from: 'orchestrator', to: 'recon', channel: 'dm', summary: '范围已锁定。展开子域枚举：被动聚合 + 解析验证 + httpx 探活抓指纹。' },
+    { kind: 'xagent', ts: '02:04:02', from: 'autopwn', to: 'recon', channel: 'dm', summary: '范围已锁定。展开子域枚举：被动聚合 + 解析验证 + httpx 探活抓指纹。' },
     { kind: 'thought', ts: '02:04:05', body: '被动子域枚举聚合四个源，dnsx 验证解析，httpx 探活并抓 title/指纹。' },
     { kind: 'action', ts: '02:04:40', agent: 'recon', cmd: 'subfinder -d example-corp.com -silent | dnsx -a -resp | httpx -title -tech-detect', output: `wiki.example-corp.com      [200] Confluence 8.5.3
 grafana.example-corp.com   [200] Grafana 10.2
 vpn.example-corp.com       [200] Ivanti 22.3R1
 mail/dev/api …             14 subdomains, 6 live web, 2 admin panels` },
-    { kind: 'xagent', ts: '02:05:02', from: 'recon', to: 'orchestrator', channel: 'dm', summary: '攻击面快照完成：14 子域 / 6 存活 Web / 2 管理后台（wiki、grafana）', payloadRef: 'ref:t1' },
+    { kind: 'xagent', ts: '02:05:02', from: 'recon', to: 'autopwn', channel: 'dm', summary: '攻击面快照完成：14 子域 / 6 存活 Web / 2 管理后台（wiki、grafana）', payloadRef: 'ref:t1' },
   ],
   'span-a3': [
-    { kind: 'xagent', ts: '02:05:20', from: 'orchestrator', to: 'recon', channel: 'dm', summary: '对 203.0.113.0/28 做 top-1000 端口测绘，速率 50 受约束。' },
+    { kind: 'xagent', ts: '02:05:20', from: 'autopwn', to: 'recon', channel: 'dm', summary: '对 203.0.113.0/28 做 top-1000 端口测绘，速率 50 受约束。' },
     { kind: 'thought', ts: '02:05:30', body: '网段已锁定在授权范围，top-1000 端口 SYN 测绘，速率 50 受约束。' },
     { kind: 'action', ts: '02:06:10', agent: 'recon', cmd: 'naabu -host 203.0.113.0/28 -top-ports 1000 -rate 50', output: `203.0.113.6    22/80/443/8080   (wiki)
 203.0.113.9    443/8443         (vpn)
@@ -431,7 +431,7 @@ mail/dev/api …             14 subdomains, 6 live web, 2 admin panels` },
 47 open ports across 6 hosts` },
   ],
   'span-b': [
-    { kind: 'xagent', ts: '02:07:02', from: 'orchestrator', to: 'weakcred', channel: 'dm', summary: '登录口弱口令检测：Grafana + OWA + SSH。限速 5/min，启用锁定保护。context: t1 摘要。' },
+    { kind: 'xagent', ts: '02:07:02', from: 'autopwn', to: 'weakcred', channel: 'dm', summary: '登录口弱口令检测：Grafana + OWA + SSH。限速 5/min，启用锁定保护。context: t1 摘要。' },
     { kind: 'guidance', ts: '02:07:30', body: 'OWA 是企业邮箱，账户锁定会影响全员，锁 3 次就停，别按满限速跑。' },
     { kind: 'thought', ts: '02:07:35', body: '收到。OWA 单独收紧策略：连续 3 次 miss 立即中止该目标。先默认凭据库精确匹配（无锁定风险），常见组合限速 5/min。' },
     { kind: 'action', ts: '02:08:15', agent: 'weakcred', cmd: 'weakcred-check --targets grafana,owa,ssh --rate 5/min --lockout-guard --owa-max-miss 3', output: `grafana.example-corp.com   admin:admin        [HIT] 已记录证据 ev://03c4…9a
@@ -442,7 +442,7 @@ exit: 1 hit / 3 targets, 0 lockouts` },
     { kind: 'xagent', ts: '02:10:40', from: 'weakcred', to: 'all', channel: 'share', summary: '情报共享：凭据 #c1 grafana admin/admin（后续横向可复用）', payloadRef: 'cred:#c1', sensitive: true },
   ],
   'span-c': [
-    { kind: 'xagent', ts: '02:07:05', from: 'orchestrator', to: 'nday', channel: 'dm', summary: '按指纹清单做 N-Day 模板匹配。命中后一律沙箱复验。context: 指纹清单。' },
+    { kind: 'xagent', ts: '02:07:05', from: 'autopwn', to: 'nday', channel: 'dm', summary: '按指纹清单做 N-Day 模板匹配。命中后一律沙箱复验。context: 指纹清单。' },
     { kind: 'thought', ts: '02:07:20', body: '指纹清单里 Confluence 8.5.3 和 Ivanti 22.3R1 都是 N-Day 高发产品。模板命中后一律进沙箱复验，误报直接反证丢弃。' },
     { kind: 'action', ts: '02:09:44', agent: 'nday', cmd: 'nuclei -l live_web.txt -t cves/ -rl 50 -jsonl -o nday.jsonl', output: `[CVE-2023-22515] wiki.example-corp.com     confluence 8.5.3   [matched]
 [CVE-2024-21887]  vpn.example-corp.com      ivanti 22.3R1      [matched]
@@ -450,10 +450,10 @@ exit: 1 hit / 3 targets, 0 lockouts` },
     { kind: 'action', ts: '02:10:55', agent: 'nday', cmd: 'poc-verify --sandbox --evidence nday.jsonl', output: `CVE-2023-22515  sandbox uid=0   [confirmed] ev://a91f…c2
 CVE-2024-21887  sandbox rce ok  [confirmed] ev://77b0…1d
 variant-hunt: confluence patch-diff → 1 疑似未公开变体` },
-    { kind: 'xagent', ts: '02:11:12', from: 'nday', to: 'orchestrator', channel: 'dm', summary: '2 confirmed CVE + PoC 证据', payloadRef: 'ev://a91f…c2' },
+    { kind: 'xagent', ts: '02:11:12', from: 'nday', to: 'autopwn', channel: 'dm', summary: '2 confirmed CVE + PoC 证据', payloadRef: 'ev://a91f…c2' },
   ],
   'span-d': [
-    { kind: 'xagent', ts: '02:13:02', from: 'orchestrator', to: 'vulnhunt', channel: 'dm', summary: 'CVE-2023-22515 真实验证（审批 #a4 已通过）。注意：allowC2=false，webshell 仅作验证，不建回连。' },
+    { kind: 'xagent', ts: '02:13:02', from: 'autopwn', to: 'vulnhunt', channel: 'dm', summary: 'CVE-2023-22515 真实验证（审批 #a4 已通过）。注意：allowC2=false，webshell 仅作验证，不建回连。' },
     { kind: 'guidance', ts: '02:13:10', body: '验证完拿到证据就卸掉 webshell，别留东西在目标上。' },
     { kind: 'thought', ts: '02:13:15', body: '收到，执行完即清理：临时管理员账户删除 + 插件卸载 + 访问日志核对。利用链分两步：setup-restore 创建临时管理员 → 插件接口上传 webshell。每步输出写入证据链。' },
     { kind: 'action', ts: '02:13:02', agent: 'vulnhunt', cmd: 'exploit-chain cve-2023-22515 --target wiki.example-corp.com --evidence --cleanup-after', running: true },

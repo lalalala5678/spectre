@@ -15,7 +15,7 @@ const STAGE_ROUTES: RouteKey[] = [
 ];
 
 const AGENT_OF_ROUTE: Record<string, string> = {
-  autopwn: 'orchestrator',
+  autopwn: 'autopwn',
   recon: 'recon',
   nday: 'nday',
   weakcred: 'weakcred',
