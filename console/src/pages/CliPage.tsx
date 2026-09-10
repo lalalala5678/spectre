@@ -18,6 +18,8 @@ interface SandboxStatus {
 export function CliPage({ wsId }: { wsId: string }) {
   const [status, setStatus] = useState<SandboxStatus | null>(null);
   const [tools, setTools] = useState<string[]>([]);
+  interface InstalledTool { name: string; layer: string; note?: string }
+  const [installed, setInstalled] = useState<InstalledTool[]>([]);
   const [cmd, setCmd] = useState('');
   const [busy, setBusy] = useState(false);
   const [output, setOutput] = useState('');
@@ -27,6 +29,8 @@ export function CliPage({ wsId }: { wsId: string }) {
     try {
       setStatus(await api<SandboxStatus>('/sandbox/status'));
       setTools(await api<string[]>('/sandbox/tools'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
     } catch (e) { setMsg(String(e)); }
   };
   useEffect(() => { void load(); }, []);
@@ -40,6 +44,9 @@ export function CliPage({ wsId }: { wsId: string }) {
       setOutput(res.output);
       setMsg(res.ok ? '安装完成' : `退出码 ${res.exitCode}`);
       setTools(await api<string[]>('/sandbox/tools'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
     } catch (e) { setMsg(String(e)); } finally { setBusy(false); }
   };
 
@@ -52,6 +59,8 @@ export function CliPage({ wsId }: { wsId: string }) {
         ? `已卸载 ${name}(清除记录 ${r.clearedLog.length} 条)`
         : `未找到 ${name} 的安装痕迹`);
       setTools(await api<string[]>('/sandbox/tools'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
+      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
     } catch (e) { setMsg(String(e)); }
   };
 
@@ -71,18 +80,37 @@ export function CliPage({ wsId }: { wsId: string }) {
         bodyClassName="p-0"
       >
         <div className="max-h-[60vh] overflow-y-auto p-3">
-          <div className="flex flex-wrap gap-1">
-            {tools.map(t => (
-              <span key={t}
-                className="group flex items-center gap-1 rounded-sm border border-void-700 bg-void-900 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-400">
-                {t}
+          <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+            共享层已安装（{installed.length}，可卸载）
+          </p>
+          <div className="mb-3 flex flex-wrap gap-1">
+            {installed.map(t => (
+              <span key={t.layer + t.name}
+                className="group flex items-center gap-1 rounded-sm border border-orange-900/60 bg-orange-950/20 px-1.5 py-0.5 font-mono text-[10.5px] text-orange-200"
+                title={t.note ? `layer=${t.layer}\n${t.note}` : `layer=${t.layer}`}>
+                {t.name}
+                <span className="text-[9px] text-zinc-500">{t.layer}</span>
                 <button
-                  onClick={() => void uninstall(t)}
-                  title={`卸载 ${t}`}
-                  className="hidden text-zinc-600 hover:text-red-400 group-hover:inline"
+                  onClick={() => void uninstall(t.name)}
+                  title={`卸载 ${t.name}`}
+                  className="text-zinc-500 hover:text-red-400"
                 >
                   <Trash2 className="h-3 w-3" />
                 </button>
+              </span>
+            ))}
+            {installed.length === 0 && (
+              <span className="py-1 text-[11px] text-zinc-600">未安装 — 用下方安装框或对话安装</span>
+            )}
+          </div>
+          <p className="mb-1 font-mono text-[10px] uppercase tracking-widest text-zinc-500">
+            沙箱可用命令（PATH，系统级）
+          </p>
+          <div className="flex flex-wrap gap-1">
+            {tools.map(t => (
+              <span key={t}
+                className="flex items-center rounded-sm border border-void-700 bg-void-900 px-1.5 py-0.5 font-mono text-[10.5px] text-zinc-400">
+                {t}
               </span>
             ))}
             {tools.length === 0 && (

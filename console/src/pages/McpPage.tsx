@@ -80,8 +80,12 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   const remove = async (name: string) => {
-    await api(`/sandbox/mcp?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
-    await load();
+    if (!window.confirm(`注销 MCP server ${name}（对新会话生效，后台连接将关闭）？`)) return;
+    try {
+      await api(`/sandbox/mcp?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
+      setMsg(`已注销 ${name}`);
+      await load();
+    } catch (e) { setMsg(String(e)); }
   };
 
   return (

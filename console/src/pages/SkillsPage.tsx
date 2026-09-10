@@ -53,9 +53,13 @@ export function SkillsPage({ wsId }: { wsId: string }) {
   };
 
   const remove = async (agentKey: string, name: string) => {
-    await api(`/sandbox/skills?agentKey=${agentKey}&name=${encodeURIComponent(name)}`,
-      { method: 'DELETE' });
-    await load();
+    if (!window.confirm(`卸载技能 ${name}（从 ${agentKey}，对其新会话生效）？`)) return;
+    try {
+      await api(`/sandbox/skills?agentKey=${agentKey}&name=${encodeURIComponent(name)}`,
+        { method: 'DELETE' });
+      setMsg(`已卸载 ${agentKey}/${name}`);
+      await load();
+    } catch (e) { setMsg(String(e)); }
   };
 
   return (

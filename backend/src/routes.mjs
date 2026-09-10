@@ -368,6 +368,10 @@ export function createRouter({ store, bus, caps, wal }) {
       await rebuildMounts(AGENT_KEYS);
       return json(res, 200, { deleted: true });
     }
+    if (path === '/api/sandbox/cli/installed' && method === 'GET') {
+      const { sharedLayerTools } = await import('./sandbox/container.mjs');
+      return json(res, 200, await sharedLayerTools());
+    }
     if (path === '/api/sandbox/cli' && method === 'DELETE') {
       const url2 = new URL(req.url, 'http://x');
       const name = url2.searchParams.get('name');

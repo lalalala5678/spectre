@@ -401,4 +401,42 @@ export async function uninstallCliTool(name) {
   return { removed, aptRemoved, clearedLog, rewritten: [] };
 }
 
+/** Tools actually installed in the shared layer (uninstallable set):
+ *  fs-probe the three layouts + package names parsed from the apt
+ *  ledger rows. Drives the CLI page's "shared layer" section — the
+ *  bare PATH listing must never carry uninstall buttons (system
+ *  commands are not ours to remove). */
+export async function sharedLayerTools() {
+  const out = [];
+  const seen = new Set();
+  const push = (name, layer, note = '') => {
+    if (!name || seen.has(`${layer}:${name}`)) return;
+    seen.add(`${layer}:${name}`);
+    out.push({ name, layer, note });
+  };
+  try {
+    for (const ent of await fsp.readdir(`${HOST.tools}/npm-global/lib/node_modules`)) {
+      if (!ent.startsWith('.')) push(ent, 'npm');
+    }
+  } catch { /* absent */ }
+  try {
+    for (const ent of await fsp.readdir(`${HOST.tools}/py`)) {
+      if (!ent.startsWith('.') && !ent.endsWith('.dist-info')) push(ent, 'pip');
+    }
+  } catch { /* absent */ }
+  try {
+    for (const ent of await fsp.readdir(`${HOST.tools}/bin`)) {
+      if (!ent.startsWith('.')) push(ent, 'bin');
+    }
+  } catch { /* absent */ }
+  for (const line of await readInstallLog()) {
+    if (!isAptInstallRow(line)) continue;
+    const m = String(line).match(/apt(?:-get)?\s+install\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
+    const pkgs = m ? m[2].trim().split(/\s+/)
+      .filter(w => /^[\w.+:~-]+$/.test(w)) : [];
+    for (const p of pkgs) push(p, 'apt', line.slice(0, 100));
+  }
+  return out;
+}
+
 export { ensureWorkspace };

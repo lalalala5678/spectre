@@ -120,11 +120,15 @@ class GatewayHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         # API mutations (projects/prefs/revise…) ride PUT through the
         # same authenticated proxy path as POST.
-        path = urllib.parse.urlsplit(self.path).path
+        split = urllib.parse.urlsplit(self.path)
+        path = split.path
         if not path.startswith(config.PREFIX):
             return self._send(404, b"not found")
-        rel = path[len(config.PREFIX):]
-        if rel.startswith("/api/"):
+        # keep the QUERY STRING — DELETE/PUT endpoints address resources
+        # by query params (?agentKey=&name= / ?name=); dropping it once
+        # turned every such call into a 400 (button E2E caught it).
+        rel = path[len(config.PREFIX):] + (('?' + split.query) if split.query else '')
+        if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
                 return self._redirect(config.PREFIX + "/login")
@@ -132,11 +136,15 @@ class GatewayHandler(BaseHTTPRequestHandler):
         return self._send(405, b"method not allowed")
 
     def do_DELETE(self):
-        path = urllib.parse.urlsplit(self.path).path
+        split = urllib.parse.urlsplit(self.path)
+        path = split.path
         if not path.startswith(config.PREFIX):
             return self._send(404, b"not found")
-        rel = path[len(config.PREFIX):]
-        if rel.startswith("/api/"):
+        # keep the QUERY STRING — DELETE/PUT endpoints address resources
+        # by query params (?agentKey=&name= / ?name=); dropping it once
+        # turned every such call into a 400 (button E2E caught it).
+        rel = path[len(config.PREFIX):] + (('?' + split.query) if split.query else '')
+        if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
                 return self._redirect(config.PREFIX + "/login")
@@ -144,12 +152,13 @@ class GatewayHandler(BaseHTTPRequestHandler):
         return self._send(405, b"method not allowed")
 
     def do_POST(self):
-        path = urllib.parse.urlsplit(self.path).path
+        split = urllib.parse.urlsplit(self.path)
+        path = split.path
         if not path.startswith(config.PREFIX):
             return self._send(404, b"not found")
-        rel = path[len(config.PREFIX):]
+        rel = path[len(config.PREFIX):] + (('?' + split.query) if split.query else '')
 
-        if rel.startswith("/api/"):
+        if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
                 return self._redirect(config.PREFIX + "/login")
