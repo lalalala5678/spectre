@@ -896,8 +896,14 @@ export function buildDirectTools(record, caps) {
   if (record.agentKey === 'report') {
     return [publishVuln, publishIntel];
   }
-  if (CONFIG_AGENT_KEYS.includes(record.agentKey)) {
-    return buildToolingTools(record, caps);
+  // recon (资产测绘) holds its OWN fetch_url instance — the shared-tool
+  // axiom: a capability needed by multiple agents = one instance each,
+  // never shared. search_web stays config-only: its vertical channels are
+  // tool-candidate search, useless for recon; dork needs go via fetch_url.
+  if (record.agentKey === 'recon') {
+    return [buildReportVulnerabilityTool(record, caps), publishIntel,
+      buildRequestRevisionTool(record, caps),
+      ...buildToolingTools({ agentKey: 'recon' }, caps)];
   }
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
     buildRequestRevisionTool(record, caps)];

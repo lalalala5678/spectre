@@ -13,7 +13,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 
@@ -30,6 +30,12 @@ const TOOLS_PROMPTS = {
   'skill-config': SKILL_CONFIG_PROMPT,
   'mcp-config': MCP_CONFIG_PROMPT,
   'cli-config': CLI_CONFIG_PROMPT,
+};
+/** Business agents with a SPECIALTY prompt: prepended BEFORE STAGE_PROMPT
+ *  (business discipline + TOOLS_GUIDE still apply — unlike config agents,
+ *  which fully replace the prompt and skip the guide). */
+const BUSINESS_PROMPTS = {
+  recon: RECON_PROMPT,
 };
 import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
@@ -178,8 +184,13 @@ export class SessionStore {
       initialState: {
         // Dynamic tool roster: generated from the ACTUAL registered set —
         // the prompt can never again claim a tool this session lacks.
+        // Prompt layering: config agents fully replace (no business guide);
+        // business specialty agents (recon) PREPEND their playbook — the
+        // stage discipline and TOOLS_GUIDE still apply underneath.
         systemPrompt: `${TOOLS_PROMPTS[record.agentKey]
-            ?? (isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT)}\n\n` +
+            ?? (BUSINESS_PROMPTS[record.agentKey]
+              ? `${BUSINESS_PROMPTS[record.agentKey]}\n\n${STAGE_PROMPT}`
+              : (isOrchestrator ? ORCHESTRATOR_PROMPT : STAGE_PROMPT))}\n\n` +
           // Config agents hold no business platform tools — the business
           // TOOLS_GUIDE would be pure noise (and boundary pollution).
           `${TOOLS_PROMPTS[record.agentKey] ? ''

@@ -173,6 +173,11 @@ export function buildToolingTools(record, caps) {
     case 'cli-config':
       return [all.listToolConfig, all.uninstallCli,
         all.searchWeb, all.fetchUrl, all.wakeAgent];
+    case 'recon':
+      // 资产测绘 agent 的独立网络查询实例(共享工具→各持独立实例公理):
+      // search_web 重新面向 OSINT/dork 描述;fetch_url 复用同一构建。
+      // 无配置智能体专属工具 — 那些永远不属于业务 agent。
+      return [all.reconSearchWeb, all.fetchUrl];
     default:
       return [];
   }
@@ -361,6 +366,71 @@ function buildAllToolingTools(caps) {
     },
   };
 
+  // Shared search core — used by BOTH the config-agent instance (tool-
+  // candidate oriented) and recon's OSINT instance (same axiom as the
+  // config trio: a capability needed by multiple agents = one instance
+  // each, never a shared singleton).
+  const runSearch = async (_id, p) => {
+    const receipt = ['渠道分解:'];
+    const hits = [];
+    let othersHaveHits = false;
+    for (const ch of await searchVertical(p.query)) {
+      if (ch.error) {
+        receipt.push(`- ${ch.channel}:0 命中(通道错误:${ch.error})`);
+      } else if (ch.items.length) {
+        receipt.push(`- ${ch.channel}:${ch.items.length} 命中`);
+        hits.push(...ch.items);
+        othersHaveHits = true;
+      } else {
+        receipt.push(`- ${ch.channel}:0 命中${othersHaveHits ? '(该通道可能异常或无此类目)' : ''}`);
+      }
+    }
+    const cfg = await getPrefs();
+    const provider = cfg.webSearchProvider ?? 'none';
+    if (provider !== 'none') {
+      try {
+        const generic = await PROVIDERS[provider](p.query, cfg.webSearch ?? cfg);
+        receipt.push(`- 通用web(${provider}):${generic.length} 命中`);
+        hits.push(...generic);
+      } catch (e) {
+      receipt.push(`- 通用web(${provider}):错误 ${String(e?.message ?? e)}`);
+      }
+    } else {
+      receipt.push('- 通用web:未配置 provider(当前=none,仅以上垂直结果;不假装搜过)');
+    }
+    if (!hits.length) {
+      return okText(receipt.join('\n') + '\n\n无结果。建议换关键词或明确目标渠道。');
+    }
+    // cross-channel dedupe (same url/title) — registry pagination
+    // once listed the same server 3x in a row (round-3 review)
+    // dedupe: exact url/title, AND cross-channel same-name merges
+    // (registry + github often carry the same project — round-3
+    // review polish; sources are unioned so nothing is lost)
+    const byName = new Map();
+    for (const h of hits) {
+      const urlKey = h.url ?? h.title;
+      if ([...byName.values()].some(e => e.urls.has(urlKey))) continue;
+      const k = h.title.split('/').pop().toLowerCase();
+      const e = byName.get(k);
+      if (e && e.title === h.title) {
+        e.urls.add(h.url ?? ''); e.count += 1;
+      } else if (!e) {
+        byName.set(k, { ...h, urls: new Set([h.url ?? '']), count: 1 });
+      } else {
+        byName.set(`${k}#${h.title}`, { ...h, urls: new Set([h.url ?? '']), count: 1 });
+      }
+    }
+    const uniq = [...byName.values()].map(e => ({
+      ...e,
+      url: [...e.urls].filter(Boolean).join(' | '),
+    }));
+    const shown = uniq.slice(0, 12);
+    return okText(receipt.join('\n') + `\n\n候选(去重后 ${uniq.length} 条,显示前 ${shown.length}):\n`
+      + shown.map((h, i) =>
+        `${i + 1}. ${h.title}\n   ${h.url}\n   ${(h.snippet ?? '').slice(0, 120)}`)
+        .join('\n'));
+  };
+
   const searchWeb = {
     name: 'search_web',
     label: '搜索',
@@ -373,66 +443,23 @@ function buildAllToolingTools(caps) {
     parameters: Type.Object({
       query: Type.String({ description: 'Search query' }),
     }),
-    execute: async (_id, p) => {
-      const receipt = ['渠道分解:'];
-      const hits = [];
-      let othersHaveHits = false;
-      for (const ch of await searchVertical(p.query)) {
-        if (ch.error) {
-          receipt.push(`- ${ch.channel}:0 命中(通道错误:${ch.error})`);
-        } else if (ch.items.length) {
-          receipt.push(`- ${ch.channel}:${ch.items.length} 命中`);
-          hits.push(...ch.items);
-          othersHaveHits = true;
-        } else {
-          receipt.push(`- ${ch.channel}:0 命中${othersHaveHits ? '(该通道可能异常或无此类目)' : ''}`);
-        }
-      }
-      const cfg = await getPrefs();
-      const provider = cfg.webSearchProvider ?? 'none';
-      if (provider !== 'none') {
-        try {
-          const generic = await PROVIDERS[provider](p.query, cfg.webSearch ?? cfg);
-          receipt.push(`- 通用web(${provider}):${generic.length} 命中`);
-          hits.push(...generic);
-        } catch (e) {
-          receipt.push(`- 通用web(${provider}):错误 ${String(e?.message ?? e)}`);
-        }
-      } else {
-        receipt.push('- 通用web:未配置 provider(当前=none,仅以上垂直结果;不假装搜过)');
-      }
-      if (!hits.length) {
-        return okText(receipt.join('\n') + '\n\n无候选。建议换关键词或明确目标渠道。');
-      }
-      // cross-channel dedupe (same url/title) — registry pagination
-      // once listed the same server 3x in a row (round-3 review)
-      // dedupe: exact url/title, AND cross-channel same-name merges
-      // (registry + github often carry the same project — round-3
-      // review polish; sources are unioned so nothing is lost)
-      const byName = new Map();
-      for (const h of hits) {
-        const urlKey = h.url ?? h.title;
-        if ([...byName.values()].some(e => e.urls.has(urlKey))) continue;
-        const k = h.title.split('/').pop().toLowerCase();
-        const e = byName.get(k);
-        if (e && e.title === h.title) {
-          e.urls.add(h.url ?? ''); e.count += 1;
-        } else if (!e) {
-          byName.set(k, { ...h, urls: new Set([h.url ?? '']), count: 1 });
-        } else {
-          byName.set(`${k}#${h.title}`, { ...h, urls: new Set([h.url ?? '']), count: 1 });
-        }
-      }
-      const uniq = [...byName.values()].map(e => ({
-        ...e,
-        url: [...e.urls].filter(Boolean).join(' | '),
-      }));
-      const shown = uniq.slice(0, 12);
-      return okText(receipt.join('\n') + `\n\n候选(去重后 ${uniq.length} 条,显示前 ${shown.length}):\n`
-        + shown.map((h, i) =>
-          `${i + 1}. ${h.title}\n   ${h.url}\n   ${(h.snippet ?? '').slice(0, 120)}`)
-          .join('\n'));
-    },
+    execute: runSearch,
+  };
+
+  // 资产测绘 agent 的独立实例:同一执行核心,OSINT/dork 面向的描述。
+  const reconSearchWeb = {
+    name: 'search_web',
+    label: 'OSINT 搜索',
+    description:
+      '[read-only] OSINT/web 搜索。query 里直接写完整搜索语法(如 '
+      + 'site:target.edu.cn、filetype:xlsx 学号、"公司名" 备案)。通用 '
+      + 'web provider 未配置时回执会如实说明,此时改用 fetch_url 定向'
+      + '抓取(如 Bing 结果页)或 bash curl;绝不假装搜过。',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      query: Type.String({ description: '搜索式(可含 dork 语法)' }),
+    }),
+    execute: runSearch,
   };
 
   const fetchUrl = {
@@ -594,7 +621,7 @@ function buildAllToolingTools(caps) {
 
   return { configureSkill, configureMcp, listToolConfig, testMcp,
     searchWeb, fetchUrl, deleteSkillTool, removeMcpServer, uninstallCli,
-    wakeAgent };
+    wakeAgent, reconSearchWeb };
 }
 
 /** Minimal rule-based HTML→text (zero deps; strips nav/script/style,

@@ -106,10 +106,12 @@
 - **技能**:重写 subdomain-sweep;新增 归属反查/C段决策/CDN绕过/拓扑确认 技能
 - **下游交接**:P7 报告 = intel 条目,nday/exploit 经 query_intel 消费
 
-## 6. 待用户拍板项(实施前)
+## 6. 拍板项状态(2026-09-11 实施夜更新)
 
-1. 资产库载体:(a) bus 扩 entryKind=asset (b) 沙箱 SQLite 工作库 (c) 混合(SQLite 工作+publish_intel 落账)——倾向 c
-2. agent 粒度:单 recon agent 多阶段 playbook vs AutoPwn dispatch 短命子 agent——倾向先单 agent
-3. 指纹规则来源:favicon mmh3+自维护最小规则集起步
-4. 学校目标选定(按 §3 选择标准筛 3 候选)
-5. recon CLI 工具集进共享层清单(subfinder/httpx/naabu/nuclei/amass/nmap 等,经 cli-config 装机)
+1. 资产库载体:本轮交付采用 publish_intel 结构化条目(6 类),SQLite 工作库未启用——首轮够用,超大规模再议
+2. agent 粒度:单 recon agent + 7 阶段 playbook 技能(SCUT E2E 验证可行)
+3. 指纹:回执原文证据法(CAS execution 字段/Coremail jsp/sudy HTML/Rails cookie/Server 头)实测有效,指纹库暂不需要
+4. 目标:华南理工大学(crt.sh 202 名/APNIC SCUT-CN 整段/137 活跃域)已用于 E2E
+5. CLI:宿主已有 nmap/dig/host/subfinder/httpx/nuclei;补装 whois(入 install-log 台账);masscan/amass 不装(轻探测哲学)
+6. 已清理:recon 挂载的测试 MCP(echo/echo2/spectre-uuid)——agent 自评"零价值"成立,已移除(仅 recon 持有,recon 范围内)
+7. 用户侧待配置(影响覆盖度,agent 已在交付物中如实声明):FOFA key/通用搜索 provider/IPv6 出口/DNS 历史库
