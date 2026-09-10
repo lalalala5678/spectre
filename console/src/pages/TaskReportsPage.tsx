@@ -12,10 +12,12 @@ import { EntryDetail } from '../components/session/EntryDetail';
  *  提供全宽列表 + 详情侧栏。 */
 export function TaskReportsPage() {
   const [wsId, setWsId] = useState<string | null>(null);
+  const [err, setErr] = useState('');
   const [selected, setSelected] = useState<ApiBusEvent | null>(null);
 
   useEffect(() => {
-    getPrefs().then(p => setWsId(p.currentWs)).catch(() => {});
+    getPrefs().then(p => setWsId(p.currentWs))
+      .catch(e => setErr(String(e)));
   }, []);
 
   return (
@@ -32,8 +34,15 @@ export function TaskReportsPage() {
         bodyClassName="p-0"
       >
         <div className="h-full max-h-[calc(100vh-180px)] overflow-y-auto">
-          {wsId !== null && (
-            <TaskReportsPanel workSessionId={wsId ?? undefined} onOpen={setSelected} />
+          {err && <p className="p-4 text-[11px] text-red-400">项目信息加载失败:{err}</p>}
+          {!err && wsId === null && (
+            <p className="animate-pulse p-6 text-center text-[11px] text-zinc-600">正在加载项目…</p>
+          )}
+          {!err && wsId === '' && (
+            <p className="p-6 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>
+          )}
+          {!err && wsId && (
+            <TaskReportsPanel workSessionId={wsId} onOpen={setSelected} />
           )}
         </div>
       </Panel>

@@ -54,11 +54,23 @@ export default function App() {
           {STAGE_ROUTES.includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(AGENT_OF_ROUTE[route])} />
           ) : route === 'skills' ? (
-            <div className="h-full overflow-hidden p-4"><SkillsPage wsId={wsId ?? ''} /></div>
+            <div className="h-full overflow-hidden p-4">
+              {wsId === null
+                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
+                : wsId ? <SkillsPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
+            </div>
           ) : route === 'mcp' ? (
-            <div className="h-full overflow-hidden p-4"><McpPage wsId={wsId ?? ''} /></div>
+            <div className="h-full overflow-hidden p-4">
+              {wsId === null
+                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
+                : wsId ? <McpPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
+            </div>
           ) : route === 'cli' ? (
-            <div className="h-full overflow-hidden p-4"><CliPage wsId={wsId ?? ''} /></div>
+            <div className="h-full overflow-hidden p-4">
+              {wsId === null
+                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
+                : wsId ? <CliPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
+            </div>
           ) : route === 'reports' ? (
             <div className="h-full overflow-hidden p-4"><TaskReportsPage /></div>
           ) : (

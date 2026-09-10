@@ -201,7 +201,7 @@ const caps = {
       `正文包含发现过程、证据链、危害分析与复现要点,并注明发现者 ${requesterAuthor.name};\n` +
       `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
       `5) 用 submit_task_report 提交任务报告收尾。`, 'system');
-    await store.awaitCompletion(writer);
+    await store.awaitCompletion(writer, 300_000);
     const published = bus.list().find(e => e.seq > baseSeq
       && e.type === 'vulnerability' && e.author?.sessionId === writer.id);
     if (published) {
@@ -247,7 +247,7 @@ const caps = {
       `问题:${question}\n\n` +
       `要求:只做验证本身——检查你的技能索引/工具清单,必要时实际调用一次,` +
       `把回执要点如实报告。不要展开其它任务。完成后一句话结论即可。`, 'system');
-    await store.awaitCompletion(target);
+    await store.awaitCompletion(target, 300_000);
     const msgs = target.agent.state.messages;
     const textOf = m => typeof m.content === 'string' ? m.content
       : (m.content?.filter?.(c => c.type === 'text')
@@ -322,7 +322,7 @@ const caps = {
       `3) 两关都过 → 调用 revise_entry(seq=${target.seq}, reason=..., title/severity/text 按核定结果)落账修订;\n` +
       `   任一关不过 → 不落账,在最终回复中明确说明驳回理由(将回执给申请者);\n` +
       `4) 提交任务报告收尾。`, 'system');
-    await store.awaitCompletion(writer);
+    await store.awaitCompletion(writer, 300_000);
     const landed = bus.list().find(e => e.revises === target.seq
       && (e.revision?.n ?? 0) > ((current?.revision?.n) ?? 0));
     if (landed) {

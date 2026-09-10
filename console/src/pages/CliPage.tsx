@@ -43,25 +43,25 @@ export function CliPage({ wsId }: { wsId: string }) {
         '/sandbox/cli', { method: 'POST', json: { command: cmd } });
       setOutput(res.output);
       setMsg(res.ok ? '安装完成' : `退出码 ${res.exitCode}`);
-      setTools(await api<string[]>('/sandbox/tools'));
-      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
-      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
-      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
+      await load();
     } catch (e) { setMsg(String(e)); } finally { setBusy(false); }
   };
 
   const uninstall = async (name: string) => {
+    if (busy) return;
     if (!window.confirm(`卸载 ${name}?(删除共享层文件并清除安装记录)`)) return;
+    setBusy(true); setMsg(`正在卸载 ${name}…`);
     try {
       const r = await api<{ removed: string[]; clearedLog: string[] }>(
         `/sandbox/cli?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
       setMsg(r.removed.length
         ? `已卸载 ${name}(清除记录 ${r.clearedLog.length} 条)`
         : `未找到 ${name} 的安装痕迹`);
-      setTools(await api<string[]>('/sandbox/tools'));
-      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
-      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
     } catch (e) { setMsg(String(e)); }
+    finally {
+      await load();
+      setBusy(false);
+    }
   };
 
   return (

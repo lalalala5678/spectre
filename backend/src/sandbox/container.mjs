@@ -110,13 +110,23 @@ export async function ensureSandbox() {
     return { driver: 'docker', ok: false, error: create.out.slice(-200) };
   }
   const boot = await bootstrapToolchain();
-  return { driver: 'docker', ok: true, created: true, ...boot };
+  // replay the shared-layer install ledger into the fresh container
+  // (apt-layer installs would otherwise be silently lost)
+  const replayed = await replayInstallLog();
+  return { driver: 'docker', ok: true, created: true, ...boot, replayed };
 }
 
 /** install-log: durable record of environment installs; replayed after a
  *  container rebuild (apt-layer packages live in the container layer and
  *  are lost — bind-mounted /opt/tools installs survive). */
-export async function appendInstallLog(command) {
+const installLogMutex = { p: Promise.resolve() };
+function withInstallLog(fn) {
+  const run = installLogMutex.p.then(fn, fn);
+  installLogMutex.p = run.catch(() => {});
+  return run;
+}
+
+async function _appendInstallLog(command) {
   const file = path.join(HOST.tools, 'install-log');
   const line = `${new Date().toISOString()}\t${String(command).replace(/\n/g, ' ')}\n`;
   await fsp.mkdir(HOST.tools, { recursive: true });
@@ -163,17 +173,40 @@ function bootstrapScript() {
 }
 
 async function bootstrapToolchain() {
+  // The marker must bind to the CONTAINER identity: apt-layer packages
+  // live in the container layer, so a rebuilt container loses them even
+  // though the persisted-volume marker survives — bind it to the
+  // container Id and bootstrap again when the Id changes.
+  let identity = 'local';
+  if (cfg.driver === 'docker') {
+    const id = await run('docker', ['inspect', '-f', '{{.Id}}', cfg.container], 30);
+    if (id.code !== 0) return { bootstrapped: false, error: 'container missing' };
+    identity = id.out.trim().slice(0, 12);
+  }
   const markerHost = path.join(HOST.tools, '.bootstrapped');
   const marker = cfg.driver === 'docker'
     ? await run('docker', ['exec', cfg.container, 'cat', '/opt/tools/.bootstrapped'], 30)
     : await run('cat', [markerHost], 30);
-  if (marker.code === 0) return { bootstrapped: true, skipped: true };
+  if (marker.code === 0 && marker.out.trim() === identity) {
+    return { bootstrapped: true, skipped: true };
+  }
   const script = bootstrapScript();
   const res = cfg.driver === 'docker'
     ? await run('docker', ['exec', cfg.container, 'bash', '-lc', script], 900)
     : await run('bash', ['-lc', script], 900);
   console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}:`,
     res.out.slice(-200));
+  if (res.code === 0) {
+    // write the identity marker + ledger the apt toolchain so a rebuild
+    // can replay it even if the marker path itself is ever lost
+    const write = `printf '%s' ${identity} > /opt/tools/.bootstrapped`;
+    if (cfg.driver === 'docker') {
+      await run('docker', ['exec', cfg.container, 'sh', '-c', write], 30);
+    } else {
+      await run('sh', ['-c', write], 30);
+    }
+    await appendInstallLog(`apt-get install -y nodejs npm python3 python3-pip git curl unzip jq build-essential`).catch(() => {});
+  }
   return { bootstrapped: res.code === 0, output: res.out.slice(-500) };
 }
 
@@ -233,7 +266,7 @@ export function looksLikeInstall(command) {
 }
 
 /** List recorded install commands (the shared-layer ledger). */
-export async function readInstallLog() {
+async function _readInstallLog() {
   const file = path.join(HOST.tools, 'install-log');
   try {
     const lines = (await fsp.readFile(file, 'utf8')).split('\n');
@@ -247,7 +280,7 @@ export async function readInstallLog() {
 /** Remove install-log lines whose command contains `match` — prevents a
  *  container rebuild from resurrecting an uninstalled tool. Returns the
  *  removed command strings. */
-export async function removeInstallLogEntries(match, keepCmds = new Set()) {
+async function _removeInstallLogEntries(match, keepCmds = new Set()) {
   const file = path.join(HOST.tools, 'install-log');
   let lines;
   try { lines = (await fsp.readFile(file, 'utf8')).split('\n'); }
@@ -286,7 +319,8 @@ async function rmIfFound(p) {
 export async function uninstallCliTool(name) {
   // reject path traversal: '..' anywhere would let a name like '..' or
   // '../x' escape the layout root (tools/bin/.. == tools itself)
-  if (!/^(?!.*\.\.)[a-zA-Z0-9_@/.-]+$/.test(name)) {
+  if (!/^[\w@][\w@./-]*$/.test(name) || name.includes('..')
+    || /[./]$/.test(name)) {
     throw new Error(`invalid tool name: ${name}`);
   }
   const removed = [];
@@ -357,8 +391,10 @@ export async function uninstallCliTool(name) {
       // the packages before this counts as removed.
       let verified = res.code === 0;
       if (verified) {
-        const chk = await run('bash', ['-lc',
-          `dpkg -l ${targets.join(' ')} 2>/dev/null | grep -c '^ii' || true`], 60);
+        const chkCmd = `dpkg -l ${targets.join(' ')} 2>/dev/null | grep -c '^ii' || true`;
+        const chk = cfg.driver === 'docker'
+          ? await run('docker', ['exec', cfg.container, 'bash', '-lc', chkCmd], 60)
+          : await run('bash', ['-lc', chkCmd], 60);
         verified = String(chk.out ?? '').trim() === '0';
       }
       const noteTail = (siblings.length
@@ -368,8 +404,10 @@ export async function uninstallCliTool(name) {
         // alternatives awareness: `which figlet` can still hit a
         // symlink owned by another package (toilet's figlet) — the
         // receipt must not read as failure, nor stay silent (round-5)
-        const alt = await run('bash', ['-lc',
-          `command -v ${name} || true`], 30);
+        const altCmd = `command -v ${name} || true`;
+        const alt = cfg.driver === 'docker'
+          ? await run('docker', ['exec', cfg.container, 'bash', '-lc', altCmd], 30)
+          : await run('bash', ['-lc', altCmd], 30);
         const altNote = String(alt.out ?? '').trim()
           ? `(注:command -v ${name} 仍命中——dpkg 层已移除,命令可能来自 alternatives/系统其它包提供)` : '';
         aptRemoved.push(rmCmd + noteTail + altNote);
@@ -406,6 +444,10 @@ export async function uninstallCliTool(name) {
  *  ledger rows. Drives the CLI page's "shared layer" section — the
  *  bare PATH listing must never carry uninstall buttons (system
  *  commands are not ours to remove). */
+export function appendInstallLog(cmd) { return withInstallLog(() => _appendInstallLog(cmd)); }
+export function removeInstallLogEntries(match, keep) { return withInstallLog(() => _removeInstallLogEntries(match, keep)); }
+export function readInstallLog() { return withInstallLog(() => _readInstallLog()); }
+
 export async function sharedLayerTools() {
   const out = [];
   const seen = new Set();

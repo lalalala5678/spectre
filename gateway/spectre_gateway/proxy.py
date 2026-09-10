@@ -29,10 +29,16 @@ def proxy(handler, api_path):
         config.RUNTIME_HOST, config.RUNTIME_PORT, timeout=600,
     )
     try:
-        upstream.request(handler.command, api_path, body=body, headers={
+        headers = {
             "Content-Type": handler.headers.get("Content-Type", ""),
             "Accept": handler.headers.get("Accept", ""),
-        })
+            # the runtime enforces the internal token on EVERY /api route;
+            # inject it here on behalf of the authenticated console session
+            "X-Internal-Token": config.RUNTIME_TOKEN,
+        }
+        if handler.command == "HEAD":
+            body = None
+        upstream.request(handler.command, api_path, body=body, headers=headers)
         response = upstream.getresponse()
     except (OSError, http.client.HTTPException) as error:
         upstream.close()
@@ -56,7 +62,7 @@ def proxy(handler, api_path):
             handler.wfile.write(b"%x\r\n%s\r\n" % (len(chunk), chunk))
             handler.wfile.flush()
         handler.wfile.write(b"0\r\n\r\n")
-    except (BrokenPipeError, ConnectionResetError):
+    except (BrokenPipeError, ConnectionResetError, TimeoutError):
         pass  # client went away mid-stream (normal for SSE)
     finally:
         upstream.close()

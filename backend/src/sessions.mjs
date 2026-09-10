@@ -17,6 +17,15 @@ import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MC
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 
+/** Disk-full resilience: a failing WAL append must degrade to a log
+ *  line, never crash the agent loop at the exact moment durability
+ *  matters most. */
+function safeWalAppend(wal, entry) {
+  try { wal?.append?.(entry); } catch (e) {
+    console.error('[wal] append failed (degraded):', e?.message ?? e);
+  }
+}
+
 const TOOLS_PROMPTS = {
   'skill-config': SKILL_CONFIG_PROMPT,
   'mcp-config': MCP_CONFIG_PROMPT,
@@ -108,7 +117,7 @@ export class SessionStore {
     this.sessions.set(id, record);
     // Durable before visible: the WAL entry carries the full shell, so a
     // restart replays this session exactly (minus the live SSE clients).
-    this.wal?.append({ t: 'sess', d: this._shellOf(record) });
+    safeWalAppend(this.wal, { t: 'sess', d: this._shellOf(record) });
     this._journal(record, 'session_created', {
       agentKey,
       engagementId: record.engagementId,
@@ -211,7 +220,14 @@ export class SessionStore {
         busy: false,
         agent: null,
       };
-      record.agent = this._buildAgent(record, messages);
+      try {
+        record.agent = this._buildAgent(record, messages);
+      } catch (e) {
+        // one poisoned record must never abort the whole boot — skip
+        // and keep going (the session stays inert rather than fatal)
+        console.error(`[rehydrate] skip session ${record.id}:`, e?.message ?? e);
+        record.agent = null;
+      }
       this.sessions.set(record.id, record);
     }
   }
@@ -489,7 +505,7 @@ export class SessionStore {
       title: String(meta.title ?? '[系统代拟] 任务报告'),
       status: String(meta.status ?? 'no-result'),
     };
-    this.wal?.append({ t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
+    safeWalAppend(this.wal, { t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
   }
 
   /**
@@ -497,10 +513,16 @@ export class SessionStore {
   /** Resolve when the session's current run ends (agent_end). Purely
    *  event-driven — used by the synchronous report_vulnerability tool
    *  to wait for its writer session. Resolves immediately if idle. */
-  awaitCompletion(record) {
+  awaitCompletion(record, timeoutMs) {
     if (!record.busy) return Promise.resolve();
     return new Promise(resolve => {
-      (record.completionWaiters ??= []).push(resolve);
+      let settled = false;
+      const done = () => { if (!settled) { settled = true; resolve(); } };
+      (record.completionWaiters ??= []).push(done);
+      // bounded wait: a wedged agent (hung MCP call, lost stream) must
+      // release its synchronous waiter — wake_agent/report_vulnerability
+      // callers used to stay busy FOREVER on this path
+      if (timeoutMs) setTimeout(done, timeoutMs).unref?.();
     });
   }
 
@@ -717,7 +739,7 @@ export class SessionStore {
         }
         // Write-ahead: RAW message (full thinking/usage for context
         // restore) + meta piggyback, fsync'd before the journal fires.
-        this.wal?.append({
+        safeWalAppend(this.wal, {
           t: 'msg',
           d: {
             sid: record.id,
@@ -734,7 +756,7 @@ export class SessionStore {
         });
         // Counters/report meta may have moved during the run (submit tool)
         // without a trailing message — persist the final snapshot.
-        this.wal?.append({ t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
+        safeWalAppend(this.wal, { t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
         this._maybeSummarize(record);
         this._reportSpawnCompletion(record);
         // Synchronous tool callers (report_vulnerability → writer wait)

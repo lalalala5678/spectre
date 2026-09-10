@@ -34,10 +34,14 @@ export async function loadMcpConfig() {
   } catch {
     servers = [];
   }
+  mcpConfigSuspect = false;
   return servers;
 }
 
 export async function saveMcpConfig(next) {
+  if (mcpConfigSuspect) {
+    throw new Error('mcp-servers.json 最近一次读取失败,拒绝写回以防清空配置;请先排查文件后重试');
+  }
   servers = next;
   await fsp.mkdir(path.dirname(CONFIG_PATH), { recursive: true });
   await fsp.writeFile(CONFIG_PATH, JSON.stringify(next, null, 2), 'utf8');
@@ -120,10 +124,20 @@ class StdioRpc {
         reject(new Error('MCP server process not running'));
         return;
       }
-      this.pending.set(id, { resolve, reject });
+      // hard timeout: a live-but-silent server must fail the call, not
+      // hang the agent's turn forever (no timeout = permanent busy)
+      const timer = setTimeout(() => {
+        this.pending.delete(id);
+        reject(new Error(`MCP call ${method} timed out (120s)`));
+      }, 120_000);
+      this.pending.set(id, {
+        resolve: v => { clearTimeout(timer); resolve(v); },
+        reject: e => { clearTimeout(timer); reject(e); },
+      });
       try {
         this.child.stdin.write(JSON.stringify({ jsonrpc: '2.0', id, method, params }) + '\n');
       } catch (e) {
+        clearTimeout(timer);
         this.pending.delete(id);
         reject(e);
       }
@@ -184,6 +198,7 @@ class HttpRpc {
     let res;
     try {
       res = await fetch(this.url, {
+        signal: AbortSignal.timeout(30_000),
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -207,14 +222,28 @@ class HttpRpc {
       const reader = res.body.getReader();
       const dec = new TextDecoder();
       let buf = '';
+      // Parse COMPLETE frames only: a non-greedy {} match once truncated
+      // JSON at the first inner '}' and mis-parsed notification frames as
+      // the response. Frames are newline-delimited `data: {...}` lines.
+      const tryParse = text => {
+        for (const line of text.split('\n')) {
+          const t = line.replace(/^data:\s*/, '').trim();
+          if (!t.startsWith('{')) continue;
+          try {
+            const msg = JSON.parse(t);
+            // only OUR response resolves; notifications/logging stream by
+            if (msg.id === id && (msg.result !== undefined || msg.error)) return msg;
+          } catch { /* partial frame — keep buffering */ }
+        }
+        return null;
+      };
       for (;;) {
         const { done, value } = await reader.read();
         if (done) break;
         buf += dec.decode(value, { stream: true });
-        const m = buf.match(/data:\s*(\{[\s\S]*?\})\s*\n/);
-        if (m) {
+        const msg = tryParse(buf);
+        if (msg) {
           reader.cancel().catch(() => {});
-          const msg = JSON.parse(m[1]);
           if (msg.error) throw new Error(msg.error.message ?? 'MCP error');
           return msg.result;
         }
@@ -232,19 +261,42 @@ class HttpRpc {
 
 const running = new Map(); // server name → rpc conn
 
+/** Corrupt-read latch: a failed load must NEVER be followed by a save
+ *  (saving [] over a transiently unreadable file once wiped every MCP
+ *  config, memory AND disk). Cleared only by a successful load. */
+let mcpConfigSuspect = false;
+const connecting = new Map(); // server name → in-flight connect promise
+
 async function connection(server) {
   if (running.has(server.name)) return running.get(server.name);
-  const rpc = server.transport === 'http'
-    ? await new HttpRpc(server.url, server.headers).start()
-    : await connectStdio(server);
-  await rpc.call('initialize', {
-    protocolVersion: '2025-06-18',
-    capabilities: {},
-    clientInfo: { name: 'spectre', version: '1.0.0' },
+  // single-flight: concurrent first-connects once double-spawned child
+  // processes and the last writer orphaned the rest
+  if (connecting.has(server.name)) return connecting.get(server.name);
+  const p = (async () => {
+    const rpc = server.transport === 'http'
+      ? await new HttpRpc(server.url, server.headers).start()
+      : await connectStdio(server);
+    // initialize WITH a timeout — a hung server must fail fast, not
+    // hang rebuildMounts (and every route that awaits it) forever
+    const init = await withTimeout(rpc.call('initialize', {
+      protocolVersion: '2025-06-18',
+      capabilities: {},
+      clientInfo: { name: 'spectre', version: '1.0.0' },
+    }), 15_000, 'MCP initialize timeout');
+    rpc.call('notifications/initialized', {}).catch(() => {});
+    running.set(server.name, rpc);
+    return rpc;
+  })().finally(() => connecting.delete(server.name));
+  connecting.set(server.name, p);
+  return p;
+}
+
+function withTimeout(promise, ms, label) {
+  return new Promise((resolve, reject) => {
+    const t = setTimeout(() => reject(new Error(label)), ms);
+    promise.then(v => { clearTimeout(t); resolve(v); },
+      e => { clearTimeout(t); reject(e); });
   });
-  rpc.call('notifications/initialized', {}).catch(() => {});
-  running.set(server.name, rpc);
-  return rpc;
 }
 
 /** Close and drop a pooled connection — the config was removed or
@@ -305,35 +357,45 @@ export async function mcpToolsFor(agentKey) {
 }
 
 /** Connectivity test used by the console MCP page. */
-/** Bounded wrapper: a hung server must fail fast, never stall the
- *  calling agent's turn. */
+/** Bounded wrapper: a hung server must fail fast AND its spawned child
+ *  must be reaped — the old race leaked the stdio process on timeout. */
 export async function testMcpServer(server) {
   try {
     return await Promise.race([
       _testMcpServer(server),
-      new Promise(resolve => setTimeout(() =>
-        resolve({ ok: false, error: 'timeout (10s)' }), 10000)),
+      new Promise(resolve => setTimeout(() => {
+        const c = testConns.get(server.name);
+        if (c) { try { c.close(); } catch {} testConns.delete(server.name); }
+        resolve({ ok: false, error: 'timeout (10s)' });
+      }, 10000)),
     ]);
   } catch (err) {
     return { ok: false, error: err.message };
   }
 }
 
+const testConns = new Map(); // server.name → rpc (for timeout reaping)
+
 async function _testMcpServer(server) {
+  let rpc = null;
   try {
-    const rpc = server.transport === 'http'
+    rpc = server.transport === 'http'
       ? await new HttpRpc(server.url, server.headers).start()
       : await connectStdio(server);
+    testConns.set(server.name, rpc);
     const init = await rpc.call('initialize', {
       protocolVersion: '2025-06-18', capabilities: {},
       clientInfo: { name: 'spectre', version: '1.0.0' },
     });
     const { tools } = await rpc.call('tools/list', {});
     rpc.close();
+    testConns.delete(server.name);
     return { ok: true, serverName: init?.serverInfo?.name ?? '?',
       protocol: init?.protocolVersion ?? '?',
       tools: (tools ?? []).map(t => t.name) };
   } catch (err) {
+    if (rpc) { try { rpc.close(); } catch {} }
+    testConns.delete(server.name);
     return { ok: false, error: err.message };
   }
 }

@@ -21,6 +21,8 @@ LOG_FILE = os.path.join(LOG_DIR, "auth.log")
 #: Upstream agent runtime for /spectre/api/*.
 RUNTIME_HOST = "127.0.0.1"
 RUNTIME_PORT = 8090
+#: Internal token the runtime enforces on every /api route.
+RUNTIME_TOKEN = os.environ.get("INTERNAL_TOKEN", "")
 
 #: Session cookie and lifetime.
 COOKIE_NAME = "spectre_sess"

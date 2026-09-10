@@ -41,7 +41,24 @@ function requireFields(res, body, fields) {
  *          bus: import('./bus.mjs').Bus}} deps
  */
 export function createRouter({ store, bus, caps, wal }) {
-  return async function route(req, res, url) {
+  // Uniform auth gate: EVERY /api route except /api/health requires the
+  // internal token. Previously only 3 endpoints checked it — every other
+  // route was reachable unauthenticated by any local process (in the
+  // local driver an agent's bash could bypass ALL tool governance by
+  // curling 127.0.0.1:8090 directly). The gateway injects the token on
+  // behalf of authenticated console sessions; temporal workers already
+  // send it via runtime-client.
+  const route = realRouter({ store, bus, caps, wal });
+  return async function gatedRoute(req, res, url) {
+    if (url.pathname !== '/api/health' && !hasInternalToken(req)) {
+      return json(res, 401, { error: 'internal token required' });
+    }
+    return route(req, res, url);
+  };
+}
+
+function realRouter({ store, bus, caps, wal }) {
+  const route = async function route(req, res, url) {
     const path = url.pathname;
     const method = req.method;
 
@@ -104,6 +121,11 @@ export function createRouter({ store, bus, caps, wal }) {
           ? String(body.orchestratorSessionId) : null;
       }
       if (body.workSessionId) {
+        // charset guard: an unchecked id once became a cwd/fs root via
+        // path.join(HOST.workspace, '../../…') and persisted in the WAL
+        if (!/^[\w-]+$/.test(String(body.workSessionId))) {
+          return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]+ only');
+        }
         opts.workSessionId = String(body.workSessionId).slice(0, 64);
         // auto-register unknown project ids (sessions may arrive before
         // the console ever created the project)
@@ -304,6 +326,12 @@ export function createRouter({ store, bus, caps, wal }) {
       if (!body.agentKey || !body.name || !body.content) {
         return bad(res, 400, 'agentKey, name, content required');
       }
+      // traversal guard: agentKey must be a real agent, name a plain
+      // identifier — a crafted name once reached rm -rf on arbitrary
+      // host paths via saveSkill/deleteSkill string concatenation
+      if (!isAgentKey(body.agentKey) || !/^[\w-]+$/.test(String(body.name))) {
+        return bad(res, 400, 'invalid agentKey or name (name: [a-zA-Z0-9_-]+)');
+      }
       const filePath = await saveSkill(body.agentKey, {
         name: String(body.name).slice(0, 60),
         description: String(body.description ?? '').slice(0, 200),
@@ -318,6 +346,9 @@ export function createRouter({ store, bus, caps, wal }) {
       const agentKey = url2.searchParams.get('agentKey');
       const name = url2.searchParams.get('name');
       if (!agentKey || !name) return bad(res, 400, 'agentKey, name required');
+      if (!isAgentKey(agentKey) || !/^[\w-]+$/.test(name)) {
+        return bad(res, 400, 'invalid agentKey or name');
+      }
       await deleteSkill(agentKey, name);
       const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
@@ -515,4 +546,5 @@ export function createRouter({ store, bus, caps, wal }) {
 
     return bad(res, 404, 'not found');
   };
+  return route;
 }

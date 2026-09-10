@@ -831,6 +831,7 @@ export function buildDirectTools(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       title: Type.String({ description: 'One-line vulnerability title' }),
+      text: Type.String({ description: 'Full vulnerability write-up: 发现过程、证据链、危害分析、复现要点 (markdown)' }),
       severity: Type.Union([
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),

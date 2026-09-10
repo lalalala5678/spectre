@@ -25,7 +25,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
     def client_ip(self):
         forwarded = self.headers.get("X-Forwarded-For", "")
         if forwarded:
-            return forwarded.split(",")[0].strip()
+            # last hop = the trusted proxy appended real client IP;
+            # [0] let attackers spoof fresh IPs and bypass lockout
+            return forwarded.split(",")[-1].strip()
         return self.client_address[0]
 
     def _cookie_token(self):
@@ -57,12 +59,17 @@ class GatewayHandler(BaseHTTPRequestHandler):
     # ---------- GET/HEAD ----------
 
     def do_GET(self):
-        path = urllib.parse.urlsplit(self.path).path
+        split = urllib.parse.urlsplit(self.path)
+        path = split.path
         if not path.startswith(config.PREFIX):
             return self._send(404, b"not found")
         rel = path[len(config.PREFIX):] or "/"
 
-        if rel == "/login":
+        if rel.startswith("/api/") and split.query:
+
+            rel += "?" + split.query  # ?since=/?ws= must reach upstream
+
+        if rel.split("?")[0] == "/login":
             query = urllib.parse.parse_qs(
                 urllib.parse.urlsplit(self.path).query,
             )
@@ -163,7 +170,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
                 return self._redirect(config.PREFIX + "/login")
             return self._proxy(rel)
-        if rel == "/login":
+        if rel.split("?")[0] == "/login":
             return self._handle_login()
         return self._send(404, b"not found")
 
