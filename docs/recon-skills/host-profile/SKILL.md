@@ -10,22 +10,23 @@ description: 需要对确认主机做端口/服务/OS 指纹并识别部署的�
 必须写"指纹源不足"+原因证据(如 403 无正文),且其前置设备(反代/LB)
 必须已被识别。所有资产,无例外。**
 
-## 1. 批量指纹管线(每个 Web 资产必过,一次跑全量)
+## 1. 批量指纹管线(统一入口 fp-scan,四层指纹库一条命令)
+
+**目标(用户铁令):只要对面是开源项目,就要直接定位是哪个开源项目(+版本)。
+尽一切可能——四层库全过,多库交叉;全部穷尽仍识别不出,才能声明"指纹源不足"。**
 
 ```bash
-# 双管线(必须都跑,-cff 是替换不是合并,两库并集才是全量指纹):
-# ① 内置 wappalyzer 库(成熟,版本捕获好:Ghost:6.64/Apache:2.4.65)
-cat assets.txt | httpx -silent -title -tech-detect -status-code \
-  -web-server -content-type -favicon -threads 15 -timeout 8 > fp_builtin.tsv
-# ② 扩展库 7613 条(webappanalyzer 社区延续版,应用覆盖更全)
-cat assets.txt | httpx -silent -tech-detect -status-code \
-  -cff /opt/tools/dicts/webappanalyzer.json -threads 15 -timeout 8 > fp_ext.tsv
-# 每行含:存活/状态码/标题/Server/技术栈(含应用名+版本)/favicon mmh3
-# 两表按资产合并去重——应用名以命中最多的为准,版本取更具体者
+# 默认层(轻,每资产 2-5 请求):httpx 内置 wappalyzer + webappanalyzer(7613)
+#   + whatweb(版本最强,默认前 120 资产);自动 follow 重定向拿登录页 title
+fp-scan -l assets.txt            # 输出 /tmp/.fps.out TSV
+# deep 层(对存疑/高价值资产):追加 nuclei 4447 指纹模板
+#   (PD technologies 917 + 0x727 国产 3530:若依/致远/通达/蓝凌/大华...)
+fp-scan -l suspects.txt --deep   # 请求数↑,仅限存疑资产
 ```
-- `-tech-detect` = 内置 wappalyzer 数据集(版本捕获强):Ghost:6.64、Apache:2.4.65、WordPress 等应用直接命中;`-cff webappanalyzer.json`(7613 条)补长尾/新应用——实测 Flarum/Ghost 双库命中,httpx 内嵌库对知名开源 web 应用(Ghost/Flarum/WordPress/若依类)本就覆盖,扩展库加厚
-- `-favicon` = favicon mmh3 hash:进阶比对(FOFA icon_hash 配置后可反查;同类资产 hash 相同=同套系统,SCUT 实测 webvpn=-1369819050/www=-2837985)
-- `-cff <file>` = 自定义指纹文件:目标特征系统(国产 OA/CMS)可自建规则扩展
+输出列:asset|status|title|server|apps(带版本)|favicon mmh3|source(命中库)。
+识别路径优先级:①apps 里直接命中(Ghost:6.64/Flarum/若依式 title)
+②title 自报系统名 ③whatweb 字段 ④nuclei deep 命中(shiro-detect→若依类)
+⑤特征路径人工兜底(见 §5)。
 
 ## 2. 逐资产判定规则
 
