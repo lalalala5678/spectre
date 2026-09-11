@@ -1,83 +1,83 @@
 ---
-name: osint-dork
-description: 需要收集目标组织的公开人员/客户/文档情报(P3 OSINT:法人、师资、学生班级学号姓名、泄露文件)时使用
+name: subdomain-sweep
+description: 需要对已知根域做子域名枚举(P1→P2 衔接)时使用——被动双源强制、免key第三源、字典爆破、dnsgen 置换、双层泛解析过滤
 ---
 
-# P3 OSINT:高级搜索语法手册
+# 子域名枚举(被动+爆破,100 分导向;波次计数强制披露)
 
-目标:收集对后续渗透有用的组织情报——法人/高管姓名、员工邮箱规律、
-公开的客户信息(如学校的学生班级学号姓名名单)、泄露文档。
-**每条结论必须带来源 URL;无 URL = 编造,直接不合格。**
+**纪律:每波必须报告 命中数/纯新增数 两个计数。禁止跳过任何波次,
+除非有当次实测回执证明该波零增益。**SCUT 教训:只跑 crt.sh 一波会漏
+65% 的资产(subfinder 免 key 一项就多 411 名,爆破再加 42 名内部命名
+资产 backup/db1/dataapi/ai——纯被动永远拿不到)。
 
-## 搜索引擎通道现状(2026-09-11 实测矩阵,禁止凭预判跳过)
-
-数据中心出口 IP + 无 JS 抓取(curl/fetch_url)下的**免费 SERP 入口全测**:
-
-| 入口 | 实测结果 | 判定 |
-|---|---|---|
-| Google SERP 直抓(含 gbv=1) | 200 但 JS 壳"click here if not redirected",零结果 | 死 |
-| html.duckduckgo.com / lite | HTTP 202 挑战页 | 死 |
-| searx.be(公共实例) | Anubis "Verifying your browser" | 死 |
-| startpage.com | 200 软墙零结果 | 死 |
-| www.bing.com | 返回无关微软页(污染) | 死 |
-| cn.bing.com -L | 返回 miit 备案无关结果(污染) | 死 |
-| Baidu / Sogou | 安全验证墙 / 人机验证码+回显出口 IP | 死 |
-
-**教训(固化)**:本技能曾预判"Google 会反爬"让 agent 直接跳过——技能
-不许预判结论;每条路径必须以当次实测回执为准才能宣告死或活(入口
-状态会变,重测成本只有一次 curl)。
-
-**配置后即活的通道**(优先级从高到低):
-1. **通用搜索 provider**(settings 配置)——search_web 工具自动启用
-2. **Google CSE JSON API**(Programmable Search Engine,用户提供 key+cx,
-   免费层 100 次/天):`curl "https://www.googleapis.com/customsearch/v1?key=<K>&cx=<CX>&q=<URL编码dork>"` ——
-   **完整支持全部 Google 高级语法,机器可读,无反爬**;这是 dork 的正确机器通道
-3. 商业 SERP 代理(SerpAPI 等,付费)
-
-任一通道可用时,下方全部语法立即生效。
-
-## 搜索语法核心
-
-### 人员/组织
-```
-"目标公司名" 法人
-site:target.edu.cn 师资 OR 教授 intitle:通讯录
-site:target.edu.cn inurl:faculty OR inurl:teacher
-```
-
-### 学生/客户名单(学校场景)
-```
-site:target.edu.cn filetype:xlsx 学号
-site:target.edu.cn (filetype:pdf OR filetype:doc OR filetype:xls) (名单 OR 花名册 OR 通讯录 OR 排名)
-site:target.edu.cn intitle:"index of" (list OR 名单)
-"target.edu.cn" 班级 学号 site:pan.baidu.com
-```
-
-### 泄露文档/目录
-```
-site:target.edu.cn intitle:"index of" (backup OR db OR config)
-site:target.edu.cn ext:sql OR ext:bak OR ext:log
-inurl:wp-content/uploads site:target.edu.cn
-```
-
-### 邮箱规律(为 weakcred agent 供弹药)
-```
-site:target.edu.cn "@target.edu.cn" 邮箱
-curl -s <页面> | grep -oE "[a-zA-Z0-9._-]+@target\.edu\.cn" | sort -u
-```
-
-## GitHub/代码泄露
+## 第一波:被动双源(强制两路都跑,分别计数)
 
 ```bash
-curl -s "https://api.github.com/search/repositories?q=target.edu.cn" | jq '.items[].full_name'
-fetch_url "https://github.com/search?q=%22target.edu.cn%22+password&type=code"
-# 代码级搜索需登录 token,无 token 如实记录
+curl -s "https://crt.sh/?q=%25.<root>&output=json" --max-time 90 \
+  | jq -r '.[].name_value' | tr 'A-Z' 'a-z' | sed 's/^\*\.//' | sort -u  # 记 N1
+subfinder -d <root> -silent -timeout 60 | sort -u                         # 记 N2
+sort -u crt.txt sf.txt > passive-union.txt                                 # 记 N3=并集
 ```
 
-## 判分自查(交付前)
+## 第 1.5 波:免 key 第三源(逐个 curl,失败如实记)
 
-- [ ] 每条情报带来源 URL,URL 可复核
-- [ ] 搜索通道:配置了哪个、实测了哪些入口、死路的回执证据
-- [ ] 邮箱规律总结成模式——下游弱口令直接用
-- [ ] 名单类文件只记 URL+概要+关键字段,不全文粘贴
-- [ ] 与渗透无关的纯介绍性内容一条不收
+```bash
+curl -s "https://rapiddns.io/subdomain/<root>?full=1" | grep -oE '[a-zA-Z0-9.-]+\.<root>' | sort -u
+curl -s "https://otx.alienvault.com/api/v1/indicators/domain/<root>/passive_dns" \
+  | jq -r '.passive_dns[].hostname' | sort -u
+```
+
+## 第二波:双层泛解析过滤 + 解析验证
+
+**第一层(根域)**:随机前缀测根。
+```bash
+dig +short "rnd${RANDOM}x.<root>" A   # 有 A = 根泛解析,全部结果需剔该 IP
+```
+**第二层(逐父区)**——SCUT 实测踩坑:`*.webvpn.<root>` 这类 WebVPN 改写区
+自身泛解析(随机前缀全解析到 WebVPN IP),置换/爆破结果会被整区污染:
+```bash
+# 对已发现的高产父区(如 webvpn/wvpn/泛域名入口)各测随机前缀
+dig +short "zzz$RANDOM.webvpn.<root>" A   # 命中 = 该区为泛区,整区从资产表剔除并单独标注
+```
+判定规则:泛区不进资产表,但泛区本身是一条拓扑情报(WebVPN 改写能力)。
+
+验证(串行低速):
+```bash
+while read d; do ip=$(dig +short "$d" A | grep -E '^[0-9.]+$' | head -1)
+  [ -n "$ip" ] && echo "$d $ip"; done < passive-union.txt | sort -u
+```
+
+## 第三波:字典爆破(dnsx + 2 万字典,公共 DNS,不算打目标)
+
+```bash
+sed "s/$/.<root>/" /var/lib/spectre/tools/dicts/domain_2w.txt > /tmp/bf.txt
+dnsx -l /tmp/bf.txt -silent -r 223.5.5.5 -r 119.29.29.29 -r 182.254.118.118 \
+  | sort -u > brute-hits.txt        # 记 N4;约 3 分钟
+comm -23 brute-hits.txt passive-union.txt > brute-new.txt   # 记 N5=纯新增
+```
+内部命名高价值词(backup/db/dataapi/api/admin/test/vpn/dns)命中的
+优先标注给下游——这些是被动源永远没有的。
+
+## 第四波:dnsgen 置换(仅被动+爆破明显未饱和时)
+
+```bash
+PYTHONPATH=/opt/tools/py /opt/tools/py/bin/dnsgen passive-union.txt \
+  | grep -v -x -f passive-union.txt | sort -u > perm.txt   # 可能百万级
+# 裁剪:只对二级部门域(如 jw./lib./mail.)的置换子集抽样验证,别全量
+shuf -n 30000 perm.txt > perm-sample.txt
+dnsx -l perm-sample.txt -silent -r 223.5.5.5 | grep -vE '\.webvpn\.<root>$|\.wvpn\.<root>$' \
+  | comm -23 - known-all.txt       # 记 N6/N7,泛区必须先剔
+```
+
+## 第五波:递归发现
+
+对已发现的**二级部门域**(jw./lib./sce./mail. 等)逐个重跑第一波
+crt.sh(`%25.<sub>`)——部门站常挂自己的证书;从页面 HTML 里 grep 域名引用。
+
+## 产物(必须含波次计数表)
+
+```
+波次 | 命中 | 纯新增 | 备注(零增益要有实测回执)
+crt.sh N1 | subfinder N2 | 并集 N3 | rapiddns/otx | 爆破 N4/N5 | 置换 N6/N7 | 递归
+资产行:子域 | 解析IP | CNAME链 | 来源波次 | 泛区标记
+```
