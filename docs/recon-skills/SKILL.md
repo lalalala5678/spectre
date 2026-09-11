@@ -50,9 +50,11 @@ while read d; do ip=$(dig +short "$d" A | grep -E '^[0-9.]+$' | head -1)
 ## 第三波:字典爆破(dnsx + 2 万字典,公共 DNS,不算打目标)
 
 ```bash
-sed "s/$/.<root>/" /var/lib/spectre/tools/dicts/domain_2w.txt > /tmp/bf.txt
-dnsx -l /tmp/bf.txt -silent -r 223.5.5.5 -r 119.29.29.29 -r 182.254.118.118 \
+sed "s/$/.<root>/" /opt/tools/dicts/domain_2w.txt > /tmp/bf.txt
+cat /tmp/bf.txt | dnsx -silent -r 223.5.5.5 -r 119.29.29.29 -r 182.254.118.118 \
   | sort -u > brute-hits.txt        # 记 N4;约 3 分钟
+# 注意:本环境 dnsx 1.2.1 的 -l 文件模式挂死(EXIT 124),必须 stdin 管道模式
+# (agent 实测隔离,证据 seq=309/310);dig 到 223.5.5.5 UDP 正常
 comm -23 brute-hits.txt passive-union.txt > brute-new.txt   # 记 N5=纯新增
 ```
 内部命名高价值词(backup/db/dataapi/api/admin/test/vpn/dns)命中的
@@ -61,11 +63,11 @@ comm -23 brute-hits.txt passive-union.txt > brute-new.txt   # 记 N5=纯新增
 ## 第四波:dnsgen 置换(仅被动+爆破明显未饱和时)
 
 ```bash
-PYTHONPATH=/opt/tools/py /opt/tools/py/bin/dnsgen passive-union.txt \
+dnsgen  # /opt/tools/bin/dnsgen,已含 PYTHONPATH passive-union.txt \
   | grep -v -x -f passive-union.txt | sort -u > perm.txt   # 可能百万级
 # 裁剪:只对二级部门域(如 jw./lib./mail.)的置换子集抽样验证,别全量
 shuf -n 30000 perm.txt > perm-sample.txt
-dnsx -l perm-sample.txt -silent -r 223.5.5.5 | grep -vE '\.webvpn\.<root>$|\.wvpn\.<root>$' \
+cat perm-sample.txt | dnsx -silent -r 223.5.5.5 | grep -vE '\.webvpn\.<root>$|\.wvpn\.<root>$' \
   | comm -23 - known-all.txt       # 记 N6/N7,泛区必须先剔
 ```
 
