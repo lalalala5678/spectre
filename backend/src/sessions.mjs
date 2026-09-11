@@ -13,6 +13,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
+import { effectiveCommon } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
@@ -199,9 +200,9 @@ export class SessionStore {
           (skillIndexBlock ? `\n\n${skillIndexBlock}` : ''),
         model: this.model,
         tools,
-        // GLM always-thinking models reject 'off'; 'low' is the fastest
-        // supported tier (see thinkingLevelMap in pi.mjs).
-        thinkingLevel: 'low',
+        // Thinking effort is user-configurable (settings bar); pi levels
+        // pass through the model's thinkingLevelMap (GLM) or raw to vendor.
+        thinkingLevel: effectiveCommon().thinkingLevel,
         messages,
       },
       streamFn: this.streamFn,
@@ -341,15 +342,65 @@ export class SessionStore {
       throw Object.assign(new Error('agent busy; use steer'), { statusCode: 409 });
     }
     record.busy = true;
-    // `source` tags WHO injected this user-role turn ('system'|'agent');
-    // absent = the real human user. Survives to the console via
-    // normalizeMessage so injections never render as "you".
-    const msg = source
-      ? { role: 'user', content: text, timestamp: Date.now(), source }
-      : text;
-    record.agent.prompt(msg).catch(err => {
-      record.busy = false;  // run never started — don't strand waitIdle
-      this._journal(record, 'error', { message: String(err) });
+    // Context compaction (user-configurable window): when the running
+    // context exceeds window−reserve, summarize the head and keep the
+    // recent tail — BEFORE queuing the new turn, while the agent is idle.
+    this._maybeCompact(record).catch(() => { /* compaction is best-effort */ })
+      .finally(() => {
+        // `source` tags WHO injected this user-role turn ('system'|'agent');
+        // absent = the real human user. Survives to the console via
+        // normalizeMessage so injections never render as "you".
+        const msg = source
+          ? { role: 'user', content: text, timestamp: Date.now(), source }
+          : text;
+        record.agent.prompt(msg).catch(err => {
+          record.busy = false;  // run never started — don't strand waitIdle
+          this._journal(record, 'error', { message: String(err) });
+        });
+      });
+  }
+
+  /** Lightweight context compaction (settings-driven):
+   *  head messages → one summary message, keep recent tail. Runs only when
+   *  the configured threshold trips; journal records the cut. */
+  async _maybeCompact(record) {
+    const eff = effectiveCommon();
+    if (!eff.compaction.enabled) return;
+    const msgs = record.agent.state.messages;
+    if (msgs.length < 8) return;
+    // last assistant usage = live context size (pi calculateContextTokens)
+    const lastA = [...msgs].reverse().find(m => m.role === 'assistant' && m.usage);
+    const ctx = lastA?.usage?.totalTokens
+      ?? lastA ? (lastA.usage.input + lastA.usage.output + (lastA.usage.cacheRead || 0) + (lastA.usage.cacheWrite || 0)) : 0;
+    const threshold = eff.contextWindow - eff.compaction.reserveTokens;
+    if (!ctx || ctx <= threshold) return;
+    // split: keep the recent tail (approx by tokens: ~1 token ≈ 4 chars)
+    const keepChars = eff.compaction.keepRecentTokens * 4;
+    let tail = [];
+    let used = 0;
+    for (let i = msgs.length - 1; i >= 0; i--) {
+      const m = msgs[i];
+      const size = JSON.stringify(m.content ?? m.text ?? '').length + 200;
+      if (used + size > keepChars && tail.length >= 4) break;
+      tail.unshift(m); used += size;
+    }
+    const head = msgs.slice(0, msgs.length - tail.length);
+    if (!head.length) return;
+    // one summarizer call through the SAME streamFn/model
+    const transcript = head.map(m => `${m.role}: ${typeof m.content === 'string'
+      ? m.content : JSON.stringify(m.content ?? '')}`).join('\n').slice(0, 240_000);
+    const r = await this.streamFn(this.model, { system: 'You are a session summarizer. Summarize the conversation so far: participants, decisions, tool findings, pending work. Be dense and factual; the summary replaces the history.', messages: [{ role: 'user', content: transcript }] }, { maxTokens: 4096 });
+    if (r.stopReason !== 'stop' && r.stopReason !== 'length') return;
+    const summaryText = (r.content ?? []).filter(c => c.type === 'text').map(c => c.text).join('');
+    if (!summaryText) return;
+    const compactMsg = {
+      role: 'user', timestamp: Date.now(), source: 'system',
+      content: `【上下文压缩】此前 ${head.length} 条消息已压缩为摘要,近期 ${tail.length} 条保留原文:\n\n${summaryText}`,
+    };
+    record.agent.state.messages = [compactMsg, ...tail];
+    this._journal(record, 'compaction', {
+      summarized: head.length, kept: tail.length,
+      tokensBefore: ctx, tokensAfter: '~' + Math.ceil(summaryText.length / 4),
     });
   }
 

@@ -5,6 +5,7 @@ import { AgentWorkspacePage, getAgent } from './pages/AgentWorkspacePage';
 import { SkillsPage } from './pages/SkillsPage';
 import { McpPage } from './pages/McpPage';
 import { CliPage } from './pages/CliPage';
+import SettingsPage from './pages/SettingsPage';
 import { getPrefs } from './api/worksession';
 import { AuditPage } from './pages/AuditPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
@@ -71,6 +72,8 @@ export default function App() {
                 ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
                 : wsId ? <CliPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
             </div>
+          ) : route === 'settings' ? (
+            <div className="h-full overflow-y-auto"><SettingsPage /></div>
           ) : route === 'reports' ? (
             <div className="h-full overflow-hidden p-4"><TaskReportsPage /></div>
           ) : (

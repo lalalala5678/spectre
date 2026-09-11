@@ -99,18 +99,18 @@ export const STAGE_PROMPT = [
  * GLM-4.6 emits `reasoning_content` before `content` (DeepSeek-style wire
  * format), hence the thinkingFormat compat flags below.
  */
-function modelCatalog() {
+function modelCatalog(eff = {}) {
   return [{
-    id: CONFIG.llmModel,
-    name: CONFIG.llmModel,
+    id: eff.model ?? CONFIG.llmModel,
+    name: eff.model ?? CONFIG.llmModel,
     api: 'openai-completions',
-    baseUrl: CONFIG.llmBaseUrl,
+    baseUrl: eff.baseUrl ?? CONFIG.llmBaseUrl,
     provider: PROVIDER_ID,
     reasoning: true,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
-    contextWindow: 786_432,
-    maxTokens: 32_768,
+    contextWindow: Number(eff.contextWindow) || 786_432,
+    maxTokens: Math.min(Number(eff.maxTokens) || 32_768, Number(eff.contextWindow) || 786_432),
     compat: {
       supportsStore: false,
       supportsDeveloperRole: false,
@@ -118,12 +118,13 @@ function modelCatalog() {
       requiresReasoningContentOnAssistantMessages: true,
       thinkingFormat: 'deepseek',
     },
-    // GLM-5.3 is an always-thinking model: 'off' is rejected by the API
-    // (code 1210). Map every pi level onto a supported Zhipu tier.
+    // GLM always-thinking: 'off' rejected (code 1210). Map pi levels onto
+    // Zhipu tiers. This is OUR deployment's wiring for GLM — other vendors
+    // get the level passed through as-is (user decision: no middle-station).
     thinkingLevelMap: {
       minimal: 'low',
       low: 'low',
-      medium: 'low',
+      medium: 'medium',
       high: 'high',
       xhigh: 'high',
       max: 'max',
@@ -136,13 +137,21 @@ function modelCatalog() {
  *             model: object,
  *             streamFn: Function }}
  */
-export function buildPi() {
+let liveModel = null;
+
+export async function buildPi() {
+  // User-facing settings override env (settings.mjs): baseUrl/apiKey/
+  // model/maxTokens/contextWindow — every save passed a live probe, so
+  // values arriving here were connectivity-verified at save time.
+  const { effectiveCommon } = await import('./agent-settings.mjs');
+  const eff = effectiveCommon();
   const models = createModels();
   models.setProvider(createProvider({
     id: PROVIDER_ID,
-    baseUrl: CONFIG.llmBaseUrl,
-    auth: { apiKey: envApiKeyAuth(PROVIDER_ID, ['LLM_API_KEY']) },
-    models: modelCatalog(),
+    baseUrl: eff.baseUrl,
+    // read prefs at CALL time so a settings save applies without rebuild
+    auth: { apiKey: async () => effectiveCommon().apiKey },
+    models: modelCatalog(eff),
     api: {
       'openai-completions': {
         stream: openaiCompletions.stream,
@@ -150,9 +159,9 @@ export function buildPi() {
       },
     },
   }));
-  const model = models.getModel(PROVIDER_ID, CONFIG.llmModel);
+  const model = models.getModel(PROVIDER_ID, eff.model);
   if (!model) {
-    throw new Error(`model not found: ${PROVIDER_ID}/${CONFIG.llmModel}`);
+    throw new Error(`model not found: ${PROVIDER_ID}/${eff.model}`);
   }
   // L1 resilience: pi's retryProviderRequest defaults maxRetries to 0 —
   // every call dies on the first 429/5xx. Inject retries + timeout for
@@ -172,7 +181,23 @@ export function buildPi() {
       timeoutMs: CONFIG.llmTimeoutMs,
     });
   };
+  liveModel = model;
   return { models, model, streamFn };
+}
+
+/** Settings save (same process) re-applies LLM prefs onto the LIVE model
+ *  object — existing + new sessions pick up changes without a restart.
+ *  baseUrl/auth are re-read per call; model identity fields mutate here. */
+export async function applyLlmPrefs() {
+  const { effectiveCommon } = await import('./agent-settings.mjs');
+  const eff = effectiveCommon();
+  if (liveModel) {
+    liveModel.id = eff.model;
+    liveModel.name = eff.model;
+    liveModel.contextWindow = eff.contextWindow;
+    liveModel.maxTokens = Math.min(eff.maxTokens, eff.contextWindow);
+  }
+  return eff;
 }
 
 /**

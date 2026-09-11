@@ -29,7 +29,7 @@ import { projectsFromWal, listProjects, getPrefs } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
 
-const { model, streamFn } = buildPi();
+const { model, streamFn } = await buildPi();
 const wal = new Wal(path.join(CONFIG.dataDir, 'state.wal'));
 wal.open();
 

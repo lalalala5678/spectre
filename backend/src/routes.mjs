@@ -264,6 +264,50 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/prefs' && method === 'GET') {
       return json(res, 200, getPrefs());
     }
+
+    // ---------- agent settings (user-facing config bar) ----------
+    // Values live in prefs (WAL-durable); saves are per-field, only after a
+    // live probe (network fields) or range check (numeric fields).
+    if (path === '/api/agent-settings' && method === 'GET') {
+      const { getSettings } = await import('./agent-settings.mjs');
+      return json(res, 200, getSettings());
+    }
+    if (path === '/api/agent-settings/save' && method === 'POST') {
+      const body = await readJson(req);
+      const { saveSetting, enabledReconSources } = await import('./agent-settings.mjs');
+      const r = await saveSetting(body, wal);
+      if (!r.ok) return bad(res, 400, r.error);
+      if (String(body.group) === 'common') {
+        // hot-apply LLM prefs (same process as the session store)
+        const { applyLlmPrefs } = await import('./pi.mjs');
+        await applyLlmPrefs();
+      }
+      if (String(body.group) === 'recon-source') {
+        // sync MCP config file + mount toggle (zero-pollution: no key ⇒
+        // server disabled, recon never sees the tools)
+        const { writeFile } = await import('node:fs/promises');
+        const { getPrefs } = await import('./projects.mjs');
+        const { CONFIG } = await import('./config.mjs');
+        const { join } = await import('node:path');
+        const root = CONFIG.dataDir;
+        const keys = getPrefs().reconApiKeys ?? {};
+        await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(keys), 'utf8');
+        const list = await loadMcpConfig();
+        const rest = list.filter(s => s.name !== 'recon-datasources');
+        if (enabledReconSources().length) {
+          rest.push({
+            name: 'recon-datasources', transport: 'stdio', agents: ['recon'],
+            enabled: true,
+            command: ['node', join(root, 'mcp-recon-datasources.mjs')],
+            env: {}, where: 'host',
+          });
+        }
+        await saveMcpConfig(rest);
+        const { rebuildMounts } = await import('./sandbox/mount.mjs');
+        await rebuildMounts(AGENT_KEYS);
+      }
+      return json(res, 200, r);
+    }
     if (path === '/api/prefs' && method === 'PUT') {
       const body = await readJson(req);
       return json(res, 200, setPrefs(body, wal));

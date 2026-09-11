@@ -20,6 +20,7 @@ export type RouteKey =
   | 'skills'         // Skill 管理
   | 'mcp'            // MCP Server 管理
   | 'cli'            // CLI 工具导入
+  | 'settings'       // Agent 配置栏
   | 'audit';         // 审计与证据链
 
 export type AgentId =

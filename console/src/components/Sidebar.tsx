@@ -22,6 +22,7 @@ export const NAV: { key: RouteKey; label: string; sub: string; icon: React.Eleme
   { key: 'skills', label: 'Skill 管理', sub: '自定义导入', icon: Puzzle, group: 'system' },
   { key: 'mcp', label: 'MCP Server', sub: '工具链接入', icon: Plug, group: 'system' },
   { key: 'cli', label: 'CLI 工具', sub: '二进制导入', icon: TerminalSquare, group: 'system' },
+  { key: 'settings', label: 'Agent 配置', sub: '模型·数据源·压缩', icon: ClipboardList, group: 'system' },
   { key: 'audit', label: '审计与证据链', sub: '操作留痕', icon: ClipboardList, group: 'system' },
 ];
 
