@@ -57,6 +57,7 @@ async function llmProbe(baseUrl, apiKey, model) {
 const RECON_SOURCES = {
   fofa: {
     label: 'FOFA',
+    tier: 'P0', why: '最大盲区补齐:备案反查/无证书vhost/非标端口/历史banner',
     defaultBase: 'https://fofa.info/api',
     fields: { baseUrl: 'Base URL(留空用官方)', email: '账号邮箱', key: 'API Key' },
     async validate({ baseUrl, email, key }) {
@@ -68,6 +69,7 @@ const RECON_SOURCES = {
   },
   hunter: {
     label: '鹰图 Hunter',
+    tier: 'P1', why: '国内第二源,与FOFA交叉验证,免费额度大',
     defaultBase: 'https://hunter.qianxin.com/openApi',
     fields: { key: 'API Key' },
     async validate({ key }) {
@@ -77,6 +79,7 @@ const RECON_SOURCES = {
   },
   quake: {
     label: 'Quake360',
+    tier: 'P2', why: '资产第三源,多源并集提覆盖',
     defaultBase: 'https://quake.360.net/api',
     fields: { key: 'API Key' },
     async validate({ key }) {
@@ -91,6 +94,7 @@ const RECON_SOURCES = {
   },
   zoomeye: {
     label: 'ZoomEye',
+    tier: 'P2', why: '资产第四源',
     defaultBase: 'https://api.zoomeye.org',
     fields: { key: 'API Key' },
     async validate({ key }) {
@@ -101,6 +105,7 @@ const RECON_SOURCES = {
   },
   censys: {
     label: 'Censys',
+    tier: 'P2', why: '海外视角TLS/证书姊妹域',
     defaultBase: 'https://search.censys.io/api',
     fields: { id: 'API ID', secret: 'API Secret' },
     async validate({ id, secret }) {
@@ -112,6 +117,7 @@ const RECON_SOURCES = {
   },
   shodan: {
     label: 'Shodan',
+    tier: 'P2', why: '海外banner',
     defaultBase: 'https://api.shodan.io',
     fields: { key: 'API Key' },
     async validate({ key }) {
@@ -120,6 +126,7 @@ const RECON_SOURCES = {
   },
   github: {
     label: 'GitHub Token',
+    tier: 'P0', why: '代码泄露检索(免费),内网地址/密钥',
     defaultBase: 'https://api.github.com',
     fields: { token: 'Personal Access Token' },
     async validate({ token }) {
@@ -130,6 +137,7 @@ const RECON_SOURCES = {
   },
   cse: {
     label: 'Google CSE',
+    tier: 'P0', why: '文档类OSINT唯一可靠机器通道(全量Google dork语法)',
     defaultBase: 'https://www.googleapis.com',
     fields: { key: 'API Key', cx: '搜索引擎 ID (cx)' },
     async validate({ key, cx }) {
@@ -140,6 +148,7 @@ const RECON_SOURCES = {
   },
   ipinfo: {
     label: 'IPinfo',
+    tier: 'P1', why: 'IP归属/ASN,C段归属判定(免费)',
     defaultBase: 'https://ipinfo.io',
     fields: { token: 'Token' },
     async validate({ token }) {
@@ -148,6 +157,7 @@ const RECON_SOURCES = {
   },
   threatbook: {
     label: '微步在线',
+    tier: 'P1', why: 'DNS历史:僵尸资产走向+CDN源站定位',
     defaultBase: 'https://x.threatbook.com/api',
     fields: { key: 'API Key' },
     async validate({ key }) {
@@ -179,8 +189,10 @@ export function settingsSchema() {
       {
         agentKey: 'recon', label: '资产测绘 Agent · 数据源',
         hint: '填好并通过连通验证的源才会挂载为 MCP 工具;未配置的源对 agent 完全不可见(零污染)。Base URL 留空一律使用官方地址。',
-        sources: Object.entries(RECON_SOURCES).map(([id, s]) => ({
-          id, label: s.label, defaultBase: s.defaultBase,
+        sources: Object.entries(RECON_SOURCES)
+          .sort((a, b) => (a[1].tier ?? 'P9').localeCompare(b[1].tier ?? 'P9'))
+          .map(([id, s]) => ({
+          id, label: s.label, defaultBase: s.defaultBase, tier: s.tier, why: s.why,
           fields: Object.entries(s.fields).map(([fid, flabel]) => ({
             id: `${id}.${fid}`, label: flabel,
             type: fid === 'key' || fid === 'secret' || fid === 'token' ? 'password' : 'text',
