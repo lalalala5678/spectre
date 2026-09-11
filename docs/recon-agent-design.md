@@ -106,6 +106,28 @@
 - **技能**:重写 subdomain-sweep;新增 归属反查/C段决策/CDN绕过/拓扑确认 技能
 - **下游交接**:P7 报告 = intel 条目,nday/exploit 经 query_intel 消费
 
+## 5.5 ARL 手段对照矩阵(2026-09-12,用户问"ARL 能扫出来的我们是否一定也能扫出来")
+
+| ARL 手段(源码级) | SPECTRE recon | 判定 |
+|---|---|---|
+| 2 万字典爆破(massdns 300 并发+4 公共 DNS) | dnsx stdin 管道模式(2 万字典同源) | ✓ 等价 |
+| 泛解析过滤(随机域基线+同 record≥15 剔除) | 双层过滤(根+逐父区随机基线)+泛区整区剔除 | ✓ 更强(ARL 无整区概念) |
+| alt_dns 置换(dnsgen 六规则+环境词+高频词) | dnsgen 已装齐(第三轮自实现替跑,工具已修) | ✓ 等价 |
+| 13 被动源插件(免 key: crtsh/rapiddns/alienvault) | crt.sh 直查+subfinder 25+ 免 key 源 | ✓ 更广 |
+| Bing/百度 site: 搜索 | 实测死路(7 入口);Google CSE 配置后反超 | △ 配置依赖 |
+| 端口扫描(test/TOP100/TOP1000/ALL 选项) | nmap top-100/200+全端口升级路径 | ✓ 轻量默认可升级 |
+| CDN 识别+跳过扫描 | CNAME/证书/IP 段三重证据 | ✓ 更强 |
+| TLS 证书取子域(SAN) | crt.sh+openssl s_client | ✓ |
+| FindSite(80/443 双探+同活去重) | 单请求状态探测+https 优先 | ✓ |
+| fetchSite 指纹(标题/favicon mmh3/webapp.json 规则库) | httpx wappalyzer(3000+规则,含版本)+favicon mmh3+-cff 自定义规则 | ✓ 升级后等价+ |
+| find_vhost Host 碰撞(404 基线+相似度) | vhost-collide 技能(本轮新增) | ✓ 新增 |
+| WIH JS 域名回流 | 枚举第五波 HTML 域引用 | ✓ |
+| NPoC PoC/弱口令扫描 | nday/weakcred agent 职责 | 范围外(平台分工) |
+| 截图/site spider/fileleak | 未做 | ✗ 未做(可选,轻探测下降级) |
+
+**结论:ARL 测绘主链全覆盖且三处更强(泛解析整区/被动源广度/CDN 证据链);
+指纹库升级后等价+;唯一配置依赖=搜索引擎(CSE);未做的仅截图/爬虫类可选项。**
+
 ## 6. 拍板项状态(2026-09-11 实施夜更新)
 
 1. 资产库载体:本轮交付采用 publish_intel 结构化条目(6 类),SQLite 工作库未启用——首轮够用,超大规模再议
