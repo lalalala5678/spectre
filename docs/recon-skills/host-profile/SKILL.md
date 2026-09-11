@@ -13,13 +13,17 @@ description: 需要对确认主机做端口/服务/OS 指纹并识别部署的�
 ## 1. 批量指纹管线(每个 Web 资产必过,一次跑全量)
 
 ```bash
-# 资产清单(域名或 URL)stdin 喂 httpx;threads 全局限速,符合轻探测
+# 双管线(必须都跑,-cff 是替换不是合并,两库并集才是全量指纹):
+# ① 内置 wappalyzer 库(成熟,版本捕获好:Ghost:6.64/Apache:2.4.65)
 cat assets.txt | httpx -silent -title -tech-detect -status-code \
-  -web-server -content-type -favicon -threads 15 -timeout 8 \
-  > fingerprint.tsv
-# 每行自动含:存活/状态码/标题/Server/wappalyzer 技术栈/favicon mmh3
+  -web-server -content-type -favicon -threads 15 -timeout 8 > fp_builtin.tsv
+# ② 扩展库 7613 条(webappanalyzer 社区延续版,应用覆盖更全)
+cat assets.txt | httpx -silent -tech-detect -status-code \
+  -cff /opt/tools/dicts/webappanalyzer.json -threads 15 -timeout 8 > fp_ext.tsv
+# 每行含:存活/状态码/标题/Server/技术栈(含应用名+版本)/favicon mmh3
+# 两表按资产合并去重——应用名以命中最多的为准,版本取更具体者
 ```
-- `-tech-detect` = wappalyzer 数据集(3000+ 技术规则,含版本):Apache:2.4.65、Nginx、Java、Express、WordPress 等,开源项目直接命中
+- `-tech-detect` = 内置 wappalyzer 数据集(版本捕获强):Ghost:6.64、Apache:2.4.65、WordPress 等应用直接命中;`-cff webappanalyzer.json`(7613 条)补长尾/新应用——实测 Flarum/Ghost 双库命中,httpx 内嵌库对知名开源 web 应用(Ghost/Flarum/WordPress/若依类)本就覆盖,扩展库加厚
 - `-favicon` = favicon mmh3 hash:进阶比对(FOFA icon_hash 配置后可反查;同类资产 hash 相同=同套系统,SCUT 实测 webvpn=-1369819050/www=-2837985)
 - `-cff <file>` = 自定义指纹文件:目标特征系统(国产 OA/CMS)可自建规则扩展
 
