@@ -178,6 +178,9 @@ export function buildToolingTools(record, caps) {
       // search_web 重新面向 OSINT/dork 描述;fetch_url 复用同一构建。
       // 无配置智能体专属工具 — 那些永远不属于业务 agent。
       return [all.reconSearchWeb, all.fetchUrl];
+    case 'nday':
+      // NDay agent 的独立 fetch_url 实例(CVE 详情/POC readme/patch 页抓取)。
+      return [all.fetchUrl];
     default:
       return [];
   }

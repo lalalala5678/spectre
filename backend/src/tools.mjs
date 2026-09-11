@@ -900,10 +900,13 @@ export function buildDirectTools(record, caps) {
   // axiom: a capability needed by multiple agents = one instance each,
   // never shared. search_web stays config-only: its vertical channels are
   // tool-candidate search, useless for recon; dork needs go via fetch_url.
-  if (record.agentKey === 'recon') {
+  if (record.agentKey === 'recon' || record.agentKey === 'nday') {
+    // recon/nday hold their OWN fetch_url instance (shared-tool axiom).
+    // search_web stays recon-only (OSINT framing); nday queries GitHub/NVD
+    // raw endpoints via bash curl + fetch_url.
     return [buildReportVulnerabilityTool(record, caps), publishIntel,
       buildRequestRevisionTool(record, caps),
-      ...buildToolingTools({ agentKey: 'recon' }, caps)];
+      ...buildToolingTools({ agentKey: record.agentKey }, caps)];
   }
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
     buildRequestRevisionTool(record, caps)];

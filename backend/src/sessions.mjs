@@ -14,7 +14,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
 import { effectiveCommon } from './agent-settings.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 
@@ -37,6 +37,7 @@ const TOOLS_PROMPTS = {
  *  which fully replace the prompt and skip the guide). */
 const BUSINESS_PROMPTS = {
   recon: RECON_PROMPT,
+  nday: NDAY_PROMPT,
 };
 import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
