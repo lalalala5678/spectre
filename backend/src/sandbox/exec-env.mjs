@@ -158,7 +158,12 @@ async function runShell(runner, command, options = {}) {
 function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
   const argvv = argv.length ? [...argv, 'bash', '-c', command]
     : ['bash', '-lc', command];
-  const cwdHost = argv.length ? cwdContainer
+  // Docker branch: `docker exec -w` already sets the CONTAINER cwd — the
+  // host-side spawn cwd must merely EXIST. Passing the container path here
+  // (e.g. /workspace/<ws>) made spawn die with ENOENT the moment the docker
+  // driver became available (bash/nuclei/dig "all dead" during the SCUT
+  // nday live run — surfaced 2026-09-12).
+  const cwdHost = argv.length ? process.cwd()
     : (containerPathToHost(cwdContainer) ?? cwdContainer);
   return new Promise(resolve => {
     const child = spawn(argvv[0], argvv.slice(1), {
@@ -308,9 +313,14 @@ export function makeExecutionEnv(cfg, wsId) {
   const cwdContainer = `${CONTAINER.workspace}/${wsId}`;
   const fsEnv = makeFileSystem(cwdContainer);
   const toolPath = sharedToolPath();
+  // NOTE: `$PATH` inside this template would reach the container as a
+  // LITERAL (docker -e does not expand) — the container then had no bash
+  // on PATH (exit 127, "bash not found"). Expand the HOST path list here
+  // so the container PATH = shared-tool dirs + sane system defaults.
   const execArgv = cfg.driver === 'docker'
     ? ['docker', 'exec', '-w', cwdContainer,
-      '-e', `PATH=${toolPath}:$PATH`, cfg.container ?? 'spectre-sandbox']
+      '-e', `PATH=${toolPath}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`,
+      cfg.container ?? 'spectre-sandbox']
     : [];
   const shell = {
     exec: (command, options, ctx) => {

@@ -317,6 +317,7 @@ export const TOOLS_GUIDE = [
   '- revise_entry: 修订情报/任务报告(任意agent,reason留审计);writer 可修订漏洞',
   '- request_vulnerability_revision: 漏洞修订申请——writer 审核必要性与正确性',
   '- spawn_agent / dispatch_agents / relay_to_agents: 派生/批量调度/定向转发',
+  '  (仅编排器/派生会话持有——直连会话没有,以提示词末尾实际注册清单为准)',
   '- publish_vulnerability: 仅报告agent会话持有——漏洞落账唯一入口',
 ].join('\n');
 
@@ -326,7 +327,7 @@ export const TOOLS_GUIDE = [
  * tooling toolkit plus its OWN search/fetch instances (independent
  * per agent — never a 4th role, per the user's three-agent design).
  */
-const SCENARIO_COMMON = [
+export const SCENARIO_COMMON = [
   '## 安装/卸载标准流程(固化,不可跳步)',
   '1) 配置(configure/delete/remove/uninstall),拿到成功回执;',
   '2) 唤醒验证:wake_agent 唤醒目标业务智能体(挂载多个时任选其一;',
@@ -527,6 +528,17 @@ export const NDAY_PROMPT = [
   'P3 落账:台账全量 publish_intel;确认可利用的逐条 report_vulnerability',
   '   (走报告 agent 验证);结束 submit_task_report(覆盖率统计:资产数×',
   '   CVE 数×四态分布)。',
+  '',
+  '# 尝试预算与低置信上报',
+  '- 单资产×单CVE:常规尝试 ≤3 次;判定性实验组(如走私双响应/布尔差/对照',
+  '  实验)单独计为一组,组内 ≤6 发——预算管的是\"发散乱试\",不是\"科学验证\"',
+  '- 版本命中+行为信号型(如版本区间权威+响应行为异常但未完全闭环):允许',
+  '  低置信 report_vulnerability 上报,一句话写明置信档位,由报告 agent 裁决',
+  '  ——驳回成本远低于漏报,禁止过度保守压着不报',
+  '- 研判前先 query_intel 拉 weakcred/exploit 的成果:已有凭据的资产按',
+  '  认证态路径验证(60 台登录墙后端/Coremail 登录面在此条件下才可验)',
+  '- DNS 资产的条件不足组行:先用 dnsx CHAOS version.bind 补版本判定',
+  '  (dig @ns chaos version.bind txt 等价),再判条件',
   '',
   '# 验证安全线(不可覆盖的破坏性约束)',
   '- RCE 验证仅用无害命令(echo 标记/id/whoami/uname),绝不删改',
