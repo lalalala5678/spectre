@@ -75,3 +75,18 @@ PYTHONPATH=/opt/tools/py python3 /opt/tools/jwt_tool/jwt_tool.py <token> -C -d \
 - 字段名铁律:加密面的字段名以【服务端行为】为准——客户端 JS 不可见时,发
   已知坏值做端到端探针比对错误响应差异,或直接看服务端日志;seq=688 曾把
   h 字段记成 p,三轮百万级请求全数错发的教训
+
+## 9. 验证码识别引擎(ddddocr,2026-09 实弹补强)
+- tesseract 对波浪字体+干扰线全 psm 失效(迪普 VPN 实弹 30+ 发 0 过)——
+  **禁止再用 tesseract 做登录面验证码**
+- 平台标准引擎 ddddocr:PYTHONPATH=/opt/tools/py/ddddocr:/opt/tools/py
+  ```python
+  import ddddocr
+  o = ddddocr.DdddOcr(show_ad=False)
+  code = o.classification(open("cap.png","rb").read())
+  ```
+- 实测基线:合成波浪扭曲+3 干扰线 20 发 10 中(50% 单发)——期望 2 发/密码,
+  配合锁定预算内行动完全可用;无扭曲面更高
+- 会话 cookie 与验证码绑定:每次猜码必须**先取新码+新 cookie 再发登录**,
+  识别错误响应差异(验证码错 vs 凭据错)分别计数,验证码错不计入锁定预算
+- 大小写不敏感先试:先 lower 后原样,响应差会告诉你哪种

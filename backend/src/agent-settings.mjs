@@ -197,6 +197,9 @@ export function settingsSchema() {
             { id: 'brute.lockBudget', label: '单账号错误预算(锁定阈值内)', type: 'number', check: num(1, 50), default: 5, hint: '先探测锁定策略,预算内行动' },
             { id: 'brute.hydraThreads', label: '服务爆破线程(hydra -t)', type: 'number', check: num(1, 32), default: 4 },
             { id: 'brute.dirWordlist', label: '目录爆破字典', type: 'select', options: ['common', 'medium', 'raft'], default: 'common', hint: 'common=SecLists common.txt;medium=directory-list-2.3-medium;raft=raft-words' },
+            { id: 'brute.baseWords', label: '语义基词(逗号分隔)', type: 'text', default: '', placeholder: 'gzpyp,gzpy,admin,service,jiaowu', hint: 'hashcat 规则管道首段基词:学校缩写/服务名/年份等,留空用默认集' },
+            { id: 'brute.userDict', label: '用户名字典', type: 'select', options: ['auto', 'xato', 'pinyin', 'staff-id'], default: 'auto', hint: 'auto=按面自适应;xato=英文top;pinyin=姓名拼音;staff-id=工号/学号' },
+            { id: 'brute.passDict', label: '密码策略', type: 'select', options: ['both', 'semantic', 'rockyou'], default: 'both', hint: 'both=语义管道+rockyou 串行;semantic=仅 hashcat 规则管道;rockyou=仅字典' },
           ],
         }],
       },
@@ -273,6 +276,14 @@ export async function saveSetting({ group, field, value }, wal) {
     } else if (leaf === 'dirWordlist') {
       if (!['common', 'medium', 'raft'].includes(String(clean(value)))) return { ok: false, error: 'common/medium/raft' };
       cur[leaf] = String(clean(value));
+    } else if (leaf === 'userDict') {
+      if (!['auto', 'xato', 'pinyin', 'staff-id'].includes(String(clean(value)))) return { ok: false, error: 'auto/xato/pinyin/staff-id' };
+      cur[leaf] = String(clean(value));
+    } else if (leaf === 'passDict') {
+      if (!['both', 'semantic', 'rockyou'].includes(String(clean(value)))) return { ok: false, error: 'both/semantic/rockyou' };
+      cur[leaf] = String(clean(value));
+    } else if (leaf === 'baseWords') {
+      cur[leaf] = String(clean(value)).slice(0, 500);
     } else return { ok: false, error: '未知配置项' };
     setPrefs({ bruteParams: cur }, wal);
     return { ok: true };
@@ -341,5 +352,10 @@ export function effectiveBruteParams() {
     lockBudget: Number(bp.lockBudget) || 5,
     hydraThreads: Number(bp.hydraThreads) || 4,
     dirWordlist: wl[bp.dirWordlist] ?? wl.common,
+    baseWords: typeof bp.baseWords === 'string' && bp.baseWords.trim()
+      ? bp.baseWords.split(/[,，\s]+/).filter(Boolean).slice(0, 32)
+      : ['password', 'admin', 'service', 'redis', 'china', 'secret', 'api', 'manager', 'root', 'test'],
+    userDict: bp.userDict ?? 'auto',
+    passDict: bp.passDict ?? 'both',
   };
 }
