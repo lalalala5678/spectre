@@ -187,6 +187,25 @@ export function settingsSchema() {
     },
     agents: [
       {
+        agentKey: 'weakcred', label: '爆破 Agent · 爆破参数(实时生效)',
+        hint: '防锁定参数与字典选择,保存后对新会话生效(注入系统提示词)。',
+        sources: [{
+          id: 'brute', label: '爆破约束', defaultBase: '',
+          fields: [
+            { id: 'brute.delaySec', label: '每账号尝试间隔(秒)', type: 'number', check: num(1, 120), default: 3, hint: '防锁定:登录面每账号两次尝试之间的最小间隔' },
+            { id: 'brute.maxConc', label: '单登录面并发', type: 'number', check: num(1, 16), default: 2 },
+            { id: 'brute.lockBudget', label: '单账号错误预算(锁定阈值内)', type: 'number', check: num(1, 50), default: 5, hint: '先探测锁定策略,预算内行动' },
+            { id: 'brute.hydraThreads', label: '服务爆破线程(hydra -t)', type: 'number', check: num(1, 32), default: 4 },
+            { id: 'brute.dirWordlist', label: '目录爆破字典', type: 'select', options: ['common', 'medium', 'raft'], default: 'common', hint: 'common=SecLists common.txt;medium=directory-list-2.3-medium;raft=raft-words' },
+          ],
+        }],
+      },
+      {
+        agentKey: 'nday', label: 'NDay Agent · 数据源(只读展示)',
+        hint: '本地情报层零 key(cvelistV5/模板库/EPSS 官方 API);GitHub token 在资产测绘组配置后同样对 NDay 生效。',
+        sources: [],
+      },
+      {
         agentKey: 'recon', label: '资产测绘 Agent · 数据源',
         hint: '填好并通过连通验证的源才会挂载为 MCP 工具;未配置的源对 agent 完全不可见(零污染)。Base URL 留空一律使用官方地址。',
         sources: Object.entries(RECON_SOURCES)
@@ -205,9 +224,13 @@ export function settingsSchema() {
 
 export function getSettings() {
   const p = getPrefs();
+  const bp = p.bruteParams ?? {};
+  const reconSources = { ...p.reconApiKeys ?? {} };
+  // weakced brute params ride in reconSources under the pseudo-source id
+  reconSources.brute = bp;
   return {
     common: p.commonSettings ?? null,
-    reconSources: p.reconApiKeys ?? {},
+    reconSources,
     schema: settingsSchema(),
   };
 }
@@ -239,6 +262,21 @@ export async function saveSetting({ group, field, value }, wal) {
     return { ok: true };
   }
 
+  if (group === 'weakcred') {
+    const cur = { ...(getPrefs().bruteParams ?? {}) };
+    const [top, leaf] = field.split('.');
+    if (top !== 'brute') return { ok: false, error: '未知配置项' };
+    const v = Number(clean(value));
+    if (['delaySec', 'maxConc', 'lockBudget', 'hydraThreads'].includes(leaf)) {
+      if (!Number.isFinite(v) || v < 1) return { ok: false, error: '必须 ≥1' };
+      cur[leaf] = v;
+    } else if (leaf === 'dirWordlist') {
+      if (!['common', 'medium', 'raft'].includes(String(clean(value)))) return { ok: false, error: 'common/medium/raft' };
+      cur[leaf] = String(clean(value));
+    } else return { ok: false, error: '未知配置项' };
+    setPrefs({ bruteParams: cur }, wal);
+    return { ok: true };
+  }
   if (group === 'recon-source') {
     const [srcId, leaf] = field.split('.');
     const src = RECON_SOURCES[srcId];
@@ -285,8 +323,23 @@ export function enabledReconSources() {
   const keys = getPrefs().reconApiKeys ?? {};
   const out = [];
   for (const [id, cfg] of Object.entries(keys)) {
-    if (!RECON_SOURCES[id]) continue;
+    if (id === 'brute' || !RECON_SOURCES[id]) continue;
     if (cfg.key || cfg.token || cfg.secret || cfg.id) out.push(id);
   }
   return out;
+}
+
+/** Effective brute params with defaults (injected into weakcred prompts). */
+export function effectiveBruteParams() {
+  const bp = getPrefs().bruteParams ?? {};
+  const wl = { common: '/opt/tools/seclists/Discovery/Web-Content/common.txt',
+    medium: '/opt/tools/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt',
+    raft: '/opt/tools/seclists/Discovery/Web-Content/raft-medium-words.txt' };
+  return {
+    delaySec: Number(bp.delaySec) || 3,
+    maxConc: Number(bp.maxConc) || 2,
+    lockBudget: Number(bp.lockBudget) || 5,
+    hydraThreads: Number(bp.hydraThreads) || 4,
+    dirWordlist: wl[bp.dirWordlist] ?? wl.common,
+  };
 }

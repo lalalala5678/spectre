@@ -13,7 +13,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
-import { effectiveCommon } from './agent-settings.mjs';
+import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
@@ -198,7 +198,8 @@ export class SessionStore {
           `${TOOLS_PROMPTS[record.agentKey] ? ''
             : TOOLS_GUIDE + '\n'}` +
           `${tools.map(t => `- ${t.name}`).join('\n')}` +
-          (skillIndexBlock ? `\n\n${skillIndexBlock}` : ''),
+          (skillIndexBlock ? `\n\n${skillIndexBlock}` : '') +
+          (record.agentKey === 'weakcred' ? `\n\n# 当前爆破参数(用户配置,实时生效)\n${JSON.stringify(effectiveBruteParams())}` : ''),
         model: this.model,
         tools,
         // Thinking effort is user-configurable (settings bar); pi levels

@@ -282,6 +282,11 @@ function realRouter({ store, bus, caps, wal }) {
         const { applyLlmPrefs } = await import('./pi.mjs');
         await applyLlmPrefs();
       }
+      if (String(body.group) === 'weakcred') {
+        const r2 = await saveSetting({ group: 'weakcred', field: String(body.field).replace(/^brute\./, 'brute.'), value: body.value }, wal);
+        if (!r2.ok) return bad(res, 400, r2.error);
+        return json(res, 200, r2);
+      }
       if (String(body.group) === 'recon-source') {
         // sync MCP config file + mount toggle (zero-pollution: no key ⇒
         // server disabled, recon never sees the tools)
