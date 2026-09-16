@@ -125,9 +125,10 @@ function SourceCard({ src, cfg, onSave }: {
   onSave: (leaf: string) => (v: string) => Promise<void>;
 }) {
   const [open, setOpen] = useState(true);
-  const mounted = Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.id));
+  const isParams = src.id === 'brute';
+  const paramCount = Object.values(cfg ?? {}).filter(v => String(v ?? '').length > 0).length;
+  const mounted = isParams ? paramCount > 0 : Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.id));
   const tier = TIER_STYLE[src.tier ?? 'P2'];
-
   return (
     <div className={cn('overflow-hidden rounded border transition-colors',
       mounted ? 'border-emerald-900/60 bg-void-900/40' : 'border-void-700 bg-void-900/20')}>
@@ -138,10 +139,9 @@ function SourceCard({ src, cfg, onSave }: {
         <span className={cn('h-2 w-2 shrink-0 rounded-full', mounted ? 'bg-emerald-400 shadow-[0_0_6px] shadow-emerald-500/60' : tier.dot)} />
         <span className="text-[13px] font-medium text-zinc-200">{src.label}</span>
         <span className={cn('rounded border px-1.5 py-0.5 font-mono text-[9.5px]', tier.chip)}>{tier.label}</span>
-        {src.why && <span className="hidden min-w-0 flex-1 truncate text-[11px] text-zinc-500 lg:block">{src.why}</span>}
         <span className={cn('ml-auto shrink-0 rounded-sm px-2 py-0.5 font-mono text-[10px]',
           mounted ? 'bg-emerald-950/60 text-emerald-400' : 'bg-void-800 text-zinc-500')}>
-          {mounted ? '已挂载 MCP' : '未配置 · 不注入'}
+          {isParams ? `参数组 · ${paramCount} 项已注入` : mounted ? '已挂载 MCP' : '未配置 · 不注入'}
         </span>
         <svg className={cn('h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform', open && 'rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 18l6-6-6-6" />
@@ -177,8 +177,8 @@ export default function SettingsPage() {
     await api('/agent-settings/save', { method: 'POST', json: { group: 'common', field: fieldId, value: v } });
     await reload();
   };
-  const saveSource = (srcId: string) => (leaf: string) => async (v: string) => {
-    await api('/agent-settings/save', { method: 'POST', json: { group: 'recon-source', field: `${srcId}.${leaf}`, value: v } });
+  const saveSource = (srcId: string, group = 'recon-source') => (leaf: string) => async (v: string) => {
+    await api('/agent-settings/save', { method: 'POST', json: { group, field: `${srcId}.${leaf}`, value: v } });
     await reload();
   };
 
@@ -188,12 +188,16 @@ export default function SettingsPage() {
   const cs = data.common ?? {};
   const llm = (cs.llm ?? {}) as Record<string, string>;
   const comp = (cs.compaction ?? {}) as Record<string, string>;
-  const sources = data.schema.agents[0]?.sources ?? [];
+  const groups = data.schema.agents ?? [];
+  const reconAgent = groups.find((a) => a.agentKey === 'recon');
+  const otherAgents = groups.filter((a) => a.agentKey !== 'recon');
+  const sources = reconAgent?.sources ?? [];
   const mountedCount = sources.filter((s) => {
     const c = data.reconSources[s.id];
     return Boolean(c && (c.key || c.token || c.secret || c.id));
   }).length;
   const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
+  const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
 
   return (
     <div className="mx-auto max-w-4xl px-6 py-6">
@@ -225,6 +229,26 @@ export default function SettingsPage() {
           })}
         </div>
       </section>
+
+      {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
+      {otherAgents.map((agent) => (
+        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded border border-void-700 bg-void-900/30">
+          <div className="flex items-center gap-2 border-b border-void-700 bg-gradient-to-r from-void-800/60 to-transparent px-4 py-3">
+            <span className="text-[12.5px] font-medium text-zinc-200">{agent.label}</span>
+          </div>
+          {agent.hint && <p className="border-b border-void-800/70 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">{agent.hint}</p>}
+          {agent.sources.length === 0 ? (
+            <div className="px-4 py-3 text-[11.5px] text-zinc-500">该智能体无独立数据源配置。</div>
+          ) : (
+            <div className="divide-y divide-void-800/70">
+              {agent.sources.map((src) => (
+                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
+
 
       {/* ---------- 资产测绘数据源(按重要性分级) ---------- */}
       <section className="mb-8">
