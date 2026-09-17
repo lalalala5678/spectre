@@ -1,0 +1,20 @@
+---\nname: poc-verify\ndescription: PoC 与验证(阶段四)\n---\n\n# PoC 与验证(阶段四)
+[轻探测] 白盒结论黑盒落地——KAT 铁律沿用(出口实测才算数)。
+
+## PoC 构造模板
+| 洞类 | PoC 形态 |
+- SQLi: 完整 HTTP 请求(方法/路径/参数/头)+预期特征(报错文案/时延/数据回显)
+- 上传: multipart body+文件名+Content-Type+预期(响应路径/可访问回执)
+- RCE(表达式/命令): echo 唯一标记 echo SPECTRE-{hash} 预期回显;禁止落地 webshell
+- 任意读: 读 /etc/hostname 等无害文件+响应片段
+- 未授权面: 无凭据请求+业务数据特征
+
+## 验证分级
+1. 本地 docker 起目标版本实测(证据最强;数据库类洞需 mysql/redis 依赖)
+2. 授权实弹目标单发验证(安全线内:echo 标记/SELECT 证明/2-3 样本)
+3. 纯代码级证据(无法起服务时): 污点链行号+构造步骤+预期(标注"未出口验证")
+
+## 落账纪律
+report_vulnerability 标题: 项目@版本|洞类|端点;正文: 污点链(文件:行)+
+绕过证明+PoC+验证级别。publish_intel 给 nday(已知 CVE 转)/api(入口面
+复用)。submit_task_report: 四阶段台账+已审/未审面清单。
