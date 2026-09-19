@@ -38,7 +38,7 @@ export default function ShellPage() {
       if (r.error) setLines(l => [...l, { dir: 'err', text: r.error! }]);
       else {
         if (r.stdout) setLines(l => [...l, { dir: 'out', text: String(r.stdout) }]);
-        if (r.stderr) setLines(l => [...l, { dir: 'err', text: r.stderr }]);
+        if (r.stderr) setLines(l => [...l, { dir: 'err', text: String(r.stderr) }]);
         setLines(l => [...l, { dir: 'sys', text: `[exit ${r.code ?? '?'} · ${r.ms ?? '?'}ms]` }]);
       }
     } catch (e) {
