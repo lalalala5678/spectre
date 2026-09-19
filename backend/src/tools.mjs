@@ -762,35 +762,37 @@ export function buildShellTools(record, caps) {
       path: Type.Optional(Type.String({ description: 'read_file:绝对路径' })),
     }),
     execute: async (_id, p) => {
+      // pi tool protocol: results must be content-block envelopes.
+      const say = (obj) => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
       const R = caps.shells;
       try {
         if (p.action === 'list') {
           const list = R.list().map(x => ({ id: x.id, name: x.name, target: x.target,
             status: x.status, user: x.user, os: (x.os || '').slice(0, 60), cmdCount: x.cmdCount,
             expiresAt: x.expiresAt }));
-          return list.length ? { ok: true, count: list.length, shells: list }
-            : { ok: true, count: 0, shells: [], note: '无 shell——c2 agent 交付后出现,或查情报库 shell-ready 标记拿 id' };
+          return say(list.length ? { ok: true, count: list.length, shells: list }
+            : { ok: true, count: 0, shells: [], note: '无 shell——c2 agent 交付后出现,或查情报库 shell-ready 标记拿 id' });
         }
-        if (!p.shellId) return { ok: false, error: 'shellId 必填' };
+        if (!p.shellId) return say({ ok: false, error: 'shellId 必填' });
         if (p.action === 'exec') {
           if (!p.command) return { ok: false, error: 'command 必填' };
           const r = await R.exec(p.shellId, p.command);
-          return { ...r, stdout: r.stdout?.slice(0, 8000), stderr: r.stderr?.slice(0, 2000) };
+          return say({ ...r, stdout: r.stdout?.slice(0, 8000), stderr: r.stderr?.slice(0, 2000) });
         }
         if (p.action === 'read_file') {
           if (!p.path) return { ok: false, error: 'path 必填' };
           const r = await R.readFile(p.shellId, p.path);
-          return { ok: r.ok, content: r.stdout?.slice(0, 16000), code: r.code };
+          return say({ ok: r.ok, content: r.stdout?.slice(0, 16000), code: r.code });
         }
         if (p.action === 'status') {
           const g = R.get(p.shellId);
-          if (!g) return { ok: false, error: 'shell 不存在' };
-          return { ok: true, shell: { ...g, tasks: (g.tasks ?? []).slice(-10) } };
+          if (!g) return say({ ok: false, error: 'shell 不存在' });
+          return say({ ok: true, shell: { ...g, tasks: (g.tasks ?? []).slice(-10) } });
         }
-        if (p.action === 'close') return R.close(p.shellId);
-        return { ok: false, error: '未知 action' };
+        if (p.action === 'close') return say(R.close(p.shellId));
+        return say({ ok: false, error: '未知 action' });
       } catch (e) {
-        return { ok: false, error: 'shell 工具异常: ' + e.message };
+        return say({ ok: false, error: 'shell 工具异常: ' + e.message });
       }
     },
   };

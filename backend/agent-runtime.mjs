@@ -65,14 +65,12 @@ bus.load(replay.busEvents);
 
 // Shell registry (C2 implant handles; transport 'local' for benchmark).
 // Scope reader mirrors /opt/tools/c2/scope.json — server-side hard gate.
-const shellScope = (() => {
-  try {
-    const sc = JSON.parse(readFileSync('/var/lib/spectre/tools/c2/scope.json', 'utf8'));
-    return () => sc;
-  } catch {
-    return () => null;
-  }
-})();
+const shellScope = () => {
+  // Read-per-call: benchmark windows open/close live; a boot-cached scope
+  // would reject freshly authorized exercises.
+  try { return JSON.parse(readFileSync('/var/lib/spectre/tools/c2/scope.json', 'utf8')); }
+  catch { return null; }
+};
 
 const shellRegistry = createShellRegistry({ bus: { emit: (entry) => bus.emit({ type: 'shell-event', ...entry }) }, wal, listScope: shellScope });
 

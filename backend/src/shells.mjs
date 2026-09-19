@@ -85,7 +85,14 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
     let stdout = '', stderr = '', code = 0;
     try {
       if (sh.transport === 'local') {
-        const argv = box ? ['exec', box, 'bash', '-lc', command] : ['bash', '-lc', command];
+        // transportRef binds the shell to ONE exec box — commands land in
+        // the compromised box, never the runtime host. Format "container"
+        // (default user) or "container:user" (low-priv web compromise).
+        const ref = sh.transportRef || 'spectre-sandbox';
+        const [cbox, cuser] = ref.includes(':') ? ref.split(':') : [ref, null];
+        const argv = cuser
+          ? ['exec', '-u', cuser, cbox, 'bash', '-lc', command]
+          : ['exec', cbox, 'bash', '-lc', command];
         const res = await new Promise((resolve) => {
           execFile('docker', argv, { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
