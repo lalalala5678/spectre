@@ -62,6 +62,33 @@ function realRouter({ store, bus, caps, wal }) {
     const path = url.pathname;
     const method = req.method;
 
+    // ---------- shells (C2 implant handles: list/register/exec/close) ----------
+    if (path === '/api/shells' && method === 'GET') {
+      return json(res, 200, { shells: caps.shells.list() });
+    }
+    if (path === '/api/shells' && method === 'POST') {
+      const body = await readJson(req);
+      if (!body?.target) return bad(res, 400, 'target 必填');
+      const sh = caps.shells.register({
+        name: String(body.name || ''), target: String(body.target),
+        transport: String(body.transport || 'local'), transportRef: String(body.transportRef || ''),
+        note: String(body.note || ''), createdBy: String(body.createdBy || 'operator'),
+        ttlHours: Number(body.ttlHours) || 24,
+      });
+      return json(res, 200, sh);
+    }
+    if (path.startsWith('/api/shells/') && path.endsWith('/exec') && method === 'POST') {
+      const id = path.split('/')[3];
+      const body = await readJson(req);
+      if (!body?.command) return bad(res, 400, 'command 必填');
+      const r = await caps.shells.exec(id, String(body.command), { timeoutMs: Math.min(Number(body.timeoutMs) || 30000, 120000) });
+      return json(res, 200, r);
+    }
+    if (path.startsWith('/api/shells/') && path.endsWith('/close') && method === 'POST') {
+      const id = path.split('/')[3];
+      return json(res, 200, caps.shells.close(id));
+    }
+
     // ---------- spawn policy settings (console-editable) ----------
     if (path === '/api/settings' && method === 'GET') {
       return json(res, 200, getSpawnSettings());

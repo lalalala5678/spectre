@@ -15,6 +15,8 @@ import http from 'node:http';
 
 import { CONFIG } from './src/config.mjs';
 import { Bus } from './src/bus.mjs';
+import { createShellRegistry } from './src/shells.mjs';
+import { readFileSync } from 'node:fs';
 import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
 import { entryKind as entryKindOf } from './src/tools.mjs';
@@ -61,7 +63,21 @@ projectsFromWal(entries);
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
 
+// Shell registry (C2 implant handles; transport 'local' for benchmark).
+// Scope reader mirrors /opt/tools/c2/scope.json — server-side hard gate.
+const shellScope = (() => {
+  try {
+    const sc = JSON.parse(readFileSync('/var/lib/spectre/tools/c2/scope.json', 'utf8'));
+    return () => sc;
+  } catch {
+    return () => null;
+  }
+})();
+
+const shellRegistry = createShellRegistry({ bus: { emit: (entry) => bus.emit({ type: 'shell-event', ...entry }) }, wal, listScope: shellScope });
+
 const caps = {
+  shells: shellRegistry,
   dispatch: (input) => startAutopwn(input),
   signalEngagement,
   emitBus: (entry) => bus.emit(entry),

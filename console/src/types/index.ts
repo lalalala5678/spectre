@@ -21,7 +21,8 @@ export type RouteKey =
   | 'mcp'            // MCP Server 管理
   | 'cli'            // CLI 工具导入
   | 'settings'       // Agent 配置栏
-  | 'audit';         // 审计与证据链
+  | 'audit'         // 审计与证据链
+  | 'shells';        // Shell 控制台
 
 export type AgentId =
   | 'autopwn'

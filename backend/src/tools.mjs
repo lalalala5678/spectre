@@ -734,6 +734,69 @@ export function buildOrchestratorTools(record, caps) {
  * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
  * intel notes use 'intel-note' to avoid the collision.
  */
+/**
+ * Shell tool — operate C2 implant handles handed over by the C2 agent or
+ * the operator (SSH-like channel over the compromise). Same tool instance
+ * per agent (independence axiom): c2 (register+handoff), persistence and
+ * postex (operate), autopwn (relay/verify). Server-side scope gate refuses
+ * out-of-window/out-of-target shells — tool-level defense mirrors it.
+ */
+export function buildShellTools(record, caps) {
+  if (!caps?.shells) return [];
+  const sh = {
+    name: 'shell',
+    label: 'Shell 通道',
+    description:
+      '[side-effects: executes on compromised host] 操作 C2 植入产生的 shell 通道(经授权门)。' +
+      'action=list 列出可用 shell(含 id/目标/系统指纹/任务数);action=exec 执行命令并返回' +
+      ' stdout/stderr/退出码;action=read_file 读文件;action=status 看 shell 元数据+最近任务;' +
+      'action=close 关闭。每条命令进平台审计(证据链)。shell 可由 c2 agent 交付或运营注册,' +
+      '在智能体间通过 id 传递(情报/任务指令中携带 shellId)。',
+    parameters: Type.Object({
+      action: Type.Union([
+        Type.Literal('list'), Type.Literal('exec'), Type.Literal('read_file'),
+        Type.Literal('status'), Type.Literal('close'),
+      ], { description: 'list / exec / read_file / status / close' }),
+      shellId: Type.Optional(Type.String({ description: 'shell id(sh-xxx);list 可省' })),
+      command: Type.Optional(Type.String({ description: 'exec:要执行的命令' })),
+      path: Type.Optional(Type.String({ description: 'read_file:绝对路径' })),
+    }),
+    execute: async (_id, p) => {
+      const R = caps.shells;
+      try {
+        if (p.action === 'list') {
+          const list = R.list().map(x => ({ id: x.id, name: x.name, target: x.target,
+            status: x.status, user: x.user, os: (x.os || '').slice(0, 60), cmdCount: x.cmdCount,
+            expiresAt: x.expiresAt }));
+          return list.length ? { ok: true, count: list.length, shells: list }
+            : { ok: true, count: 0, shells: [], note: '无 shell——c2 agent 交付后出现,或查情报库 shell-ready 标记拿 id' };
+        }
+        if (!p.shellId) return { ok: false, error: 'shellId 必填' };
+        if (p.action === 'exec') {
+          if (!p.command) return { ok: false, error: 'command 必填' };
+          const r = await R.exec(p.shellId, p.command);
+          return { ...r, stdout: r.stdout?.slice(0, 8000), stderr: r.stderr?.slice(0, 2000) };
+        }
+        if (p.action === 'read_file') {
+          if (!p.path) return { ok: false, error: 'path 必填' };
+          const r = await R.readFile(p.shellId, p.path);
+          return { ok: r.ok, content: r.stdout?.slice(0, 16000), code: r.code };
+        }
+        if (p.action === 'status') {
+          const g = R.get(p.shellId);
+          if (!g) return { ok: false, error: 'shell 不存在' };
+          return { ok: true, shell: { ...g, tasks: (g.tasks ?? []).slice(-10) } };
+        }
+        if (p.action === 'close') return R.close(p.shellId);
+        return { ok: false, error: '未知 action' };
+      } catch (e) {
+        return { ok: false, error: 'shell 工具异常: ' + e.message };
+      }
+    },
+  };
+  return [sh];
+}
+
 export function entryKind(e) {
   if (e.type === 'vulnerability' || e.type === 'intel') return 'vulnerability';
   if (e.type === 'intel-note') return 'intel-note';
