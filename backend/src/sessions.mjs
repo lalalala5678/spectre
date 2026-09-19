@@ -14,7 +14,7 @@ import { Agent } from '@earendil-works/pi-agent-core';
 import { CONFIG } from './config.mjs';
 import { typeLabelOf } from './agents.mjs';
 import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 
@@ -41,6 +41,7 @@ const BUSINESS_PROMPTS = {
   weakcred: BRUTE_PROMPT,
   api: API_PROMPT,
   exploit: VULNHUNT_PROMPT,
+  c2: C2_PROMPT,
 };
 import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
