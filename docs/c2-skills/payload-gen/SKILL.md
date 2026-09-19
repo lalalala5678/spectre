@@ -44,3 +44,9 @@ c2-basetype.py verify
 ## 无回显场景
 Agent 型打入(jar agent / JAR_AGENT 输出),配合目标栈真实加载桩模板;
 enc/code 桩族在没有模板前不得交付。
+
+## 注入位选新令(2026-09 三令)
+内存马优先新注入点/机制(研究覆盖低=厂商特征少):Valve/Pipeline、
+Upgrade/WebSocket、HandlerAdapter、WebFlux/Spring Cloud Gateway 钩子、
+线程池 Runnable 包装、编解码器位;经典五位仅基线兜底;维护注入位
+研究覆盖度台账(低覆盖优先,随公开研究动态更新);退回经典位须附理由。
