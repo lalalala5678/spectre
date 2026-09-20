@@ -754,11 +754,18 @@ export function buildShellTools(record, caps) {
       '在智能体间通过 id 传递(情报/任务指令中携带 shellId)。',
     parameters: Type.Object({
       action: Type.Union([
-        Type.Literal('list'), Type.Literal('exec'), Type.Literal('read_file'),
-        Type.Literal('status'), Type.Literal('close'),
-      ], { description: 'list / exec / read_file / status / close' }),
+        Type.Literal('list'), Type.Literal('register'), Type.Literal('exec'),
+        Type.Literal('read_file'), Type.Literal('status'), Type.Literal('close'),
+      ], { description: 'list / register(把已验证通道自注册进审计体系) / exec / read_file / status / close' }),
+      name: Type.Optional(Type.String({ description: 'register: 通道名(如 dc8-webshell)' })),
+      target: Type.Optional(Type.String({ description: 'register: 授权目标名(须在 scope 清单)' })),
+      transport: Type.Optional(Type.Union([Type.Literal('local'), Type.Literal('ssh'), Type.Literal('web')],
+        { description: 'register: local|ssh|web' })),
+      transportRef: Type.Optional(Type.String({
+        description: 'register: 通道定义——local: "容器名[:用户]"; ssh: "user:pass@host:port"; web: URL 模板含 {CMD}(GET 或 POST|url|body),可加 "#MARK" 响应定界(只取 <MARK>..</MARK> 之间,消页面噪声)' })),
       shellId: Type.Optional(Type.String({ description: 'shell id(sh-xxx);list 可省' })),
       command: Type.Optional(Type.String({ description: 'exec:要执行的命令' })),
+      timeoutMs: Type.Optional(Type.Number({ description: 'exec:硬超时毫秒(默认 30000,web 通道强制硬杀)' })),
       path: Type.Optional(Type.String({ description: 'read_file:绝对路径' })),
     }),
     execute: async (_id, p) => {
@@ -773,10 +780,21 @@ export function buildShellTools(record, caps) {
           return say(list.length ? { ok: true, count: list.length, shells: list }
             : { ok: true, count: 0, shells: [], note: '无 shell——c2 agent 交付后出现,或查情报库 shell-ready 标记拿 id' });
         }
+        if (p.action === 'register') {
+          if (!p.transportRef || !p.target) return say({ ok: false, error: 'register 需 transportRef+target' });
+          const sh = R.register({
+            name: p.name || 'ch-' + Date.now().toString(36), target: p.target,
+            transport: p.transport || 'web', transportRef: p.transportRef,
+            note: 'agent 自注册(' + (record.agentKey || 'agent') + ')',
+            createdBy: record.agentKey || 'agent',
+          });
+          await R.fingerprint?.(sh.id).catch?.(() => {});
+          return say({ ok: true, shell: sh, note: '已注册并进审计体系;后续 exec/read_file 用 shellId=' + sh.id });
+        }
         if (!p.shellId) return say({ ok: false, error: 'shellId 必填' });
         if (p.action === 'exec') {
           if (!p.command) return { ok: false, error: 'command 必填' };
-          const r = await R.exec(p.shellId, p.command);
+          const r = await R.exec(p.shellId, p.command, { timeoutMs: Math.min(p.timeoutMs || 30_000, 120_000) });
           return say({ ...r, stdout: r.stdout?.slice(0, 8000), stderr: r.stderr?.slice(0, 2000) });
         }
         if (p.action === 'read_file') {
