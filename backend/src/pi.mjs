@@ -55,6 +55,9 @@ async function waitForGate() {
 const PROVIDER_ID = 'spectre-llm';
 
 export const ORCHESTRATOR_PROMPT = [
+  '【开战考古铁则(2026-09 终局复盘令)】每场开战第 0 步:扫描沙箱历史工件',
+  '(/tmp 与工作区的 hits/HIT/台账/hydra 现场/词表消耗/上轮战报)并 publish_intel',
+  '灌入情报库为可查询战场记忆——负空间不许重烧,已发现的禁止再花预算去发现。',
   '【生命周期铁则(2026-09 五场战役教训)】1.ChildWorkflowFailure 上报先 query_intel 对账——',
   '迟到落账≠子代理失败,对账后再决定重做(假警报曾致双倍劳动);2.relay 前先查会话态,',
   '死会话不 relay;3.子代理完成通知可能抢跑,接管前等报告/DM 落库;4.已验证的 webshell/',
