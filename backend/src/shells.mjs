@@ -54,22 +54,45 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
     return { ok: true };
   }
 
-  function register({ name, target, transport = 'local', transportRef = '', note = '', createdBy = 'operator', ttlHours = 24 }) {
+  function register({ name, target, transport = 'local', transportRef = '', note = '', tags = [], createdBy = 'operator', ttlHours = 24 }) {
     const id = 'sh-' + randomUUID().slice(0, 8);
+    // 命名规范:<目标>-<面>-<权限> 建议(不强制,但重名/空名拒)
+    const nm = String(name || '').trim();
+    if (!nm) return { error: 'name 必填(建议格式 目标-面-权限,如 dc8-web-www)' };
+    if ([...shells.values()].some(x => x.name === nm && x.status === 'active'))
+      return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
+        // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
+    const tr = String(transportRef || '');
+    if (transport === 'web' && !tr.includes('{CMD}'))
+      return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK)' };
+    if (transport === 'ssh' && !/^(.+?):(.*?)@([^:]+)(?::(\d+))?$/.test(tr))
+      return { error: 'ssh transportRef 需 user:pass@host[:port]' };
+    if (transport === 'local' && !tr)
+      return { error: 'local transportRef 需 容器名[:用户] (如 pxlab:www-data)' };
     const sh = {
       id, name: name || id, target, transport, transportRef, note,
+      tags: Array.isArray(tags) ? tags.slice(0, 8).map(String) : [],
       createdBy, createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + ttlHours * 3600e3).toISOString(),
       cmdCount: 0, lastActiveAt: null, status: 'active',
       tasks: [],          // tasking history (Mythic): {n, command, code, ms, at}
       host: null, user: null, os: null,  // auto-fingerprint (Sliver session meta)
     };
+    if (sh.error) return sh;
     shells.set(id, sh);
-    audit('shell-register', { id, target, transport, createdBy });
+    audit('shell-register', { id, target, transport, createdBy, name: nm });
     return sh;
   }
 
-  function list() { return [...shells.values()]; }
+  function list(f = {}) {
+    let out = [...shells.values()];
+    if (f.target) out = out.filter(x => x.target === f.target);
+    if (f.transport) out = out.filter(x => x.transport === f.transport);
+    if (f.tag) out = out.filter(x => (x.tags ?? []).includes(f.tag));
+    if (f.name) out = out.filter(x => String(x.name).toLowerCase().includes(String(f.name).toLowerCase()));
+    if (f.status) out = out.filter(x => x.status === f.status);
+    return out;
+  }
 
   function get(id) { return shells.get(id) ?? null; }
 

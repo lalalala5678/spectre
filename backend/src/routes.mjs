@@ -72,10 +72,11 @@ function realRouter({ store, bus, caps, wal }) {
       const sh = caps.shells.register({
         name: String(body.name || ''), target: String(body.target),
         transport: String(body.transport || 'local'), transportRef: String(body.transportRef || ''),
-        note: String(body.note || ''), createdBy: String(body.createdBy || 'operator'),
+        note: String(body.note || ''), tags: Array.isArray(body.tags) ? body.tags : [],
+        createdBy: String(body.createdBy || 'operator'),
         ttlHours: Number(body.ttlHours) || 24,
       });
-      return json(res, 200, sh);
+      return json(res, sh.error ? 400 : 200, sh);
     }
     if (path.startsWith('/api/shells/') && path.endsWith('/exec') && method === 'POST') {
       const id = path.split('/')[3];

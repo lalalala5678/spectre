@@ -757,7 +757,11 @@ export function buildShellTools(record, caps) {
         Type.Literal('list'), Type.Literal('register'), Type.Literal('exec'),
         Type.Literal('read_file'), Type.Literal('status'), Type.Literal('close'),
       ], { description: 'list / register(把已验证通道自注册进审计体系) / exec / read_file / status / close' }),
-      name: Type.Optional(Type.String({ description: 'register: 通道名(如 dc8-webshell)' })),
+      name: Type.Optional(Type.String({ description: 'register: 通道名(唯一,建议 目标-面-权限 如 dc8-web-www);list 时可作名称子串过滤' })),
+      tags: Type.Optional(Type.Array(Type.String(), { description: 'register: 标签(≤8,如 ["web","www","entry"])' })),
+      filterTarget: Type.Optional(Type.String({ description: 'list: 按授权目标过滤' })),
+      filterTransport: Type.Optional(Type.String({ description: 'list: 按传输过滤(local/ssh/web)' })),
+      filterTag: Type.Optional(Type.String({ description: 'list: 按标签过滤' })),
       target: Type.Optional(Type.String({ description: 'register: 授权目标名(须在 scope 清单)' })),
       transport: Type.Optional(Type.Union([Type.Literal('local'), Type.Literal('ssh'), Type.Literal('web')],
         { description: 'register: local|ssh|web' })),
@@ -774,20 +778,23 @@ export function buildShellTools(record, caps) {
       const R = caps.shells;
       try {
         if (p.action === 'list') {
-          const list = R.list().map(x => ({ id: x.id, name: x.name, target: x.target,
-            status: x.status, user: x.user, os: (x.os || '').slice(0, 60), cmdCount: x.cmdCount,
-            expiresAt: x.expiresAt }));
+          const list = R.list({ target: p.filterTarget, transport: p.filterTransport,
+            tag: p.filterTag, name: p.name, status: 'active' })
+            .map(x => ({ id: x.id, name: x.name, target: x.target, transport: x.transport,
+              tags: x.tags ?? [], status: x.status, user: x.user, os: (x.os || '').slice(0, 60),
+              cmdCount: x.cmdCount, expiresAt: x.expiresAt }));
           return say(list.length ? { ok: true, count: list.length, shells: list }
-            : { ok: true, count: 0, shells: [], note: '无 shell——c2 agent 交付后出现,或查情报库 shell-ready 标记拿 id' });
+            : { ok: true, count: 0, shells: [], note: '无匹配 shell——放宽过滤或查情报库 shell-ready;注册用 register' });
         }
         if (p.action === 'register') {
           if (!p.transportRef || !p.target) return say({ ok: false, error: 'register 需 transportRef+target' });
           const sh = R.register({
-            name: p.name || 'ch-' + Date.now().toString(36), target: p.target,
+            name: p.name, target: p.target,
             transport: p.transport || 'web', transportRef: p.transportRef,
-            note: 'agent 自注册(' + (record.agentKey || 'agent') + ')',
+            tags: p.tags, note: 'agent 自注册(' + (record.agentKey || 'agent') + ')',
             createdBy: record.agentKey || 'agent',
           });
+          if (sh?.error) return say({ ok: false, error: sh.error });
           await R.fingerprint?.(sh.id).catch?.(() => {});
           return say({ ok: true, shell: sh, note: '已注册并进审计体系;后续 exec/read_file 用 shellId=' + sh.id });
         }
