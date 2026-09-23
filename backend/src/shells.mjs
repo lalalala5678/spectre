@@ -18,6 +18,8 @@
  * the same interface.
  */
 import { randomUUID } from 'node:crypto';
+import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
+import { dirname as pdirname } from 'node:path';
 import { execFile } from 'node:child_process';
 
 
@@ -31,8 +33,26 @@ function parseFormBody(tpl) {
   return out;
 }
 
-/** shells by id — process-lifetime registry (audit trail lives on the bus). */
+/** shells by id — persisted to disk on every mutation; replayed on boot. */
 const shells = new Map();
+const SHELL_SNAPSHOT = '/var/lib/spectre/tools/c2/shells.json';
+
+function persistShells() {
+  try {
+    mkdirSync(pdirname(SHELL_SNAPSHOT), { recursive: true });
+    writeFileSync(SHELL_SNAPSHOT, JSON.stringify([...shells.values()]));
+  } catch { /* best-effort; bus audit is the source of truth */ }
+}
+
+function loadShells() {
+  try {
+    const arr = JSON.parse(readFileSync(SHELL_SNAPSHOT, 'utf8'));
+    for (const sh of arr) shells.set(sh.id, sh);
+    return arr.length;
+  } catch { return 0; }
+}
+// Boot-time replay (restores across runtime restarts)
+loadShells();
 
 const MAX_OUT = 64 * 1024;
 
@@ -79,7 +99,7 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
       host: null, user: null, os: null,  // auto-fingerprint (Sliver session meta)
     };
     if (sh.error) return sh;
-    shells.set(id, sh);
+    shells.set(id, sh); persistShells();
     audit('shell-register', { id, target, transport, createdBy, name: nm });
     return sh;
   }
@@ -99,7 +119,7 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
   function close(id) {
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
-    sh.status = 'closed';
+    sh.status = 'closed'; persistShells();
     audit('shell-close', { id });
     return { ok: true };
   }

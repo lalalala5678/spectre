@@ -232,10 +232,22 @@ function makeFileSystem(cwdContainer) {
     readBinaryFile: async (p, ctx) => wrap(async () =>
       new Uint8Array(await fsp.readFile(resolve(p)))),
     writeFile: async (p, content, ctx) => wrap(async () => {
+      const mapped = containerPathToHost(String(p ?? ''));
+      if (mapped === null && path.isAbsolute(String(p ?? ''))) {
+        // Docker driver: unmapped absolute path = write lands on HOST fs,
+        // bash inside container can't see it (the write↔bash split bug).
+        return err({ code: 'permission_denied',
+          message: `路径 ${p} 不在容器映射表(/workspace,/opt/tools,/opt/skills)内——write 落宿主而 bash 看不见。改用 /workspace/<项目>/ 相对路径或 /opt/tools/,或用 bash heredoc 写入。` });
+      }
       await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
       await fsp.writeFile(resolve(p), content);
     }),
     appendFile: async (p, content, ctx) => wrap(async () => {
+      const mapped = containerPathToHost(String(p ?? ''));
+      if (mapped === null && path.isAbsolute(String(p ?? ''))) {
+        return err({ code: 'permission_denied',
+          message: `路径 ${p} 不在容器映射表内——改用 /workspace/ 相对路径或 bash heredoc。` });
+      }
       await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
       await fsp.appendFile(resolve(p), content);
     }),
