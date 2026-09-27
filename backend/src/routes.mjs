@@ -359,6 +359,7 @@ function realRouter({ store, bus, caps, wal }) {
           const forNday = def && (def.agents ?? ['recon']).includes('nday');
           if (forNday && hasCred(cfg)) ndayOut[sid] = cfg;
         }
+        await mkdir(join(root, 'tools/nday'), { recursive: true });
         await writeFile(join(root, 'tools/nday/api-keys.json'), JSON.stringify(ndayOut, null, 1), 'utf8');
 
         // ── phish SMTP(仅 smtp 源且已验证)──
