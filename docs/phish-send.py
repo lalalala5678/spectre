@@ -26,6 +26,16 @@ try:
 except ImportError:
     HAS_DKIM = False
 
+
+def edusrc_gate(paths=()):
+    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
+    ev = os.environ.get('SPECTRE_EDUSRC', '')
+    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
+    import sys as _s
+    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
+        if m and 'edusrc' in str(m).lower():
+            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=_s.stderr)
+            _s.exit(76)
 def load_smtp_default():
     """设置面板验证通过的 SMTP 通道(仅验证过才落盘)"""
     for p in ('/opt/tools/phish/smtp.json',
@@ -45,6 +55,7 @@ def load_scope():
         return None
 
 def gate():
+    edusrc_gate()
     """完整授权门(F10 修复): targets+时间窗,同 c2-qa.py 语义"""
     sc = load_scope()
     import time as _t

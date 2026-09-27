@@ -52,7 +52,18 @@ def scope_gate_full():
 # phishlet 加载
 # ============================================================
 
+
+def edusrc_gate(paths=()):
+    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
+    ev = os.environ.get('SPECTRE_EDUSRC', '')
+    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
+    import sys as _s
+    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
+        if m and 'edusrc' in str(m).lower():
+            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=_s.stderr)
+            _s.exit(76)
 def load_phishlet(path):
+    edusrc_gate((path,))
     pl = json.load(open(path))
     required = ['name', 'proxy_host', 'target_host']
     for k in required:
@@ -283,6 +294,7 @@ def make_handler(phishlet, db_file):
     return PhishletHandler
 
 def serve(listen, phishlet, db_file):
+    edusrc_gate((phishlet.get('proxy_host', '') if isinstance(phishlet, dict) else '',))
     scope_gate_full()  # F10: 完整授权门(targets+window)
     host, _, port = listen.rpartition(':')
     handler = make_handler(phishlet, db_file)

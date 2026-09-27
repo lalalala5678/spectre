@@ -76,6 +76,16 @@ def add_event(db, kind, uid, extra=None):
             fcntl.flock(lf, fcntl.LOCK_UN)
     print(f'[track] {kind} uid={uid}', flush=True)
 
+
+def edusrc_gate(paths=()):
+    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
+    ev = os.environ.get('SPECTRE_EDUSRC', '')
+    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
+    import sys as _s
+    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
+        if m and 'edusrc' in str(m).lower():
+            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=_s.stderr)
+            _s.exit(76)
 def _scope_ok():
     """V2: 逐请求 scope 复查——serve() 启动时一次校验后撤权不停服
     (writer 实证: 撤 scope 后运行中的 serve 仍接受 /submit)。"""
@@ -168,11 +178,13 @@ class TrackHandler(BaseHTTPRequestHandler):
         pass  # Quiet (tracking data goes to db, not access log)
 
 def serve(port):
+    edusrc_gate()
     scope_gate_full()  # F10: 完整授权门(targets+window)
     print(f'[phish-track] listening :{port}', flush=True)
     HTTPServer(('0.0.0.0', port), TrackHandler).serve_forever()
 
 def report():
+    edusrc_gate()
     db = load_db()
     events = db['events']
     by_uid = {}
