@@ -33,17 +33,47 @@ def scope_gate_full():
     return sc
 
 def load_db():
-    try: return json.load(open(DB_FILE))
-    except: return {'events': []}
+    # V6: 共享锁读(与写锁互斥)
+    import fcntl
+    try:
+        with open(DB_FILE + '.lock', 'w') as lf:
+            fcntl.flock(lf, fcntl.LOCK_SH)
+            try:
+                return json.load(open(DB_FILE))
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+    except Exception:
+        return {'events': []}
 
 def save_db(db):
-    json.dump(db, open(DB_FILE, 'w'), indent=1)
+    # V6: 排他文件锁——phishlet-proxy 与 track 并发写同库曾互踩
+    # (agent 实战目击 proxy 事件消失)。load-modify-save 全程持锁。
+    import fcntl
+    with open(DB_FILE + '.lock', 'w') as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            json.dump(db, open(DB_FILE, 'w'), indent=1)
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
 
 def add_event(db, kind, uid, extra=None):
+    # V6b: 整个 read-modify-write 持排他锁——此前锁只在 save 段,
+    # 两进程(如 track+proxy)各自 load 旧快照后互覆盖(实测丢 12/200)。
     ev = {'kind': kind, 'uid': uid, 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
     if extra: ev.update(extra)
-    db['events'].append(ev)
-    save_db(db)
+    import fcntl
+    with open(DB_FILE + '.lock', 'w') as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            # 锁内裸读——load_db 自带 SH 锁会与已持 EX 死锁(同进程双 fd)
+            try:
+                cur = json.load(open(DB_FILE))
+            except Exception:
+                cur = {'events': []}
+            cur['events'].append(ev)
+            json.dump(cur, open(DB_FILE, 'w'), indent=1)
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
     print(f'[track] {kind} uid={uid}', flush=True)
 
 def _scope_ok():
