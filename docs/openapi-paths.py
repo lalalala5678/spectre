@@ -51,32 +51,47 @@ def extract_paths(spec, base=''):
             results.append(entry)
     # 猜测隐藏路径(F32: 参数化路径不拼 /{id} 后缀——/api/users/{id}/{id}
     # 是垃圾;兄弟猜测挂集合根 /api/users/<guess>;非参数路径才拼 detail/export)
+    seen_guess = set()
     for path in paths:
         parametrized = '{' in path
-        root = path.rsplit('/{', 1)[0] if parametrized else path
+        # F45: 剥全部参数段(嵌套 /a/{id}/b/{x} → 集合根 /a/b)——
+        # 此前仅剥最后一个 {..},父级字面量残留(/api/users/{id}/orders/all)
+        import re as _re_g
+        root = _re_g.sub(r'/\{[^}/]+\}(?=/|$)', '', path) if parametrized else path
         guesses = (['all', 'list', 'search', 'export', 'admin'] if parametrized
                    else ['{id}', 'detail', 'export', 'admin', 'all', 'list', 'search'])
         for guess in guesses:
-            results.append({'path': base + root.rstrip('/') + '/' + guess, 'method': 'GET',
+            gp = base + root.rstrip('/') + '/' + guess
+            if gp in seen_guess:
+                continue  # F45: 去重(兄弟路径 5 条重复+签名撞车)
+            seen_guess.add(gp)
+            results.append({'path': gp, 'method': 'GET',
                            'summary': '(guessed sibling)', 'params': [], 'auth': False})
     return results
 
 def gen_test_cases(paths):
+    """F45: 用例签名去重"""
     """从路径生成测试用例——IDOR/越权/注入锚点"""
     cases = []
+    _sig = set()
+    def _add(c):
+        k = (c['test'], c['path'], c['method'])
+        if k not in _sig:
+            _sig.add(k)
+            cases.append(c)
     for p in paths:
         # 有 {id} 参数的→IDOR 测试点
         if '{id}' in p['path'] or any(pr['in'] == 'path' for pr in p['params']):
-            cases.append({'test': 'idor', 'path': p['path'], 'method': p['method'],
+            _add({'test': 'idor', 'path': p['path'], 'method': p['method'],
                          'hint': '替换 {id} 为其他用户/顺序 ID'})
         # POST/PUT/PATCH→越权/参数篡改
         if p['method'] in ('POST', 'PUT', 'PATCH'):
-            cases.append({'test': 'mass-assignment', 'path': p['path'], 'method': p['method'],
+            _add({'test': 'mass-assignment', 'path': p['path'], 'method': p['method'],
                          'hint': '注入 role/is_admin/status/balance 字段'})
         # 无 auth 标记(显式公开/未知,非仅缺标记)的敏感方法
         if p['auth'] is not True and p['method'] in ('GET', 'DELETE') and any(k in p['path'].lower() for k in ('user', 'admin', 'internal', 'debug', 'config', 'secret', 'key', 'token')):
             label = 'explicit-public' if p['auth'] is None else 'unauth-sensitive'
-            cases.append({'test': label, 'path': p['path'], 'method': p['method'],
+            _add({'test': label, 'path': p['path'], 'method': p['method'],
                          'hint': '显式公开(security:[])的敏感端点——确认是否应公开' if p['auth'] is None else '未标记 security 的敏感端点'})
     return cases
 
