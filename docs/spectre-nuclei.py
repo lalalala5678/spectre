@@ -8,10 +8,18 @@
   spectre-nuclei list --templates /path/to/nuclei-templates/ --search weblogic
 """
 import sys, os, json, re, argparse, hashlib, time
+import sys as _sys
+for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
 import yaml
 import urllib.request, urllib.error
 import socket
 import ssl
+import sys as _sys
+for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
 
 # ============================================================
 # 模板解析(nuclei YAML 子集)

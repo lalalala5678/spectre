@@ -15,6 +15,10 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.utils import formataddr, formatdate
 from pathlib import Path
+import sys as _sys
+for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):
+    if _p not in _sys.path:
+        _sys.path.insert(0, _p)
 
 try:
     PYTHONPATH = ['/opt/tools/py/dkim', '/opt/tools/py']
