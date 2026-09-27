@@ -89,7 +89,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // the stale response must never overwrite the newer one.
     let cancelled = false;
     (async () => {
-      const all = await api<ApiSessionSummary[]>('/sessions');
+      const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(ws.id)}`);
       if (cancelled) return;
       const mine = all.filter(s =>
         s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
@@ -136,7 +136,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     const load = async () => {
       try {
         if (stopped) return;
-        const all = await api<ApiSessionSummary[]>('/sessions');
+        const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(wsId)}`);
         const mine = all.filter(s =>
           s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
           && s.workSessionId === wsId,

@@ -28,7 +28,7 @@ export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; wor
     setError('');
     setSessionId(null);
     try {
-      const all = await api<ApiSessionSummary[]>('/sessions');
+      const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(workSessionId)}`);
       const mine = all.filter(s => s.agentKey === agentKey
         && !s.engagementId && !s.parentSessionId
         && s.workSessionId === workSessionId);

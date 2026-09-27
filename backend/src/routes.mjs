@@ -117,7 +117,13 @@ function realRouter({ store, bus, caps, wal }) {
 
     // ---------- sessions (console + internal) ----------
     if (path === '/api/sessions' && method === 'GET') {
-      return json(res, 200, store.list());
+      // F6 修复: 服务端 workSessionId 过滤——全量 578 会话 220KB 被 4s 轮询
+      // 无界放大;缺省参数保持全量(向后兼容既有调用方)。
+      const wsFilter = url.searchParams.get('workSessionId');
+      const list = wsFilter
+        ? store.list().filter(s => s.workSessionId === wsFilter)
+        : store.list();
+      return json(res, 200, list);
     }
     // Tree-only projection: the dispatch panel polls every 4s and only
     // needs topology/state fields — 41KB full list → ~6KB per poll.

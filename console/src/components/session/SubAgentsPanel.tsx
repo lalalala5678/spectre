@@ -18,7 +18,7 @@ export function SubAgentsPanel({ workSessionId, onDrill }: {
     let stopped = false;
     const load = async () => {
       try {
-        const all = await api<ApiSessionSummary[]>('/sessions');
+        const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(workSessionId)}`);
         if (!stopped) {
           // project isolation: only children spawned in this project
           setChildren(all.filter(s =>
