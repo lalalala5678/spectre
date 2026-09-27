@@ -13,17 +13,30 @@ def fetch_spec(url):
     return json.load(urllib.request.urlopen(req, timeout=15, context=ctx))
 
 def extract_paths(spec, base=''):
-    """提取所有路径+方法+参数"""
+    """提取所有路径+方法+参数
+    F32: 根级 security 继承——op 无 security 键时回退 spec 级全局;
+    auth 三态: True=op显式鉴权 / None=显式公开(security:[]) / False=未知(继承全局但全局未声明)"""
     results = []
     paths = spec.get('paths', {})
+    global_sec = spec.get('security')  # None=未声明; []=全局公开; [{...}]=全局鉴权
     for path, methods in paths.items():
         full = base + path
         for method, detail in methods.items():
             if method not in ('get', 'post', 'put', 'patch', 'delete', 'head', 'options'):
                 continue
+            # F32 三态 auth + 根级继承
+            if 'security' in detail:
+                op_sec = detail['security']
+                auth = bool(op_sec) if op_sec else None  # []=显式公开
+            elif global_sec:
+                auth = True  # 继承全局鉴权
+            elif global_sec == []:
+                auth = None  # 继承全局公开
+            else:
+                auth = False  # 未知
             entry = {'path': full, 'method': method.upper(),
                      'summary': detail.get('summary', detail.get('description', '')[:60]),
-                     'params': [], 'auth': bool(detail.get('security'))}
+                     'params': [], 'auth': auth}
             for p in detail.get('parameters', []):
                 entry['params'].append({'name': p.get('name'), 'in': p.get('in'),
                                         'required': p.get('required', False),
@@ -36,10 +49,15 @@ def extract_paths(spec, base=''):
                             entry.setdefault('body_schema', {})[ct] = spec_body['schema']
                 except Exception: pass
             results.append(entry)
-    # 猜测隐藏路径(openapi 里常见 deleted/hidden 但实现仍在)
+    # 猜测隐藏路径(F32: 参数化路径不拼 /{id} 后缀——/api/users/{id}/{id}
+    # 是垃圾;兄弟猜测挂集合根 /api/users/<guess>;非参数路径才拼 detail/export)
     for path in paths:
-        for guess in ['{id}', '{id}/detail', '{id}/export', '{id}/admin', 'all', 'list', 'search']:
-            results.append({'path': base + path + '/' + guess, 'method': 'GET',
+        parametrized = '{' in path
+        root = path.rsplit('/{', 1)[0] if parametrized else path
+        guesses = (['all', 'list', 'search', 'export', 'admin'] if parametrized
+                   else ['{id}', 'detail', 'export', 'admin', 'all', 'list', 'search'])
+        for guess in guesses:
+            results.append({'path': base + root.rstrip('/') + '/' + guess, 'method': 'GET',
                            'summary': '(guessed sibling)', 'params': [], 'auth': False})
     return results
 
@@ -55,10 +73,11 @@ def gen_test_cases(paths):
         if p['method'] in ('POST', 'PUT', 'PATCH'):
             cases.append({'test': 'mass-assignment', 'path': p['path'], 'method': p['method'],
                          'hint': '注入 role/is_admin/status/balance 字段'})
-        # 无 auth 标记的敏感方法
-        if not p['auth'] and p['method'] in ('GET', 'DELETE') and any(k in p['path'].lower() for k in ('user', 'admin', 'internal', 'debug', 'config', 'secret', 'key', 'token')):
-            cases.append({'test': 'unauth-sensitive', 'path': p['path'], 'method': p['method'],
-                         'hint': '未标记 security 的敏感端点'})
+        # 无 auth 标记(显式公开/未知,非仅缺标记)的敏感方法
+        if p['auth'] is not True and p['method'] in ('GET', 'DELETE') and any(k in p['path'].lower() for k in ('user', 'admin', 'internal', 'debug', 'config', 'secret', 'key', 'token')):
+            label = 'explicit-public' if p['auth'] is None else 'unauth-sensitive'
+            cases.append({'test': label, 'path': p['path'], 'method': p['method'],
+                         'hint': '显式公开(security:[])的敏感端点——确认是否应公开' if p['auth'] is None else '未标记 security 的敏感端点'})
     return cases
 
 if __name__ == '__main__':
@@ -79,7 +98,7 @@ if __name__ == '__main__':
     else:
         print(f'== {len(paths)} API paths ==')
         for p in paths[:30]:
-            auth = '🔒' if p['auth'] else '  '
+            auth = '🔒' if p['auth'] is True else ('🆓' if p['auth'] is None else '❓')
             print(f'{auth} {p["method"]:>7} {p["path"]}  # {p["summary"][:40]}')
         print(f'\n== {len(cases)} test cases(IDOR/越权/未授权) ==')
         for c in cases[:20]:
