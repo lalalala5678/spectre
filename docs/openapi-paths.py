@@ -69,15 +69,33 @@ def extract_paths(spec, base=''):
                            'summary': '(guessed sibling)', 'params': [], 'auth': False})
     return results
 
+_SAMPLES = {'string': 'qa-probe', 'integer': '1'}
+
+def _resolve_id(p):
+    import re as _re
+    return _re.sub(r'\{(\w+)\}', '1', p)
+
+def _identity_matrix(path, method):
+    """F46: 三身份可执行模板(unauth/低权/跨角色 curl 三行,铁律1 对照组)"""
+    rp = _resolve_id(path)
+    return {
+        'exec': [
+            {'identity': 'unauth', 'curl': 'curl -s -o /dev/null -w "%{http_code} %{size_download}" -X ' + method + ' "' + rp + '"'},
+            {'identity': 'low-priv', 'curl': 'curl -s -o /dev/null -w "%{http_code} %{size_download}" -X ' + method + ' -H "Authorization: Bearer $LOW_TOKEN" "' + rp + '"'},
+            {'identity': 'cross-user', 'curl': 'curl -s -o /dev/null -w "%{http_code} %{size_download}" -X ' + method + ' -H "Authorization: Bearer $OTHER_TOKEN" "' + rp + '"'},
+        ],
+        'verdict': '三身份状态码/长度差异即分级证据;同值=面等价(记录非漏洞)',
+    }
+
 def gen_test_cases(paths):
-    """F45: 用例签名去重"""
-    """从路径生成测试用例——IDOR/越权/注入锚点"""
+    """F45 去重 + F46 可执行三身份模板"""
     cases = []
     _sig = set()
     def _add(c):
         k = (c['test'], c['path'], c['method'])
         if k not in _sig:
             _sig.add(k)
+            c['matrix'] = _identity_matrix(c['path'], c['method'])
             cases.append(c)
     for p in paths:
         # 有 {id} 参数的→IDOR 测试点
