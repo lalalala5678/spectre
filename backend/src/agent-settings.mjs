@@ -377,7 +377,11 @@ export async function saveSetting({ group, field, value }, wal) {
     const [top, leaf] = field.split('.');
     cur[top] = { ...(cur[top] ?? {}), [leaf]: def.type === 'number' ? Number(v) : v };
     if (['llm.baseUrl', 'llm.apiKey', 'llm.model'].includes(field)) {
+      // F47: 空值=清除该项回退 env 默认(跳过 probe——空串不是可测端点)
       const merged = { ...defaultsFromEnv(), ...cur.llm };
+      for (const k of ['baseUrl', 'apiKey', 'model']) {
+        if (!merged[k]) merged[k] = defaultsFromEnv()[k];
+      }
       const r = await llmProbe(merged.baseUrl, merged.apiKey, merged.model);
       if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
     }
