@@ -87,7 +87,7 @@ def do_http(req_spec, target):
     # 代入 {{var}};全部替换后仍残留 {{...}} 的路径/体直接跳过
     # (字面量发出=必假阳性,php 组复扫 2 FP 实锤)。
     import re as _re3
-    _pl = req_spec.get('payloads') or {}
+    _pl = {**(req_spec.get('variables') or {}), **(req_spec.get('payloads') or {})}
     def _payloads_sub(txt):
         def _one(m):
             name = m.group(1)
@@ -146,7 +146,8 @@ def do_http(req_spec, target):
 # 匹配器(nuclei matchers 子集)
 # ============================================================
 
-def apply_matchers(matchers, status, headers, body):
+def apply_matchers(matchers, status, headers, body, req_condition=None):
+    apply_matchers._req_condition = req_condition or 'and'
     """执行 matchers——全部 AND 关系(nuclei 默认)"""
     # F29: internal:true 是条件匹配器,不构成最终命中——纯 internal 模板
     # 一律不判中(防"任何 200 服务器被报 critical RCE")。
@@ -190,10 +191,15 @@ def apply_matchers(matchers, status, headers, body):
         if mtype == 'status':
             matched = status in (status_expected or [])
         elif mtype == 'word':
+            # F40: nuclei word 默认大小写敏感;case-insensitive: true 才不敏感
+            # (恒不敏感曾放大 FP 面)
+            ci = bool(m.get('case-insensitive'))
+            def _has(w, h):
+                return (w.lower() in h.lower()) if ci else (w in h)
             if condition == 'and':
-                matched = all(w.lower() in haystack.lower() for w in words)
+                matched = all(_has(w, haystack) for w in words)
             else:
-                matched = any(w.lower() in haystack.lower() for w in words)
+                matched = any(_has(w, haystack) for w in words)
         elif mtype == 'regex':
             try:
                 if condition == 'and':
@@ -246,11 +252,10 @@ def apply_matchers(matchers, status, headers, body):
     # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
     # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
     # 请求级 or 语义 = 任一非 internal matcher 命中即可。
-    req_cond = None
-    for m0 in matchers:
-        if not m0.get('internal'):
-            req_cond = m0.get('condition')
-            break
+    # F38-修: 请求级组合读 nuclei 真实键 matchers-condition(默认 and);
+    # 此前把 matcher 内 condition(其 words 的 or)误当请求级 →
+    # status 单独命中即 FP(exposures 复扫 azure 类实锤)。
+    req_cond = getattr(apply_matchers, '_req_condition', 'and')
     final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
     # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
     # internal word 命中的具体词可在后续请求 {{name}} 引用)
@@ -328,11 +333,10 @@ def run_dns_matchers(matchers, answers):
     # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
     # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
     # 请求级 or 语义 = 任一非 internal matcher 命中即可。
-    req_cond = None
-    for m0 in matchers:
-        if not m0.get('internal'):
-            req_cond = m0.get('condition')
-            break
+    # F38-修: 请求级组合读 nuclei 真实键 matchers-condition(默认 and);
+    # 此前把 matcher 内 condition(其 words 的 or)误当请求级 →
+    # status 单独命中即 FP(exposures 复扫 azure 类实锤)。
+    req_cond = getattr(apply_matchers, '_req_condition', 'and')
     final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
     # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
     # internal word 命中的具体词可在后续请求 {{name}} 引用)
@@ -419,19 +423,41 @@ def execute_template(tpl, target, timeout=15):
                     })
                     break
                 continue
-            _mres = apply_matchers(matchers, status, headers, body)
+            # F40-修: matched-at 用解析后的路径——do_http 内部替换不发回,
+            # shown 仍是原始 {{var}};先在此做同款替换(BaseURL/payloads/
+            # variables/randstr),兜底判定才不误杀合法命中
+            _vars_pl = {**(req_spec.get('variables') or {}),
+                        **(req_spec.get('payloads') or {})}
+            def _resolve_disp(p_str):
+                out = str(p_str).replace('{{BaseURL}}', target.rstrip('/'))
+                import random as _r2, string as _s2, re as _re4
+                def _rr(mm):
+                    n2 = mm.group(1)
+                    ln = int(n2) if n2 and n2.isdigit() else 8
+                    return ''.join(_r2.choices(_s2.ascii_lowercase, k=ln))
+                out = _re4.sub(r'\{\{randstr[_ ]?(\d+)?\}\}', _rr, out)
+                for kk, vv in _vars_pl.items():
+                    if isinstance(vv, list):
+                        vv = vv[0] if vv else ''
+                    out = out.replace('{{' + kk + '}}', str(vv))
+                return out
+            _mres = apply_matchers(matchers, status, headers, body,
+                                   (req_spec.get('matchers-condition') or 'and'))
             if isinstance(_mres, dict):
                 captured_vars.update(_mres.get('__vars__', {}))
             if _mres:
                 extractors = req_spec.get('extractors', tpl.get('extractors', []))
                 extracted = apply_extractors(extractors, status, headers, body)
                 shown = one_path if isinstance(one_path, str) else str(one_path)
+                _ma = _resolve_disp(shown)
+                if '{{' in _ma:
+                    break  # F40: 变量未解析的命中=字面量 FP,丢弃
                 findings.append({
                     'template-id': tpl_id,
                     'name': info.get('name', tpl_id),
                     'severity': info.get('severity', 'unknown'),
                     'type': 'http',
-                    'matched-at': shown.replace('{{BaseURL}}', target.rstrip('/')),
+                    'matched-at': _ma,
                     'extracted': extracted,
                     'curl': f'curl -X {req_spec.get("method", "GET")} \'{shown.replace("{{BaseURL}}", target.rstrip("/"))}\'',
                 })
