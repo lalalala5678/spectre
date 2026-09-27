@@ -157,8 +157,10 @@ function realRouter({ store, bus, caps, wal }) {
       if (body.workSessionId) {
         // charset guard: an unchecked id once became a cwd/fs root via
         // path.join(HOST.workspace, '../../…') and persisted in the WAL
-        if (!/^[\w-]+$/.test(String(body.workSessionId))) {
-          return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]+ only');
+        // F13: 长度上限——100KB 全 A 实测被接受,永久入 WAL 放大全量响应
+        if (!/^[\w-]+$/.test(String(body.workSessionId))
+            || String(body.workSessionId).length > 64) {
+          return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]{1,64} only');
         }
         opts.workSessionId = String(body.workSessionId).slice(0, 64);
         // auto-register unknown project ids (sessions may arrive before
