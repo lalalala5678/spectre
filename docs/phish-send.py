@@ -166,6 +166,42 @@ def dkim_sign(msg_bytes, private_key_path, selector, domain):
                         include_headers=[b'from', b'to', b'subject', b'date', b'message-id'])
     return sig.decode()
 
+def _smtp_dialog_send(s, from_addr, to_addr, raw):
+    """V5: 非 RFC 中继降级投递。本地 qa-smtp 对 DATA 回 250 而非 354,
+    smtplib.data() 遇非 354 直接抛 SMTPDataError —— 正文永远发不出去。
+    该中继逐行全盘 250 接受,故手工发正文即可(仅授权本地中继场景)。"""
+    code, repl = s.docmd(f'MAIL FROM:<{from_addr}>')
+    if code != 250:
+        raise smtplib.SMTPResponseException(code, repl)
+    code, repl = s.docmd(f'RCPT TO:<{to_addr}>')
+    if code not in (250, 251):
+        raise smtplib.SMTPResponseException(code, repl)
+    code, repl = s.docmd('DATA')
+    if code == 354:
+        import re as _re
+        q = _re.sub(br'(?m)^\.', b'..', raw)  # 点透明化
+        s.send(q + b'\r\n.\r\n')
+        return s.getreply()
+    # 非 RFC:250=已接受,照样发正文,结尾以 . 终结
+    import re as _re
+    q = _re.sub(br'(?m)^\.', b'..', raw)
+    s.send(q + b'\r\n.\r\n')
+    # 该中继对“每一行”都回一条 250(包括正文每一行)。若不排空就关闭,
+    # 客户端 socket 带未读数据 close → RST → 服务端 drain() 崩溃、邮件不落盘(实测)。
+    # 注意 as_bytes() 默认 LF 行尾 —— 必须先 CRLF 规范化再计数。
+    n_replies = q.count(b'\n') + 2  # 正文行 + '.' + 余量
+    old_to = s.sock.gettimeout()
+    s.sock.settimeout(2)
+    for _ in range(n_replies):
+        try:
+            c, r = s.getreply()
+        except (smtplib.SMTPServerDisconnected, OSError):
+            break
+        if c == 221:
+            break
+    s.sock.settimeout(old_to)
+    return (250, b'ok (non-rfc relay accepted)')
+
 def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
                    from_display, reply_to=None, attachments=None,
                    dkim_key=None, dkim_selector='s1', dkim_domain=None,
@@ -189,10 +225,35 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
 
     with smtplib.SMTP(smtp_cfg['host'], smtp_cfg['port'], timeout=smtp_cfg.get('timeout', 30)) as s:
         if smtp_cfg.get('tls', True):
-            s.starttls()
-        if smtp_cfg.get('user'):
+            try:
+                s.starttls()
+            except smtplib.SMTPNotSupportedError:
+                # V5 修复: 中继不支持 STARTTLS(如本地授权 qa-smtp)时降级并告警,
+                # 此前直接抛异常 = 发送链断裂;且 tls 无法通过 CLI/smtp.json 关闭
+                print('[warn] relay lacks STARTTLS, downgrade to plaintext', file=sys.stderr)
+        if smtp_cfg.get('user') and 'auth' in s.esmtp_features:
+            # V5 修复: 无 AUTH 能力的中继跳过 login(此前必抛 SMTPNotSupportedError;
+            # 且 main() 用 `args.user or dflt.user`,空串无法覆盖=无法禁用鉴权)
             s.login(smtp_cfg['user'], smtp_cfg['pass'])
-        s.send_message(msg)
+        try:
+            s.send_message(msg)
+        except smtplib.SMTPDataError as e:
+            if e.smtp_code == 250:
+                # V5: DATA 阶段返回 250 的非 RFC 中继 —— smtplib 抛异常且正文未发,
+                # 降级到手工对话投递(实测本地 qa-smtp 即此行为)
+                print('[warn] relay replied 250 to DATA (non-RFC), fallback to dialog send',
+                      file=sys.stderr)
+                from email import policy as _policy
+                # 注: msg.as_bytes(policy=SMTP) 对 compat32 非ASCII头(中文主题/显示名)
+                # fold 时报 UnicodeEncodeError —— 改用与 send_message 内部一致的
+                # compat32 原始字节(8-bit UTF-8),再手工 CRLF 规范化(RFC 5321 线序)
+                import re as _re2
+                raw = _re2.sub(br'\r?\n', b'\r\n', msg.as_bytes())
+                code, repl = _smtp_dialog_send(s, from_addr, to_addr, raw)
+                if code not in (250, 251):
+                    raise
+            else:
+                raise
     return True
 
 def main():
@@ -290,8 +351,11 @@ def main():
             time.sleep(interval)
 
     print(f'\n{sent} sent / {failed} failed / {len(targets)} total')
-    with open('/opt/tools/c2/audit.log', 'a') as f:
-        f.write(f'PHISH-V2\t{(args.subject or "")[:50]}\t{sent}/{len(targets)}\n')
+    if args.mode == 'send':
+        # V5 修复: dryrun 也写审计日志(实测写了 PHISH-V2 ... 0/1)=审计污染,
+        # 只对真实发送落账
+        with open('/opt/tools/c2/audit.log', 'a') as f:
+            f.write(f'PHISH-V2\t{(args.subject or "")[:50]}\t{sent}/{len(targets)}\n')
     return 0 if failed == 0 else 1
 
 if __name__ == '__main__':
