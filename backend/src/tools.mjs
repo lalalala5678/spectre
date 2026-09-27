@@ -35,7 +35,7 @@ const stageEnum = Type.Enum(
 /** Spawnable stage keys — 'report' EXCLUDED: the report writer is a
  *  platform service woken ONLY via the report_vulnerability tool (and
  *  by the user from the console nav), never a dispatch-tree child. */
-const SPAWNABLE_KEYS = STAGE_KEYS.filter(k => k !== 'report');
+export const SPAWNABLE_KEYS = STAGE_KEYS.filter(k => k !== 'report');
 const spawnStageEnum = Type.Enum(
   Object.fromEntries(SPAWNABLE_KEYS.map((key) => [key, key])),
 );

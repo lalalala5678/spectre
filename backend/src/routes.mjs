@@ -7,6 +7,7 @@
  */
 
 import { AGENTS, AGENT_KEYS, isAgentKey } from './agents.mjs';
+import { SPAWNABLE_KEYS } from './tools.mjs';
 import { CONFIG } from './config.mjs';
 import { hasInternalToken, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
 import * as path_mod from 'node:path';
@@ -651,9 +652,10 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/autopwn' && method === 'POST') {
       const body = await readJson(req);
       const instruction = String(body.instruction || '').slice(0, 8000);
-      const agents = (body.agents || []).filter(isAgentKey);
+      // F17: 只允许可派发键——report 是服务 agent(writer 唤醒制),config 三兄弟非 stage
+      const agents = (body.agents || []).filter(k => SPAWNABLE_KEYS.includes(k));
       if (!instruction || agents.length === 0) {
-        return bad(res, 400, 'instruction and agents required');
+        return bad(res, 400, 'instruction and agents required (spawnable only)');
       }
       const started = await startAutopwn({ engagementId: undefined, instruction, agents });
       return json(res, 201, started);
@@ -690,8 +692,8 @@ function realRouter({ store, bus, caps, wal }) {
         }
       }
       const requested = (body.agents || []).filter(isAgentKey);
-      const pool = requested.length > 0 ? requested : ['recon', 'nday', 'weakcred',
-        'api', 'exploit', 'c2', 'persistence', 'postex', 'report'];
+      const pool = requested.length > 0 ? requested.filter(k => SPAWNABLE_KEYS.includes(k))
+        : SPAWNABLE_KEYS;
       const rerun = pool.filter(k => !completed.has(k));
       if (rerun.length === 0) {
         return json(res, 200, { engagementId: prevId, resumed: false,
