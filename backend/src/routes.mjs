@@ -333,6 +333,11 @@ function realRouter({ store, bus, caps, wal }) {
         const root = CONFIG.dataDir;
         const keys = getPrefs().reconApiKeys ?? {};
 
+        // ── F14: 数据源文件只含有凭据的源(零污染)──无凭据的残留记录
+        // (如清空密码后的 smtp)不应进任何注入文件。
+        const hasCred = cfg => Boolean(cfg && (cfg.key || cfg.token || cfg.secret
+          || cfg.id || cfg.user || cfg.password));
+
         // ── c2 免杀云查 keys(只写已通过 validate 的源;失败即不落盘)──
         // 本次保存的源若属 c2 消费且 r.mounted(或无 secret),同步;其余 c2 源保持现状
         const { RECON_SOURCES_INTERNAL } = await import('./agent-settings.mjs');
@@ -341,8 +346,7 @@ function realRouter({ store, bus, caps, wal }) {
           if (sid === 'brute' || sid === 'smtp') continue;
           const def = RECON_SOURCES_INTERNAL[sid];
           const forC2 = def && (def.agents ?? ['recon']).includes('c2');
-          const hasSecret = cfg && (cfg.key || cfg.token || cfg.secret || cfg.id);
-          if (forC2 && hasSecret) c2Out[sid] = cfg;
+          if (forC2 && hasCred(cfg)) c2Out[sid] = cfg;
         }
         await mkdir(join(root, 'tools/c2'), { recursive: true });
         await writeFile(join(root, 'tools/c2/api-keys.json'), JSON.stringify(c2Out, null, 1), 'utf8');
@@ -353,8 +357,7 @@ function realRouter({ store, bus, caps, wal }) {
           if (sid === 'brute' || sid === 'smtp') continue;
           const def = RECON_SOURCES_INTERNAL[sid];
           const forNday = def && (def.agents ?? ['recon']).includes('nday');
-          const hasSecret = cfg && (cfg.key || cfg.token || cfg.secret || cfg.id);
-          if (forNday && hasSecret) ndayOut[sid] = cfg;
+          if (forNday && hasCred(cfg)) ndayOut[sid] = cfg;
         }
         await writeFile(join(root, 'tools/nday/api-keys.json'), JSON.stringify(ndayOut, null, 1), 'utf8');
 
@@ -366,7 +369,11 @@ function realRouter({ store, bus, caps, wal }) {
           JSON.stringify(smtpHasSecret ? { host: smtpCfg.host, port: Number(smtpCfg.port) || 587,
             user: smtpCfg.user, pass: smtpCfg.password } : {}, null, 1), 'utf8');
 
-        await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(keys), 'utf8');
+        const withCreds = {};
+        for (const [sid, cfg] of Object.entries(keys)) {
+          if (sid !== 'brute' && hasCred(cfg)) withCreds[sid] = cfg;
+        }
+        await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(withCreds), 'utf8');
         const list = await loadMcpConfig();
         const rest = list.filter(s => s.name !== 'recon-datasources');
         if (enabledReconSources().length) {
