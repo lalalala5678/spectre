@@ -95,6 +95,9 @@ export function buildIntelTools(record, caps) {
       q: Type.Optional(Type.String({
         description: 'Keyword substring matched against title/detail',
       })),
+      before: Type.Optional(Type.Number({
+        description: 'Pagination cursor: only entries with seq < before (pass the oldest seq of the current page to fetch the next older page)',
+      })),
       limit: Type.Optional(Type.Number({
         description: 'Max entries shown, default 10, cap 20 (total match count is always reported)',
       })),
@@ -172,18 +175,34 @@ export function buildIntelTools(record, caps) {
           return hay.includes(q);
         })
         .sort((a, b) => b.seq - a.seq);
-      const limit = Math.min(Math.max(Number(params.limit) || 10, 1), 20);
-      const hits = matched.slice(0, limit);
+      // F35: 上限 20→50 + before 游标(翻页: 传 before=本页最旧 seq 取更旧一页)
+      const limit = Math.min(Math.max(Number(params.limit) || 10, 1), 50);
+      const before = Number(params.before) || null;
+      const paged = before ? matched.filter(e => e.seq < before) : matched;
+      const hits = paged.slice(0, limit);
       const latestSeq = inWs.length ? Math.max(...inWs.map(e => e.seq)) : 0;
-      const countLine = `匹配 ${matched.length} 条${matched.length > hits.length
-        ? `,显示最新 ${hits.length} 条(可用 seq 取单条全文)` : ''}(新→旧,库内最新 seq=${latestSeq}):`;
+      const olderLeft = paged.length - hits.length;
+      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条${olderLeft > 0
+        ? `,显示最新 ${hits.length} 条(续翻传 before=${hits[hits.length - 1].seq};单条全文传 seq)` : ''}(新→旧,库内最新 seq=${latestSeq}):`;
 
       if (hits.length === 0) {
         const scope = inWs.filter(e => isEntry(e) && !e.void);
         const reports = scope.filter(e => e.type === 'task-report').length;
         const vulns = scope.filter(e => entryKind(e) === 'vulnerability').length;
         const notes = scope.filter(e => entryKind(e) === 'intel-note').length;
-        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条。可尝试放宽 kind/status/author 或去掉 q。`;
+        // F35: 提示只列真正在用的过滤维度——未传 q 不说"去掉 q"(误导排查)
+        const relax = [];
+        if (kind !== 'both') relax.push('kind');
+        if (params.agentType) relax.push('agentType');
+        if (status) relax.push('status');
+        if (severity) relax.push('severity');
+        if (params.author) relax.push('author');
+        if (q) relax.push('q');
+        const hasAny = reports + vulns + notes > 0;
+        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条。`;
+        hint += relax.length
+          ? (hasAny ? `当前过滤(${relax.join('/')})过窄,可放宽或去掉。` : `项目本身为空——过滤(${relax.join('/')})不是原因。`)
+          : (hasAny ? '' : '项目尚无任何产出。');
         if (kind === 'vulnerability' && status) {
           hint += '\n注意:status 仅适用于任务报告;漏洞请用 severity 过滤。';
         }
