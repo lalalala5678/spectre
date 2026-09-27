@@ -20,6 +20,7 @@ export function AuditPage() {
   const [events, setEvents] = useState<BusEvent[] | null>(null);
   const [err, setErr] = useState('');
   const [limit, setLimit] = useState(50);
+  const [exportTick, setExportTick] = useState(0);
 
   useEffect(() => {
     api<BusEvent[]>('/bus')
@@ -27,29 +28,31 @@ export function AuditPage() {
       .catch(e => setErr(e instanceof Error ? e.message : String(e)));
   }, []);
 
+  useEffect(() => {
+    if (exportTick === 0) return;
+    const text = JSON.stringify(events ?? [], null, 1);
+    const blob = new Blob([text], { type: 'application/json' });
+    const a = document.createElement('a');
+    a.href = URL.createObjectURL(blob);
+    a.download = `spectre-audit-${Date.now()}.json`;
+    a.click();
+  }, [exportTick]);
+
   const shown = (events ?? []).slice(0, limit);
 
   return (
     <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
       <Panel
         title="操作审计链(总线事件,新→旧)"
-        right={
-          <button
-            onClick={() => {
-              const text = JSON.stringify(events ?? [], null, 1);
-              const blob = new Blob([text], { type: 'application/json' });
-              const a = document.createElement('a');
-              a.href = URL.createObjectURL(blob);
-              a.download = `spectre-audit-${Date.now()}.json`;
-              a.click();
-            }}
-            className="flex items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[11px] text-zinc-400 hover:bg-void-700">
-            <Download className="h-3 w-3" /> 导出 JSON
-          </button>
-        }
         className="xl:col-span-2"
         bodyClassName="p-0"
       >
+        <div className="mb-2 flex justify-end">          <button
+            onClick={() => setExportTick(t => t + 1)}
+            className="flex items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[11px] text-zinc-400 hover:bg-void-700">
+            <Download className="h-3 w-3" /> 导出 JSON
+          </button>
+</div>
         {err ? <div className="px-3 py-4 text-[11.5px] text-red-400">加载失败:{err}</div>
           : !events ? <div className="flex items-center gap-2 px-3 py-4 text-[11.5px] text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />载入中…</div>
           : <table className="w-full text-left">
