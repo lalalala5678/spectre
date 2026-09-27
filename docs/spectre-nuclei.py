@@ -151,10 +151,21 @@ def apply_matchers(matchers, status, headers, body):
     # F29: internal:true 是条件匹配器,不构成最终命中——纯 internal 模板
     # 一律不判中(防"任何 200 服务器被报 critical RCE")。
     matchers = matchers or []
-    if matchers and all(m.get("internal") for m in matchers):
-        return False
     body_str = body.decode('utf-8', errors='replace')
     header_str = '\n'.join(f'{k}: {v}' for k, v in headers.items())
+    if matchers and all(m.get("internal") for m in matchers):
+        # F39: 纯 internal 请求=变量捕获步骤(多请求链第一跳),
+        # 捕获命中词返回 dict;非最终命中(F29 反假阳性语义保持)。
+        captured = {}
+        for m in matchers:
+            if not m.get('name'):
+                continue
+            hay = header_str if m.get('part') == 'header' else body_str
+            for w in (m.get('words') or []):
+                if w.lower() in hay.lower():
+                    captured[m['name']] = w
+                    break
+        return {'__vars__': captured} if captured else False
     results = []
 
     for m in matchers:
@@ -240,7 +251,22 @@ def apply_matchers(matchers, status, headers, body):
         if not m0.get('internal'):
             req_cond = m0.get('condition')
             break
-    return any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
+    final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
+    # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
+    # internal word 命中的具体词可在后续请求 {{name}} 引用)
+    if final:
+        captured = {}
+        for m, hit in zip(matchers, results):
+            if m.get('internal') and hit and m.get('name'):
+                words = m.get('words') or []
+                hay = header_str if m.get('part') == 'header' else body_str
+                for w in words:
+                    if w.lower() in hay.lower():
+                        captured[m['name']] = w
+                        break
+        if captured:
+            return {'__vars__': captured}
+    return final
 
 def apply_extractors(extractors, status, headers, body):
     """执行 extractors(提取动态值)
@@ -307,7 +333,22 @@ def run_dns_matchers(matchers, answers):
         if not m0.get('internal'):
             req_cond = m0.get('condition')
             break
-    return any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
+    final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
+    # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
+    # internal word 命中的具体词可在后续请求 {{name}} 引用)
+    if final:
+        captured = {}
+        for m, hit in zip(matchers, results):
+            if m.get('internal') and hit and m.get('name'):
+                words = m.get('words') or []
+                hay = header_str if m.get('part') == 'header' else body_str
+                for w in words:
+                    if w.lower() in hay.lower():
+                        captured[m['name']] = w
+                        break
+        if captured:
+            return {'__vars__': captured}
+    return final
 
 # ============================================================
 # 主执行流程
@@ -322,6 +363,7 @@ def execute_template(tpl, target, timeout=15):
     # http 协议(社区模板顶层键是 http:;requests: 为旧式/自定义兼容)
     # F27: 此前只读 requests 导致社区 14k 模板全部 0 请求假完成。
     http_specs = tpl.get('http') or tpl.get('requests') or []
+    captured_vars = {}  # F39: 跨请求变量(internal matcher 捕获)
     for req_spec in http_specs:
         # interactsh(OOB)标记——跳过(无 OOB 基础设施时)
         if '{{interactsh-url}}' in json.dumps(req_spec):
@@ -346,6 +388,13 @@ def execute_template(tpl, target, timeout=15):
                 req_spec['headers'] = {**rh, **(req_spec.get('headers') or {})}
                 if rbody:
                     req_spec['body'] = rbody
+        # F39: 前序请求捕获变量注入本请求(path/body 的 {{name}})
+        if captured_vars:
+            import json as _json_dumps
+            spec_str = _json_dumps.dumps(req_spec)
+            for k, v in captured_vars.items():
+                spec_str = spec_str.replace('{{' + k + '}}', v)
+            req_spec = _json_dumps.loads(spec_str)
         # 多 path 支持(nuclei 标准: path 是 list,每个都试)
         raw_paths = req_spec.get('path', '/')
         path_list = raw_paths if isinstance(raw_paths, list) else [raw_paths]
@@ -370,7 +419,10 @@ def execute_template(tpl, target, timeout=15):
                     })
                     break
                 continue
-            if apply_matchers(matchers, status, headers, body):
+            _mres = apply_matchers(matchers, status, headers, body)
+            if isinstance(_mres, dict):
+                captured_vars.update(_mres.get('__vars__', {}))
+            if _mres:
                 extractors = req_spec.get('extractors', tpl.get('extractors', []))
                 extracted = apply_extractors(extractors, status, headers, body)
                 shown = one_path if isinstance(one_path, str) else str(one_path)
