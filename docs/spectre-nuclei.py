@@ -193,6 +193,35 @@ def apply_matchers(matchers, status, headers, body):
                 matched = False
         elif mtype == 'binary':
             matched = False  # binary matching not implemented
+        elif mtype == 'dsl':
+            # F38: dsl 子集——status_code/contains()/len()/all() + and/or/not
+            exprs = m.get('dsl', [])
+            vals = {
+                'status_code': status,
+                'len': len(body),
+                'true': True, 'false': False,
+            }
+            def _ev(expr):
+                e = expr
+                # contains(x, y) → x in haystack-ish(body/header)
+                import re as _rr
+                def _contains(mm):
+                    hay_name, needle = mm.group(1), mm.group(2)
+                    hay = body_str if hay_name in ('body', 'string') else header_str
+                    return needle.strip('"\'') in hay
+                e = _rr.sub(r"(\w+)\s*!?=~?\s*['\"]([^'\"]*)['\"]", lambda mm: repr(mm.group(2) in body_str), e)
+                e = _rr.sub(r"contains\((\w+),\s*['\"]([^'\"]*)['\"]\)", lambda mm: str(mm.group(2) in (body_str if mm.group(1) not in ('header',) else header_str)), e)
+                e = _rr.sub(r"len\((\w+)\)", lambda mm: str(len(body_str) if mm.group(1) not in ('header',) else len(header_str)), e)
+                e = _rr.sub(r"status_code", str(status), e)
+                e = _rr.sub(r"\btrue\b", 'True', e)
+                e = _rr.sub(r"\bfalse\b", 'False', e)
+                e = e.replace(' && ', ' and ').replace(' || ', ' or ')
+                try:
+                    return bool(eval(e, {'__builtins__': {}}, dict(vals)))
+                except Exception:
+                    return False
+            results_dsl = [_ev(x) for x in exprs]
+            matched = all(results_dsl) if (m.get('condition', 'or') != 'or') else any(results_dsl)
 
         # negative matcher
         if m.get('negative', False):
@@ -200,7 +229,18 @@ def apply_matchers(matchers, status, headers, body):
 
         results.append(matched)
 
-    return all(results) if results else False
+    if not results:
+        return False
+    cond = (matchers[0] if not matchers[0].get('internal') else (matchers[1] if len(matchers) > 1 else {})).get('condition')
+    # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
+    # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
+    # 请求级 or 语义 = 任一非 internal matcher 命中即可。
+    req_cond = None
+    for m0 in matchers:
+        if not m0.get('internal'):
+            req_cond = m0.get('condition')
+            break
+    return any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
 
 def apply_extractors(extractors, status, headers, body):
     """执行 extractors(提取动态值)
@@ -256,7 +296,18 @@ def run_dns_matchers(matchers, answers):
             words = m.get('words', [])
             matched = any(any(w.lower() in str(a).lower() for a in answers) for w in words)
             results.append(matched)
-    return all(results) if results else False
+    if not results:
+        return False
+    cond = (matchers[0] if not matchers[0].get('internal') else (matchers[1] if len(matchers) > 1 else {})).get('condition')
+    # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
+    # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
+    # 请求级 or 语义 = 任一非 internal matcher 命中即可。
+    req_cond = None
+    for m0 in matchers:
+        if not m0.get('internal'):
+            req_cond = m0.get('condition')
+            break
+    return any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
 
 # ============================================================
 # 主执行流程
