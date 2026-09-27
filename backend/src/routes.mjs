@@ -339,6 +339,17 @@ function realRouter({ store, bus, caps, wal }) {
         await mkdir(join(root, 'tools/c2'), { recursive: true });
         await writeFile(join(root, 'tools/c2/api-keys.json'), JSON.stringify(c2Out, null, 1), 'utf8');
 
+        // ── nday 情报源 keys(已验证才落盘)──
+        const ndayOut = {};
+        for (const [sid, cfg] of Object.entries(keys)) {
+          if (sid === 'brute' || sid === 'smtp') continue;
+          const def = RECON_SOURCES_INTERNAL[sid];
+          const forNday = def && (def.agents ?? ['recon']).includes('nday');
+          const hasSecret = cfg && (cfg.key || cfg.token || cfg.secret || cfg.id);
+          if (forNday && hasSecret) ndayOut[sid] = cfg;
+        }
+        await writeFile(join(root, 'tools/nday/api-keys.json'), JSON.stringify(ndayOut, null, 1), 'utf8');
+
         // ── phish SMTP(仅 smtp 源且已验证)──
         const smtpCfg = keys.smtp ?? {};
         const smtpHasSecret = smtpCfg.user || smtpCfg.password;

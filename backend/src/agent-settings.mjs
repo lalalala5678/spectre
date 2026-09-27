@@ -127,6 +127,47 @@ const RECON_SOURCES = {
       return probe(`${RECON_SOURCES.shodan.defaultBase}/api-info?key=${encodeURIComponent(key)}`, {});
     },
   },
+  metadefender: {
+    label: 'MetaDefender (OPSWAT)',
+    tier: 'P1', why: 'C2 免杀多引擎云查(30+ 引擎并集,AVCONDS 威胁评分)',
+    defaultBase: 'https://cloud.metadefender.com/api',
+    agents: ['c2'],
+    fields: { key: 'API Key' },
+    async validate({ key, baseUrl }) {
+      const base = baseUrl || RECON_SOURCES.metadefender.defaultBase;
+      return probe(`${base}/v4/key/${encodeURIComponent(key)}`, {
+        headers: { apikey: key },
+      }, { okCheck: (st, b) => (st === 200 ? true : st === 401 || st === 403 ? 'MetaDefender: key 无效' : `HTTP ${st}`) });
+    },
+  },
+  hybridanalysis: {
+    label: 'Hybrid Analysis (Falcon)',
+    tier: 'P1', why: 'C2 免杀沙箱云查(VxFamily/威胁分数,免费层)',
+    defaultBase: 'https://www.hybrid-analysis.com/api',
+    agents: ['c2'],
+    fields: { key: 'API Key' },
+    async validate({ key, baseUrl }) {
+      const base = baseUrl || RECON_SOURCES.hybridanalysis.defaultBase;
+      return probe(`${base}/v2/key/current`, {
+        headers: { 'api-key': key, 'user-agent': 'spectre' },
+      }, { okCheck: (st, b, t) => (st === 200 && b ? true : (b?.message || `HTTP ${st}: ${String(t).slice(0, 80)}`)) });
+    },
+  },
+  nvd: {
+    label: 'NVD (NIST)',
+    tier: 'P1', why: 'NDay CVE 拉取提速(无 key 5 请求/30s→带 key 50)',
+    defaultBase: 'https://services.nvd.nist.gov/rest/json',
+    agents: ['nday'],
+    fields: { key: 'API Key' },
+    async validate({ key, baseUrl }) {
+      const base = baseUrl || RECON_SOURCES.nvd.defaultBase;
+      return probe(`${base}/cves/2.0?resultsPerPage=1`, {
+        headers: { apiKey: key },
+      }, { okCheck: (st, b) => (st === 200 && b?.totalResults !== undefined ? true
+        : st === 404 || st === 403 ? 'NVD: key 无效或被封禁'
+        : b?.message ? `NVD: ${b.message}` : `HTTP ${st}`) });
+    },
+  },
   virustotal: {
     label: 'VirusTotal',
     tier: 'P1', why: 'C2 免杀多引擎云查(70+引擎并集)',
@@ -274,9 +315,17 @@ export function settingsSchema() {
         }],
       },
       {
-        agentKey: 'nday', label: 'NDay Agent · 数据源(只读展示)',
-        hint: '本地情报层零 key(cvelistV5/模板库/EPSS 官方 API);GitHub token 在资产测绘组配置后同样对 NDay 生效。',
-        sources: [],
+        agentKey: 'nday', label: 'NDay Agent · 情报源',
+        hint: '本地情报层零 key(cvelistV5/模板库/EPSS);NVD key 提速 CVE 拉取;GitHub token 在资产测绘组配置后同样生效。',
+        sources: Object.entries(RECON_SOURCES)
+          .filter(([, sv]) => (sv.agents ?? ['recon']).includes('nday'))
+          .map(([id, sv]) => ({
+            id, label: sv.label, defaultBase: sv.defaultBase, tier: sv.tier, why: sv.why,
+            fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
+              id: `${id}.${fid}`, label: flabel,
+              type: fid === 'key' || fid === 'secret' || fid === 'token' ? 'password' : 'text',
+            })),
+          })),
       },
       {
         agentKey: 'recon', label: '资产测绘 Agent · 数据源',
