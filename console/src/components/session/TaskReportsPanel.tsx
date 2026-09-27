@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 
-import { api, foldEntries, subscribeSse, type ApiBusEvent } from '../../api/client';
+import { api, foldEntries, subscribeBus, type ApiBusEvent } from '../../api/client';
 
 type FoldedEntry = ApiBusEvent & { current: ApiBusEvent; revisedCount: number };
 import { StatusBadge } from './VulnPanel';
@@ -39,7 +39,7 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
         cursor.v = all.at(-1)?.seq ?? 0;
       } catch { /* SSE reconnect will heal */ }
     })();
-    const off = subscribeSse('/bus/events', (name, raw) => {
+    const off = subscribeBus((name, raw) => {
       if (name !== 'bus') return;
       const e = raw as ApiBusEvent;
       if (e.seq <= cursor.v) return;
@@ -59,7 +59,7 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
       if (!accept(e)) return;
       setEvents(prev => prev.some(x => x.seq === e.seq)
         ? prev : [{ ...e, current: e, revisedCount: 0 } as FoldedEntry, ...prev].slice(0, 20));
-    }, () => cursor.v);
+    });
     return () => { stopped = true; off(); };
   }, [workSessionId]);
 

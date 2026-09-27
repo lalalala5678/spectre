@@ -139,6 +139,49 @@ export interface Unsubscribe {
  * Subscribe to an SSE endpoint with cursor-based replay.
  * `since` is captured at subscribe time; new connections replay from there.
  */
+// F52: bus/events 共享单例——此前每个面板(Vuln/Intel/TaskReports/
+// EntryDetail/BusView)各开一条 SSE,同一工作区 4-5 连接;页面切换
+// 叠加曾把浏览器并发连接池耗尽(ERR_INSUFFICIENT_RESOURCES ×1090,
+// 全量 UI 实测)。引用计数: 首订阅者建立,末订阅者关闭。
+type BusHandler = (eventName: string, data: unknown) => void;
+const busSubs = new Set<BusHandler>();
+let busSource: EventSource | null = null;
+let busCursor = 0;
+let busFailures = 0;
+
+function busConnect() {
+  if (busSource || busSubs.size === 0) return;
+  busSource = new EventSource(`${API_BASE}/bus/events?since=${busCursor}`);
+  busSource.addEventListener('bus', (ev: MessageEvent) => {
+    busFailures = 0;
+    try {
+      const payload = JSON.parse(ev.data as string);
+      if (typeof payload.seq === 'number') busCursor = payload.seq;
+      for (const h of busSubs) h('bus', payload);
+    } catch { /* malformed */ }
+  });
+  busSource.onerror = () => {
+    busSource?.close();
+    busSource = null;
+    if (busSubs.size > 0) {
+      const delay = Math.min(2000 * ++busFailures, 15_000);
+      setTimeout(busConnect, delay);
+    }
+  };
+}
+
+export function subscribeBus(onEvent: BusHandler): Unsubscribe {
+  busSubs.add(onEvent);
+  busConnect();
+  return () => {
+    busSubs.delete(onEvent);
+    if (busSubs.size === 0) {
+      busSource?.close();
+      busSource = null;
+    }
+  };
+}
+
 export function subscribeSse(
   path: string,
   onEvent: (eventName: string, data: unknown) => void,

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight, MessageSquareText } from 'lucide-react';
 
-import { api, foldEntries, subscribeSse, type ApiBusEvent } from '../../api/client';
+import { api, foldEntries, subscribeBus, type ApiBusEvent } from '../../api/client';
 
 type FoldedEntry = ApiBusEvent & { current: ApiBusEvent; revisedCount: number };
 import { cn } from '../../utils/cn';
@@ -93,7 +93,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
         cursor.v = all.at(-1)?.seq ?? 0;
       } catch { /* SSE reconnect will heal */ }
     })();
-    const off = subscribeSse('/bus/events', (name, raw) => {
+    const off = subscribeBus((name, raw) => {
       if (name !== 'bus') return;
       const e = raw as ApiBusEvent;
       if (e.seq <= cursor.v) return;
@@ -114,7 +114,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
       // seq-guard: snapshot + SSE replay overlap must not duplicate
       setEvents(prev => prev.some(x => x.seq === e.seq)
         ? prev : [{ ...e, current: e, revisedCount: 0 } as FoldedEntry, ...prev].slice(0, 20));
-    }, () => cursor.v);
+    });
     return () => { stopped = true; off(); };
   }, [agentKey, workSessionId]);
 

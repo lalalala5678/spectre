@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Megaphone } from 'lucide-react';
-import { api, subscribeSse, type ApiBusEvent } from '../api/client';
+import { api, subscribeBus, type ApiBusEvent } from '../api/client';
 import type { MessageChannel } from '../types';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
@@ -38,9 +38,7 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
 
   useEffect(() => {
     if (!live) return;
-    return subscribeSse(
-      '/bus/events',
-      (name, raw) => {
+    return subscribeBus((name, raw) => {
         if (name !== 'bus') return;
         const ev = raw as ApiBusEvent;
         if (ev.workSessionId !== workSessionId) return;
@@ -48,9 +46,7 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
           const next = prev.concat(ev);
           return next.length > 500 ? next.slice(next.length - 500) : next;
         });
-      },
-      () => cursor.current,
-    );
+      });
   }, [live]);
 
   const list = events

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { CornerUpLeft, History, Loader2, PencilLine, SendHorizontal } from 'lucide-react';
 
 import {
-  api, foldEntries, reviseEntryDirect, reviseEntryViaAgent, subscribeSse,
+  api, foldEntries, reviseEntryDirect, reviseEntryViaAgent, subscribeBus,
   type ApiBusEvent,
 } from '../../api/client';
 import { Markdown } from './Markdown';
@@ -46,7 +46,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
     } catch { /* SSE will heal */ }
   };
   useEffect(() => { void loadChain(); }, [event.seq]);
-  useEffect(() => subscribeSse('/bus/events', (name, raw) => {
+  useEffect(() => subscribeBus((name, raw) => {
     if (name !== 'bus') return;
     const e = raw as ApiBusEvent;
     if (e.revises === event.seq) {
@@ -54,7 +54,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
       setDialogDone(`修订已落账（第 ${e.revision?.n ?? '?'} 次）`);
       setDialogBusy(false);
     }
-  }, () => 0), [event.seq]);
+  }), [event.seq]);
 
   const folded = useMemo(
     () => foldEntries(chain)[0] ?? { ...event, current: event, revisedCount: 0 },

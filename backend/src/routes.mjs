@@ -70,6 +70,11 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/shells' && method === 'POST') {
       const body = await readJson(req);
       if (!body?.target) return bad(res, 400, 'target 必填');
+      // F51: transport 枚举早期校验(此前 'quantum' 可注册,exec 才报未接入)
+      const KNOWN_TRANSPORTS = ['local', 'ssh', 'web'];
+      if (!KNOWN_TRANSPORTS.includes(String(body.transport || ''))) {
+        return bad(res, 400, `transport 必须是 ${KNOWN_TRANSPORTS.join('/')} 之一`);
+      }
       const sh = caps.shells.register({
         name: String(body.name || ''), target: String(body.target),
         transport: String(body.transport || 'local'), transportRef: String(body.transportRef || ''),
