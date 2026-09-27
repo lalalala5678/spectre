@@ -515,19 +515,26 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {tab === 'history' && (
             <Panel title="历史会话" bodyClassName="p-0" className="w-full">
               <div className="divide-y divide-void-700">
-                {[
-                  ['sess-0905-2204', 'api.example-corp.com', 'done', '09-05 22:04', '3 个漏洞 · 1 critical'],
-                  ['sess-0905-1841', '203.0.113.0/28 端口基线', 'done', '09-05 18:41', '47 端口 / 12 服务'],
-                  ['sess-0904-2310', 'wiki 历史漏洞复验', 'failed', '09-04 23:10', '沙箱池耗尽，已重试成功'],
-                ].map(([id, title, st, time, summary]) => (
-                  <button key={id} className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-void-800/60">
-                    <Dot tone={st === 'done' ? 'cyan' : 'red'} />
+                {/* F22: 原为硬编码 mock(死链无 onClick)。接 mySessions 真数据,
+                    点击下钻该会话只读详情(drill 机制已有)。 */}
+                {mySessions.length === 0 ? (
+                  <div className="px-3 py-4 text-[11.5px] text-zinc-500">本项目该 agent 暂无历史会话。</div>
+                ) : [...mySessions].reverse().slice(0, 30).map(s => (
+                  <button key={s.id}
+                    onClick={() => { setTab('session'); setDrillSession(s.id); }}
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-void-800/60">
+                    <Dot tone={s.busy ? 'orange' : 'cyan'} />
                     <div className="min-w-0 flex-1">
-                      <div className="text-[12px] font-medium text-zinc-200">{title}</div>
-                      <div className="font-mono text-[10px] text-zinc-600">{id} · {time}</div>
+                      <div className="truncate text-[12px] font-medium text-zinc-200">
+                        {s.title || '(未命名会话)'}
+                      </div>
+                      <div className="font-mono text-[10px] text-zinc-600">
+                        {s.id} · {new Date(s.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                      </div>
                     </div>
-                    <span className="text-[11px] text-zinc-500">{summary}</span>
-                    <span className={cn('text-[10px]', st === 'done' ? 'text-zinc-500' : 'text-red-400')}>{st}</span>
+                    <span className={cn('shrink-0 text-[10px]', s.busy ? 'text-orange-400' : 'text-zinc-500')}>
+                      {s.busy ? 'busy' : 'done'}
+                    </span>
                   </button>
                 ))}
               </div>
