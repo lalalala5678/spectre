@@ -318,12 +318,35 @@ function realRouter({ store, bus, caps, wal }) {
       if (String(body.group) === 'recon-source') {
         // sync MCP config file + mount toggle (zero-pollution: no key ⇒
         // server disabled, recon never sees the tools)
-        const { writeFile } = await import('node:fs/promises');
+        const { writeFile, mkdir } = await import('node:fs/promises');
         const { getPrefs } = await import('./projects.mjs');
         const { CONFIG } = await import('./config.mjs');
         const { join } = await import('node:path');
         const root = CONFIG.dataDir;
         const keys = getPrefs().reconApiKeys ?? {};
+
+        // ── c2 免杀云查 keys(只写已通过 validate 的源;失败即不落盘)──
+        // 本次保存的源若属 c2 消费且 r.mounted(或无 secret),同步;其余 c2 源保持现状
+        const { RECON_SOURCES_INTERNAL } = await import('./agent-settings.mjs');
+        const c2Out = {};
+        for (const [sid, cfg] of Object.entries(keys)) {
+          if (sid === 'brute' || sid === 'smtp') continue;
+          const def = RECON_SOURCES_INTERNAL[sid];
+          const forC2 = def && (def.agents ?? ['recon']).includes('c2');
+          const hasSecret = cfg && (cfg.key || cfg.token || cfg.secret || cfg.id);
+          if (forC2 && hasSecret) c2Out[sid] = cfg;
+        }
+        await mkdir(join(root, 'tools/c2'), { recursive: true });
+        await writeFile(join(root, 'tools/c2/api-keys.json'), JSON.stringify(c2Out, null, 1), 'utf8');
+
+        // ── phish SMTP(仅 smtp 源且已验证)──
+        const smtpCfg = keys.smtp ?? {};
+        const smtpHasSecret = smtpCfg.user || smtpCfg.password;
+        await mkdir(join(root, 'tools/phish'), { recursive: true });
+        await writeFile(join(root, 'tools/phish/smtp.json'),
+          JSON.stringify(smtpHasSecret ? { host: smtpCfg.host, port: Number(smtpCfg.port) || 587,
+            user: smtpCfg.user, pass: smtpCfg.password } : {}, null, 1), 'utf8');
+
         await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(keys), 'utf8');
         const list = await loadMcpConfig();
         const rest = list.filter(s => s.name !== 'recon-datasources');
@@ -653,6 +676,28 @@ function realRouter({ store, bus, caps, wal }) {
       } catch (err) {
         return bad(res, 404, String(err));
       }
+    }
+
+    // ---------- 数据源可用性复查(挂载门:不可用 ⇒ 前端可见+不注入) ----------
+    if (path === '/api/agent-settings/verify' && method === 'GET') {
+      const { getPrefs } = await import('./projects.mjs');
+      const { RECON_SOURCES_INTERNAL } = await import('./agent-settings.mjs');
+      const keys = getPrefs().reconApiKeys ?? {};
+      const results = [];
+      for (const [sid, cfg] of Object.entries(keys)) {
+        if (sid === 'brute') continue;
+        const def = RECON_SOURCES_INTERNAL[sid];
+        if (!def || !cfg) continue;
+        const hasSecret = cfg.key || cfg.token || cfg.secret || cfg.id || cfg.password;
+        if (!hasSecret) { results.push({ id: sid, configured: false }); continue; }
+        const v = await def.validate(cfg);
+        results.push({
+          id: sid, configured: true, label: def.label,
+          agents: def.agents ?? ['recon'],
+          ok: v.ok, error: v.ok ? null : (v.error || '').slice(0, 160),
+        });
+      }
+      return json(res, 200, { results, checkedAt: new Date().toISOString() });
     }
 
     // ---------- phish campaign 漏斗(GoPhish 面板数据) ----------

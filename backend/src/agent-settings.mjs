@@ -53,7 +53,10 @@ async function llmProbe(baseUrl, apiKey, model) {
   }, { timeoutMs: 20000 });
 }
 
-/* -------- data-source validators (official default base URLs) -------- */
+/* -------- data-source validators (official default base URLs) --------
+ * Each source declares which agents consume it. A key is persisted ONLY
+ * after a live validate() success, and mounted ONLY for the listed agents
+ * (zero-pollution: unverifiable source ⇒ agent never sees it). */
 const RECON_SOURCES = {
   fofa: {
     label: 'FOFA',
@@ -124,6 +127,18 @@ const RECON_SOURCES = {
       return probe(`${RECON_SOURCES.shodan.defaultBase}/api-info?key=${encodeURIComponent(key)}`, {});
     },
   },
+  virustotal: {
+    label: 'VirusTotal',
+    tier: 'P1', why: 'C2 免杀多引擎云查(70+引擎并集)',
+    defaultBase: 'https://www.virustotal.com/api',
+    agents: ['c2'],
+    fields: { key: 'API Key' },
+    async validate({ key }) {
+      return probe(`${RECON_SOURCES.virustotal.defaultBase}/v3/users/${encodeURIComponent(key)}`, {
+        headers: { 'x-apikey': key },
+      }, { okCheck: (s) => (s === 200 ? true : s === 401 ? 'VT: key 无效' : s === 403 ? 'VT: 权限不足(需高级 key)' : `HTTP ${s}`) });
+    },
+  },
   github: {
     label: 'GitHub Token',
     tier: 'P0', why: '代码泄露检索(免费),内网地址/密钥',
@@ -157,7 +172,8 @@ const RECON_SOURCES = {
   },
   threatbook: {
     label: '微步在线',
-    tier: 'P1', why: 'DNS历史:僵尸资产走向+CDN源站定位',
+    tier: 'P1', why: 'DNS历史:僵尸资产走向+CDN源站定位;C2 免杀云查(文件信誉)',
+    agents: ['recon', 'c2'],
     defaultBase: 'https://x.threatbook.com/api',
     fields: { key: 'API Key' },
     async validate({ key }) {
@@ -166,7 +182,35 @@ const RECON_SOURCES = {
           ? true : `微步: ${b?.verbose_msg || '认证失败'}`) });
     },
   },
+  smtp: {
+    label: 'SMTP 发信',
+    tier: 'P0', why: '钓鱼 agent 邮件发送通道(直连/中继)',
+    agents: ['phish'],
+    fields: { host: 'SMTP 主机', port: '端口', user: '账号', password: '密码' },
+    async validate({ host, port, user, password }) {
+      if (!host || !user) return { ok: false, error: 'SMTP 需要 host + user' };
+      const p = Number(port) || 587;
+      try {
+        const net = await import('node:net');
+        const ok = await new Promise((resolve) => {
+          const sock = net.createConnection({ host, port: p });
+          const t = setTimeout(() => { sock.destroy(); resolve(false); }, 8000);
+          sock.once('data', (d) => {
+            clearTimeout(t); sock.destroy();
+            resolve(d.toString().startsWith('220'));
+          });
+          sock.once('error', () => { clearTimeout(t); resolve(false); });
+        });
+        if (!ok) return { ok: false, error: `SMTP ${host}:${p} 无响应或非 SMTP banner` };
+        return { ok: true, detail: { banner: true } };
+      } catch (e) {
+        return { ok: false, error: `SMTP 连接失败: ${String(e?.message ?? e).slice(0, 120)}` };
+      }
+    },
+  },
 };
+
+export const RECON_SOURCES_INTERNAL = RECON_SOURCES;
 
 /* ---------------- schema (UI renders from this) ---------------- */
 export function settingsSchema() {
@@ -186,6 +230,32 @@ export function settingsSchema() {
       ],
     },
     agents: [
+      {
+        agentKey: 'c2', label: 'C2 Agent · 免杀云查引擎',
+        hint: '填好并通过连通验证的引擎才会写入沙箱 api-keys.json 供 c2-qa 调用;未配置/校验失败对 agent 完全不可见(零污染)。微步在「资产测绘」组配置后此处同步生效。',
+        sources: Object.entries(RECON_SOURCES)
+          .filter(([sid, sv]) => (sv.agents ?? ['recon']).includes('c2') && sid !== 'smtp')
+          .map(([id, sv]) => ({
+            id, label: sv.label, defaultBase: sv.defaultBase, tier: sv.tier, why: sv.why,
+            fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
+              id: `${id}.${fid}`, label: flabel,
+              type: fid === 'key' || fid === 'secret' || fid === 'token' || fid === 'password' ? 'password' : 'text',
+            })),
+          })),
+      },
+      {
+        agentKey: 'phish', label: '钓鱼 Agent · 发信通道',
+        hint: 'SMTP 通过 banner 探测后才写入沙箱 smtp.json(默认通道);凭据永不回显。',
+        sources: Object.entries(RECON_SOURCES)
+          .filter(([, sv]) => (sv.agents ?? ['recon']).includes('phish'))
+          .map(([id, sv]) => ({
+            id, label: sv.label, defaultBase: sv.defaultBase ?? '', tier: sv.tier, why: sv.why,
+            fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
+              id: `${id}.${fid}`, label: flabel,
+              type: fid === 'password' || fid === 'key' || fid === 'token' ? 'password' : 'text',
+            })),
+          })),
+      },
       {
         agentKey: 'weakcred', label: '爆破 Agent · 爆破参数(实时生效)',
         hint: '防锁定参数与字典选择,保存后对新会话生效(注入系统提示词)。',
@@ -212,6 +282,7 @@ export function settingsSchema() {
         agentKey: 'recon', label: '资产测绘 Agent · 数据源',
         hint: '填好并通过连通验证的源才会挂载为 MCP 工具;未配置的源对 agent 完全不可见(零污染)。Base URL 留空一律使用官方地址。',
         sources: Object.entries(RECON_SOURCES)
+          .filter(([, sv]) => (sv.agents ?? ['recon']).includes('recon'))
           .sort((a, b) => (a[1].tier ?? 'P9').localeCompare(b[1].tier ?? 'P9'))
           .map(([id, s]) => ({
           id, label: s.label, defaultBase: s.defaultBase, tier: s.tier, why: s.why,
@@ -293,7 +364,8 @@ export async function saveSetting({ group, field, value }, wal) {
     const src = RECON_SOURCES[srcId];
     if (!src) return { ok: false, error: '未知数据源' };
     const cur = { ...(getPrefs().reconApiKeys?.[srcId] ?? {}), [leaf]: clean(value) };
-    const hasSecret = cur.key || cur.token || cur.secret || cur.id;
+    const hasSecret = cur.key || cur.token || cur.secret || cur.id
+      || (srcId === 'smtp' && (cur.user || cur.password));
     const all = { ...(getPrefs().reconApiKeys ?? {}), [srcId]: cur };
     if (!hasSecret) {
       setPrefs({ reconApiKeys: all }, wal);

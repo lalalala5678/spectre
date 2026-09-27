@@ -119,16 +119,18 @@ function FieldRow({ def, value, onSave }: {
 }
 
 /** 数据源卡片(带 tier 徽章 + 挂载状态) */
-function SourceCard({ src, cfg, onSave }: {
+function SourceCard({ src, cfg, onSave, verify }: {
   src: SourceDef;
   cfg: Record<string, string> | undefined;
   onSave: (leaf: string) => (v: string) => Promise<void>;
+  verify?: { ok: boolean; error?: string | null };
 }) {
   const [open, setOpen] = useState(true);
   const isParams = src.id === 'brute';
   const paramCount = Object.values(cfg ?? {}).filter(v => String(v ?? '').length > 0).length;
-  const mounted = isParams ? paramCount > 0 : Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.id));
+  const mounted = isParams ? paramCount > 0 : Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.id || cfg.password));
   const tier = TIER_STYLE[src.tier ?? 'P2'];
+  const verifyState = verify;
   return (
     <div className={cn('overflow-hidden rounded border transition-colors',
       mounted ? 'border-emerald-900/60 bg-void-900/40' : 'border-void-700 bg-void-900/20')}>
@@ -138,11 +140,17 @@ function SourceCard({ src, cfg, onSave }: {
       >
         <span className={cn('h-2 w-2 shrink-0 rounded-full', mounted ? 'bg-emerald-400 shadow-[0_0_6px] shadow-emerald-500/60' : tier.dot)} />
         <span className="text-[13px] font-medium text-zinc-200">{src.label}</span>
-        <span className={cn('rounded border px-1.5 py-0.5 font-mono text-[9.5px]', tier.chip)}>{tier.label}</span>
         <span className={cn('ml-auto shrink-0 rounded-sm px-2 py-0.5 font-mono text-[10px]',
-          mounted ? 'bg-emerald-950/60 text-emerald-400' : 'bg-void-800 text-zinc-500')}>
-          {isParams ? `参数组 · ${paramCount} 项已注入` : mounted ? '已挂载 MCP' : '未配置 · 不注入'}
+          verifyState && !verifyState.ok ? 'bg-red-950/60 text-red-400'
+            : mounted ? 'bg-emerald-950/60 text-emerald-400' : 'bg-void-800 text-zinc-500')}>
+          {verifyState && !verifyState.ok
+            ? 'key 已失效 · 不注入'
+            : isParams ? `参数组 · ${paramCount} 项已注入`
+            : mounted ? (verifyState ? '已验证 · 已注入' : '已挂载 MCP') : '未配置 · 不注入'}
         </span>
+        {verifyState && !verifyState.ok && verifyState.error && (
+          <span className="max-w-[220px] truncate font-mono text-[9.5px] text-red-400/70" title={verifyState.error}>{verifyState.error}</span>
+        )}
         <svg className={cn('h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform', open && 'rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 18l6-6-6-6" />
         </svg>
@@ -162,10 +170,22 @@ function SourceCard({ src, cfg, onSave }: {
     </div>
   );
 }
-
 export default function SettingsPage() {
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [err, setErr] = useState('');
+  const [verify, setVerify] = useState<Record<string, { ok: boolean; error?: string | null }> | null>(null);
+  const [verifying, setVerifying] = useState(false);
+  const runVerify = () => {
+    setVerifying(true);
+    api<{ results: { id: string; ok?: boolean; error?: string | null }[] }>('/agent-settings/verify')
+      .then((r) => {
+        const m: Record<string, { ok: boolean; error?: string | null }> = {};
+        for (const it of r.results) if (it.ok !== undefined) m[it.id] = { ok: it.ok, error: it.error };
+        setVerify(m);
+      })
+      .catch(() => setVerify(null))
+      .finally(() => setVerifying(false));
+  };
 
   const reload = () => api<SettingsPayload>('/agent-settings')
     .then(setData)
@@ -211,8 +231,14 @@ export default function SettingsPage() {
             每条配置独立保存:点击保存后先用所填值做真实连通检测/范围校验,失败不落盘。
           </p>
         </div>
-        <button onClick={() => void reload()} title="刷新"
-          className="mb-1 text-zinc-600 transition-colors hover:text-zinc-300"><RotateCw className="h-3.5 w-3.5" /></button>
+        <div className="flex items-center gap-2">
+          <button onClick={() => void runVerify()} disabled={verifying}
+            className="mb-1 flex items-center gap-1.5 rounded-sm border border-void-600 px-2.5 py-1 font-mono text-[11px] text-zinc-300 transition-colors hover:border-orange-700 hover:text-orange-300 disabled:opacity-50">
+            {verifying ? <><Loader2 className="h-3 w-3 animate-spin" />复查中</> : <><ShieldCheck className="h-3 w-3" />复查可用性</>}
+          </button>
+          <button onClick={() => void reload()} title="刷新"
+            className="mb-1 text-zinc-600 transition-colors hover:text-zinc-300"><RotateCw className="h-3.5 w-3.5" /></button>
+        </div>
       </div>
 
       {/* ---------- 通用配置(全局) ---------- */}
@@ -242,7 +268,7 @@ export default function SettingsPage() {
           ) : (
             <div className="divide-y divide-void-800/70">
               {agent.sources.map((src) => (
-                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
+                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
               ))}
             </div>
           )}
@@ -281,7 +307,7 @@ export default function SettingsPage() {
             </div>
             <div className="space-y-2">
               {byTier(t).map((src) => (
-                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} onSave={saveSource(src.id)} />
+                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
               ))}
             </div>
           </div>
