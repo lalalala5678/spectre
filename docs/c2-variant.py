@@ -386,7 +386,12 @@ def cmd_gen(args):
             chosen.append('decomp')
         rest = [f for f in fam_pool if f not in ('mask', 'decomp')]
         if rest:
-            chosen += random.sample(rest, k=random.randint(0, min(2, len(rest))))
+            # PAPERCUT-1: k=random.randint(0,...) 可取 0——单家族轮
+            # (如 --families struct)3 连空转;保证 chosen 非空
+            k = random.randint(0, min(2, len(rest)))
+            if not chosen and k == 0:
+                k = 1
+            chosen += random.sample(rest, k=k)
         for f in chosen:
             if f == 'mask':
                 body, mask_keys = fam_mask(body, ext)

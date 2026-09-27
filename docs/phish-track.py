@@ -152,7 +152,10 @@ class TrackHandler(BaseHTTPRequestHandler):
             qs = parse_qs(body)
             uid = qs.get('uid', ['unknown'])[0]
             # Hash credentials immediately (never store plaintext)
-            cred_hash = hashlib.sha256(str(qs).encode()).hexdigest()[:16]
+            # 优化项(seq1914): 只哈希凭据字段——str(qs) 曾把 uid 卷入,
+            # 同凭据不同收件人哈希不同,不可比对
+            cred_only = {k: v for k, v in qs.items() if k.lower() != 'uid'}
+            cred_hash = hashlib.sha256(json.dumps(cred_only, sort_keys=True).encode()).hexdigest()[:16]
             add_event(db, 'submit', uid, {'cred_hash': cred_hash, 'ip': self.client_address[0]})
             self.send_response(302)
             self.send_header('Location', '/success')

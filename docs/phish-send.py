@@ -119,12 +119,19 @@ def split_visible_text(text, parts=3):
     return ' '.join(words)
 
 def build_email(from_display, from_addr, to_addr, subject, html_body,
-                reply_to=None, domain=None, text_body=None):
+                reply_to=None, domain=None, text_body=None, attachments=None):
     """构造完整邮件(头部一致性核心)"""
     # 提取 From 域名
     from_domain = from_addr.split('@')[1] if '@' in from_addr else domain or 'localhost'
 
-    msg = MIMEMultipart('alternative')
+    # 优化项(seq1914): 附件须挂 mixed 容器——alternative 语义是
+    # 同内容多格式,附件混入属结构误用(部分客户端丢弃)
+    attachments = attachments or []
+    msg = MIMEMultipart('mixed') if attachments else MIMEMultipart('alternative')
+    if attachments:
+        _alt = MIMEMultipart('alternative')
+        msg.attach(_alt)
+        msg._alt_part = _alt  # 文本部分挂 mixed>alternative
 
     # === 头部一致性(关键) ===
     msg['Subject'] = subject
@@ -153,7 +160,8 @@ def build_email(from_display, from_addr, to_addr, subject, html_body,
         plain = re.sub(r'\s+', ' ', plain).strip()
         msg.attach(MIMEText(plain[:2000], 'plain', 'utf-8'))
 
-    msg.attach(MIMEText(html_body, 'html', 'utf-8'))
+    _target = getattr(msg, '_alt_part', msg)
+    _target.attach(MIMEText(html_body, 'html', 'utf-8'))
     return msg, from_domain
 
 def dkim_sign(msg_bytes, private_key_path, selector, domain):
@@ -208,7 +216,8 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
                    text_body=None):
     """发送一封完整仿真的邮件"""
     msg, from_domain = build_email(from_display, from_addr, to_addr,
-                                   subject, html_body, reply_to, dkim_domain, text_body)
+                                   subject, html_body, reply_to, dkim_domain,
+                                   text_body, attachments)
 
     for fpath in (attachments or []):
         with open(fpath, 'rb') as f:
