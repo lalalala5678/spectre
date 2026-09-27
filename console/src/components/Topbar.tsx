@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Bell, Search } from 'lucide-react';
+import { Bell, LogOut, Search } from 'lucide-react';
 
 /** F25: 原 fmtTime 为 mock 冻结时钟(2026-09-06 硬编码)——改实时时钟 */
 export function Topbar() {
@@ -23,6 +23,14 @@ export function Topbar() {
       <div className="font-mono text-[11px] text-zinc-600">{fmt(now)} 本地</div>
 
       <div className="flex-1" />
+
+      <button
+        onClick={() => { window.location.href = '/spectre/logout'; }}
+        title="登出"
+        className="rounded-sm p-1.5 text-zinc-500 hover:bg-void-800 hover:text-zinc-300"
+      >
+        <LogOut className="h-3.5 w-3.5" />
+      </button>
 
       <button className="relative rounded-sm p-1.5 text-zinc-500 hover:bg-void-800 hover:text-zinc-300" title="通知">
         <Bell className="h-4 w-4" />
