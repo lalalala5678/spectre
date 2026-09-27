@@ -229,7 +229,20 @@ function makeFileSystem(cwdContainer) {
   };
   return {
     cwd: cwdContainer,
-    absolutePath: async (p, ctx) => wrap(async () => path.resolve(resolveFull(p))),
+    // F30-A: 返回容器视图路径——官方 write 拿 absolutePath 的结果原样传回
+    // env.writeFile,若此处给宿主路径,守卫(按容器路径判定)会把相对路径
+    // 解析结果当"未映射绝对路径"拦杀(weakcred 实战两轮谎报成功的根因)。
+    absolutePath: async (p, ctx) => wrap(async () => {
+      const str = String(p ?? '');
+      if (path.isAbsolute(str)) {
+        // 已是容器路径(或宿主路径→转容器视图);未映射的保持原样由守卫拒
+        const host = containerPathToHost(str);
+        if (host) return str;
+        const cont = hostPathToContainer(str);
+        return cont ?? path.resolve(str);
+      }
+      return path.join(cwdContainer, str);
+    }),
     joinPath: async (parts, ctx) => wrap(async () => path.join(...parts)),
     readTextFile: async (p, ctx) => wrap(async () =>
       await fsp.readFile(resolve(p), 'utf8')),
@@ -245,23 +258,34 @@ function makeFileSystem(cwdContainer) {
     }),
     readBinaryFile: async (p, ctx) => wrap(async () =>
       new Uint8Array(await fsp.readFile(resolve(p)))),
-    writeFile: async (p, content, ctx) => wrap(async () => {
+    writeFile: async (p, content, ctx) => {
+      // F30-B: 拍平双层 Result——wrap(ok(inner)) 会把内层 {ok:false} 当
+      // 成功值,pi 的 getOrThrow 不抛→官方工具谎报 Successfully wrote。
       const deny = denyMutate(p);
-      if (deny) return err({ code: 'permission_denied', message: deny });
-      await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
-      await fsp.writeFile(resolve(p), content);
-    }),
-    appendFile: async (p, content, ctx) => wrap(async () => {
+      if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
+      try {
+        await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
+        await fsp.writeFile(resolve(p), content);
+        return ok(undefined);
+      } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
+    },
+    appendFile: async (p, content, ctx) => {
       const deny = denyMutate(p);
-      if (deny) return err({ code: 'permission_denied', message: deny });
-      await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
-      await fsp.appendFile(resolve(p), content);
-    }),
-    renameFile: async (s, d, ctx) => wrap(async () => {
+      if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
+      try {
+        await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
+        await fsp.appendFile(resolve(p), content);
+        return ok(undefined);
+      } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
+    },
+    renameFile: async (s, d, ctx) => {
       const deny = denyMutate(s) ?? denyMutate(d);
-      if (deny) return err({ code: 'permission_denied', message: deny });
-      await fsp.rename(resolve(s), resolve(d));
-    }),
+      if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
+      try {
+        await fsp.rename(resolve(s), resolve(d));
+        return ok(undefined);
+      } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
+    },
     fileInfo: async (p, ctx) => wrap(async () => {
       const host = resolve(p);
       const st = await fsp.lstat(host);
@@ -291,11 +315,14 @@ function makeFileSystem(cwdContainer) {
       await fsp.realpath(resolve(p))),
     exists: async (p, ctx) => wrap(async () =>
       fs.existsSync(resolve(p))),
-    createDir: async (p, opts, ctx) => wrap(async () => {
+    createDir: async (p, opts, ctx) => {
       const deny = denyMutate(p);
-      if (deny) return err({ code: 'permission_denied', message: deny });
-      await fsp.mkdir(resolve(p), { recursive: opts?.recursive !== false });
-    }),
+      if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
+      try {
+        await fsp.mkdir(resolve(p), { recursive: opts?.recursive !== false });
+        return ok(undefined);
+      } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
+    },
     cleanup: async ctx => { /* host fs needs no cleanup */ },
   };
 }

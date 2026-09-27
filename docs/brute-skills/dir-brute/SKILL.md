@@ -21,6 +21,7 @@ ffuf -w /opt/tools/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt 
 # 备份/压缩专项(高风险高命中):
 ffuf -w <目标名+常见词> :EXT 变体 -u http://<t>/FUZZ.FUZ2Z -w2:zip,tar.gz,rar,7z,bak,sql,old
 dirsearch -u http://<t>/ -e php,asp,jsp,html,zip,bak,sql,env -t 20
+  (/opt/tools/bin/dirsearch 为薄包装: PYTHONPATH + python3 -m dirsearch)
 ```
 
 ## 3. 高价值目标清单(命中即报告)
