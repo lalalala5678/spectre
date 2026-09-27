@@ -279,10 +279,13 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
 def apply_extractors(extractors, status, headers, body):
     """执行 extractors(提取动态值)
     F29: part 支持——header/all/response 时 regex 搜对应面(此前只搜 body,
-    纯 extractor 模板永不触发)。"""
+    纯 extractor 模板永不触发)。
+    F42: internal: true extractor 命中值进 __vars__(与 internal matcher
+    捕获合流,多请求 {{name}} 引用——nuclei extract-to 同语义)。"""
     body_str = body.decode('utf-8', errors='replace')
     header_str = '\r\n'.join(f'{k}: {v}' for k, v in headers.items())
     extracted = {}
+    _vars_out = {}
     for ex in extractors or []:
         extype = ex.get('type', '')
         name = ex.get('name', f'ext_{len(extracted)}')
@@ -303,6 +306,10 @@ def apply_extractors(extractors, status, headers, body):
                     if hk.lower() == k.strip().lower():
                         extracted[name] = hv
                         break
+        if ex.get('internal') and name in extracted:
+            _vars_out[name] = extracted[name]
+    if _vars_out:
+        extracted['__vars__'] = _vars_out
     return extracted
 
 # ============================================================
@@ -420,6 +427,8 @@ def execute_template(tpl, target, timeout=15):
             if not matchers and ext_q:
                 # F29: 纯 extractor 模板(社区 187 个)——提取到值即命中
                 ex_hit = apply_extractors(ext_q, status, headers, body)
+                if isinstance(ex_hit, dict):
+                    captured_vars.update(ex_hit.pop('__vars__', {}))
                 if ex_hit:
                     shown0 = one_path if isinstance(one_path, str) else str(one_path)
                     findings.append({
@@ -448,6 +457,11 @@ def execute_template(tpl, target, timeout=15):
                         vv = vv[0] if vv else ''
                     out = out.replace('{{' + kk + '}}', str(vv))
                 return out
+            # F42: internal extractor 的捕获变量(extract-to 语义)
+            _pre_ext = req_spec.get('extractors', tpl.get('extractors', []))
+            _pre_hits = apply_extractors(_pre_ext or [], status, headers, body)
+            if isinstance(_pre_hits, dict):
+                captured_vars.update(_pre_hits.pop('__vars__', {}))
             _mres = apply_matchers(matchers, status, headers, body,
                                    (req_spec.get('matchers-condition') or 'and'))
             if isinstance(_mres, dict):
