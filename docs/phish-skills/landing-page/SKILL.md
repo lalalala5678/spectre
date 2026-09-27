@@ -1,19 +1,37 @@
 ---
 name: landing-page
-description: 高仿真着陆页——品牌克隆/凭据表单/追踪注入
+description: 反向代理着陆页 v2——处理 JS/SSO/多步登录/凭据拦截
 ---
 
-# 着陆页(线三)
-[creates artifacts] 仿真度=目标品牌的镜像。
+# 着陆页(线三) v2 — 反向代理模式
+[creates artifacts] 不再克隆 HTML——做 MITM 反向代理。
 
-## 克隆流程
-1. 访问目标真实登录页(授权范围内)
-2. 保存 HTML+CSS+logo(base64 内嵌)
-3. 替换表单 action → {{TRACK_URL}}/submit
-4. 注入隐藏 uid 字段
-5. 部署到控制域(子域名近似:portal.company-verify.co)
+## 为什么反向代理(不是克隆)
+克隆的 HTML:
+- JS 不执行(登录按钮没反应)
+- CSS/字体从 CDN 加载失败(页面裸奔)
+- SSO 跳转链断裂(Okta/Azure AD 多步流走不通)
+- CAPTCHA 加载不出
+反向代理全部解决——浏览器看到的就是真实页面。
 
-## 凭据处理(红线)
-- 收到即 SHA-256 哈希——明文不落盘不传输
-- 哈希仅用于统计"有提交",不用于登录尝试
-- 报告只写"提交率",不写具体凭据
+## phish-proxy.py 用法
+```bash
+phish-proxy.py serve --listen 0.0.0.0:80 \
+    --target https://login.target-corp.com \
+    --db /tmp/phish-track.json
+```
+
+## 核心行为
+1. GET 请求 → 转发到目标 → 剥离 CSP/X-Frame-Options/HSTS
+   → 注入追踪像素 → 返回
+2. CSS/JS/图片/字体 → 全部从目标域加载(页面完整渲染)
+3. POST 凭据表单 → 拦截:
+   - SHA-256 哈希(email:password)——明文即毁
+   - 只记录哈希+邮箱域+IP(不记明文密码)
+   - 302 到 success 页
+4. SSO 多步流 → 非凭据 POST 直接转发(CSRF token/握手正常)
+
+## 凭据处理红线
+- 明文密码在内存中存在 <1ms(读→哈希→丢弃)
+- 数据库只有 cred_hash(16 hex chars)
+- 报告只写提交率,不写具体凭据

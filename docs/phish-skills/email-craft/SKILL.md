@@ -1,34 +1,33 @@
 ---
 name: email-craft
-description: 仿真钓鱼邮件制作——预文本/HTML 模板/发件人伪装/附件向量
+description: 仿真钓鱼邮件制作 v2——预文本/头部一致性/内容混淆/多部分降级
 ---
 
-# 邮件制作(线一)
-[creates artifacts] 仿真度最大化=与真实攻击不可区分。
+# 邮件制作(线一) v2
+[creates artifacts] 企业网关对抗级仿真。
 
-## 预文本库(scam scenarios)
-按目标定制,常见族:
-- 紧急通知类:密码即将过期/账号异常/安全警告
-- 共享文档类:XXX 共享了文件给您(OneDrive/钉钉/企微仿)
-- 人事类:工资条/考勤异常/绩效考核通知
-- 高管类:CEO 欺诈(紧急转账/保密要求)
-- IT 类:VPN 配置变更/邮箱迁移/系统升级
+## 头部一致性(第一优先——网关最先查的)
+- Message-ID 域名 = From 域名(phish-send v2 自动做)
+- Reply-To 同域或不设(不同域 = 红旗,v2 自动忽略跨域 reply-to)
+- Date 时区与目标所在地一致(中国目标用 +0800)
+- Return-Path = From 地址(直连时 envelope from 与 header from 对齐)
 
-## HTML 模板规范
-- 内联 CSS(邮箱客户端不加载外部样式)
-- 品牌 logo(base64 内嵌,不外链)
-- 响应式(max-width 600px 居中)
-- 页脚法务文本+取消订阅(增加可信度)
-- 追踪像素:<img src="{{TRACK_URL}}/open.gif?uid=X">
-- 行动链接:{{TRACK_URL}}/click/X (指向着陆页)
+## 预文本库(按目标定制)
+- IT 类:密码过期/VPN 配置/邮箱迁移/系统升级
+- 人事类:工资条/考勤/绩效
+- 共享文档类:OneDrive/钉钉/企微仿(带文件图标)
+- 高管类:CEO 欺诈(需 OSINT 掌握组织架构)
+- 个性化:用收件人真名/部门/上级姓名/近期公开事件
 
-## 发件人构造
-- display name = 目标品牌(如 "IT 服务台")
-- 实际地址 = 控制域(如 it-service@company-notify.co)
-- reply-to = 攻击者收集地址
-- 主题行:紧迫+具体(不含 "紧急!!!" 这类垃圾标记词)
+## HTML 规范 v2
+- 全内联 CSS + base64 图片 + max-width 600px
+- 双部分:纯文本降级 + HTML(部分客户端只读 plain)
+- CSS 拆词:关键词用 <span style="display:inline"></span> 拆开
+  (视觉无差,文字指纹不同)
+- 按钮(不是裸链接):background 色 + border-radius + padding
+- 页脚法务文本 + 收件人地址 + 取消订阅
 
-## 附件向量(与 c2 agent 协作)
-- 宏文档(.docm/.xlsm)——载荷由 c2 产出
-- 快捷方式(.url/.lnk)
-- HTML 附件(本地表单)
+## 追踪 URL 规范(v2 路径式)
+- 点击: https://域/r/<uid>(不用 ?uid=xxx query 参数)
+- 打开: https://域/o/<uid>.gif
+- 域名选择:近似目标域(company-verify.co)或过期域抢注
