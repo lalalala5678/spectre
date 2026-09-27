@@ -144,14 +144,19 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
         if (!m) return { ok: false, error: 'ssh transportRef 需 user:pass@host[:port]' };
         const [, u, pw, h, port] = m;
         const r = await new Promise((resolve) => {
+          const tSecS = Math.max(1, Math.ceil(timeoutMs / 1000));
           execFile('sshpass', ['-p', pw, 'ssh', '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null', '-p', port || '22',
-            `${u}@${h}`, 'bash -lc ' + JSON.stringify(command)],
+            `${u}@${h}`, `timeout -k 5 ${tSecS} bash -lc ` + JSON.stringify(command)],
             { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? ''), code: err ? (err.code ?? 1) : 0 }));
         });
         stdout = r.so; stderr = r.se; code = r.code;
+        if (code === 124 || code === 137) stderr += '\n[timeout: 远端进程已被 timeout(1) 终止]';
         if (r.err?.killed) stderr += '\n[timeout]';
+        if (r.err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+          stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
+        }
       } else if (sh.transport === 'web') {
         // transportRef: full URL template with {CMD} placeholder, e.g.
         //   http://h/p.php?c={CMD}        (GET; CMD urlencoded)
@@ -194,16 +199,24 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
         // (default user) or "container:user" (low-priv web compromise).
         const ref = sh.transportRef || 'spectre-sandbox';
         const [cbox, cuser] = ref.includes(':') ? ref.split(':') : [ref, null];
+        // F18: 容器侧 timeout(1) 包裹——node 杀 docker CLI 不杀容器进程
+        // (泄漏 bash+sleep),且 docker CLI 被 SIGTERM 后 err 为空导致超时
+        // 谎报 code:0 ok:true。容器内 timeout 真杀进程并返回 124。
+        const tSec = Math.max(1, Math.ceil(timeoutMs / 1000));
         const argv = cuser
-          ? ['exec', '-u', cuser, cbox, 'bash', '-lc', command]
-          : ['exec', cbox, 'bash', '-lc', command];
+          ? ['exec', '-u', cuser, cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command]
+          : ['exec', cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command];
         const res = await new Promise((resolve) => {
-          execFile('docker', argv, { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
+          execFile('docker', argv, { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
         });
         stdout = res.so; stderr = res.se;
         code = res.err ? (res.err.code ?? 1) : 0;
+        if (code === 124 || code === 137) { stderr += '\n[timeout: 容器内进程已被 timeout(1) 终止]'; }
         if (res.err && res.err.killed) stderr += '\n[timeout]';
+        if (res.err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+          stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
+        }
       } else {
         return { ok: false, error: `transport ${sh.transport} 未接入(真实植入通道后续挂)` };
       }
