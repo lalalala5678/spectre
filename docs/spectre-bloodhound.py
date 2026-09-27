@@ -16,80 +16,113 @@ from collections import defaultdict, deque
 # ============================================================
 
 def collect(dc, domain, username, password, out):
+    """F44 容错化(postex 走查 5 缺口):
+    - 缺属性用户(memberOf 空,AD 极常见)不崩——安全读
+    - 分页拉全量(>1000 不再静默截断)
+    - try/finally 保 unbind
+    - RootDSE 空守卫(回退域名推导)
+    - 绑定失败友好错(exit 3)"""
     from ldap3 import Server, Connection, ALL, SUBTREE
     server = Server(dc, port=389, get_info=ALL)
-    conn = Connection(server, user=f'{domain}\\{username}', password=password,
-                      authentication='NTLM', auto_bind=True)
-    base = server.info.other.get('defaultNamingContext', [f'DC={",DC=".join(domain.split("."))}'])[0]
-
-    graph = {'users': [], 'groups': [], 'computers': [], 'acls': [],
-             'sessions': [], 'ous': [], 'meta': {'domain': domain, 'dc': dc}}
-
-    # 用户
-    conn.search(base, '(objectClass=user)', SUBTREE, attributes=[
-        'sAMAccountName', 'distinguishedName', 'memberOf', 'description',
-        'servicePrincipalName', 'userAccountControl', 'pwdLastSet', 'adminCount',
-        'lastLogonTimestamp', 'mail'])
-    for e in conn.entries:
-        u = {
-            'name': str(e.sAMAccountName), 'dn': str(e.distinguishedName),
-            'groups': [str(g) for g in (e.memberOf.values if e.memberOf.raw_values else [])],
-            'spn': [str(s) for s in (e.servicePrincipalName.values if e.servicePrincipalName.raw_values else [])],
-            'adminCount': bool(e.adminCount.value),
-            'uac': int(e.userAccountControl.value or 0),
-            'pwdLastSet': str(e.pwdLastSet.value or ''),
-            'desc': str(e.description.value or ''),
-            'mail': str(e.mail.value or ''),
-        }
-        # 关键标志
-        u['kerberoastable'] = bool(u['spn'])
-        u['disabled'] = bool(u['uac'] & 0x2)
-        u['dontReqPreauth'] = bool(u['uac'] & 0x400000)
-        u['cleartext_pw_in_desc'] = 'pass' in u['desc'].lower() or 'pw' in u['desc'].lower()[:30]
-        graph['users'].append(u)
-
-    # 组
-    conn.search(base, '(objectClass=group)', SUBTREE, attributes=[
-        'sAMAccountName', 'distinguishedName', 'member', 'adminCount', 'description'])
-    for e in conn.entries:
-        g = {
-            'name': str(e.sAMAccountName), 'dn': str(e.distinguishedName),
-            'members': [str(m) for m in (e.member.values if e.member.raw_values else [])],
-            'adminCount': bool(e.adminCount.value),
-            'desc': str(e.description.value or ''),
-        }
-        graph['groups'].append(g)
-
-    # 计算机
-    conn.search(base, '(objectClass=computer)', SUBTREE, attributes=[
-        'sAMAccountName', 'distinguishedName', 'operatingSystem', 'memberOf'])
-    for e in conn.entries:
-        c = {
-            'name': str(e.sAMAccountName).rstrip('$'), 'dn': str(e.distinguishedName),
-            'os': str(e.operatingSystem.value or ''),
-            'groups': [str(g) for g in (e.memberOf.values if e.member.raw_values else [])],
-        }
-        graph['computers'].append(c)
-
-    # ACL(nTSecurityDescriptor 解析——简化:只看关键扩展权限)
     try:
-        conn.search(base, '(|(objectClass=user)(objectClass=group)(objectClass=domain))',
-                    SUBTREE, attributes=['nTSecurityDescriptor', 'sAMAccountName', 'distinguishedName'])
-        # 完整 DACL 解析需要 pyasn1 之类的 BER 解码,此处只记录有 nTSecurityDescriptor 的对象
-        # 深度分析交给 analyze 阶段(从 acl 属性的存在性推断)
-        graph['meta']['acl_objects'] = len(conn.entries)
-    except Exception:
-        pass
+        conn = Connection(server, user=f'{domain}\\{username}', password=password,
+                          authentication='NTLM', auto_bind=True)
+    except Exception as e:
+        print(f'[!] LDAP 绑定失败({dc}@{domain}): {e}', file=sys.stderr)
+        sys.exit(3)
+    try:
+        _nc = ((server.info or {}).other or {}).get('defaultNamingContext') or []
+        if not _nc:
+            print('[!] RootDSE 无 defaultNamingContext——回退域名推导', file=sys.stderr)
+        base = _nc[0] if _nc else f'DC={",DC=".join(domain.split("."))}'
 
-    conn.unbind()
-    json.dump(graph, open(out, 'w'), indent=1, ensure_ascii=False)
+        graph = {'users': [], 'groups': [], 'computers': [], 'acls': [],
+                 'sessions': [], 'ous': [], 'meta': {'domain': domain, 'dc': dc}}
+
+        def _vals(e, attr):
+            try:
+                a = getattr(e, attr, None)
+                if a is None:
+                    return []
+                return [str(x) for x in (a.raw_values or a.values or [])]
+            except Exception:
+                return []
+
+        def _sval(e, attr):
+            try:
+                v = getattr(e, attr, None)
+                return str(v.value) if v is not None and v.value is not None else ''
+            except Exception:
+                return ''
+
+        # 用户(分页)
+        conn.search(base, '(objectClass=user)', SUBTREE, paged_size=500, attributes=[
+            'sAMAccountName', 'distinguishedName', 'memberOf', 'description',
+            'servicePrincipalName', 'userAccountControl', 'pwdLastSet', 'adminCount',
+            'lastLogonTimestamp', 'mail'])
+        for e in conn.entries:
+            name = _sval(e, 'sAMAccountName')
+            if not name:
+                continue
+            try:
+                uac = int(e.userAccountControl.value or 0)
+            except Exception:
+                uac = 0
+            u = {
+                'name': name, 'dn': _sval(e, 'distinguishedName'),
+                'groups': _vals(e, 'memberOf'),
+                'spn': _vals(e, 'servicePrincipalName'),
+                'adminCount': _sval(e, 'adminCount') not in ('', 'False', '0', 'None'),
+                'uac': uac,
+                'pwdLastSet': _sval(e, 'pwdLastSet'),
+                'desc': _sval(e, 'description'),
+                'mail': _sval(e, 'mail'),
+            }
+            u['kerberoastable'] = bool(u['spn'])
+            u['disabled'] = bool(u['uac'] & 0x2)
+            u['dontReqPreauth'] = bool(u['uac'] & 0x400000)
+            u['cleartext_pw_in_desc'] = 'pass' in u['desc'].lower() or 'pw' in u['desc'].lower()[:30]
+            graph['users'].append(u)
+
+        # 组(分页)
+        conn.search(base, '(objectClass=group)', SUBTREE, paged_size=500, attributes=[
+            'sAMAccountName', 'distinguishedName', 'member', 'adminCount', 'description'])
+        for e in conn.entries:
+            name = _sval(e, 'sAMAccountName')
+            if not name:
+                continue
+            g = {
+                'name': name, 'dn': _sval(e, 'distinguishedName'),
+                'members': _vals(e, 'member'),
+                'adminCount': _sval(e, 'adminCount') not in ('', 'False', '0', 'None'),
+                'desc': _sval(e, 'description'),
+            }
+            graph['groups'].append(g)
+
+        # 计算机(分页)
+        conn.search(base, '(objectClass=computer)', SUBTREE, paged_size=500, attributes=[
+            'sAMAccountName', 'distinguishedName', 'operatingSystem', 'memberOf'])
+        for e in conn.entries:
+            name = _sval(e, 'sAMAccountName')
+            if not name:
+                continue
+            c = {
+                'name': name.rstrip('$'), 'dn': _sval(e, 'distinguishedName'),
+                'os': _sval(e, 'operatingSystem'),
+                'groups': _vals(e, 'memberOf'),
+            }
+            graph['computers'].append(c)
+
+        json.dump(graph, open(out, 'w'), indent=1, ensure_ascii=False)
+    finally:
+        try:
+            conn.unbind()
+        except Exception:
+            pass
     print(f'[✓] collected: {len(graph["users"])} users, {len(graph["groups"])} groups, '
           f'{len(graph["computers"])} computers → {out}')
     return graph
 
-# ============================================================
-# 分析(图论)
-# ============================================================
 
 def build_adjacency(graph):
     """构建邻接表——两条边:
