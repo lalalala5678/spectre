@@ -168,10 +168,17 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
         const [spec0, marker] = spec.split('#');
         const isPost = spec0.startsWith('POST|');
         const tpl = isPost ? spec0.slice(5) : spec0;
+        // F26: POST 模板形如 "url|c={CMD}" —— url 与 form 段用 | 分隔;
+        // 此前整段 tpl 当 fetch url 且 parseFormBody 吃进完整 URL 导致
+        // 命令字段丢失(实测 post-ok: 空)。拆开:url 部分 fetch,form 部分
+        // 做 body。无 | 时 form 段缺省 c={CMD}。
+        const postSplit = isPost ? tpl.split('|') : [];
+        const postUrl = isPost ? (postSplit[0] || tpl) : tpl;
+        const postForm = isPost ? (postSplit.slice(1).join('|') || 'c={CMD}') : '';
         if (!tpl.includes('{CMD}')) return { ok: false, error: 'web transportRef 需含 {CMD} 占位' };
         const enc = encodeURIComponent(command);
-        const url = isPost ? tpl : tpl.replace('{CMD}', enc);
-        const body = isPost ? tpl.replace('{CMD}', enc) : null;
+        const url = isPost ? postUrl : tpl.replace('{CMD}', enc);
+        const body = isPost ? postForm.replace('{CMD}', enc) : null;
         const ctl = new AbortController();
         const t = setTimeout(() => ctl.abort(), Math.min(timeoutMs, 60_000)); // hard kill
         try {
