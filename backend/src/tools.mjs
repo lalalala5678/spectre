@@ -20,8 +20,8 @@ import { clipMarked } from './pi.mjs';
 import { foldRevisions } from './revision.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 
-/** The exactly-three configuration agents (AGENTS.md 铁律:有且只有). */
-const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
+// (E1 清理: CONFIG_AGENT_KEYS 死常量已删——唯一权威来源在 agents.mjs 导出)
+export { CONFIG_AGENT_KEYS } from './agents.mjs';
 
 const STAGE_KEYS = [
   'recon', 'nday', 'weakcred', 'api', 'exploit',

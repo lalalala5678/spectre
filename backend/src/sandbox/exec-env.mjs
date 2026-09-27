@@ -203,6 +203,20 @@ function makeFileSystem(cwdContainer) {
     const host = containerPathToHost(s);
     return host ?? s;
   };
+  /** E2/E2b 统一写策略: 映射层尊重挂载意图——未映射绝对路径拒写
+   * (扩展到全部变更操作);skills 前缀拒写(容器 :ro 意图,宿主侧
+   * 绕过=跨 agent 污染向量)。合法技能写入走 saveSkill。 */
+  const denyMutate = p => {
+    const s = String(p ?? '');
+    if (path.isAbsolute(s) && containerPathToHost(s) === null) {
+      return `路径 ${s} 不在容器映射表(/workspace,/opt/tools,/opt/skills)内——落宿主而 bash 看不见。改用 /workspace/<项目>/ 相对路径或 /opt/tools/。`;
+    }
+    const host = resolve(s);
+    if (host === HOST.skills || host.startsWith(HOST.skills + path.sep)) {
+      return `路径 ${s} 属 /opt/skills(只读挂载意图)——技能写入请用 configure_skill 工具或配置面板(带 frontmatter 校验),write 直写会绕过校验污染其它 agent。`;
+    }
+    return null;
+  };
   /** Relative paths resolve against the SESSION's project cwd (mapped to
    *  its host path), never the runtime process cwd. */
   const resolveFull = p => {
@@ -232,27 +246,22 @@ function makeFileSystem(cwdContainer) {
     readBinaryFile: async (p, ctx) => wrap(async () =>
       new Uint8Array(await fsp.readFile(resolve(p)))),
     writeFile: async (p, content, ctx) => wrap(async () => {
-      const mapped = containerPathToHost(String(p ?? ''));
-      if (mapped === null && path.isAbsolute(String(p ?? ''))) {
-        // Docker driver: unmapped absolute path = write lands on HOST fs,
-        // bash inside container can't see it (the write↔bash split bug).
-        return err({ code: 'permission_denied',
-          message: `路径 ${p} 不在容器映射表(/workspace,/opt/tools,/opt/skills)内——write 落宿主而 bash 看不见。改用 /workspace/<项目>/ 相对路径或 /opt/tools/,或用 bash heredoc 写入。` });
-      }
+      const deny = denyMutate(p);
+      if (deny) return err({ code: 'permission_denied', message: deny });
       await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
       await fsp.writeFile(resolve(p), content);
     }),
     appendFile: async (p, content, ctx) => wrap(async () => {
-      const mapped = containerPathToHost(String(p ?? ''));
-      if (mapped === null && path.isAbsolute(String(p ?? ''))) {
-        return err({ code: 'permission_denied',
-          message: `路径 ${p} 不在容器映射表内——改用 /workspace/ 相对路径或 bash heredoc。` });
-      }
+      const deny = denyMutate(p);
+      if (deny) return err({ code: 'permission_denied', message: deny });
       await fsp.mkdir(path.dirname(resolve(p)), { recursive: true });
       await fsp.appendFile(resolve(p), content);
     }),
-    renameFile: async (s, d, ctx) => wrap(async () =>
-      await fsp.rename(resolve(s), resolve(d))),
+    renameFile: async (s, d, ctx) => wrap(async () => {
+      const deny = denyMutate(s) ?? denyMutate(d);
+      if (deny) return err({ code: 'permission_denied', message: deny });
+      await fsp.rename(resolve(s), resolve(d));
+    }),
     fileInfo: async (p, ctx) => wrap(async () => {
       const host = resolve(p);
       const st = await fsp.lstat(host);
@@ -282,8 +291,11 @@ function makeFileSystem(cwdContainer) {
       await fsp.realpath(resolve(p))),
     exists: async (p, ctx) => wrap(async () =>
       fs.existsSync(resolve(p))),
-    createDir: async (p, opts, ctx) => wrap(async () =>
-      await fsp.mkdir(resolve(p), { recursive: opts?.recursive !== false })),
+    createDir: async (p, opts, ctx) => wrap(async () => {
+      const deny = denyMutate(p);
+      if (deny) return err({ code: 'permission_denied', message: deny });
+      await fsp.mkdir(resolve(p), { recursive: opts?.recursive !== false });
+    }),
     cleanup: async ctx => { /* host fs needs no cleanup */ },
   };
 }

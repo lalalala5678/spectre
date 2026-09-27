@@ -46,6 +46,9 @@ export function typeLabelOf(key) {
 
 export const AGENT_KEYS = AGENTS.map(a => a.key);
 
+/** 配置三键(AGENTS.md 铁律:有且只有)——唯一权威来源。 */
+export const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
+
 export function isAgentKey(key) {
   return AGENT_KEYS.includes(key);
 }

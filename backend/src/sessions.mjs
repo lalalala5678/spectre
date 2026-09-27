@@ -17,6 +17,7 @@ import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
+import { buildToolingTools } from './sandbox/tooling.mjs';
 
 /** Disk-full resilience: a failing WAL append must degrade to a log
  *  line, never crash the agent loop at the exact moment durability
@@ -172,16 +173,23 @@ export class SessionStore {
     // sees the whole project, it must be able to file leads; live
     // regression proved the static roster lied to it) minus the
     // duplicate spawn_agent; every agent queries intel.
+    // E1(铁律:有且只有): 配置agent第一分支——只持自己的配置工具
+    // +官方 bash/read/write/edit;业务工具集(report_vulnerability/
+    // publish_intel/...)不属于它们。此前落入 buildDirectTools 默认尾
+    // =全套业务工具(CONFIG_AGENT_KEYS 死代码从未接线)。
+    const isConfigAgent = ['skill-config', 'mcp-config', 'cli-config'].includes(record.agentKey);
     const base = isOrchestrator
       ? [
         ...buildOrchestratorTools(record, this.caps),
         ...buildChildTools(record, this.caps).filter(t => t.name !== 'spawn_agent'),
         ...buildIntelTools(record, this.caps),
       ]
-      : hasParent
-        ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps)]
-        : [...buildDirectTools(record, this.caps),
-          ...buildIntelTools(record, this.caps)];
+      : isConfigAgent
+        ? buildToolingTools(record, this.caps)
+        : hasParent
+          ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps)]
+          : [...buildDirectTools(record, this.caps),
+            ...buildIntelTools(record, this.caps)];
     // Sandbox layer: official bash/read/write/edit (ExecutionEnv-bound,
     // project cwd) + per-agent MCP tools + per-agent skill index.
     const mount = mountForSession(record.agentKey, record.workSessionId);
