@@ -62,7 +62,12 @@ export function emitRevision(bus, { target, fields, reason,
     type: target.type,
     revises: target.seq,
     title: fields.title ?? base.title,
-    summary: fields.title ?? base.summary,
+    // F34: status/title 任一变更时重算 summary——此前沿用原串,
+    // "failed · X" 修订为 success 后仍显示 failed(编排对账实测矛盾)
+    summary: (fields.title !== undefined || fields.status !== undefined)
+      ? `${fields.status !== undefined ? fields.status
+          : (base.status ?? target.status ?? '')} · ${fields.title ?? base.title}`
+      : (fields.title ?? base.summary),
     severity: fields.severity !== undefined ? fields.severity : base.severity,
     status: fields.status !== undefined ? fields.status : base.status,
     detail: fields.text ?? base.detail,

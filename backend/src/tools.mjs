@@ -273,8 +273,13 @@ export function buildIntelTools(record, caps) {
       let inferred = false;
       if (!status) {
         inferred = true;
+        // F34: 推断收窄——描述性否定("未能确认/无法验证"是正常阴性结论,
+        // 非"任务失败")曾把 no-result 报成 failed(编排对账实测踩中)。
+        // 仅当失败词出现在任务定性位置(开头 40 字符或带"任务/执行/整体"前缀)才判 failed。
         const o = `${params.outcome ?? ''}\n${params.title ?? ''}`.toLowerCase();
-        status = /失败|无法|未能|没?有成功|failed|error|超时|timeout/.test(o)
+        const outcomeHead = (params.outcome ?? '').trim().slice(0, 40).toLowerCase();
+        status = (/^(任务|执行|整体)?(失败|failed)|超时|timeout/.test(outcomeHead)
+            || /任务失败|执行失败|整体失败|operation failed/.test(o))
           ? 'failed'
           : /部分|partial|未完成/.test(o)
             ? 'partial'
