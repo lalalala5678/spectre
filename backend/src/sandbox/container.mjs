@@ -97,7 +97,7 @@ export async function ensureSandbox() {
     return { driver: 'docker', ok: false, error: `pull failed: ${pull.out.slice(-200)}` };
   }
   const create = await run('docker', [
-    'run', '-d', '--name', cfg.container,
+    'run', '-d', '--init', '--name', cfg.container,
     '--network', 'host',
     '-v', `${HOST.workspace}:/workspace`,
     '-v', `${HOST.skills}:/opt/skills:ro`,
@@ -105,6 +105,8 @@ export async function ensureSandbox() {
     '-v', `${HOST.uploads}:/opt/uploads`,
     '-w', '/workspace',
     cfg.image, 'sleep', 'infinity',
+    // --init(F11): tini 作为 PID1 收割孤儿——sleep infinity 不 wait() 导致
+    // docker exec 的孤儿进程永久僵尸化(实测 458 个 Sep15 遗留)。
   ]);
   if (create.code !== 0) {
     return { driver: 'docker', ok: false, error: create.out.slice(-200) };
