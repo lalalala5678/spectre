@@ -5,7 +5,7 @@ import {
 import { AGENTS } from '../mock/data';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
-import { Dot, statusTone } from '../components/ui/Badge';
+import { Dot } from '../components/ui/Badge';
 import { Panel } from '../components/ui/Panel';
 import { PanelStack } from '../components/ui/PanelStack';
 import { LiveSession } from '../components/session/LiveSession';
@@ -271,11 +271,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           <div className="flex items-center gap-2">
             <h1 className="text-sm font-semibold text-zinc-100">{agent.name}</h1>
             <span className="text-[11px] text-zinc-500">{agent.codename}</span>
-            <span className="flex items-center gap-1 text-[10px] text-zinc-500">
-              <Dot tone={statusTone(agent.status)} />
-              {agent.status}
-            </span>
-            <span className="font-mono text-[10px] text-zinc-600">{agent.version}</span>
+            {/* F24: 删假 status/version(mock 硬编码,与真实会话态无关) */}
           </div>
           <p className="mt-px truncate text-[11px] text-zinc-600">{agent.desc}</p>
         </div>
@@ -465,49 +461,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {tab === 'config' && (
             <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
               {isAuto && <SpawnLimitSettings />}
-              <Panel title="运行时配置">
-                <div className="space-y-3">
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-600">模型</span>
-                    <select className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 outline-none">
-                      <option>{agent.model}</option>
-                      <option>deepseek-v4-pro</option>
-                      <option>kimi-k3</option>
-                      <option>auto（按任务路由）</option>
-                    </select>
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-600">最大并发工具调用</span>
-                    <input type="number" defaultValue={4} className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[12px] text-zinc-200 outline-none" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-600">单任务超时 (s)</span>
-                    <input type="number" defaultValue={900} className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[12px] text-zinc-200 outline-none" />
-                  </label>
-                  <label className="block">
-                    <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-600">System Prompt 附加段</span>
-                    <textarea rows={4} placeholder="注入到该 Agent system prompt 末尾的自定义约束…" className="w-full resize-none rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600 outline-none" />
-                  </label>
-                </div>
-              </Panel>
-              <Panel title="能力挂载（快捷）">
-                <p className="mb-2 text-[11px] text-zinc-600">
-                  完整管理请前往 <span className="text-zinc-400">Skill 管理 / MCP Server</span> 页面。此处仅做启用开关。
-                </p>
-                <div className="space-y-1.5">
-                  {agent.skills.map((s) => (
-                    <div key={s} className="flex items-center justify-between rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
-                      <span className="font-mono text-[11.5px] text-zinc-300">#{s}</span>
-                      <Dot tone="cyan" />
-                    </div>
-                  ))}
-                  {agent.mcpServers.map((m) => (
-                    <div key={m} className="flex items-center justify-between rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
-                      <span className="font-mono text-[11.5px] text-zinc-400">{m} (mcp)</span>
-                      <Dot tone="cyan" />
-                    </div>
-                  ))}
-                </div>
+              {/* F24: 原「运行时配置」为无保存逻辑的假表单(模型假选项/输入框
+                  不落地)——真实配置在「Agent 配置」页(LLM 连通校验+逐字段保存)。
+                  能力挂载原为 mock 假技能名,改真实技能目录(只读展示)。 */}
+              <Panel title="本 Agent 技能(真实挂载,只读)">
+                <RealSkillsPanel agentKey={agent.id} />
               </Panel>
             </div>
           )}
@@ -543,6 +501,32 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         </div>
       )}
 
+    </div>
+  );
+}
+
+/** F24: 真实技能只读面板(原 mock 假技能名列表) */
+function RealSkillsPanel({ agentKey }: { agentKey: string }) {
+  const [names, setNames] = useState<string[] | null>(null);
+  const [err, setErr] = useState('');
+  useEffect(() => {
+    api<{ agentKey: string; name: string }[]>('/sandbox/skills')
+      .then(tree => {
+        setNames(tree.filter(t => t.agentKey === agentKey).map(t => t.name));
+      })
+      .catch(e => setErr(e instanceof Error ? e.message : String(e)));
+  }, [agentKey]);
+  if (err) return <div className="text-[11.5px] text-red-400">加载失败:{err}</div>;
+  if (!names) return <div className="text-[11.5px] text-zinc-500">载入中…</div>;
+  if (!names.length) return <div className="text-[11.5px] text-zinc-500">该 agent 暂无挂载技能。</div>;
+  return (
+    <div className="space-y-1.5">
+      {names.map(n => (
+        <div key={n} className="flex items-center justify-between rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
+          <span className="font-mono text-[11.5px] text-zinc-300">#{n}</span>
+          <Dot tone="cyan" />
+        </div>
+      ))}
     </div>
   );
 }
