@@ -608,6 +608,40 @@ function realRouter({ store, bus, caps, wal }) {
       const started = await startAutopwn({ engagementId: undefined, instruction, agents });
       return json(res, 201, started);
     }
+    // ---------- autopwn resume(断点续跑——只补跑未完成的 agent) ----------
+    if (path === '/api/autopwn/resume' && method === 'POST') {
+      const body = await readJson(req);
+      const prevId = String(body.engagementId || '');
+      const instruction = String(body.instruction || '').slice(0, 8000);
+      if (!prevId || !instruction) {
+        return bad(res, 400, 'engagementId and instruction required');
+      }
+      const prevEngagement = `autopwn-${prevId}`;
+      // 从 bus 提取旧战役的完成信号: result/share 事件按 agent 归类
+      const completed = new Set();
+      for (const ev of bus.list()) {
+        if (ev.engagement !== prevEngagement) continue;
+        const from = ev.from || '';
+        if (['recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2',
+             'persistence', 'postex', 'report'].includes(from)
+            && (ev.channel === 'share' || (ev.channel === 'dm' && ev.type === 'result'))) {
+          completed.add(from);
+        }
+      }
+      const requested = (body.agents || []).filter(isAgentKey);
+      const pool = requested.length > 0 ? requested : ['recon', 'nday', 'weakcred',
+        'api', 'exploit', 'c2', 'persistence', 'postex', 'report'];
+      const rerun = pool.filter(k => !completed.has(k));
+      if (rerun.length === 0) {
+        return json(res, 200, { engagementId: prevId, resumed: false,
+          completed: [...completed], rerun: [],
+          message: '旧战役全部 agent 已有产出,无需续跑' });
+      }
+      const started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun });
+      return json(res, 201, { ...started, resumed: true,
+        completed: [...completed], rerun,
+        message: `续跑:跳过 ${completed.size} 个已完成,重跑 ${rerun.length} 个` });
+    }
     if (path === '/api/autopwn' && method === 'GET') {
       const workflowId = url.searchParams.get('workflowId');
       if (!workflowId) {
@@ -619,6 +653,49 @@ function realRouter({ store, bus, caps, wal }) {
       } catch (err) {
         return bad(res, 404, String(err));
       }
+    }
+
+    // ---------- phish campaign 漏斗(GoPhish 面板数据) ----------
+    if (path === '/api/phish/campaigns' && method === 'GET') {
+      const dbFiles = [];
+      const trackDir = '/var/lib/spectre/tools/phish';
+      const { readdirSync, readFileSync, existsSync } = await import('node:fs');
+      if (existsSync(trackDir)) {
+        for (const fn of readdirSync(trackDir)) {
+          if (fn.endsWith('.json')) dbFiles.push(fn.replace('.json', ''));
+        }
+      }
+      const campaigns = [];
+      for (const name of dbFiles) {
+        try {
+          const ev = JSON.parse(readFileSync(`${trackDir}/${name}.json`, 'utf8')).events || [];
+          const byUid = {};
+          for (const e of ev) {
+            byUid[e.uid] ??= { open: 0, click: 0, submit: 0, session: 0 };
+            if (e.kind === 'open') byUid[e.uid].open++;
+            if (e.kind === 'click') byUid[e.uid].click++;
+            if (e.kind === 'submit') byUid[e.uid].submit++;
+            if (e.kind === 'session-captured') byUid[e.uid].session++;
+          }
+          const targets = Object.keys(byUid).length;
+          const opens = Object.values(byUid).filter(v => v.open > 0).length;
+          const clicks = Object.values(byUid).filter(v => v.click > 0).length;
+          const submits = Object.values(byUid).filter(v => v.submit > 0).length;
+          const sessions = Object.values(byUid).filter(v => v.session > 0).length;
+          campaigns.push({
+            name, events: ev.length, targets,
+            funnel: { opens, clicks, submits, sessions },
+            rates: {
+              open: targets ? Math.round(opens * 100 / targets) : 0,
+              click: targets ? Math.round(clicks * 100 / targets) : 0,
+              submit: targets ? Math.round(submits * 100 / targets) : 0,
+              session: targets ? Math.round(sessions * 100 / targets) : 0,
+            },
+            timeline: ev.slice(-50).map(e => ({ ts: e.ts, kind: e.kind, uid: e.uid })),
+          });
+        } catch { /* skip corrupt */ }
+      }
+      return json(res, 200, { campaigns });
     }
 
     return bad(res, 404, 'not found');

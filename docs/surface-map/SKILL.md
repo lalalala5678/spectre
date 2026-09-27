@@ -1,0 +1,39 @@
+---\nname: surface-map\ndescription: 攻击面测绘·白盒(阶段二)\n---\n\n# 攻击面测绘·白盒(阶段二)
+[read-only] 路由注册面全枚举——审计优先级排序器。
+
+## Spring 系(若依/JeecgBoot 族)
+1. 路由注解全扫: `grep -rn "@RequestMapping\|@GetMapping\|@PostMapping" --include="*.java" | wc -l`
+2. **未鉴权金矿三处**:
+   - SecurityConfig/ShiroConfig 的 filterChainDefinitionMap putAnon / permitAll 列表
+   - @Anonymous / @PassToken / @IgnoreAuth 类自定义注解(grep 定义处,再全扫使用处)
+   - 拦截器白名单: ExcludeUrlProperties/ignore-urls 配置项(application.yml)
+3. jeecg 特有: JimuNoLoginRequired 注解、/jmreport/** 拦截器豁免(历史洞高发区)
+4. 低权可达: @RequiresPermissions 值 vs 默认角色权限表(sys_menu 初始 SQL)
+
+## ThinkPHP/PHP 系
+- route 配置(route.php)+控制器自动映射+__call 魔术方法面
+- 中间件白名单(middleware.php allow)
+
+## 产出表
+| 端点 | 鉴权 | 控制器.方法 | 参数 | 优先级 |
+未鉴权×功能端点=P0;未鉴权×静态资源=P2;低权×管理功能=P1。
+该表直接决定阶段三的审计顺序——不要均匀撒网。
+
+## 平台工具(2026-09 白盒 benchmark 5 工具沉淀,原会话资产升级平台层)
+- `wb-anon.sh <srcdir>`:5 框架未鉴权面一发提取(Shiro anon/Security permitAll/
+  @SaIgnore/yml excludes/拦截器注册)——jeecg 实测一发命中 /jmreport/** anon
+- 工具位升级:/opt/tools/bin/wb-*.sh(原 /workspace/ws-whitebox/tools/)
+- sa-token 陷阱:拦截器 excludes 上的路径 @SaCheckPermission 同步失效(ruoyi-ai
+  839 根因);拦截器注册函数的覆盖表=豁免金矿
+
+## 路径匹配三写法判例集(SOP v3,2026-09 /chat 误判教训)
+`excludePathPatterns`/anon 链的豁免判定=匹配模式语义×端点实际路径双核对:
+- `/path`(精确)≠`/path/**`(Ant 递归)≠前缀想当然
+- 判例:seq839 `/resource/oss/upload` 精确端点=成立;seq833 `/jmreport/**`
+  递归=成立;/chat(把精确当递归用)=误判被 writer 实证驳回
+- 判豁免面前置步骤:先抄下注册代码原文的写法,再逐端点核对
+## 运营侧效率指标(白盒 benchmark 标定)
+- 重发现率:精确/同族/反证/误报 四分(首轮 5/2/1/0)
+- 产出密度:洞/小时(首轮 11 洞/3h≈3.7)
+- tagdiff 命中占比:补丁定位法直接命中的洞占比(827/830=2/11)
+- SOP 版本追踪:每轮自评后 SOP+1,趋势回退=技能债
