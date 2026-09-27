@@ -651,6 +651,17 @@ function realRouter({ store, bus, caps, wal }) {
         return bad(res, 400, 'engagementId and instruction required');
       }
       const prevEngagement = `autopwn-${prevId}`;
+      // F1 修复:存在性校验——bus 有事件 OR Temporal describe 成功(双通道:
+      // temporal-dev 历史保留期短于 bus WAL,老战役工作流记录过期仍可续跑)。
+      // 两者皆无 = typo/不存在的 ID,404 引导走主端点,防静默全量新战役。
+      const knownByBus = bus.list().some(e => e.engagement === prevEngagement);
+      if (!knownByBus) {
+        try {
+          await describeWorkflow(prevEngagement);
+        } catch {
+          return bad(res, 404, 'engagement not found, use POST /api/autopwn');
+        }
+      }
       // 从 bus 提取旧战役的完成信号: result/share 事件按 agent 归类
       const completed = new Set();
       for (const ev of bus.list()) {
@@ -670,6 +681,10 @@ function realRouter({ store, bus, caps, wal }) {
         return json(res, 200, { engagementId: prevId, resumed: false,
           completed: [...completed], rerun: [],
           message: '旧战役全部 agent 已有产出,无需续跑' });
+      }
+      if (body.dryRun) {
+        return json(res, 200, { engagementId: prevId, dryRun: true,
+          completed: [...completed], rerun });
       }
       const started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun });
       return json(res, 201, { ...started, resumed: true,
