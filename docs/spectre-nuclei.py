@@ -229,7 +229,10 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
                 e = _rr.sub(r"(\w+)\s*!?=~?\s*['\"]([^'\"]*)['\"]", lambda mm: repr(mm.group(2) in body_str), e)
                 e = _rr.sub(r"contains\((\w+),\s*['\"]([^'\"]*)['\"]\)", lambda mm: str(mm.group(2) in (body_str if mm.group(1) not in ('header',) else header_str)), e)
                 e = _rr.sub(r"len\((\w+)\)", lambda mm: str(len(body_str) if mm.group(1) not in ('header',) else len(header_str)), e)
-                e = _rr.sub(r"status_code", str(status), e)
+                # F41: 只替换独立 status_code——re.sub 无界会吞
+                # status_code_2 → '200_2' 数字字面量恒真(CVE-2021-45968
+                # FP 实锤);带 _N 后缀的多请求变量保持字面量→eval False
+                e = _rr.sub(r"(?<![\w])status_code(?![\w])", str(status), e)
                 e = _rr.sub(r"\btrue\b", 'True', e)
                 e = _rr.sub(r"\bfalse\b", 'False', e)
                 e = e.replace(' && ', ' and ').replace(' || ', ' or ')
@@ -371,6 +374,10 @@ def execute_template(tpl, target, timeout=15):
     for req_spec in http_specs:
         # interactsh(OOB)标记——跳过(无 OOB 基础设施时)
         if '{{interactsh-url}}' in json.dumps(req_spec):
+            continue
+        # F41: flow: 条件编排未支持(979 模板 15.8%)——执行会
+        # 误判(3/4 剩余 FP 根因),整体跳过=诚实 FN 边界
+        if req_spec.get('flow') or tpl.get('flow'):
             continue
 
         # F29: raw 原文请求块(METHOD /path HTTP/1.1 + 头 + 体)
