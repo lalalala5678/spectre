@@ -83,9 +83,27 @@ def do_http(req_spec, target):
         import re as _re2
         return _re2.sub(r'\{\{randstr[_ ]?(\d+)?\}\}', _r, t)
     path = _dyn(path)
+    # F37: payloads 变量系统——模板级 payloads: {var: val|(list|range)}
+    # 代入 {{var}};全部替换后仍残留 {{...}} 的路径/体直接跳过
+    # (字面量发出=必假阳性,php 组复扫 2 FP 实锤)。
+    import re as _re3
+    _pl = req_spec.get('payloads') or {}
+    def _payloads_sub(txt):
+        def _one(m):
+            name = m.group(1)
+            if name in _pl:
+                v = _pl[name]
+                if isinstance(v, list):
+                    v = v[0] if v else ''
+                return str(v)
+            return m.group(0)
+        return _re3.sub(r'\{\{(\w+)\}\}', _one, txt)
+    path = _payloads_sub(path)
+    if _re3.search(r'\{\{\w+\}\}', path):
+        return 0, {}, b'__UNRESOLVED_VAR__'
     body = None
     if 'body' in req_spec:
-        body = _dyn(str(req_spec['body']).replace('{{BaseURL}}', base))
+        body = _payloads_sub(_dyn(str(req_spec['body']).replace('{{BaseURL}}', base)))
         headers.setdefault('Content-Type', 'application/x-www-form-urlencoded')
 
     url = path if path.startswith('http') else base + path
@@ -284,8 +302,8 @@ def execute_template(tpl, target, timeout=15):
             sub_spec = dict(req_spec)
             sub_spec['path'] = one_path
             status, headers, body = do_http(sub_spec, target)
-            if body == b'__OUTBOUND_BLOCKED__':
-                continue  # F29: 出站围栏拦截——不算命中
+            if body in (b'__OUTBOUND_BLOCKED__', b'__UNRESOLVED_VAR__'):
+                continue  # F29 围栏 / F37 未解析变量——均不算命中
             matchers = req_spec.get('matchers', tpl.get('matchers', []))
             ext_q = req_spec.get('extractors', tpl.get('extractors', []))
             if not matchers and ext_q:
