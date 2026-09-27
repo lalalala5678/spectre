@@ -280,10 +280,14 @@ const caps = {
    *  (enforcement point for the review mandate); notes/reports: any
    *  agent (shared working records — reason rides for audit). */
   reviseEntry: (callerRecord, params) => {
+    // F33: 项目作用域——与 query_intel 同语义(e.ws === caller.ws ?? null)。
+    // 此前无过滤: 跨项目 seq 可被修订(writer 自评空库负对照命中,
+    // 审计链污染面)。
     const target = bus.list().find(e => e.seq === Number(params.seq)
-      && entryKindOf(e) !== null && !e.revises);
+      && entryKindOf(e) !== null && !e.revises
+      && e.workSessionId === (callerRecord.workSessionId ?? null));
     if (!target) {
-      return { text: `seq=${params.seq} 不是可修订的原始条目(不存在/已折叠)。` };
+      return { text: `seq=${params.seq} 不在本项目可修订范围(不存在/他项目条目/已折叠)。` };
     }
     const kind = entryKindOf(target);
     if (kind === 'vulnerability' && callerRecord.agentKey !== 'report') {
@@ -310,9 +314,10 @@ const caps = {
    *  Same detached-session + event-driven-wait pattern as reportWriter. */
   revisionWriter: async (requesterRecord, targetSeq, reason, changes) => {
     const target = bus.list().find(e => e.seq === Number(targetSeq)
-      && entryKindOf(e) === 'vulnerability' && !e.revises);
+      && entryKindOf(e) === 'vulnerability' && !e.revises
+      && e.workSessionId === (requesterRecord.workSessionId ?? null));  // F33
     if (!target) {
-      return { text: `seq=${targetSeq} 不是漏洞原始条目,无法申请修订。` };
+      return { text: `seq=${targetSeq} 不是本项目漏洞原始条目,无法申请修订。` };
     }
     const chain = bus.list().filter(e => e.revises === target.seq);
     const current = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
