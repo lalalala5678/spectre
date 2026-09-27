@@ -104,8 +104,20 @@ def do_http(req_spec, target):
         req.add_header(k, v)
     req.add_header('User-Agent', 'Mozilla/5.0 (Windows NT 10.0; Win64; x64)')
 
+    # F36: 重定向围栏——urlopen 默认跟随 302 且不复检(exploit PoC:
+    # 302 跳第三方把请求带出围栏,自定义 Host 头随行)。每跳复检 netloc;
+    # redirects:true 时同样受围栏约束,跨域跳转以 30x 状态返回。
+    import urllib.request as _ur
+    from urllib.parse import urlsplit as _us2
+    _base_netloc = _us2(base).netloc
+    class _FencedRedirect(_ur.HTTPRedirectHandler):
+        def redirect_request(self, r2, fp, code, msg, headers, newurl):
+            if _us2(newurl).netloc and _us2(newurl).netloc != _base_netloc:
+                return None
+            return super().redirect_request(r2, fp, code, msg, headers, newurl)
     try:
-        resp = urllib.request.urlopen(req, timeout=10, context=ctx)
+        opener = _ur.build_opener(_FencedRedirect, _ur.HTTPSHandler(context=ctx))
+        resp = opener.open(req, timeout=10)
         return resp.status, dict(resp.headers), resp.read()
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers), e.read()

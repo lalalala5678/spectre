@@ -228,9 +228,19 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
             try:
                 s.starttls()
             except smtplib.SMTPNotSupportedError:
-                # V5 修复: 中继不支持 STARTTLS(如本地授权 qa-smtp)时降级并告警,
-                # 此前直接抛异常 = 发送链断裂;且 tls 无法通过 CLI/smtp.json 关闭
-                print('[warn] relay lacks STARTTLS, downgrade to plaintext', file=sys.stderr)
+                # F36: V5 的自动降级曾把 AUTH PLAIN 凭据明文出网(exploit
+                # 假中继抓包实锤)。降级现须显式同意: smtp.json
+                # "allow_plaintext": true 或 CLI --allow-plaintext;
+                # 无凭据场景维持告警降级(无泄露面)。
+                has_creds = bool(smtp_cfg.get('user') or smtp_cfg.get('pass'))
+                allowed = bool(smtp_cfg.get('allow_plaintext'))
+                if has_creds and not allowed:
+                    raise SystemExit(
+                        '[refuse] 中继不支持 STARTTLS 且已配置凭据——明文降级会把 AUTH '
+                        'PLAIN 凭据裸送线路。如确需(仅限本地授权靶)在 smtp.json 加 '
+                        '"allow_plaintext": true 或 CLI 传 --allow-plaintext。')
+                print('[warn] relay lacks STARTTLS, downgrade to plaintext'
+                      + (' (no credentials)' if not has_creds else ' (explicitly allowed)'), file=sys.stderr)
         if smtp_cfg.get('user') and 'auth' in s.esmtp_features:
             # V5 修复: 无 AUTH 能力的中继跳过 login(此前必抛 SMTPNotSupportedError;
             # 且 main() 用 `args.user or dflt.user`,空串无法覆盖=无法禁用鉴权)
@@ -271,6 +281,7 @@ def main():
     p.add_argument('--track-url', default='https://t.local')
     p.add_argument('--attach', action='append')
     p.add_argument('--rate', default='5/min')
+    p.add_argument('--allow-plaintext', action='store_true', help='显式同意明文降级(仅限本地授权靶;凭据将明文出网)')
     p.add_argument('--dkim-key', help='DKIM 私钥路径(pem)')
     p.add_argument('--dkim-selector', default='s1')
     p.add_argument('--dkim-domain', help='DKIM 签名域(默认 From 域)')
@@ -285,8 +296,14 @@ def main():
         # 域名净化(此前 ../../ 直拼路径=root 任意覆写)
         import re as _re
         gate()
-        if not _re.fullmatch(r'[A-Za-z0-9.-]{1,253}', args.genkey_domain or ''):
-            print('genkey-domain 非法(仅 [A-Za-z0-9.-])', file=sys.stderr)
+        # F36: selector 未校验+域允许 '..' 字面量 → 组合穿越(root 任意
+        # 目录覆写 *.pem, exploit PoC)。双字段白名单+段级 '..' 拒绝。
+        if not _re.fullmatch(r'[A-Za-z0-9.-]{1,253}', args.genkey_domain or '') \
+                or '..' in (args.genkey_domain or '').split('.'):
+            print('genkey-domain 非法(仅 [A-Za-z0-9.-] 且无 .. 段)', file=sys.stderr)
+            sys.exit(2)
+        if not _re.fullmatch(r'[A-Za-z0-9_-]{1,63}', args.genkey_selector or 's1'):
+            print('genkey-selector 非法(仅 [A-Za-z0-9_-])', file=sys.stderr)
             sys.exit(2)
         if not args.genkey_domain:
             print('genkey 需要 --genkey-domain', file=sys.stderr); sys.exit(1)
@@ -313,7 +330,9 @@ def main():
     smtp_cfg = {'host': host, 'port': int(port or 587),
                 'user': args.user or dflt.get('user', ''),
                 'pass': args.password or dflt.get('pass', ''),
-                'tls': True, 'timeout': 30}
+                'tls': True, 'timeout': 30,
+                'allow_plaintext': bool(getattr(args, 'allow_plaintext', False))
+                    or bool(dflt.get('allow_plaintext'))}
 
     if os.path.isfile(args.to or ''):
         targets = [l.strip() for l in open(args.to) if l.strip() and '@' in l]
