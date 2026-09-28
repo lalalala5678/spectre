@@ -14,6 +14,7 @@ import { EntryDetail } from '../components/session/EntryDetail';
 import { DispatchTreePanel } from '../components/session/DispatchTreePanel';
 import { TaskReportsPanel } from '../components/session/TaskReportsPanel';
 import { IntelNotesPanel } from '../components/session/IntelNotesPanel';
+import { PhishCampaignsPanel } from '../components/session/PhishCampaignsPanel';
 import { BusView } from './BusView';
 import { cn } from '../utils/cn';
 import {
@@ -473,6 +474,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     workSessionId={workSession.id}
                     onOpen={setEntryView}
                   />
+                  {agent.id === 'phish' && <PhishCampaignsPanel />}
                 </PanelStack>
               )}
             </div>

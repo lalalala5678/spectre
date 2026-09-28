@@ -7,6 +7,10 @@ interface ShellHandle {
   id: string; name: string; target: string; transport: string;
   status: string; user: string | null; os: string | null;
   cmdCount: number; createdAt: string; expiresAt: string;
+  /** F61: 后端一直返回但 UI 从未显示——运维/编排都依赖 */
+  lastActiveAt?: string | null;
+  tasks?: string[];
+  note?: string | null;
 }
 interface ExecResult { ok: boolean; stdout?: string; stderr?: string; code?: number; error?: string; ms?: number }
 
@@ -80,7 +84,10 @@ export default function ShellPage() {
               <Radio className={cn('h-3 w-3', s.status === 'active' ? 'text-emerald-400' : 'text-zinc-600')} />
               <span className="font-mono text-[12px] text-zinc-200">{s.name || s.id}</span>
             </div>
-            <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{s.target} · {s.cmdCount} cmd</div>
+            <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · 活跃 ${s.lastActiveAt.slice(5, 16)}` : ''}</div>
+            {(s.tasks?.length ?? 0) > 0 && (
+              <div className="mt-0.5 truncate font-mono text-[9.5px] text-sky-400/70" title={s.tasks!.join(', ')}>任务: {s.tasks!.join(', ')}</div>
+            )}
           </button>
         ))}
       </div>
@@ -91,7 +98,7 @@ export default function ShellPage() {
             <span className="text-emerald-400">●</span>
             <span>{cur.user || '?'}@{cur.target}</span>
             <span className="truncate text-zinc-600">{(cur.os || '').slice(0, 60)}</span>
-            <span className="ml-auto text-zinc-600">{cur.transport} · 到期 {cur.expiresAt.slice(5, 16)}</span>
+            <span className="ml-auto text-zinc-600">{cur.transport} · 到期 {cur.expiresAt.slice(5, 16)}{cur.lastActiveAt ? ` · 活跃 ${cur.lastActiveAt.slice(11, 16)}` : ''}</span>
           </div>
           <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[12px] leading-relaxed">
             {lines.map((l, i) => (
