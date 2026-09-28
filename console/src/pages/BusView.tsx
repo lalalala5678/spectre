@@ -5,11 +5,16 @@ import type { MessageChannel } from '../types';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 
-const CH_META: Record<MessageChannel, { label: string; cls: string }> = {
+const CH_META: Record<string, { label: string; cls: string }> = {
   announce: { label: '公告', cls: 'border-red-900 text-red-400' },
   dm: { label: '私信', cls: 'border-void-500 text-zinc-500' },
   share: { label: '共享', cls: 'border-orange-900 text-orange-400' },
 };
+
+/** R3-6: 未映射频道此前 chMeta(m.channel).cls 直接 TypeError——整个
+ * 应用白屏(实测: journal 一条 channel='r2t' 测试事件即触发)。
+ * 未知频道回退中性样式, 任何频道值都必须可渲染。 */
+const chMeta = (c: string) => CH_META[c] ?? { label: c, cls: 'border-void-600 text-zinc-400' };
 
 const fmtTime = (iso: string) => {
   const d = new Date(iso);
@@ -20,34 +25,60 @@ const fmtTime = (iso: string) => {
 export function BusView({ workSessionId }: { workSessionId: string }) {
   const [filter, setFilter] = useState<MessageChannel | 'all'>('all');
   const [events, setEvents] = useState<ApiBusEvent[]>([]);
-  const [live, setLive] = useState(false);
+  const [, setLive] = useState(false);
   const cursor = useRef(0);
 
+  const [connError, setConnError] = useState('');
+
   // Replay history, then attach the live SSE stream.
+  // R3-2: workSessionId 进依赖——切换项目必须重取快照(旧 deps [] 换项目
+  // 后旧快照滞留+SSE 闭包持旧 id, 新项目事件全丢)。
+  // R3-3: 失败不再空吞——connError+15s 退避重试; 订阅先行+since 尾拉
+  // 消除'快照→订阅'间隙丢事件。
   useEffect(() => {
     let cancelled = false;
-    (async () => {
-      const history = await api<ApiBusEvent[]>('/bus');
-      if (cancelled) return;
-      setEvents(history.filter(e => e.workSessionId === workSessionId));
-      cursor.current = history.at(-1)?.seq ?? 0;
-      setLive(true);
-    })().catch(() => { /* gateway will re-auth on next action */ });
-    return () => { cancelled = true; };
-  }, []);
-
-  useEffect(() => {
-    if (!live) return;
-    return subscribeBus((name, raw) => {
-        if (name !== 'bus') return;
-        const ev = raw as ApiBusEvent;
-        if (ev.workSessionId !== workSessionId) return;
-        setEvents((prev) => {
-          const next = prev.concat(ev);
-          return next.length > 500 ? next.slice(next.length - 500) : next;
+    let off = () => {};
+    const run = async () => {
+      try {
+        const history = await api<ApiBusEvent[]>('/bus'
+          + (workSessionId ? `?ws=${workSessionId}` : ''));
+        if (cancelled) return;
+        const seen = new Set<number>();
+        const myWs = workSessionId;
+        off = subscribeBus((name, raw) => {
+          if (name !== 'bus') return;
+          const ev = raw as ApiBusEvent;
+          if (ev.workSessionId !== myWs || seen.has(ev.seq)) return;
+          seen.add(ev.seq);
+          setEvents((prev) => {
+            const next = prev.concat(ev);
+            return next.length > 500 ? next.slice(next.length - 500) : next;
+          });
         });
-      });
-  }, [live]);
+        const mine = history.filter(e => e.workSessionId === myWs);
+        setEvents(mine);
+        for (const e of mine) seen.add(e.seq);
+        cursor.current = history.at(-1)?.seq ?? 0;
+        if (cursor.current > 0) {
+          const tail = await api<ApiBusEvent[]>(`/bus?since=${cursor.current}`
+            + (workSessionId ? `&ws=${workSessionId}` : ''));
+          if (!cancelled) {
+            for (const ev of tail) {
+              if (ev.workSessionId !== myWs || seen.has(ev.seq)) continue;
+              seen.add(ev.seq);
+              setEvents(prev => prev.concat(ev));
+            }
+          }
+        }
+        if (!cancelled) { setLive(true); setConnError(''); }
+      } catch (e) {
+        if (!cancelled) setConnError(e instanceof Error ? e.message : String(e));
+      }
+    };
+    void run();
+    const retry = connError !== '' ? setInterval(() => { if (!cancelled) void run(); }, 15_000) : 0;
+    return () => { cancelled = true; off(); if (retry) clearInterval(retry); };
+  }, [workSessionId, connError]);
 
   const list = events
     .filter((m) => filter === 'all' || m.channel === filter)
@@ -102,9 +133,9 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
             <tr key={m.seq} className={cn('hover:bg-void-800/60', m.channel === 'announce' && 'bg-red-950/5')}>
               <td className="px-3 py-2.5 font-mono text-[11px] text-zinc-600">{fmtTime(m.ts)}</td>
               <td className="px-3 py-2.5">
-                <span className={cn('inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px]', CH_META[m.channel].cls)}>
+                <span className={cn('inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px]', chMeta(m.channel).cls)}>
                   {m.channel === 'announce' && <Megaphone className="h-2.5 w-2.5" />}
-                  {CH_META[m.channel].label}
+                  {chMeta(m.channel).label}
                 </span>
               </td>
               <td className="px-3 py-2.5">

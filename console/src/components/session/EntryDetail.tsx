@@ -76,6 +76,26 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
       setDialogDone(`已提交报告智能体，撰写中…（落账后自动刷新；若被驳回，` +
         `点此查看撰写对话的判定理由）`);
       setWriterSessionId(r.sessionId);
+      // R3-4: 拒绝路径解除——后端 revise-request 只回 202, writer 驳回
+      // 不产生修订事件(原实现仅靠 revises SSE 解除 busy, 驳回=永久旋转)。
+      // 轮询 writer 会话: 回合结束(busy=false)且修订未落账 → 提示判定。
+      void (async () => {
+        const sid = r.sessionId;
+        for (let i = 0; i < 30; i++) {
+          await new Promise(rr => setTimeout(rr, 4000));
+          try {
+            const st = await api<{ busy: boolean }>(`/sessions/${sid}`);
+            if (!st.busy) {
+              setDialogBusy(false);
+              setDialogDone(prev => prev.includes('已提交报告智能体')
+                ? `${prev}\n撰写回合已结束——若上方条目未更新即被驳回, 点开撰写对话查看判定理由`
+                : prev);
+              return;
+            }
+          } catch { /* 会话读取失败继续轮询 */ }
+        }
+        setDialogBusy(false);  // 120s 兜底解除
+      })();
     } catch (err) {
       setDialogDone(`提交失败:${String(err)}`);
       setDialogBusy(false);

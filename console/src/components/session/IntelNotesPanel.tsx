@@ -43,7 +43,8 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
         const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
         if (stopped) return;
-        setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+        // R3-1: 先折后滤(同 VulnPanel)
+        setEvents(foldEntries(all).filter(accept).slice(-20).reverse());
         setLoaded(true);
         cursor.v = all.at(-1)?.seq ?? 0;
       } catch { /* SSE reconnect will heal */ }
@@ -59,7 +60,8 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
           try {
             const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
-            setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+            // R3-1: 先折后滤(同 VulnPanel)
+        setEvents(foldEntries(all).filter(accept).slice(-20).reverse());
             setLoaded(true);
           } catch { /* next event heals */ }
         })();

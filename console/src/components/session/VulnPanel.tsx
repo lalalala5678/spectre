@@ -88,7 +88,10 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
         const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
         if (stopped) return;
-        setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+        // R3-1: 先折后滤——accept 判 ORIGINAL 身份(origin/from), 修订事件
+        // (origin='user'/'agent'/'writer')在折后才被剔除; 此前先滤后折把
+        // 修订全部剥掉, 面板永久显示旧 title/severity(与 EntryDetail 矛盾)。
+        setEvents(foldEntries(all).filter(accept).slice(-20).reverse());
         setLoaded(true);
         cursor.v = all.at(-1)?.seq ?? 0;
       } catch { /* SSE reconnect will heal */ }
@@ -104,7 +107,10 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
           try {
             const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
-            setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
+            // R3-1: 先折后滤——accept 判 ORIGINAL 身份(origin/from), 修订事件
+        // (origin='user'/'agent'/'writer')在折后才被剔除; 此前先滤后折把
+        // 修订全部剥掉, 面板永久显示旧 title/severity(与 EntryDetail 矛盾)。
+        setEvents(foldEntries(all).filter(accept).slice(-20).reverse());
             setLoaded(true);
           } catch { /* next event heals */ }
         })();

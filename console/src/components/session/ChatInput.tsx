@@ -25,6 +25,12 @@ export function ChatInput({
       const res = await fetch('/spectre/api/sandbox/uploads', {
         method: 'POST', body: form, credentials: 'include' });
       if (!res.ok && res.redirected) { window.location.assign(res.url); return; }
+      // R3-5: 非 2xx(400/413…)此前落入成功分支, 拼出'[已上传 undefined]'
+      // 伪成功路径——显式抛错走 catch 的'上传失败'。
+      if (!res.ok) {
+        const body = await res.json().catch(() => ({})) as { error?: string };
+        throw new Error(body.error ?? `HTTP ${res.status}`);
+      }
       const data = await res.json() as { sandboxPath: string };
       setValue(v => (v ? `${v}\n` : '') + `[已上传 ${data.sandboxPath}] `);
       inputRef.current?.focus();

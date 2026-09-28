@@ -145,6 +145,9 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
         // pending) and MUST NOT poison the marker for the real root.
         const sig = `${rootId ?? ''}#` + all.map(s => `${s.id}:${s.busy ? 1 : 0}`
           + `:${s.spawnName ?? ''}:${s.messages}:${s.title ?? ''}`).join('|');
+        // R3: 去重签名接线——此前只写不读, 注释宣称的去重是死代码。
+        if (sig === lastSig.current) return;
+
         lastSig.current = sig;
         setTree(buildTree(all, rootId ?? ''));
       } catch {
