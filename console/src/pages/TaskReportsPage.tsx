@@ -16,7 +16,7 @@ export function TaskReportsPage() {
   const [selected, setSelected] = useState<ApiBusEvent | null>(null);
 
   useEffect(() => {
-    getPrefs().then(p => setWsId(p.currentWs))
+    getPrefs().then(p => setWsId(p.currentWs ?? ''))  // R16-F3: null 哨兵双义永久卡加载
       .catch(e => setErr(String(e)));
   }, []);
 

@@ -122,6 +122,7 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
 }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const lastSig = useRef('');
+  const retryTimer = useRef<ReturnType<typeof setTimeout> | null>(null);  // R16-F5
 
   const [connError, setConnError] = useState(false);
   useEffect(() => {
@@ -153,14 +154,22 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
       } catch {
         if (stopped) return;
         setConnError(true);
-        setTimeout(() => { if (!stopped) void load(); }, retryMs);
+        // R16-F5: 退避链上限 1——失败期 4s 轮询仍在触发, 每个 catch 各
+        // 自派生一条 setTimeout 链会无界叠加(请求量随停机时长线性涨)。
+        if (retryTimer.current == null) {
+          const ms = retryMs;
+          retryTimer.current = setTimeout(() => {
+            retryTimer.current = null;
+            if (!stopped) void load();
+          }, ms);
+        }
         retryMs = Math.min(retryMs * 2, 4000);
         return;
       }
     };
     void load();
     const timer = setInterval(load, 4000);
-    return () => { stopped = true; clearInterval(timer); };
+    return () => { stopped = true; clearInterval(timer); if (retryTimer.current) clearTimeout(retryTimer.current); };
   }, [rootId]);
 
   // F73: 全树递归计数——此前 1+children.length 漏计孙代及更深

@@ -38,35 +38,42 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   const [editing, setEditing] = useState(false);
   const [editBusy, setEditBusy] = useState(false);
 
+  // R16-F1: 孤儿条目(原始已被 journal 裁剪, 面板折叠推送的是修订自身,
+  // revises=原seq)——锚定 event.seq 只命中自己, 同源兄弟修订全漏(修
+  // 订历史永不渲染+SSE 不刷新)。统一锚 rootSeq。
+  const rootSeq = event.revises ?? event.seq;
   const loadChain = async () => {
     try {
       const all = await api<ApiBusEvent[]>('/bus'
         + (event.workSessionId ? `?ws=${event.workSessionId}` : ''));
-      setChain(all.filter(e => e.seq === event.seq || e.revises === event.seq));
+      setChain(all.filter(e => e.seq === rootSeq || e.revises === rootSeq));
     } catch { /* SSE will heal */ }
   };
-  useEffect(() => { void loadChain(); }, [event.seq]);
+  useEffect(() => { void loadChain(); }, [rootSeq]);
   useEffect(() => subscribeBus((name, raw) => {
     if (name !== 'bus') return;
     const e = raw as ApiBusEvent;
-    if (e.revises === event.seq) {
+    if (e.revises === rootSeq) {
       void loadChain();
       setDialogDone(`修订已落账（第 ${e.revision?.n ?? '?'} 次）`);
       setDialogBusy(false);
     }
-  }), [event.seq]);
+  }), [rootSeq]);
 
   const folded = useMemo(
     () => foldEntries(chain)[0] ?? { ...event, current: event, revisedCount: 0 },
     [chain, event]);
+  /** R16-F2: 孤儿=原始条目已随 journal 裁剪(foldEntries 标记或修订
+   * 事件直入)——后端 revise 系按 !e.revises 找原始, 恒 404。 */
+  const isOrphan = folded.orphaned === true || event.revises != null;
   const current = folded.current;
   const severity = current.severity ?? 'info';
   const title = current.title
     ?? current.summary.replace(/^(情报上报|产出)[:：]?/, '');
   const revisions = useMemo(
-    () => chain.filter(e => e.revises === event.seq)
+    () => chain.filter(e => e.revises === rootSeq)
       .sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0)),
-    [chain, event.seq]);
+    [chain, rootSeq]);
 
   const submitDialog = async () => {
     if (!dialogText.trim()) return;
@@ -230,16 +237,30 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
                   {current.summary}
                 </p>
               )}
-            <button
-              onClick={() => setEditing(true)}
-              className="mt-1 flex w-fit items-center gap-1.5 rounded-sm border border-void-600 bg-void-800 px-2.5 py-1 text-[11px] text-zinc-400 hover:border-void-400 hover:text-zinc-200"
-            >
-              <PencilLine className="h-3 w-3" /> 直接编辑
-            </button>
+            {!isOrphan && (
+              <button
+                onClick={() => setEditing(true)}
+                className="mt-1 flex w-fit items-center gap-1.5 rounded-sm border border-void-600 bg-void-800 px-2.5 py-1 text-[11px] text-zinc-400 hover:border-void-400 hover:text-zinc-200"
+              >
+                <PencilLine className="h-3 w-3" /> 直接编辑
+              </button>
+            )}
+            {isOrphan && (
+              // R16-F2: 孤儿(原始已被裁剪)的后端 revise 恒 404——不渲染
+              // 死按钮, 给一行诊断(拒则短痛)。
+              <p className="mt-1 text-[10.5px] text-zinc-600">
+                原始条目已随消息日志裁剪, 修订链已封存(仅存档审计)
+              </p>
+            )}
           </>
         )}
 
         {/* dialog revision */}
+        {isOrphan ? (
+          <div className="mt-2 rounded-sm border border-void-700 bg-void-900/60 p-2.5">
+            <p className="text-[10.5px] text-zinc-600">修订对话框不可用——原始条目已裁剪, 修订链封存(仅存档审计)</p>
+          </div>
+        ) : (
         <div className="mt-2 rounded-sm border border-void-700 bg-void-900/60 p-2.5">
           <p className="mb-1.5 font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">
             修订对话框 → 报告智能体{isVuln ? '（原撰写者审核）' : ''}
@@ -279,6 +300,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             </div>
           )}
         </div>
+        )}
       </div>
     </div>
   );

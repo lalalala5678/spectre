@@ -76,7 +76,7 @@ export default function App() {
   // R13-F1: 依赖 [route]——项目切换只写服务端 prefs, App 层 wsId 此前
   // 是启动快照永不刷新, skills/mcp/cli 页持续作用于旧项目(跨项目错写)。
   useEffect(() => {
-    getPrefs().then(p => setWsId(p.currentWs)).catch(() => {});
+    getPrefs().then(p => setWsId(p.currentWs ?? '')).catch(() => {});  // R16-F3
   }, [route]);
 
   return (

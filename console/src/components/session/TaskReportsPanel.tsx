@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { cn } from '../../utils/cn';
 
 import { api, foldEntries, subscribeBus, type ApiBusEvent } from '../../api/client';
 
@@ -90,9 +91,13 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
             >
               <div className="flex w-full items-center gap-2">
                 <StatusBadge status={cur.status ?? 'no-result'} />
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
+                <span className={cn('min-w-0 flex-1 truncate text-[12.5px]',
+                  cur.void ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
                   {cur.title ?? cur.summary}
                 </span>
+                {cur.void && (
+                  <span className="shrink-0 rounded-sm border border-void-600 px-1 py-0.5 font-mono text-[8.5px] text-zinc-600">已作废</span>
+                )}
                 {event.revisedCount > 0 && (
                   <span className="shrink-0 rounded-sm border border-sky-800 bg-sky-950/40 px-1 py-0.5 font-mono text-[8.5px] tracking-widest text-sky-300">
                     ⟳{event.revisedCount}
