@@ -98,7 +98,7 @@ export function AuditPage() {
         </Panel>
         <Panel title="导出说明">
           <div className="space-y-2 text-[11.5px] leading-relaxed text-zinc-500">
-            审计导出为总线全量 JSON(seq 连续递增);修订链(revises/revision)
+            审计导出为内存 journal 最近 5000 条(滚动上限,seq 单调);修订链(revises/revision)
             与审批流(origin/requestedBy)字段均在事件内。签名/Merkle 属后续
             增强,当前以 WAL 追加语义保证不可改写历史。
           </div>
