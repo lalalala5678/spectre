@@ -44,12 +44,21 @@ export function McpPage({ wsId }: { wsId: string }) {
         ? f.agents.filter(x => x !== a) : [...f.agents, a] }));
   };
 
+  const [busy, setBusy] = useState(false);
   const create = async () => {
+    if (busy) return;
     if (!form.name.trim()) { setMsg('name 必填'); return; }
     let headers: Record<string, string> | null = {};
     if (form.transport === 'http') {
-      try { headers = JSON.parse(form.headersJson || '{}'); }
-      catch { headers = null; setMsg('headers 非法 JSON'); }
+      try {
+        headers = JSON.parse(form.headersJson || '{}');
+        // R11-F3: JSON.parse 只验'是 JSON'——'x'/[1]/5 标量数组穿透
+        // 到后端持久化(R5-F3 未覆盖 headers 类型)。
+        if (typeof headers !== 'object' || headers === null || Array.isArray(headers)) {
+          setMsg('headers 必须为 {"k":"v"} JSON 对象');
+          return;
+        }
+      } catch { setMsg('headers 非法 JSON'); return; }
     }
     if (headers === null) return;
     const body = form.transport === 'http'
@@ -58,11 +67,15 @@ export function McpPage({ wsId }: { wsId: string }) {
       : { name: form.name, transport: 'stdio',
           command: form.commandStr.trim().split(/\s+/).filter(Boolean),
           where: form.where, agents: form.agents };
+    setBusy(true);
     try {
       await api('/sandbox/mcp', { method: 'POST', json: body });
       setMsg(`已注册 ${form.name}`);
+      // R11-F2: 对齐 SkillsPage——成功后清载荷字段(保留挂载目标)
+      setForm(f => ({ ...f, name: '', url: '', headersJson: '', commandStr: '' }));
       await load();
     } catch (e) { setMsg(String(e)); }
+    finally { setBusy(false); }
   };
 
   const test = async (name: string) => {
@@ -220,6 +233,7 @@ export function McpPage({ wsId }: { wsId: string }) {
         </div>
         <button
           onClick={() => void create()}
+            disabled={busy}
           className="flex w-full items-center justify-center gap-1 rounded-sm bg-orange-600 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-500"
         >
           <Plus className="h-3 w-3" /> 注册并挂载

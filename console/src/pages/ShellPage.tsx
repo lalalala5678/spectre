@@ -33,6 +33,17 @@ export default function ShellPage() {
 
   const cur = shells.find(s => s.id === active) ?? null;
 
+  async function closeShell(s: ShellHandle) {
+    if (!window.confirm(`关闭通道 ${s.name ?? s.id}?(${s.target} · 一次性纪律, 关闭后不可再执行)`)) return;
+    try {
+      await api(`/shells/${s.id}/close`, { method: 'POST' });
+      if (active === s.id) { setActive(null); setLines([]); }
+      await reload();
+    } catch (e) {
+      setErr(e instanceof Error ? e.message : String(e));
+    }
+  }
+
   async function run() {
     if (!cur || !cmd.trim() || busy) return;
     const c = cmd; setCmd(''); setBusy(true);
@@ -88,6 +99,13 @@ export default function ShellPage() {
             {(s.tasks?.length ?? 0) > 0 && (
               <div className="mt-0.5 truncate font-mono text-[9.5px] text-sky-400/70" title={s.tasks!.join(', ')}>任务: {s.tasks!.join(', ')}</div>
             )}
+            {s.status === 'active' && (
+              <button
+                onClick={e => { e.stopPropagation(); closeShell(s); }}
+                className="mt-1 rounded-sm border border-red-900/60 px-1.5 py-0.5 text-[9.5px] text-red-400/80 hover:border-red-700 hover:text-red-300"
+                title="关闭通道(一次性纪律下的即时终止)"
+              >关闭</button>
+            )}
           </button>
         ))}
       </div>
@@ -110,7 +128,7 @@ export default function ShellPage() {
           <div className="flex items-center gap-2 border-t border-void-800 px-3 py-2">
             <span className="font-mono text-[12px] text-orange-300">$</span>
             <input value={cmd} onChange={e => setCmd(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') void run(); }}
+              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void run(); }}  // R11-F5: IME 同款(R8-F1)
               placeholder="command…"
               className="flex-1 bg-transparent font-mono text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-700" />
             <button onClick={() => void run()} disabled={busy || !cmd.trim()}

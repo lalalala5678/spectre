@@ -30,7 +30,6 @@ export function CliPage({ wsId }: { wsId: string }) {
       setStatus(await api<SandboxStatus>('/sandbox/status'));
       setTools(await api<string[]>('/sandbox/tools'));
       setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
-      setInstalled(await api<InstalledTool[]>('/sandbox/cli/installed'));
     } catch (e) { setMsg(String(e)); }
   };
   useEffect(() => { void load(); }, []);
