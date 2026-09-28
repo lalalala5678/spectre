@@ -349,11 +349,6 @@ function realRouter({ store, bus, caps, wal }) {
         const { applyLlmPrefs } = await import('./pi.mjs');
         await applyLlmPrefs();
       }
-      if (String(body.group) === 'weakcred') {
-        const r2 = await saveSetting({ group: 'weakcred', field: String(body.field).replace(/^brute\./, 'brute.'), value: body.value }, wal);
-        if (!r2.ok) return bad(res, 400, r2.error);
-        return json(res, 200, r2);
-      }
       if (String(body.group) === 'recon-source') {
         // sync MCP config file + mount toggle (zero-pollution: no key ⇒
         // server disabled, recon never sees the tools)
@@ -797,7 +792,10 @@ function realRouter({ store, bus, caps, wal }) {
         if (sid === 'brute') continue;
         const def = RECON_SOURCES_INTERNAL[sid];
         if (!def || !cfg) continue;
-        const hasSecret = cfg.key || cfg.token || cfg.secret || cfg.id || cfg.password;
+        // R10-F3: 与 save 侧 hasCred 口径统一(含 smtp.user; censys.id
+        // 降为参数型字段——R10-F1)
+        const hasSecret = cfg.key || cfg.token || cfg.secret || cfg.password
+          || (sid === 'smtp' && cfg.user);
         if (!hasSecret) { results.push({ id: sid, configured: false }); continue; }
         const v = await def.validate(cfg);
         results.push({

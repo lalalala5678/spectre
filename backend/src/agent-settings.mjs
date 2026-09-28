@@ -373,19 +373,23 @@ export async function saveSetting({ group, field, value }, wal) {
     if (def.type === 'select' && !def.options.includes(v)) {
       return { ok: false, error: `必须是 ${def.options.join('/')}` };
     }
-    const cur = { ...(getPrefs().commonSettings ?? {}) };
     const [top, leaf] = field.split('.');
-    cur[top] = { ...(cur[top] ?? {}), [leaf]: def.type === 'number' ? Number(v) : v };
+    const leafVal = def.type === 'number' ? Number(v) : v;
     if (['llm.baseUrl', 'llm.apiKey', 'llm.model'].includes(field)) {
       // F47: 空值=清除该项回退 env 默认(跳过 probe——空串不是可测端点)
-      const merged = { ...defaultsFromEnv(), ...cur.llm };
+      const merged = { ...defaultsFromEnv(), ...(getPrefs().commonSettings ?? {}).llm,
+        [leaf]: leafVal };
       for (const k of ['baseUrl', 'apiKey', 'model']) {
         if (!merged[k]) merged[k] = defaultsFromEnv()[k];
       }
       const r = await llmProbe(merged.baseUrl, merged.apiKey, merged.model);
       if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
     }
-    setPrefs({ commonSettings: cur }, wal);
+    // R10-F2: probe 是 20s 网络窗口——窗口后重读 prefs 只合并本叶子,
+    // 并发保存的另一字段不被陈旧快照覆盖。
+    const fresh = { ...(getPrefs().commonSettings ?? {}) };
+    fresh[top] = { ...(fresh[top] ?? {}), [leaf]: leafVal };
+    setPrefs({ commonSettings: fresh }, wal);
     return { ok: true };
   }
 
@@ -416,17 +420,25 @@ export async function saveSetting({ group, field, value }, wal) {
     const [srcId, leaf] = field.split('.');
     const src = RECON_SOURCES[srcId];
     if (!src) return { ok: false, error: '未知数据源' };
-    const cur = { ...(getPrefs().reconApiKeys?.[srcId] ?? {}), [leaf]: clean(value) };
-    const hasSecret = cur.key || cur.token || cur.secret || cur.id
+    const leafVal = clean(value);
+    const cur = { ...(getPrefs().reconApiKeys?.[srcId] ?? {}), [leaf]: leafVal };
+    // R10-F1: id 不算 secret——censys.id 参数化(同 cse.cx), 先存免探
+    // 测落盘; 此前含 cur.id 使 censys 逐字段保存永久死锁(任一先存都
+    // 触发双字段整体验证)。
+    const hasSecret = cur.key || cur.token || cur.secret
       || (srcId === 'smtp' && (cur.user || cur.password));
-    const all = { ...(getPrefs().reconApiKeys ?? {}), [srcId]: cur };
     if (!hasSecret) {
-      setPrefs({ reconApiKeys: all }, wal);
+      const all0 = { ...(getPrefs().reconApiKeys ?? {}), [srcId]: cur };
+      setPrefs({ reconApiKeys: all0 }, wal);
       return { ok: true, mounted: false };
     }
     const r = await src.validate(cur);
     if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
-    setPrefs({ reconApiKeys: all }, wal);
+    // R10-F2: validate(~15s 网络窗口)后重读——并发保存的兄弟字段不被
+    // 陈旧快照覆盖(丢更新)。
+    const freshAll = { ...(getPrefs().reconApiKeys ?? {}) };
+    freshAll[srcId] = { ...(freshAll[srcId] ?? {}), [leaf]: leafVal };
+    setPrefs({ reconApiKeys: freshAll }, wal);
     return { ok: true, mounted: true };
   }
 
@@ -460,7 +472,7 @@ export function enabledReconSources() {
   const out = [];
   for (const [id, cfg] of Object.entries(keys)) {
     if (id === 'brute' || !RECON_SOURCES[id]) continue;
-    if (cfg.key || cfg.token || cfg.secret || cfg.id) out.push(id);
+    if (cfg.key || cfg.token || cfg.secret) out.push(id);
   }
   return out;
 }
