@@ -17,7 +17,7 @@ import { injectionOriginOf } from './sessions.mjs';
 import { entryKind as entryKindOf } from './tools.mjs';
 import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
-import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs } from './projects.mjs';
+import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
 import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 
@@ -302,6 +302,14 @@ function realRouter({ store, bus, caps, wal }) {
         setLastSession(pid, body.agentKey, body.sessionId, wal);
       }
       return json(res, 200, getProject(pid));
+    }
+    const projDelMatch = path.match(/^\/api\/projects\/([a-z0-9-]+)$/);
+    if (projDelMatch && method === 'DELETE') {
+      // F58: projects were immortal — no delete API, no UI entry; test
+      // and abandoned projects accumulated forever.
+      const pid = projDelMatch[1];
+      if (!deleteProject(pid, wal)) return bad(res, 404, 'project not found');
+      return json(res, 200, { deleted: true, id: pid });
     }
     if (path === '/api/prefs' && method === 'GET') {
       return json(res, 200, getPrefs());
@@ -662,7 +670,17 @@ function realRouter({ store, bus, caps, wal }) {
       if (!instruction || agents.length === 0) {
         return bad(res, 400, 'instruction and agents required (spawnable only)');
       }
-      const started = await startAutopwn({ engagementId: undefined, instruction, agents });
+      // F54: 外部启动的 engagement 此前不携带 workSessionId →
+      // orchestrator 及全部子会话/share/task-report 事件 ws=None,
+      // 在任何项目面板都不可见(全链"蒸发")。接受可选 ws 并透传。
+      const wsParam = String(body.workSessionId || '').slice(0, 64);
+      if (wsParam && !/^[\w-]+$/.test(wsParam)) {
+        return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]{1,64} only');
+      }
+      const started = await startAutopwn({
+        engagementId: undefined, instruction, agents,
+        workSessionId: wsParam || undefined,
+      });
       return json(res, 201, started);
     }
     // ---------- autopwn resume(断点续跑——只补跑未完成的 agent) ----------
@@ -709,7 +727,12 @@ function realRouter({ store, bus, caps, wal }) {
         return json(res, 200, { engagementId: prevId, dryRun: true,
           completed: [...completed], rerun });
       }
-      const started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun });
+      const wsResume = String(body.workSessionId || '').slice(0, 64);
+      if (wsResume && !/^[\w-]+$/.test(wsResume)) {
+        return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]{1,64} only');
+      }
+      const started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun,
+        workSessionId: wsResume || undefined });
       return json(res, 201, { ...started, resumed: true,
         completed: [...completed], rerun,
         message: `续跑:跳过 ${completed.size} 个已完成,重跑 ${rerun.length} 个` });

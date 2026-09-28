@@ -16,6 +16,7 @@ let prefs = { currentWs: null, ui: {} };
 export function projectsFromWal(entries) {
   for (const e of entries) {
     if (e.t === 'proj' && e.d?.id) projects.set(e.d.id, e.d);
+    if (e.t === 'proj-del' && e.d?.id) projects.delete(e.d.id);
     if (e.t === 'pref' && e.d) prefs = { ...prefs, ...e.d };
   }
 }
@@ -48,6 +49,18 @@ export function renameProject(id, label, wal) {
   p.label = String(label ?? '').slice(0, 60) || p.label;
   wal?.append({ t: 'proj', d: p });
   return p;
+}
+
+/** F58: project deletion. WAL tombstone (proj-del) keeps the replay
+ *  deterministic; sessions of the project are kept (history) but the
+ *  project disappears from every list. Deleting the CURRENT project
+ *  clears the preference (caller responsibility to pick a next one). */
+export function deleteProject(id, wal) {
+  if (!projects.has(id)) return false;
+  projects.delete(id);
+  wal?.append({ t: 'proj-del', d: { id } });
+  if (prefs.currentWs === id) prefs.currentWs = null;
+  return true;
 }
 
 export function createProject(label, wal, id) {

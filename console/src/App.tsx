@@ -33,7 +33,7 @@ const AGENT_OF_ROUTE: Record<string, string> = {
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
     const h = window.location.hash.replace('#', '') as RouteKey;
-    const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit'];
+    const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
     return valid.includes(h) ? h : 'autopwn';
   });
 
@@ -41,6 +41,19 @@ export default function App() {
     setRoute(r);
     window.location.hash = r;
   };
+
+  // F57: hash deep-links / browser back-forward used to only work at
+  // first mount — the route was read once in useState and never updated
+  // on later hash changes (manual URL edits, history navigation).
+  useEffect(() => {
+    const onHash = () => {
+      const h = window.location.hash.replace('#', '') as RouteKey;
+      const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
+      setRoute(valid.includes(h) ? h : 'autopwn');
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
 
   const [wsId, setWsId] = useState<string | null>(null);
   useEffect(() => {

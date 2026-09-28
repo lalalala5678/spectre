@@ -78,6 +78,10 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
         )}
         {events.map(event => {
           const a = event.author;
+          // F56: render the CURRENT version (current = latest revision) —
+          // reading the original's fields left the list showing the stale
+          // title/status after a revision landed.
+          const cur = event.current ?? event;
           return (
             <button
               key={event.seq}
@@ -85,9 +89,9 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
               className="flex w-full flex-col gap-px rounded-sm border border-void-700 bg-void-900 px-2 py-1.5 text-left hover:border-void-500"
             >
               <div className="flex w-full items-center gap-2">
-                <StatusBadge status={event.status ?? 'no-result'} />
+                <StatusBadge status={cur.status ?? 'no-result'} />
                 <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
-                  {event.title ?? event.summary}
+                  {cur.title ?? cur.summary}
                 </span>
                 {event.revisedCount > 0 && (
                   <span className="shrink-0 rounded-sm border border-sky-800 bg-sky-950/40 px-1 py-0.5 font-mono text-[8.5px] tracking-widest text-sky-300">

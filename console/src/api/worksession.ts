@@ -116,3 +116,8 @@ export async function getLastSession(wsId: string,
   const all = await listWorkSessions();
   return all.find(p => p.id === wsId)?.lastSessions?.[agentKey] ?? null;
 }
+
+/** F58: delete a project (server-side, WAL tombstone). */
+export async function deleteWorkSession(id: string): Promise<void> {
+  await api(`/projects/${encodeURIComponent(id)}`, { method: 'DELETE' });
+}

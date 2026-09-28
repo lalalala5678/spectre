@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus,
-} from 'lucide-react';
+  ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2 } from 'lucide-react';
 import { AGENTS } from '../mock/data';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
@@ -18,7 +17,7 @@ import { IntelNotesPanel } from '../components/session/IntelNotesPanel';
 import { BusView } from './BusView';
 import { cn } from '../utils/cn';
 import {
-  ensureWorkSession, listWorkSessions, newWorkSession, switchWorkSession,
+  deleteWorkSession, ensureWorkSession, listWorkSessions, newWorkSession, switchWorkSession,
   setLastSession, putPrefsSync, getPrefs, cnNumber, type WorkSession,
 } from '../api/worksession';
 
@@ -246,6 +245,24 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     setSwitcherOpen(false);
   };
 
+  // F58: delete a project from the switcher. Deleting the CURRENT
+  // project falls back to the most recent remaining one (or creates a
+  // fresh unnamed workspace so the console never dead-ends).
+  const removeProject = (id: string, label: string) => {
+    if (!window.confirm(`删除项目「${label}」?该操作不可撤销(会话历史保留,项目从列表移除)。`)) return;
+    void (async () => {
+      await deleteWorkSession(id);
+      const rest = await listWorkSessions();
+      setProjects(rest);
+      if (workSession && workSession.id === id) {
+        const next = rest.length ? rest[rest.length - 1] : await newWorkSession('');
+        await switchWorkSession(next.id);
+        setWorkSession(next);
+      }
+      setSwitcherOpen(false);
+    })();
+  };
+
   // Conversations sorted by creation → numbered names (会话一/二…),
   // independent per agent inside this work session.
   const namedSessions = [...mySessions]
@@ -321,19 +338,27 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               )}
               <div className="max-h-64 overflow-y-auto">
                 {projects.slice().reverse().map((ws: WorkSession) => (
-                  <button
-                    key={ws.id}
-                    onClick={() => pickWorkSession(ws.id)}
-                    className={cn(
-                      'flex w-full items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-void-800',
-                      ws.id === workSession.id ? 'text-zinc-100' : 'text-zinc-500',
-                    )}
-                  >
-                    <span className="truncate">{ws.label}</span>
-                    <span className="shrink-0 font-mono text-[9px] text-zinc-600">
-                      {ws.createdAt.slice(5, 10)}
-                    </span>
-                  </button>
+                  <div key={ws.id} className="group flex items-center gap-1">
+                    <button
+                      onClick={() => pickWorkSession(ws.id)}
+                      className={cn(
+                        'flex min-w-0 flex-1 items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-void-800',
+                        ws.id === workSession.id ? 'text-zinc-100' : 'text-zinc-500',
+                      )}
+                    >
+                      <span className="truncate">{ws.label}</span>
+                      <span className="shrink-0 font-mono text-[9px] text-zinc-600">
+                        {ws.createdAt.slice(5, 10)}
+                      </span>
+                    </button>
+                    <button
+                      title="删除项目"
+                      onClick={e => { e.stopPropagation(); removeProject(ws.id, ws.label); }}
+                      className="shrink-0 rounded-sm p-1 text-zinc-700 opacity-0 hover:bg-red-950 hover:text-red-400 group-hover:opacity-100"
+                    >
+                      <Trash2 className="h-3 w-3" />
+                    </button>
+                  </div>
                 ))}
               </div>
             </div>
