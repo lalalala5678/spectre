@@ -285,6 +285,9 @@ export async function agentTaskWorkflow(input) {
         detail: '**状态**:no-result(系统代拟)\n\n## 说明\n催办 2 次后仍未调用 ' +
           `submit_task_report,任务报告由系统代拟。\n\n## 最终回复原文\n${result.reply ?? '(无输出)'}`,
         engagement: `autopwn-${engagementId}`,
+        // F65: 该事件此前缺 workSessionId → 合成报告在任何项目面板
+        // 都不可见(F64b 实测: seq2207 ws=None, 同战役其余事件全带)。
+        workSessionId: workSessionId ?? null,
       });
       // The bus event carries the report, but the runtime record counter did
       // not follow — which would keep the session "active" forever under the
