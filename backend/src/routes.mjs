@@ -88,6 +88,9 @@ function realRouter({ store, bus, caps, wal }) {
       const id = path.split('/')[3];
       const body = await readJson(req);
       if (!body?.command) return bad(res, 400, 'command 必填');
+      // F63: 不存在的 shell 此前返回 200+ok:false——与 /sessions/{id}
+      // 的 404 语义不一致(接口实测)。统一 404。
+      if (!caps.shells.get(id)) return bad(res, 404, 'shell not found');
       const r = await caps.shells.exec(id, String(body.command), { timeoutMs: Math.min(Number(body.timeoutMs) || 30000, 120000) });
       return json(res, 200, r);
     }
@@ -102,6 +105,16 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/settings' && method === 'PUT') {
       const body = await readJson(req);
+      // F63: 越界/非数值此前被静默回落默认值并返回 200——调用方
+      // 无从得知设置没生效(接口实测)。显式 400。
+      for (const k of ['spawnMaxDepth', 'spawnMaxAgents']) {
+        if (body[k] === undefined) continue;
+        const n = Number(body[k]);
+        const max = k === 'spawnMaxDepth' ? 10 : 64;
+        if (!Number.isFinite(n) || n < 1 || n > max) {
+          return bad(res, 400, `${k} must be a number in [1, ${max}]`);
+        }
+      }
       return json(res, 200, setSpawnSettings(body));
     }
 
