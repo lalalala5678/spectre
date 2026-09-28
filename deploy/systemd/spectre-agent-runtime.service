@@ -1,6 +1,7 @@
 [Unit]
 Description=SPECTRE agent runtime (pi sessions + bus)
 After=network.target temporal-dev.service
+StartLimitIntervalSec=0
 Wants=temporal-dev.service
 
 [Service]

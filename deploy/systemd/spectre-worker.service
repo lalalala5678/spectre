@@ -1,6 +1,7 @@
 [Unit]
 Description=SPECTRE Temporal worker (AutoPwn orchestration)
 After=network.target temporal-dev.service spectre-agent-runtime.service
+StartLimitIntervalSec=0
 Wants=temporal-dev.service spectre-agent-runtime.service
 
 [Service]

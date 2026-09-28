@@ -1,30 +1,25 @@
 [Unit]
-Description=SPECTRE console auth gateway (127.0.0.1:8081)
+Description=SPECTRE OOB side-channel collector (TCP :19999, HVV target callbacks)
 After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-EnvironmentFile=/root/spectre/backend/.env
-WorkingDirectory=/root/spectre/gateway
-ExecStart=/usr/bin/python3 /root/spectre/gateway/server.py
+ExecStart=/usr/bin/python3 /root/spectre/deploy/oob-collector.py
 Restart=always
 RestartSec=2
-User=root
-
-# sandbox
+# R18-F2: 唯一公网监听单元此前零沙箱(root 裸奔)——镜像 console 基线。
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/spectre-console /var/lib/spectre
 ProtectHome=read-only
 PrivateTmp=true
 ProtectKernelTunables=true
 ProtectKernelModules=true
 ProtectControlGroups=true
+ProtectKernelLogs=true
 RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 RestrictNamespaces=true
 LockPersonality=true
 MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
-
-[Install]
-WantedBy=multi-user.target
+# 源码验证唯一写路径是数据目录
+ReadWritePaths=/var/lib/spectre/oob
