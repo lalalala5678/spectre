@@ -257,10 +257,19 @@ export class SessionStore {
       try {
         record.agent = this._buildAgent(record, messages);
       } catch (e) {
-        // one poisoned record must never abort the whole boot — skip
-        // and keep going (the session stays inert rather than fatal)
-        console.error(`[rehydrate] skip session ${record.id}:`, e?.message ?? e);
-        record.agent = null;
+        // R1-F4: 毒多半在重放消息里——先以空消息重建降级活 agent
+        // (保会话可用); 再失败才 inert。此前直接 inert, 但下游读取
+        // 未判空, 一条毒记录让 GET /api/sessions 全体 500。
+        try {
+          record.agent = this._buildAgent(record, []);
+          console.error(`[rehydrate] session ${record.id} 降级重建(丢历史消息):`, e?.message ?? e);
+        } catch (e2) {
+          // one poisoned record must never abort the whole boot — skip
+          // and keep going (the session stays inert rather than fatal;
+          // 读取路径已全部判空, 见 R1-F4)
+          console.error(`[rehydrate] skip session ${record.id}:`, e2?.message ?? e2);
+          record.agent = null;
+        }
       }
       this.sessions.set(record.id, record);
     }
@@ -271,7 +280,7 @@ export class SessionStore {
     return [...this.sessions.values()].map(s => ({
       t: 'sess',
       d: this._shellOf(s),
-      m: s.agent.state.messages,
+      m: s.agent?.state.messages ?? [],
       meta: {
         brief: s.brief,
         briefUpTo: s.briefUpTo,
@@ -307,9 +316,19 @@ export class SessionStore {
    * until the summarizer sets it, so the `!record.title` generation gate
    * (and the `<title/>` decline path) is unaffected.
    */
+  /** R1-F4: inert 会话(agent=null, WAL 毒记录)入口守卫——返回 503
+   * 而非卡 busy=true + 未处理 rejection(可能进程退出)。 */
+  _requireLiveAgent(record) {
+    if (!record.agent) {
+      throw Object.assign(
+        new Error('session inert (corrupt record) — see runtime log'),
+        { statusCode: 503 });
+    }
+  }
+
   _displayTitle(record) {
     if (record.title) return record.title;
-    const first = record.agent.state.messages.find(m => m.role === 'user');
+    const first = record.agent?.state.messages.find(m => m.role === 'user') ?? null;
     const text = first ? (normalizeMessage(first).text || '').trim() : '';
     if (!text) return null;
     const line = (text.split('\n').find(l => l.trim()) ?? '').trim();
@@ -324,7 +343,7 @@ export class SessionStore {
       title: this._displayTitle(s),
       createdAt: s.createdAt,
       busy: s.busy,
-      messages: s.agent.state.messages.length,
+      messages: s.agent?.state.messages.length ?? 0,
       engagementId: s.engagementId,
       orchestratorSessionId: s.orchestratorSessionId,
       workSessionId: s.workSessionId,
@@ -345,7 +364,7 @@ export class SessionStore {
       engagementId: record.engagementId,
       spawnName: record.spawnName,
       spawnDescription: record.spawnDescription,
-      messages: record.agent.state.messages.map(m => normalizeMessage(m)),
+      messages: (record.agent?.state.messages ?? []).map(m => normalizeMessage(m)),
       // SSE cursor: clients subscribe with ?since=lastSeq to avoid
       // replaying the history they just fetched.
       brief: record.brief,
@@ -360,6 +379,7 @@ export class SessionStore {
    * window, or they'd harvest an empty reply (the "(无输出)" bug).
    */
   prompt(record, text, source) {
+    this._requireLiveAgent(record);
     if (record.busy) {
       throw Object.assign(new Error('agent busy; use steer'), { statusCode: 409 });
     }
@@ -376,7 +396,12 @@ export class SessionStore {
           ? { role: 'user', content: text, timestamp: Date.now(), source }
           : text;
         record.agent.prompt(msg).catch(err => {
-          record.busy = false;  // run never started — don't strand waitIdle
+          // R1-F2: 'already processing' 恰恰意味着另一运行在途(竞态败
+          // 者)——此时 agent 正在流式, 清 busy 会让 waitIdle 收割旧回
+          // 复、并发 /messages 绕过 409。只在真实非流式时清。
+          if (!record.agent.state.isStreaming) {
+            record.busy = false;  // run never started — don't strand waitIdle
+          }
           this._journal(record, 'error', { message: String(err) });
         });
       });
@@ -428,6 +453,15 @@ export class SessionStore {
 
   /** Queue a steering message for delivery after the current turn. */
   steer(record, text, source) {
+    this._requireLiveAgent(record);
+    // R1-F3: pi 的 steer 队列只在运行回合结束注入——空闲 agent 上的
+    // steer 会滞留队列(若再无 prompt 则永不送达, 202 却静默丢弃; 若随
+    // 后有 prompt 则注入顺序倒置: 后发的用户消息先入上下文, 实测确
+    // 认)。空闲时直达 prompt(复用 busy 翻转/409/正确次序); 忙时保留
+    // 队列路径(正是指令语义: 运行中转向)。
+    if (!record.busy && !record.agent.state.isStreaming) {
+      return this.prompt(record, text, source);
+    }
     record.agent.steer(source
       ? { role: 'user', content: text, timestamp: Date.now(), source }
       : { role: 'user', content: text, timestamp: Date.now() });
@@ -448,6 +482,7 @@ export class SessionStore {
    * instead of surfacing an error.
    */
   followUp(record, text, source = injectionOriginOf(text)) {
+    this._requireLiveAgent(record);
     const agent = record.agent;
     const msg = { role: 'user', content: text, timestamp: Date.now(), source };
     const queue = () => {
@@ -461,7 +496,8 @@ export class SessionStore {
     record.busy = true;  // same synchronous-flip rule as prompt()
     this._journal(record, 'followup_injected', { text: truncateText(text, 200) });
     Promise.resolve(record.agent.prompt(msg)).catch(() => {
-      record.busy = false;
+      // R1-F2: 同 prompt()——输给竞态时不清 busy(见上)。
+      if (!record.agent.state.isStreaming) record.busy = false;
       queue();
     });
   }
@@ -471,6 +507,8 @@ export class SessionStore {
     while (record.busy && Date.now() < deadline) {
       await new Promise(resolve => setTimeout(resolve, 300));
     }
+    // R1-F4: inert 会话直接判空闲(无消息可收割)
+    if (!record.agent) return { sessionId: record.id, idle: true, reply: '' };
     const last = [...record.agent.state.messages].reverse()
       .find(m => m.role === 'assistant');
     return {

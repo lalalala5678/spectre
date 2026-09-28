@@ -9,7 +9,7 @@
 import { AGENTS, AGENT_KEYS, isAgentKey } from './agents.mjs';
 import { SPAWNABLE_KEYS } from './tools.mjs';
 import { CONFIG } from './config.mjs';
-import { hasInternalToken, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
+import { hasInternalToken, isInternalCaller, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
 import * as path_mod from 'node:path';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
@@ -168,7 +168,7 @@ function realRouter({ store, bus, caps, wal }) {
       // console user must not forge orchestrator-linked sessions. The
       // workSessionId grouping key is ordinary user state.
       const opts = {};
-      if (body.engagementId && hasInternalToken(req)) {
+      if (body.engagementId && isInternalCaller(req)) {
         opts.engagementId = String(body.engagementId);
         opts.orchestratorSessionId = body.orchestratorSessionId
           ? String(body.orchestratorSessionId) : null;
@@ -217,7 +217,7 @@ function realRouter({ store, bus, caps, wal }) {
         return store.attach(record, sse(req, res), since);
       }
       if (action === '/followup' && method === 'POST') {
-        if (!hasInternalToken(req)) {
+        if (!isInternalCaller(req)) {
           return bad(res, 401, 'internal only');
         }
         const body = await readJson(req);
@@ -236,7 +236,7 @@ function realRouter({ store, bus, caps, wal }) {
         }
         // Agent-impersonating injections (Temporal activities) need the
         // internal token; plain console users ride their own session auth.
-        if (body.source === 'agent' && !hasInternalToken(req)) {
+        if (body.source === 'agent' && !isInternalCaller(req)) {
           return bad(res, 401, 'agent source requires internal token');
         }
         try {
@@ -256,13 +256,13 @@ function realRouter({ store, bus, caps, wal }) {
         return json(res, 202, { ok: true });
       }
       if (action === '/wait-idle' && method === 'POST') {
-        if (!hasInternalToken(req)) {
+        if (!isInternalCaller(req)) {
           return bad(res, 401, 'internal only');
         }
         return json(res, 200, await store.waitIdle(record));
       }
       if (action === '/report-state' && method === 'GET') {
-        if (!hasInternalToken(req)) {
+        if (!isInternalCaller(req)) {
           return bad(res, 401, 'internal only');
         }
         // Workflow-side task-report gate reads this (agentTaskWorkflow).
@@ -273,7 +273,7 @@ function realRouter({ store, bus, caps, wal }) {
         });
       }
       if (action === '/mark-report-synthesized' && method === 'POST') {
-        if (!hasInternalToken(req)) {
+        if (!isInternalCaller(req)) {
           return bad(res, 401, 'internal only');
         }
         // Workflow-synthesized fallback report: bump the counter so the
@@ -592,7 +592,7 @@ function realRouter({ store, bus, caps, wal }) {
       return bus.attach(sse(req, res), since);
     }
     if (path === '/api/bus' && method === 'POST') {
-      if (!hasInternalToken(req)) {
+      if (!isInternalCaller(req)) {
         return bad(res, 401, 'internal only');
       }
       const body = await readJson(req);

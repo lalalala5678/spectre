@@ -49,6 +49,17 @@ export function hasInternalToken(req) {
   return req.headers['x-internal-token'] === CONFIG.internalToken;
 }
 
+/** F75/R1-F1: 直连内部判定——token 匹配且不携带网关注入的来源标记。
+ * 网关为所有已认证控制台请求注入 X-Internal-Token, 使历史上全部
+ * internal-only 子门对控制台用户恒真(注释声称的权限模型是死代码)。
+ * 网关现随 token 附带 X-Console-Origin: 1(服务端构造, 客户端不可
+ * 伪造——proxy.py 的上游头集合不含任何透传); 子门改用本判定后,
+ * 控制台来源恰好被拒, 与各子门注释意图一致。gatedRoute 仍用
+ * hasInternalToken(统一门只挡本机直连无 token 的进程)。 */
+export function isInternalCaller(req) {
+  return hasInternalToken(req) && !req.headers['x-console-origin'];
+}
+
 /** Read the raw request body as a Buffer (size-capped like readJson). */
 export async function readRawBody(req, maxBytes) {
   const cap = maxBytes ?? 100 * 1024 * 1024; // 100MB upload ceiling

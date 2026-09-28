@@ -35,6 +35,10 @@ def proxy(handler, api_path):
             # the runtime enforces the internal token on EVERY /api route;
             # inject it here on behalf of the authenticated console session
             "X-Internal-Token": config.RUNTIME_TOKEN,
+            # F75/R1-F1: 服务端来源标记(上游头集合为固定构造, 客户端
+            # 不可伪造)——runtime 的 internal-only 子门以此区分
+            # '经网关的控制台会话' 与 'Temporal/内部直连'。
+            "X-Console-Origin": "1",
         }
         if handler.command == "HEAD":
             body = None
