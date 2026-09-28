@@ -37,7 +37,6 @@ const signals = {
   broadcast: defineSignal('broadcast'),
   dm: defineSignal('dm'),
   orchestratorRelay: defineSignal('orchestratorRelay'),
-  agentMessage: defineSignal('agentMessage'),
 };
 
 const llm = proxyActivities({
@@ -88,7 +87,6 @@ export async function autoPwnWorkflow(input) {
   const engagement = `autopwn-${engagementId}`;
   const children = new Map();     // agentKey -> child handle
   const inbox = [];               // {kind, from, to, text, summary, payloadRef}
-  const publishedVulns = new Set();  // agentKeys that emitted intel
   let open = true;
 
   setHandler(signals.agentShare, (msg) => {
@@ -102,13 +100,6 @@ export async function autoPwnWorkflow(input) {
   });
   setHandler(signals.orchestratorRelay, (msg) => {
     inbox.push({ kind: 'relay', from: 'orchestrator', ...msg });
-  });
-  // child → orchestrator intel: bus journal + followUp happen runtime-side
-  // (the tool); the signal also marks the child so its completion share is
-  // skipped — the vuln/intel events already represent that output (prevents
-  // the "two entries for one request" duplication).
-  setHandler(signals.agentMessage, (msg) => {
-    publishedVulns.add(msg.from);
   });
 
   // Single drain task: journal events + route dms per policy above.
@@ -137,13 +128,20 @@ export async function autoPwnWorkflow(input) {
           workSessionId,
         });
         for (const [, handle] of children) {
-          await handle.signal(signals.dm, { from: 'orchestrator', text: msg.text });
+          // R7-F2: 已完成/失败的 child 接受 signal 会抛错并拖垮整个
+          // 父工作流(notify+汇总全丢)。空投本就无人消费——best-effort
+          // 跳过(7829e91 删码前的先例语义)。
+          try {
+            await handle.signal(signals.dm, { from: 'orchestrator', text: msg.text });
+          } catch { /* child closed — skip */ }
         }
       } else if (msg.kind === 'relay') {
         for (const key of msg.to ?? []) {
           const handle = children.get(key);
           if (handle) {
-            await handle.signal(signals.dm, { from: 'orchestrator', text: msg.text });
+            try {  // R7-F2: 同 broadcast——已完成 child 跳过
+              await handle.signal(signals.dm, { from: 'orchestrator', text: msg.text });
+            } catch { /* child closed — skip */ }
           }
         }
       }
@@ -157,7 +155,11 @@ export async function autoPwnWorkflow(input) {
   });
 
   const results = new Map();
-  await Promise.all(agents.map(async (agentKey) => {
+  // R7-F5: 重复 agentKey(LLM 传重复数组)会撞 workflowId 抛
+  // 'workflow already started' → Promise.all 一败全弃 + 已启动的健康
+  // child 被默认 TERMINATE 连坐杀。入口去重。
+  const uniqueAgents = [...new Set(agents)];
+  await Promise.all(uniqueAgents.map(async (agentKey) => {
     await quick.busEmit({
       channel: 'dm', from: 'orchestrator', to: agentKey, type: 'dispatch',
       summary: `任务派发:${instruction.slice(0, 80)}`, engagement,
@@ -173,7 +175,9 @@ export async function autoPwnWorkflow(input) {
     try {
       const result = await handle.result();
       results.set(agentKey, result);
-      if (!publishedVulns.has(agentKey)) {
+      {
+        // R7-F1: 无条件发完成 share——resume 完成判定依赖 channel='share'
+        // 事件(publish_intel 落的是 dm+intel-note, 不可替代)。
         await quick.busEmit({
           channel: 'share', from: agentKey, type: 'result',
           title: `${agentKey} 产出`,
@@ -206,11 +210,24 @@ export async function autoPwnWorkflow(input) {
       return `- ${key}: ${clipMarked(value.summary ?? value.error ?? '', CHILD_SUMMARY_MAX)}`;
     })
     .join('\n');
-  await quick.notifyEngagementDone({
-    orchestratorSessionId,
-    engagementId,
-    summary: summaryLines,
-  });
+  try {
+    await quick.notifyEngagementDone({
+      orchestratorSessionId,
+      engagementId,
+      summary: summaryLines,
+    });
+  } catch (e) {
+    // R7-F4: 编排会话 404/runtime 停机曾把已完成战役标 FAILED——
+    // 汇总全丢。bus 兜底(落 WAL, 面板可见, 不依赖会话存活); 再失败
+    // 也让 workflow 正常完成(结果在返回值+bus)。
+    try {
+      await quick.busEmit({
+        channel: 'announce', from: 'orchestrator', type: 'context',
+        title: `战役汇总(编排会话投递失败兜底): ${engagementId}`,
+        summary: summaryLines.slice(0, 480), engagement, workSessionId,
+      });
+    } catch { /* 战役确已完成: 结果在返回值+先前的关闭公告 */ }
+  }
 
   return {
     engagementId,
@@ -254,18 +271,30 @@ export async function agentTaskWorkflow(input) {
   let result;
   let report;
   try {
-    result = await llm.promptAndWait(
-      session.sessionId,
-      // Fix-A (P1+P6): recipient identity injected. Project-3 exposed
-      // the full multi-role instruction to every agent WITHOUT naming
-      // the recipient — all three self-identified as the dispatcher and
-      // burned 12 spawn calls. Keep the 【AutoPwn 任务 prefix first:
-      // report-compliance rules and frontend fallback regexes key on it.
-      `【AutoPwn 任务 · ${engagementId}】你是本任务 ${agentKey} 阶段智能体。` +
-      `下方指令中的多角色分工由平行智能体各自执行,你只负责 ${agentKey} ` +
-      `对应的部分;除非指令明确要求,不要派生子智能体、不要代行其它角色` +
-      `的交付物。\n${instruction}`,
-    );
+    try {
+      result = await llm.promptAndWait(
+        session.sessionId,
+        // Fix-A (P1+P6): recipient identity injected. Project-3 exposed
+        // the full multi-role instruction to every agent WITHOUT naming
+        // the recipient — all three self-identified as the dispatcher and
+        // burned 12 spawn calls. Keep the 【AutoPwn 任务 prefix first:
+        // report-compliance rules and frontend fallback regexes key on it.
+        `【AutoPwn 任务 · ${engagementId}】你是本任务 ${agentKey} 阶段智能体。` +
+        `下方指令中的多角色分工由平行智能体各自执行,你只负责 ${agentKey} ` +
+        `对应的部分;除非指令明确要求,不要派生子智能体、不要代行其它角色` +
+        `的交付物。\n${instruction}`,
+      );
+    } catch (e) {
+      // R7-F3: 活动失败(650s 超时/5xx)此前直接穿透——会话已落库但
+      // 报告门未跑, taskReportCount 恒 0, activeOnly 配额槽跨重启
+      // 永久占用(P2 同类复发通道)。best-effort 标记后重抛(父流程
+      // 已容忍 child 失败; resume 会把失败 agent 判未完成重跑)。
+      try {
+        await quick.markReportSynthesized(session.sessionId,
+          { title: `[失败] ${agentKey} 任务报告`, status: 'failed' });
+      } catch { /* 收尾尽力 */ }
+      throw e;
+    }
     // Task-report gate: a task may only finish with a report on file.
     // Nudge ≤2 (followUp fires an idle agent; steer would only queue),
     // then synthesize from the final reply so readers never see a hole.

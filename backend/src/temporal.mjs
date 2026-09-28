@@ -25,7 +25,7 @@ export async function startAutopwn({ engagementId, instruction, agents,
                                      orchestratorSessionId, workSessionId }) {
   const id = engagementId || `eng-${Date.now().toString(36)}`;
   // The orchestrator never schedules itself.
-  const targets = agents.filter((key) => key !== 'autopwn');
+  const targets = [...new Set(agents)].filter((key) => key !== 'autopwn');  // R7-F5: 去重
   if (targets.length === 0) {
     throw Object.assign(new Error('no stage agents selected'), { statusCode: 400 });
   }
