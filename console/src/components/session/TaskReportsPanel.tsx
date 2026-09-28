@@ -51,6 +51,7 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
           try {
             const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
+            if (stopped) return;  // R20-F2: 项目切换竞态——旧在途 refetch 不得覆盖新项目清场
             setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
             setLoaded(true);
           } catch { /* next event heals */ }

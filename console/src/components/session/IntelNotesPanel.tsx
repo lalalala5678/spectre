@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
+import { cn } from '../../utils/cn';
 
 import { api, foldEntries, subscribeBus, type ApiBusEvent } from '../../api/client';
 
@@ -60,6 +61,7 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
           try {
             const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
+            if (stopped) return;  // R20-F2: 项目切换竞态——旧在途 refetch 不得覆盖新项目清场
             // R3-1: 先折后滤(同 VulnPanel)
         setEvents(foldEntries(all).filter(accept).slice(-20).reverse());
             setLoaded(true);
@@ -101,7 +103,8 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
                 <span className="shrink-0 rounded-sm border border-teal-800 bg-teal-950/60 px-1.5 py-0.5 font-mono text-[9px] uppercase tracking-widest text-teal-400">
                   情报
                 </span>
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
+                <span className={cn('min-w-0 flex-1 truncate text-[12.5px]',
+                  event.current.void ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
                   {title}
                 </span>
                 {event.revisedCount > 0 && (

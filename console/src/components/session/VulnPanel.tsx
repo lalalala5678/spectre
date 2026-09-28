@@ -107,6 +107,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
           try {
             const all = await api<ApiBusEvent[]>('/bus'
           + (workSessionId ? `?ws=${workSessionId}` : ''));
+            if (stopped) return;  // R20-F2: 项目切换竞态——旧在途 refetch 不得覆盖新项目清场
             // R3-1: 先折后滤——accept 判 ORIGINAL 身份(origin/from), 修订事件
         // (origin='user'/'agent'/'writer')在折后才被剔除; 此前先滤后折把
         // 修订全部剥掉, 面板永久显示旧 title/severity(与 EntryDetail 矛盾)。
@@ -150,7 +151,8 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
             >
               <div className="flex w-full items-center gap-2">
                 <SeverityBadge severity={severity} />
-                <span className="min-w-0 flex-1 truncate text-[12.5px] text-zinc-300">
+                <span className={cn('min-w-0 flex-1 truncate text-[12.5px]',
+                  event.current.void ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
                   {title}
                 </span>
                 {event.payloadRef?.startsWith('sess:') && onOpenSession && (
