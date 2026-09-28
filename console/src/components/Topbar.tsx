@@ -1,14 +1,14 @@
 import { useEffect, useRef, useState } from 'react';
 import { Activity, Bell, LogOut, Search } from 'lucide-react';
 
-import { api, subscribeBus, type ApiBusEvent } from '../api/client';
+import { api, subscribeBus } from '../api/client';
 
 /** F60: /api/health 前端零消费——模型名/会话总量/总线事件总量后端有、
  * 用户无从得知。状态栏 30s 轮询展示(ok 掉线变红)。 */
 interface HealthInfo { ok: boolean; model: string; sessions: number; bus: number; }
 
 interface TreeSess { id: string; agentKey: string; title: string | null; busy?: boolean }
-interface BusEvt { seq: number; ts?: string; type: string | null; title: string | null; summary: string | null; severity?: string | null }
+interface BusEvt { seq: number; ts?: string; type: string | null; title: string | null; summary: string | null; severity?: string | null; status?: string | null }
 
 /** F69: 顶栏搜索此前是空壳(placeholder 承诺"会话/资产/发现/CVE"但无任何
  * 逻辑)。实现: ≥2 字符防抖搜索会话(/sessions/tree 轻投影)+总线条目

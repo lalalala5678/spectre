@@ -160,7 +160,11 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
     return () => { stopped = true; clearInterval(timer); };
   }, [rootId]);
 
-  const count = tree ? 1 + tree.children.length : 0;
+  // F73: 全树递归计数——此前 1+children.length 漏计孙代及更深
+  // (spawnMaxDepth=3 时 L2/L3 不入数, 头部计数与树体不一致)。
+  const sizeOf = (n: { children: unknown[] }): number =>
+    1 + n.children.reduce((acc: number, c) => acc + sizeOf(c as { children: unknown[] }), 0);
+  const count = tree ? sizeOf(tree) : 0;
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">

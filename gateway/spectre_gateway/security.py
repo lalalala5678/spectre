@@ -45,6 +45,12 @@ class Security:
         self._lock = threading.Lock()
         self._sessions = {}   # sha256(token) -> {user, ip, ua, login_ts, last_ts}
         self._failtrack = {}  # ip -> {n, window_start, locked_until}
+        # F72: memory-only sessions logged everyone out on every deploy
+        # (spectre-console restart IS the gateway restart). Load the
+        # compact sha256-keyed sidecar; write-behind keeps it current.
+        from .session_store import SessionPersistence
+        self._persist = SessionPersistence()
+        self._sessions = self._persist.load()
 
     # ---------- credentials ----------
 
@@ -119,6 +125,8 @@ class Security:
                 "login_ts": now,
                 "last_ts": now,
             }
+        self._persist.mark_dirty()
+        self._persist.flush_if_dirty(self._sessions)
         return token
 
     def check_session(self, token):
@@ -139,11 +147,15 @@ class Security:
                 del self._sessions[key]
                 return None
             session["last_ts"] = now
+            self._persist.mark_dirty()
+            self._persist.flush_if_dirty(self._sessions)
             return session
 
     def revoke_session(self, token):
         with self._lock:
             self._sessions.pop(self._token_key(token), None)
+        self._persist.mark_dirty()
+        self._persist.flush_if_dirty(self._sessions, force=True)
 
     @staticmethod
     def _token_key(token):

@@ -40,7 +40,6 @@ export type AgentId =
   | 'mcp-config'
   | 'cli-config';
 
-export type AgentStatus = 'idle' | 'running' | 'waiting_approval' | 'error' | 'offline';
 
 export interface AgentMeta {
   id: AgentId;
