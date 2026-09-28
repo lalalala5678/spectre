@@ -26,6 +26,18 @@ export async function promptAndWait(sessionId, text) {
   return runtime.waitIdle(sessionId);
 }
 
+/**
+ * F64: the workflow nudge loop calls llm.waitIdle — the activity was
+ * never exported, so any agent that missed its report crashed the
+ * workflow at the first nudge (ApplicationFailure: not registered) and
+ * the promised synthesized fallback report never landed (postex in
+ * eng-mul1a8a5: 21-message session, zero bus events).
+ * @returns {Promise<{sessionId: string, reply: string}>}
+ */
+export async function waitIdle(sessionId) {
+  return runtime.waitIdle(sessionId);
+}
+
 /** Queue a steering message into a live pi session. */
 export async function steerSession(sessionId, text) {
   return runtime.steer(sessionId, text);
