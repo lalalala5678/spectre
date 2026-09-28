@@ -48,8 +48,11 @@ export default function App() {
   const [runningCount, setRunningCount] = useState(0);
   useEffect(() => {
     let stopped = false;
-    const poll = () => api<{ busy: boolean; agentKey: string }[]>('/sessions/tree')
-      .then(t => { if (!stopped) setRunningCount(t.filter(s => s.busy).length); })
+    const poll = () => api<{ busy: boolean; agentKey: string; engagementId?: string | null }[]>('/sessions/tree')
+      // R13-F5: 徽标在 autopwn 导航项——只计 autopwn 会话与 engagement
+      // 子会话(此前任意 stage agent busy 都点亮 AutoPwn '运行中')。
+      .then(t => { if (!stopped) setRunningCount(t.filter(s => s.busy
+        && (s.agentKey === 'autopwn' || s.engagementId)).length); })
       .catch(() => {});
     poll();
     const timer = setInterval(poll, 20_000);
@@ -70,9 +73,11 @@ export default function App() {
   }, []);
 
   const [wsId, setWsId] = useState<string | null>(null);
+  // R13-F1: 依赖 [route]——项目切换只写服务端 prefs, App 层 wsId 此前
+  // 是启动快照永不刷新, skills/mcp/cli 页持续作用于旧项目(跨项目错写)。
   useEffect(() => {
     getPrefs().then(p => setWsId(p.currentWs)).catch(() => {});
-  }, []);
+  }, [route]);
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-void-950 font-sans text-slate-200">

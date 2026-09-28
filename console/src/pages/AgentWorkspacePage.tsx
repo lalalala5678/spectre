@@ -46,6 +46,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     Promise.all([ensureWorkSession(), getPrefs()]).then(async ([ws, prefs]) => {
       if (cancelled) return;
       uiPrefsRef.current = prefs.ui ?? {};
+      const saved = Number(prefs.ui?.rightRatio);
+      if (saved > 0.02 && saved < 0.98) setRightRatio(saved);  // R13-F2
       setWorkSession(ws);
       setUiReady(true);
       setProjects(await listWorkSessions());
@@ -191,10 +193,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
   // Right column width as a viewport ratio: user-draggable, persisted as a
   // ratio (adapts across monitors), CSS does all the math on resize.
-  const [rightRatio, setRightRatio] = useState<number>(() => {
-    const saved = Number(uiPrefsRef.current?.rightRatio);
-    return saved > 0.02 && saved < 0.98 ? saved : DEFAULT_RIGHT_RATIO;
-  });
+  // R13-F2: 持久化读回——初始化器先于 boot effect 执行, ref 必 null
+  // 恒走默认(只写不读)。改常量初始化 + boot then 内恢复。
+  const [rightRatio, setRightRatio] = useState<number>(DEFAULT_RIGHT_RATIO);
   const dragW = useRef<{ startX: number; startW: number; moved: boolean } | null>(null);
   const onResizeDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragW.current = {
@@ -233,7 +234,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     dragW.current = null;
   };
   const resetRightW = () => {
-    void putPrefsSync({ ui: { rightRatio: 0.3 } });
+    void putPrefsSync({ ui: { rightRatio: DEFAULT_RIGHT_RATIO } });  // R13-F3
     setRightRatio(DEFAULT_RIGHT_RATIO);
   };
   const pickWorkSession = (id: string) => {

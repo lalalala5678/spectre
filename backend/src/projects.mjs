@@ -113,7 +113,19 @@ export function getPrefs() {
 }
 
 export function setPrefs(patch, wal) {
-  prefs = { ...prefs, ...patch, ui: { ...prefs.ui, ...(patch.ui ?? {}) } };
+  const ui = { ...prefs.ui, ...(patch.ui ?? {}) };
+  // R13-F4: stackRatios 按 key 合并——ui 级浅合并此前使单 key patch
+  // 整体替换 stackRatios(auto 页拖动抹掉 stage 页已存比例, 违
+  // PanelStack 'per storage key' 持久化契约)。null 值按 key 清除
+  // (evenSplit 语义保留)。
+  if (patch.ui?.stackRatios) {
+    ui.stackRatios = { ...(prefs.ui?.stackRatios ?? {}) };
+    for (const [k, v] of Object.entries(patch.ui.stackRatios)) {
+      if (v === null) delete ui.stackRatios[k];
+      else ui.stackRatios[k] = v;
+    }
+  }
+  prefs = { ...prefs, ...patch, ui };
   wal?.append({ t: 'pref', d: prefs });
   return getPrefs();
 }
