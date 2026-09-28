@@ -90,9 +90,13 @@ const caps = {
     store.followUp(record, text);
   },
   /** Read the last N messages of a session (read_session tool backing). */
-  readSessionMessages: (sessionId, last) => {
+  readSessionMessages: (sessionId, last, callerWs) => {
     const record = store.get(sessionId);
     if (!record) return null;
+    // R12-F1: 项目作用域(F33 同语义)——此前唯一无门的跨项目读取通道,
+    // A 项目 agent 凭任意 sessionId 可读 B 项目全部转录(writer 会话/
+    // 用户直连会话含内)。null===null 时旧会话互通。
+    if ((record.workSessionId ?? null) !== (callerWs ?? null)) return null;
     return record.agent.state.messages.slice(-last)
       .map(m => ({ role: m.role, text: typeof m.content === 'string'
         ? m.content

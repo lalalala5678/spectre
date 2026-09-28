@@ -337,10 +337,16 @@ export function buildIntelTools(record, caps) {
       // matching vulnerability entity starves downstream kind=vulnerability queries.
       const warnings = [];
       if (params.vulns?.length) {
-        const published = (caps.listBus?.() ?? [])
+        // R12-F4: 核对标题空间=查询展示空间——折修订取现行标题且滤
+        // void(此前读原始事件: 作废漏洞仍算'已发布'悬空不告警; 引用
+        // 旧标题与现行标题空间不一致)。
+        const { foldRevisions } = await import('./revision.mjs');
+        const published = foldRevisions((caps.listBus?.() ?? [])
           .filter(e => e.workSessionId === (record.workSessionId ?? null)
-            && entryKind(e) === 'vulnerability')
-          .map(e => normTitle(e.title));
+            && entryKind(e) !== null))
+          .filter(e => entryKind(e.current ?? e) === 'vulnerability'
+            && !e.current.void)
+          .map(e => normTitle(e.current.title ?? e.title));
         for (const t of params.vulns) {
           const nt = normTitle(t);
           const hit = published.some(p => p.includes(nt) || nt.includes(p));
@@ -423,7 +429,7 @@ export function buildIntelTools(record, caps) {
       const sid = String(params.sessionId).replace(/^sess:/, '');
       const last = Math.min(Math.max(Number(params.last) || 10, 1), 30);
       // Access the session store via caps — injected by the composition root
-      const messages = caps.readSessionMessages?.(sid, last);
+      const messages = caps.readSessionMessages?.(sid, last, record.workSessionId ?? null);
       if (!messages) {
         return { content: [{ type: 'text',
           text: `会话 ${sid} 不存在或不可读。payloadRef 格式为 "sess:xxx",传 sessionId 时可带或不带前缀。` }] };
@@ -798,6 +804,13 @@ export function buildShellTools(record, caps) {
     }),
     execute: async (_id, p) => {
       // pi tool protocol: results must be content-block envelopes.
+/** R12-F3 helper: slice 截断必附标记。模块级(say 是工具闭包内)。 */
+function markClipped(text, cap, how) {
+  const s = String(text ?? '');
+  if (s.length <= cap) return s;
+  return s.slice(0, cap) + `\n[已截断 ${cap}/${s.length} 字符——${how}]`;
+}
+
       const say = (obj) => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
       const R = caps.shells;
       try {
@@ -824,14 +837,17 @@ export function buildShellTools(record, caps) {
         }
         if (!p.shellId) return say({ ok: false, error: 'shellId 必填' });
         if (p.action === 'exec') {
-          if (!p.command) return { ok: false, error: 'command 必填' };
+          if (!p.command) return say({ ok: false, error: 'command 必填' });  // R12-F2
           const r = await R.exec(p.shellId, p.command, { timeoutMs: Math.min(p.timeoutMs || 30_000, 120_000) });
-          return say({ ...r, stdout: r.stdout?.slice(0, 8000), stderr: r.stderr?.slice(0, 2000) });
+          return say({ ...r,
+            stdout: markClipped(r.stdout, 8000, '管道 head/tail/grep 缩小后重取'),
+            stderr: markClipped(r.stderr, 2000, '重定向到文件后分段读') });  // R12-F3
         }
         if (p.action === 'read_file') {
-          if (!p.path) return { ok: false, error: 'path 必填' };
+          if (!p.path) return say({ ok: false, error: 'path 必填' });  // R12-F2
           const r = await R.readFile(p.shellId, p.path);
-          return say({ ok: r.ok, content: r.stdout?.slice(0, 16000), code: r.code });
+          return say({ ok: r.ok,
+            content: markClipped(r.stdout, 16000, '重读用 tail -c +N 分段取'), code: r.code });  // R12-F3
         }
         if (p.action === 'status') {
           const g = R.get(p.shellId);
