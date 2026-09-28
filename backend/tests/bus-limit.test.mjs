@@ -25,4 +25,21 @@ ck('二轮截断后封顶不变', bus.list().length === 5000)
 ck('原事件已被截', !bus.list().some(e => e.seq === orig.seq));
 ck('修订事件仍在', bus.list().some(e => e.seq === rev.seq && e.revises === orig.seq));
 
+// R2-F2: 孤儿链现行版=最新修订(n 最大)——截断后 ≥2 修订, fold 应出 newest
+import { foldRevisions } from '../src/revision.mjs';
+const bus2 = new Bus(nullWal);
+for (let i = 0; i < 5000; i++) {
+  bus2.emit({ channel: 'share', from: 'recon', summary: `f-${i}` });
+}
+const o2 = bus2.emit({ channel: 'share', from: 'recon', type: 'intel', title: '孤儿链', summary: 'o' });
+bus2.emit({ channel: 'share', from: 'recon', type: 'intel', title: '孤儿链r1', summary: 'r1', revises: o2.seq, revision: { n: 1 } });
+bus2.emit({ channel: 'share', from: 'recon', type: 'intel', title: '孤儿链r2', summary: 'r2', revises: o2.seq, revision: { n: 2 } });
+for (let i = 0; i < 4999; i++) {
+  bus2.emit({ channel: 'share', from: 'recon', summary: `t-${i}` });
+}
+const folded2 = foldRevisions(bus2.list());
+const orph2 = folded2.find(e => e.orphaned);
+ck('孤儿现行版=最新修订', orph2?.current.title === '孤儿链r2', orph2?.current.title);
+ck('孤儿计数=2', orph2?.revisedCount === 2);
+
 finish();

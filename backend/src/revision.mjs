@@ -37,8 +37,11 @@ export function foldRevisions(events) {
     // revision: fold into its original — unless the original is gone
     if (knownSeqs.has(e.revises) || seenOrphans.has(e.revises)) continue;
     seenOrphans.add(e.revises);
-    folded.push({ ...e, current: e, revisedCount: counts.get(e.revises) ?? 0,
-      orphaned: true });
+    // R2-F2: 孤儿链的现行版=最新修订(n 最大)——此前取遍历序第一条
+    // (最旧), 与文件头/query_intel 契约'newest is CURRENT'矛盾。
+    const newest = byOriginal.get(e.revises) ?? e;
+    folded.push({ ...newest, current: newest,
+      revisedCount: counts.get(e.revises) ?? 0, orphaned: true });
   }
   return folded;
 }

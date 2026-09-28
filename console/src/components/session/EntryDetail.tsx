@@ -192,7 +192,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
               setEditBusy(true);
               try {
                 await reviseEntryDirect(event.seq, fields,
-                  '用户直接编辑', current.workSessionId ?? '');
+                  '用户直接编辑', current.workSessionId ?? null);
                 setEditing(false);
               } catch (err) {
                 alert(`保存失败:${String(err)}`);
@@ -323,10 +323,12 @@ function EditForm({ kind, current, busy, onCancel, onSave }: {
       <div className="flex gap-2">
         <button
           onClick={() => onSave({
-            title: title || undefined,
+            // R2-F4: 原样透传——`|| undefined` 把刻意清空(空串)静默
+            // 转成'保持原值', 终审路径无法清空字段(redact 场景尤甚)。
+            title,
             ...(kind === 'vuln' ? { severity } : {}),
             ...(kind === 'report' ? { status } : {}),
-            text: text || undefined,
+            text,
           })}
           disabled={busy}
           className="rounded-sm border border-emerald-800/70 bg-emerald-950/30 px-3 py-1 text-[11px] text-emerald-300 hover:border-emerald-600 disabled:opacity-40"

@@ -265,9 +265,11 @@ export function foldEntries(events: ApiBusEvent[]): Array<ApiBusEvent & {
         revisedCount: counts.get(e.seq) ?? 0 });
     } else if (!known.has(e.revises) && !orphans.has(e.revises)) {
       // original trimmed past the bus journal — surface standalone
+      // R2-F2: current=最新修订(n 最大), 双胞胎对齐 revision.mjs
       orphans.add(e.revises);
-      out.push({ ...e, current: e, revisedCount: counts.get(e.revises) ?? 0,
-        orphaned: true });
+      const newest = byOriginal.get(e.revises) ?? e;
+      out.push({ ...newest, current: newest,
+        revisedCount: counts.get(e.revises) ?? 0, orphaned: true });
     }
   }
   return out;
@@ -276,7 +278,7 @@ export function foldEntries(events: ApiBusEvent[]): Array<ApiBusEvent & {
 /** Direct user edit — human is the final authority, lands immediately. */
 export async function reviseEntryDirect(seq: number,
   fields: { title?: string; severity?: string; status?: string; text?: string },
-  reason: string, workSessionId: string): Promise<ApiBusEvent> {
+  reason: string, workSessionId: string | null): Promise<ApiBusEvent> {
   return api<ApiBusEvent>('/bus/revise', {
     method: 'POST', json: { seq, ...fields, reason, workSessionId },
   });
