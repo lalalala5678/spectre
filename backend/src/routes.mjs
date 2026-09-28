@@ -115,7 +115,7 @@ function realRouter({ store, bus, caps, wal }) {
           return bad(res, 400, `${k} must be a number in [1, ${max}]`);
         }
       }
-      return json(res, 200, setSpawnSettings(body));
+      return json(res, 200, setSpawnSettings(body, wal));
     }
 
     // ---------- health & registry ----------

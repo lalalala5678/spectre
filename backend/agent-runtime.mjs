@@ -24,7 +24,7 @@ import { emitRevision } from './src/revision.mjs';
 import { buildPi } from './src/pi.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
-import { getSpawnSettings } from './src/settings.mjs';
+import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
 import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
 import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
@@ -61,6 +61,7 @@ for (const e of entries) {
 }
 // project registry + prefs (server-side, browser stores nothing)
 projectsFromWal(entries);
+spawnSettingsFromWal(entries);  // F68: spawn policy WAL replay
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
 
@@ -348,6 +349,7 @@ const compactWal = () => wal.compact([
   ...bus.list().map(e => ({ t: 'bus', d: e })),
   ...listProjects().map(p => ({ t: 'proj', d: p })),
   { t: 'pref', d: getPrefs() },
+  { t: 'spawn', d: getSpawnSettings() },  // F68: compact 白名单补 spawn
 ]);
 compactWal();
 process.on('SIGTERM', () => {
