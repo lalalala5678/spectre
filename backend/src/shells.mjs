@@ -70,8 +70,50 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
     const inTargets = Array.isArray(sc.targets) && sc.targets.includes(shell.target);
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
     if (!inTargets) return { ok: false, error: `授权门:目标 ${shell.target} 不在清单(拒绝)` };
-    if (shell.expiresAt && now > shell.expiresAt) return { ok: false, error: 'shell 已过期(一次性纪律)' };
+    if (shell.expiresAt && now > shell.expiresAt) {
+      // R6-F3: 过期是事实终态——懒翻 status 让查重/list 反映真值
+      // (此前僵尸 status=active 永久占名, 卡死同名重注册)。
+      shell.status = 'expired';
+      try { persistShells(); } catch { /* audit 已留痕 */ }
+      return { ok: false, error: 'shell 已过期(一次性纪律)' };
+    }
+    // R6-F1: target 是自由文本标签, 与流量实际目的地零绑定——此前
+    // 注册 target=授权名即可把 transportRef 指向任意内网地址(实测
+    // 打穿 runtime 自身 /api/health)。推导 web/ssh 的目的地主机并
+    // 要求 ∈ targets(精确或点后缀子域); local=平台自有沙箱不校验。
+    if (shell.transport === 'web' || shell.transport === 'ssh') {
+      const dest = destinationHost(shell);
+      if (dest) {
+        const ok = (sc.targets || []).some(t => {
+          const tt = String(t).toLowerCase();
+          const d = dest.toLowerCase();
+          return d === tt || d.endsWith('.' + tt);
+        });
+        if (!ok) {
+          return { ok: false, error:
+            `授权门:通道目的地 ${dest} 不在目标清单(拒绝)——target 标签与 transportRef 端点不一致` };
+        }
+      }
+    }
     return { ok: true };
+  }
+
+  /** R6-F1: 从 transportRef 推导流量实际目的地主机。 */
+  function destinationHost(shell) {
+    const tr = String(shell.transportRef || '');
+    try {
+      if (shell.transport === 'web') {
+        const [spec0] = tr.split('#');
+        const tpl = spec0.startsWith('POST|') ? spec0.slice(5) : spec0;
+        const urlPart = tpl.split('|')[0];
+        return new URL(urlPart).hostname;
+      }
+      if (shell.transport === 'ssh') {
+        const m = /^(.+?):(.*?)@([^:]+)(?::(\d+))?$/.exec(tr);
+        return m ? m[3] : null;
+      }
+    } catch { return null; }
+    return null;
   }
 
   function register({ name, target, transport = 'local', transportRef = '', note = '', tags = [], createdBy = 'operator', ttlHours = 24 }) {
@@ -79,7 +121,10 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
     // 命名规范:<目标>-<面>-<权限> 建议(不强制,但重名/空名拒)
     const nm = String(name || '').trim();
     if (!nm) return { error: 'name 必填(建议格式 目标-面-权限,如 dc8-web-www)' };
-    if ([...shells.values()].some(x => x.name === nm && x.status === 'active'))
+    // R6-F3: 过期通道不占名(事实终态, gate 已拒执行)
+    const nowIso = new Date().toISOString().slice(0, 19) + 'Z';
+    if ([...shells.values()].some(x => x.name === nm && x.status === 'active'
+        && !(x.expiresAt && x.expiresAt <= nowIso)))
       return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
         // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
     const tr = String(transportRef || '');
@@ -233,6 +278,7 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
     sh.cmdCount += 1; sh.lastActiveAt = new Date().toISOString();
     const task = { n: sh.cmdCount, command: command.slice(0, 500), code, ms: Date.now() - t0, at: sh.lastActiveAt };
     sh.tasks.push(task);
+    persistShells();  // R6-F2: every-mutation 契约
     if (sh.tasks.length > 100) sh.tasks.splice(0, sh.tasks.length - 100);
     audit('shell-exec', { id, target: sh.target, cmd: command.slice(0, 120), code, ms: task.ms });
     return { ok: code === 0, stdout: stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task };
@@ -248,13 +294,19 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
       sh.user = (user || '').trim() || null;
       sh.os = rest.join(' ').trim() || null;
       sh.host = sh.os ? String(sh.os).split(' ')[1] : null;
+    persistShells();  // R6-F2
     }
     return sh;
   }
 
   /** Convenience: read one file through the shell (cat), for agent tool. */
   async function readFile(id, path) {
-    const r = await exec(id, `cat -- ${JSON.stringify(path)} 2>&1 | head -c 65536`);
+    // R6-F4: 单引号安全转义(双引号内 $()/反引号会展开, path 即注入
+    // 点); cat 退出码经 PIPESTATUS 传播——读失败不再被 head 的恒 0
+    // 吞掉, 错误文本仍在 stdout 可诊断。
+    const q = "'" + String(path).replace(/'/g, `'\\''`) + "'";
+    const r = await exec(id,
+      `o=$(cat -- ${q} 2>&1); c=$?; printf %s "$o" | head -c 65536; exit $c`);
     return r;
   }
 
