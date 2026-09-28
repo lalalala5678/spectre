@@ -820,16 +820,25 @@ function realRouter({ store, bus, caps, wal }) {
       const campaigns = [];
       for (const name of dbFiles) {
         try {
-          const ev = JSON.parse(readFileSync(`${trackDir}/${name}.json`, 'utf8')).events || [];
+          const parsed = JSON.parse(readFileSync(`${trackDir}/${name}.json`, 'utf8'));
+          // R15-F1: 同目录双用途(smtp.json 凭据配置)被 *.json 通配收
+          // 录——按'有无 events 数组'判别, 非 campaign 的 json 自免疫。
+          if (!parsed || !Array.isArray(parsed.events)) continue;
+          const ev = parsed.events;
           const byUid = {};
           for (const e of ev) {
-            byUid[e.uid] ??= { open: 0, click: 0, submit: 0, session: 0 };
+            byUid[e.uid] ??= { open: 0, click: 0, submit: 0, session: 0, sent: 0 };
             if (e.kind === 'open') byUid[e.uid].open++;
             if (e.kind === 'click') byUid[e.uid].click++;
             if (e.kind === 'submit') byUid[e.uid].submit++;
             if (e.kind === 'session-captured') byUid[e.uid].session++;
+            if (e.kind === 'sent') byUid[e.uid].sent++;  // R15-F5
           }
-          const targets = Object.keys(byUid).length;
+          // R15-F5: 分母=有 sent 事件的 uid(发送数)——此前分母=已互动
+          // uid, 打开率结构性虚高(实测 100%)。存量旧库无 sent 时回退
+          // 互动分母以免面板清空。
+          const sentTargets = Object.values(byUid).filter(v => v.sent > 0).length;
+          const targets = sentTargets || Object.keys(byUid).length;
           const opens = Object.values(byUid).filter(v => v.open > 0).length;
           const clicks = Object.values(byUid).filter(v => v.click > 0).length;
           const submits = Object.values(byUid).filter(v => v.submit > 0).length;

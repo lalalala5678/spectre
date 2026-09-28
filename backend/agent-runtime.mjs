@@ -178,6 +178,13 @@ const caps = {
       `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
       `5) 用 submit_task_report 提交任务报告收尾。`, 'system');
     await store.awaitCompletion(writer, 300_000);
+    // R15-F2: 超时兜底触发时 writer 仍在跑——此前落入 declined 分支
+    // 伪造'驳回'回执, 慢运行稍后落账即回执与账本矛盾。
+    if (writer.busy) {
+      return { ok: false, timeout: true,
+        text: `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
+          `可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查是否落账` };
+    }
     const published = bus.list().find(e => e.seq > baseSeq
       && e.type === 'vulnerability' && e.author?.sessionId === writer.id);
     if (published) {
@@ -304,8 +311,17 @@ const caps = {
       `   任一关不过 → 不落账,在最终回复中明确说明驳回理由(将回执给申请者);\n` +
       `4) 提交任务报告收尾。`, 'system');
     await store.awaitCompletion(writer, 300_000);
+    if (writer.busy) {  // R15-F2: 同 reportWriter——超时非判定
+      return { ok: false, timeout: true,
+        text: `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
+          `可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查修订` };
+    }
+    // R15-F3: 身份过滤——emitRevision 的 author 继承原条目作者, 每
+    // emitter 的精确身份在 revision.approvedBy。并发修订/用户直编落
+    // 同 seq 此前被误记己功(实驳回却回执'已核准')。
     const landed = bus.list().find(e => e.revises === target.seq
-      && (e.revision?.n ?? 0) > ((current?.revision?.n) ?? 0));
+      && (e.revision?.n ?? 0) > ((current?.revision?.n) ?? 0)
+      && e.revision?.approvedBy?.sessionId === writer.id);
     if (landed) {
       return {
         ok: true,

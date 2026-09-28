@@ -234,6 +234,31 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
                                    subject, html_body, reply_to, dkim_domain,
                                    text_body, attachments)
 
+
+def track_sent(db_path, uid):
+    """R15-F5: 发送成功记 sent 事件——漏斗分母(此前分母=已互动 uid,
+    打开率结构性 100%)。V6c 锁协议与 phish-track 同源; 失败不阻塞
+    发送循环(分母缺失时聚合端回退互动分母)。"""
+    import json, fcntl, time, os
+    try:
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        with open(db_path + '.lock', 'w') as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                db = {'events': []}
+                try:
+                    db = json.load(open(db_path))
+                except Exception:
+                    pass
+                db.setdefault('events', []).append(
+                    {'kind': 'sent', 'uid': uid,
+                     'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
+                json.dump(db, open(db_path, 'w'), indent=1)
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+    except Exception as e:
+        print(f'  (track-sent 失败不阻塞: {e})')
+
     for fpath in (attachments or []):
         with open(fpath, 'rb') as f:
             att = MIMEApplication(f.read(), Name=Path(fpath).name)
@@ -303,6 +328,8 @@ def main():
     p.add_argument('--subject', required=False)
     p.add_argument('--html', help='HTML 模板')
     p.add_argument('--track-url', default='https://t.local')
+    p.add_argument('--track-db', default='/var/lib/spectre/tools/phish/track.json',
+                    help='发送事件落库(漏斗分母, R15-F5)')
     p.add_argument('--attach', action='append')
     p.add_argument('--rate', default='5/min')
     p.add_argument('--allow-plaintext', action='store_true', help='显式同意明文降级(仅限本地授权靶;凭据将明文出网)')
@@ -386,6 +413,7 @@ def main():
                           args.attach, args.dkim_key, args.dkim_selector,
                           args.dkim_domain or (args.from_addr.split('@')[1] if '@' in args.from_addr else None))
             sent += 1
+            track_sent(args.track_db, uid)  # R15-F5: sent 事件=漏斗分母
             print(f'[{i+1}/{len(targets)}] OK {to_addr} (uid={uid})')
         except Exception as e:
             failed += 1
