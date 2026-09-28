@@ -156,7 +156,11 @@ async function runShell(runner, command, options = {}) {
  *  paths only exist inside the sandbox for the docker driver).
  *  Merged stdout/stderr capture. */
 function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
-  const argvv = argv.length ? [...argv, 'bash', '-c', command]
+  // R5-F5: 超时杀宿主 docker exec 客户端不会终止容器内命令(attached
+  // exec 不转发信号, 只产生 stdin EOF)。容器分支用 timeout(1) 包装,
+  // 截止时刻在容器内执行——超时契约真正终止该次执行而非仅断视图。
+  const argvv = argv.length
+    ? [...argv, 'timeout', '-k', '2', String(timeoutSec || 86400), 'bash', '-c', command]
     : ['bash', '-lc', command];
   // Docker branch: `docker exec -w` already sets the CONTAINER cwd — the
   // host-side spawn cwd must merely EXIST. Passing the container path here

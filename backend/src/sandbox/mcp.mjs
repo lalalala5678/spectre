@@ -65,9 +65,11 @@ function clipStderr(t) {
 }
 
 class StdioRpc {
-  constructor(argv, env) {
+  constructor(argv, env, opts = {}) {
     this.argv = argv;
     this.env = env ?? {};
+    this.container = opts.container ?? null;  // R5-F1: 远程 kill 目标
+    this.remotePid = null;
     this.nextId = 1;
     this.pending = new Map();
     this.buffer = '';
@@ -106,6 +108,12 @@ class StdioRpc {
       const line = this.buffer.slice(0, idx).trim();
       this.buffer = this.buffer.slice(idx + 1);
       if (!line) continue;
+      // R5-F1: PID-echo 协议——sh -c 'echo $$; exec' 的首行是容器侧
+      // PID(非 JSON), JSON 解析本就忽略; 捕获供 close() 远程 kill。
+      if (this.remotePid === null && /^\d+$/.test(line)) {
+        this.remotePid = Number(line);
+        continue;
+      }
       try {
         const msg = JSON.parse(line);
         if (msg.id !== undefined && this.pending.has(msg.id)) {
@@ -144,6 +152,13 @@ class StdioRpc {
     });
   }
   close() {
+    // R5-F1: 先杀容器内真实进程(attached docker exec 不转发信号,
+    // 只杀宿主客户端会泄漏容器侧进程)。fire-and-forget: TERM→1s→KILL。
+    if (this.container && this.remotePid) {
+      const kill = sig => { try { spawn('docker', ['exec', this.container, 'kill', `-${sig}`, String(this.remotePid)], { stdio: 'ignore' }); } catch { /* best effort */ } };
+      kill('TERM');
+      setTimeout(() => kill('KILL'), 1000).unref?.();
+    }
     try { this.child.kill(); } catch { /* already gone */ }
   }
 }
@@ -152,11 +167,16 @@ class StdioRpc {
  *  wired straight into the container-side process. */
 async function connectStdio(server) {
   if (server.where === 'sandbox') {
-    // docker exec -i <container> <command...> — streams over the driver
+    // docker exec -i <container> <command...> — streams over the driver.
+    // R5-F1: attached docker exec 不转发信号——杀宿主客户端只产生
+    // stdin EOF, 容器内进程存活(实测 sleep 600 残留)。sh -c 先回显
+    // 容器侧 PID(首行), close() 时 docker exec kill 该 PID。
     const { spawn: sp } = await import('node:child_process');
     const argv = ['docker', 'exec', '-i',
-      server.container ?? 'spectre-sandbox', ...server.command];
-    const rpc = new StdioRpc(argv, server.env);
+      server.container ?? 'spectre-sandbox', 'sh', '-c',
+      'echo $$; exec "$@"', '--', ...server.command];
+    const rpc = new StdioRpc(argv, server.env, {
+      container: server.container ?? 'spectre-sandbox' });
     const conn = await rpc.start();
     tieToParentExit(conn);
     return conn;

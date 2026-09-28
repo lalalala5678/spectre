@@ -521,22 +521,42 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/sandbox/mcp' && method === 'POST') {
       const body = await readJson(req);
-      if (!body.name || !body.transport) {
-        return bad(res, 400, 'name, transport required');
+      if (!body.name) {
+        return bad(res, 400, 'name required');
+      }
+      // R5-F3: 归一化+形状校验(与 tooling.mjs configure_mcp 对齐)——
+      // 此前任意 transport 字符串/字符串 command 被持久化, 每轮
+      // rebuildMounts spawn 垃圾 argv 且无法自愈。
+      const transport = String(body.transport ?? '').trim().toLowerCase();
+      if (transport !== 'http' && transport !== 'stdio') {
+        return bad(res, 400, 'transport 必须是 http/stdio 之一');
+      }
+      if (transport === 'stdio'
+          && (!Array.isArray(body.command) || body.command.length === 0
+              || !body.command.every(x => typeof x === 'string'))) {
+        return bad(res, 400, 'stdio command 必须为非空字符串数组, 如 ["npx","-y","server"]');
+      }
+      if (transport === 'http' && !body.url) {
+        return bad(res, 400, 'http transport 需要 url');
       }
       const entry = {
         name: String(body.name).slice(0, 60),
-        transport: body.transport,
+        transport,
         agents: Array.isArray(body.agents) ? body.agents.filter(isAgentKey) : [],
         enabled: body.enabled !== false,
-        ...(body.transport === 'http'
-          ? { url: String(body.url ?? '').slice(0, 500),
+        ...(transport === 'http'
+          ? { url: String(body.url).slice(0, 500),
               headers: body.headers ?? {} }
-          : { command: body.command ?? [], env: body.env ?? {},
+          : { command: body.command, env: body.env ?? {},
               where: body.where === 'sandbox' ? 'sandbox' : 'host' }),
       };
       const list = (await loadMcpConfig())
         .filter(s => s.name !== entry.name);
+      // R5-F2: 同名更新必须失效旧连接——POST 此前从不关闭, 新
+      // command/env 永不生效, 旧 stdio 子进程滞留到重启(与 DELETE
+      // 路径'removed or CHANGED 都不得存活'的注释矛盾)。
+      const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
+      closeMcpConnection(entry.name);
       const next = await saveMcpConfig([...list, entry]);
       const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);

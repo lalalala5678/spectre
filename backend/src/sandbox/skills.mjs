@@ -54,7 +54,9 @@ export async function saveSkill(agentKey, { name, description, content }) {
   const dir = `${HOST.skills}/${agentKey}/${name}`;
   const { mkdir, writeFile } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
-  const fm = `---\nname: ${name}\ndescription: ${description}\n---\n\n`;
+  // R5-F4: description 含换行/--- 可伪造第二 frontmatter 块污染解析
+  // ——JSON 字符串是合法 YAML 双引号标量, 换行/引号/冒号全转义。
+  const fm = `---\nname: ${JSON.stringify(name)}\ndescription: ${JSON.stringify(String(description).replace(/\s*[\r\n]+\s*/g, ' '))}\n---\n\n`;
   await writeFile(`${dir}/SKILL.md`, fm + content, 'utf8');
   return `${CONTAINER.skills}/${agentKey}/${name}/SKILL.md`;
 }
