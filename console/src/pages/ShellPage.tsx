@@ -9,7 +9,9 @@ interface ShellHandle {
   cmdCount: number; createdAt: string; expiresAt: string;
   /** F61: 后端一直返回但 UI 从未显示——运维/编排都依赖 */
   lastActiveAt?: string | null;
-  tasks?: string[];
+  /** R19-F1: 后端契约 {n,command,code,ms,at}(shells.mjs 注释明文)——
+   * 此前声明 string[] 并 join, 渲染 '[object Object]' 乱码。 */
+  tasks?: { n: number; command: string; code: number | string; ms: number; at: string | null }[];
   note?: string | null;
 }
 interface ExecResult { ok: boolean; stdout?: string; stderr?: string; code?: number; error?: string; ms?: number }
@@ -97,7 +99,7 @@ export default function ShellPage() {
             </div>
             <div className="mt-0.5 font-mono text-[10px] text-zinc-500">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · 活跃 ${s.lastActiveAt.slice(5, 16)}` : ''}</div>
             {(s.tasks?.length ?? 0) > 0 && (
-              <div className="mt-0.5 truncate font-mono text-[9.5px] text-sky-400/70" title={s.tasks!.join(', ')}>任务: {s.tasks!.join(', ')}</div>
+              <div className="mt-0.5 truncate font-mono text-[9.5px] text-sky-400/70" title={s.tasks!.map(t => t.command).join(', ')}>任务: {s.tasks!.map(t => t.command).join(', ')}</div>
             )}
             {s.status === 'active' && (
               <button

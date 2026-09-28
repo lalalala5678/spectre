@@ -8,7 +8,7 @@ import { api, subscribeBus } from '../api/client';
 interface HealthInfo { ok: boolean; model: string; sessions: number; bus: number; }
 
 interface TreeSess { id: string; agentKey: string; title: string | null; busy?: boolean }
-interface BusEvt { seq: number; ts?: string; type: string | null; title: string | null; summary: string | null; severity?: string | null; status?: string | null }
+interface BusEvt { seq: number; ts?: string; type: string | null; title: string | null; summary: string | null; severity?: string | null; status?: string | null; revises?: number | null }
 
 /** F69: 顶栏搜索此前是空壳(placeholder 承诺"会话/资产/发现/CVE"但无任何
  * 逻辑)。实现: ≥2 字符防抖搜索会话(/sessions/tree 轻投影)+总线条目
@@ -27,6 +27,10 @@ const NOTICE_HASH: Record<Notice['kind'], string> = {
 };
 
 function noticeOf(e: BusEvt): Notice | null {
+  // R19-F2: 修订事件(revises 指针, type 继承原始)不触发通知——同一
+  // 漏洞多次修订此前多次响铃+未读虚增(活库 33 条修订匹配谓词);
+  // void 撤回性修订按设计同样不响。通知身份=原始发布。
+  if (e.revises) return null;
   if (e.type === 'vulnerability') {
     return { seq: e.seq, kind: 'vulnerability',
       text: `[${e.severity ?? '?'}] ${e.title ?? e.summary ?? ''}`,
