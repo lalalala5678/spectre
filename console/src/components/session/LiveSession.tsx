@@ -75,12 +75,13 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   }, []);
 
   useEffect(() => {
+    // R8-F2: 会话切换(非空→非空)同样清场——switchSession 直换 id 不经
+    // null, 旧转录在 fetch 期间乃至失败后残留在新 id 下, 脏 busy 把新
+    // 消息误路由为 steer(违反本 effect 自述的 skeleton-not-stale)。
+    setMessages([]);
+    setLoaded(false);
+    setBusy(false);
     if (!sessionId) {
-      // Project switch stage: clear the previous project's transcript so
-      // the skeleton (not stale content) shows while bootstrapping.
-      setMessages([]);
-      setLoaded(false);
-      setBusy(false);
       return;
     }
     let cancelled = false;
@@ -192,8 +193,9 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   const send = async (text: string, mode: 'prompt' | 'steer') => {
     if (!sessionId) return;
     setError('');
+    const opTs = Date.now();
     if (mode === 'prompt') {
-      setMessages(prev => [...prev, { role: 'user', ts: Date.now(), text }]);
+      setMessages(prev => [...prev, { role: 'user', ts: opTs, text }]);
     }
     try {
       await api(`/sessions/${sessionId}/${mode === 'prompt' ? 'messages' : 'steer'}`, {
@@ -201,6 +203,9 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
         json: { text },
       });
     } catch (err) {
+      // R8-F3: 回滚乐观气泡——失败的消息从未入账, 残留即转录造假。
+      setMessages(prev => prev.filter(m =>
+        !(m.role === 'user' && m.ts === opTs && m.text === text)));
       setError(String(err));
     }
   };

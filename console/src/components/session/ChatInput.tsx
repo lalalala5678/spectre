@@ -24,7 +24,7 @@ export function ChatInput({
       form.append('file', file);
       const res = await fetch('/spectre/api/sandbox/uploads', {
         method: 'POST', body: form, credentials: 'include' });
-      if (!res.ok && res.redirected) { window.location.assign(res.url); return; }
+      if (res.redirected && res.url.includes('/login')) { window.location.assign('/spectre/login'); return; }  // R8-F5: 判定写反(对照 client.ts)
       // R3-5: 非 2xx(400/413…)此前落入成功分支, 拼出'[已上传 undefined]'
       // 伪成功路径——显式抛错走 catch 的'上传失败'。
       if (!res.ok) {
@@ -85,6 +85,7 @@ export function ChatInput({
           className="min-h-[20px] min-w-0 flex-1 resize-none bg-transparent font-mono text-[13px] leading-5 text-zinc-200 placeholder:text-zinc-700 outline-none"
           rows={1}
           onKeyDown={(e) => {
+            if (e.nativeEvent.isComposing) return;  // R8-F1: IME 组合期 Enter 是确认候选, 不是提交
             if (e.key === 'Enter' && e.shiftKey) {
               return; // plain newline — textarea default, never submits
             }
