@@ -17,7 +17,7 @@ import { injectionOriginOf } from './sessions.mjs';
 import { entryKind as entryKindOf } from './tools.mjs';
 import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
-import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject } from './projects.mjs';
+import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
 import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 
@@ -184,7 +184,11 @@ function realRouter({ store, bus, caps, wal }) {
         opts.workSessionId = String(body.workSessionId).slice(0, 64);
         // auto-register unknown project ids (sessions may arrive before
         // the console ever created the project)
-        ensureProject(opts.workSessionId, wal);
+        // R9-F5: 已删项目(墓碑)不复活——会话照建(F58 保留历史),
+        // 但项目不再以'未命名'重回列表。
+        if (!isTombstoned(opts.workSessionId)) {
+          ensureProject(opts.workSessionId, wal);
+        }
       }
       if (body.parentSessionId) {
         opts.parentSessionId = String(body.parentSessionId).slice(0, 64);

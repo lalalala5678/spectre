@@ -13,12 +13,26 @@ import { Wal } from './persist.mjs';
 let projects = new Map();   // id → project
 let prefs = { currentWs: null, ui: {} };
 
+const tombstones = new Set();  // R9-F5: 已删项目墓碑——迟到的会话变更不得复活
+
 export function projectsFromWal(entries) {
   for (const e of entries) {
-    if (e.t === 'proj' && e.d?.id) projects.set(e.d.id, e.d);
-    if (e.t === 'proj-del' && e.d?.id) projects.delete(e.d.id);
+    if (e.t === 'proj' && e.d?.id) { projects.set(e.d.id, e.d); tombstones.delete(e.d.id); }
+    if (e.t === 'proj-del' && e.d?.id) { projects.delete(e.d.id); tombstones.add(e.d.id); }
     if (e.t === 'pref' && e.d) prefs = { ...prefs, ...e.d };
   }
+}
+
+/** R9-F5: 项目是否已被删除(墓碑)。已删 id 不经 ensureProject 复活
+ * (F58 '从每个列表消失'不变量); 从未见过的 id 照常零摩擦自动建。 */
+export function isTombstoned(id) {
+  return tombstones.has(id);
+}
+
+/** R9-F5: 全部墓碑 id——compact 重写时保留 proj-del(R9 调试发现:
+ * compact 只写活项目, 墓碑不过 compaction 则重启丢失)。 */
+export function tombstonesAll() {
+  return [...tombstones];
 }
 
 export function listProjects() {
@@ -36,6 +50,7 @@ export function ensureProject(id, wal, label) {
   if (!id) return null;
   let p = projects.get(id);
   if (p) return p;
+  tombstones.delete(id);  // R9-F5: 显式创建/重建清墓碑
   p = { id, label: label ?? '未命名项目', createdAt: new Date().toISOString(),
     lastSessions: {} };
   projects.set(id, p);
@@ -58,8 +73,14 @@ export function renameProject(id, label, wal) {
 export function deleteProject(id, wal) {
   if (!projects.has(id)) return false;
   projects.delete(id);
+  tombstones.add(id);  // R9-F5
   wal?.append({ t: 'proj-del', d: { id } });
-  if (prefs.currentWs === id) prefs.currentWs = null;
+  if (prefs.currentWs === id) {
+    prefs.currentWs = null;
+    // R9-F1: 内存变更必须先 durable——不落盘则非优雅退出后重放出
+    // 悬空 currentWs, 且 boot compact 以 getPrefs() 快照永久固化。
+    wal?.append({ t: 'pref', d: prefs });
+  }
   return true;
 }
 

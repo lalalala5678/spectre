@@ -28,7 +28,7 @@ import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
 import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
 import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
-import { projectsFromWal, listProjects, getPrefs } from './src/projects.mjs';
+import { projectsFromWal, listProjects, getPrefs, tombstonesAll } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
 
@@ -348,6 +348,7 @@ const compactWal = () => wal.compact([
   ...store.snapshotForDisk(),
   ...bus.list().map(e => ({ t: 'bus', d: e })),
   ...listProjects().map(p => ({ t: 'proj', d: p })),
+  ...[...tombstonesAll()].map(id => ({ t: 'proj-del', d: { id } })),  // R9-F5: 墓碑过 compact
   { t: 'pref', d: getPrefs() },
   { t: 'spawn', d: getSpawnSettings() },  // F68: compact 白名单补 spawn
 ]);
