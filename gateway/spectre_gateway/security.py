@@ -125,8 +125,9 @@ class Security:
                 "login_ts": now,
                 "last_ts": now,
             }
-        self._persist.mark_dirty()
-        self._persist.flush_if_dirty(self._sessions)
+            self._persist.mark_dirty()
+            snap = dict(self._sessions)  # R4-1: 锁内快照
+        self._persist.flush_if_dirty(snap)
         return token
 
     def check_session(self, token):
@@ -148,14 +149,16 @@ class Security:
                 return None
             session["last_ts"] = now
             self._persist.mark_dirty()
-            self._persist.flush_if_dirty(self._sessions)
-            return session
+            snap = dict(self._sessions)  # R4-3: fsync 移出认证锁
+        self._persist.flush_if_dirty(snap)
+        return session
 
     def revoke_session(self, token):
         with self._lock:
             self._sessions.pop(self._token_key(token), None)
-        self._persist.mark_dirty()
-        self._persist.flush_if_dirty(self._sessions, force=True)
+            self._persist.mark_dirty()
+            snap = dict(self._sessions)  # R4-1: 锁内快照
+        self._persist.flush_if_dirty(snap, force=True)
 
     @staticmethod
     def _token_key(token):

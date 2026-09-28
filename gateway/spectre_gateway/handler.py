@@ -53,6 +53,30 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if body and self.command != "HEAD":
             self.wfile.write(body)
 
+    def _drain(self):
+        """R4-2: 早退路径排空请求体——keep-alive 下残留 body 字节会被
+        当作下一请求的请求行解析(实测 303→501 解析错位)。超上限或读
+        异常直接断连(body 既不可信也不必留)。"""
+        try:
+            length = int(self.headers.get("Content-Length", "0"))
+        except ValueError:
+            self.close_connection = True
+            return
+        if length <= 0:
+            return
+        if length > config.MAX_BODY_BYTES:
+            self.close_connection = True
+            return
+        try:
+            remaining = length
+            while remaining > 0:
+                chunk = self.rfile.read(min(remaining, 65536))
+                if not chunk:
+                    break
+                remaining -= len(chunk)
+        except OSError:
+            self.close_connection = True
+
     def _redirect(self, location, headers=None):
         self._send(303, headers={"Location": location, **(headers or {})})
 
@@ -82,6 +106,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if rel.startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
+                self._drain()  # R4-2: keep-alive 体排空
                 return self._redirect(config.PREFIX + "/login")
             return self._proxy(rel)
 
@@ -100,6 +125,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
 
         if not self._session():
             audit("auth_redirect", ip=self.client_ip(), path=rel)
+            self._drain()  # R4-2
             return self._redirect(config.PREFIX + "/login")
 
         if rel in ("", "/"):
@@ -138,6 +164,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
+                self._drain()  # R4-2: keep-alive 体排空
                 return self._redirect(config.PREFIX + "/login")
             return self._proxy(rel)
         return self._send(405, b"method not allowed")
@@ -154,6 +181,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
+                self._drain()  # R4-2: keep-alive 体排空
                 return self._redirect(config.PREFIX + "/login")
             return self._proxy(rel)
         return self._send(405, b"method not allowed")
@@ -168,6 +196,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
+                self._drain()  # R4-2: keep-alive 体排空
                 return self._redirect(config.PREFIX + "/login")
             return self._proxy(rel)
         if rel.split("?")[0] == "/login":
@@ -178,6 +207,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         ip = self.client_ip()
         if self.security.is_locked(ip):
             audit("login_blocked_lockout", ip=ip)
+            self._drain()  # R4-2
             return self._redirect(config.PREFIX + "/login?e=lock")
 
         try:
@@ -185,6 +215,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         except ValueError:
             length = config.MAX_BODY_BYTES + 1
         if length > config.MAX_BODY_BYTES:
+            audit("request_413", ip=ip, length=length)  # R4-2: 记账补齐
+            self.close_connection = True
             return self._send(413, b"too large")
 
         raw = self.rfile.read(length).decode("utf-8", "replace")

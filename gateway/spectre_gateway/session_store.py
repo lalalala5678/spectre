@@ -47,7 +47,11 @@ class SessionPersistence:
         """Write-behind: coalesce rapid mutations (login bursts) into
         one fsync'd write per debounce window. force=True bypasses the
         debounce — terminal writes (revoke) must land BEFORE the
-        process can die, or a restart resurrects revoked sessions."""
+        process can die, or a restart resurrects revoked sessions.
+
+        R4-1: 记账+序列化+写盘全程持自锁——单一写者, 消灭共用 .tmp
+        的撕裂写; 调用方传 SNAPSHOT(锁内 dict(...)), 迭代的是私有
+        快照, 与 Security._lock 内的 mutate 无竞态。"""
         with self._lock:
             if not self._dirty:
                 return
@@ -56,10 +60,11 @@ class SessionPersistence:
                 return
             self._dirty = False
             self._last_write = now
-        tmp = self._path + ".tmp"
-        os.makedirs(os.path.dirname(self._path), exist_ok=True)
-        with open(tmp, "w", encoding="utf-8") as f:
-            json.dump(sessions, f)
-            f.flush()
-            os.fsync(f.fileno())
-        os.replace(tmp, self._path)
+            payload = json.dumps(sessions)
+            tmp = self._path + ".tmp"
+            os.makedirs(os.path.dirname(self._path), exist_ok=True)
+            with open(tmp, "w", encoding="utf-8") as f:
+                f.write(payload)
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(tmp, self._path)
