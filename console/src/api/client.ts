@@ -139,6 +139,17 @@ export interface Unsubscribe {
  * Subscribe to an SSE endpoint with cursor-based replay.
  * `since` is captured at subscribe time; new connections replay from there.
  */
+/** R14-F3: 认证过期探测——从 subscribeSse 闭包提升为共享(双胞胎纪律)。
+ * Gateway 把过期会话重定向到登录页, 必须停掉静默退避循环送用户重登。 */
+async function authExpired(): Promise<boolean> {
+  try {
+    const res = await fetch(`${API_BASE}/health`);
+    return res.redirected && res.url.includes('/login');
+  } catch {
+    return false;
+  }
+}
+
 // F52: bus/events 共享单例——此前每个面板(Vuln/Intel/TaskReports/
 // EntryDetail/BusView)各开一条 SSE,同一工作区 4-5 连接;页面切换
 // 叠加曾把浏览器并发连接池耗尽(ERR_INSUFFICIENT_RESOURCES ×1090,
@@ -160,9 +171,14 @@ function busConnect() {
       for (const h of busSubs) h('bus', payload);
     } catch { /* malformed */ }
   });
-  busSource.onerror = () => {
+  busSource.onerror = async () => {
     busSource?.close();
     busSource = null;
+    // R14-F3: 与 subscribeSse 同款探测——过期后六面板静默退避死循环
+    if (await authExpired()) {
+      window.location.assign('/spectre/login');
+      return;
+    }
     if (busSubs.size > 0) {
       const delay = Math.min(2000 * ++busFailures, 15_000);
       setTimeout(busConnect, delay);
@@ -192,14 +208,7 @@ export function subscribeSse(
   let closed = false;
 
   let failures = 0;
-  const authExpired = async () => {
-    try {
-      const res = await fetch(`${API_BASE}/health`);
-      return res.redirected && res.url.includes('/login');
-    } catch {
-      return false;
-    }
-  };
+
   const connect = () => {
     if (closed) return;
     source = new EventSource(`${API_BASE}${path}?since=${cursor}`);

@@ -84,20 +84,42 @@ export async function ensureWorkSession(): Promise<WorkSession> {
   return newWorkSession('');
 }
 
-let migrated = false;
-async function migrateLegacyStorage() {
-  if (migrated) return;
-  migrated = true;
-  try {
+// R14-F2: memoized promise——migrated 布尔在 await 前置位, 并发
+// ensureWorkSession(StrictMode 双挂载确定性触发)在上传在途时即看
+// 到空表, 各自建'未命名项目'。并发者 await 同一 promise, 落后者
+// 的列表必在上传落地之后。
+let migration: Promise<void> | null = null;
+function migrateLegacyStorage(): Promise<void> {
+  return migration ??= (async () => {
     const raw = localStorage.getItem('spectre.ws.registry');
-    if (raw) {
-      const legacy = JSON.parse(raw) as Array<{ id: string; label?: string }>;
-      if (Array.isArray(legacy) && legacy.length) {
+    if (!raw) {
+      wipeSpectreKeys();
+      return;
+    }
+    let legacy: Array<{ id: string; label?: string }>;
+    try {
+      legacy = JSON.parse(raw) as Array<{ id: string; label?: string }>;
+    } catch {
+      // registry unreadable — server data wins(无可救数据, wipe 合理)
+      wipeSpectreKeys();
+      return;
+    }
+    if (Array.isArray(legacy) && legacy.length) {
+      try {
+        // R14-F1: 上传失败(网络/5xx/auth 过期)不 wipe——键保留待下次
+        // boot 重试(服务端 !getProject 守卫保证幂等); 此前落同一
+        // catch 后无条件清除, 遗留注册表不可逆丢失。
         await api('/projects', { method: 'POST',
           json: { projects: legacy.map(p => ({ id: p.id, label: p.label })) } });
+      } catch {
+        return;  // 保留 spectre.* 键重试
       }
     }
-  } catch { /* registry unreadable — server data wins */ }
+    wipeSpectreKeys();
+  })();
+}
+
+function wipeSpectreKeys() {
   // Wipe every spectre.* key: browser is cookie-only now.
   for (const key of Object.keys(localStorage)) {
     if (key.startsWith('spectre.')) localStorage.removeItem(key);
