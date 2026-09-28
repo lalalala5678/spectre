@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { api } from './api/client';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { AgentWorkspacePage, getAgent } from './pages/AgentWorkspacePage';
@@ -42,6 +43,19 @@ export default function App() {
     window.location.hash = r;
   };
 
+  // F71: 侧栏 autopwn 运行点此前硬编码 runningCount={1}——恒亮假
+  // "运行中"。改真数据: 轻投影 tree 轮询 busy 会话数(20s)。
+  const [runningCount, setRunningCount] = useState(0);
+  useEffect(() => {
+    let stopped = false;
+    const poll = () => api<{ busy: boolean; agentKey: string }[]>('/sessions/tree')
+      .then(t => { if (!stopped) setRunningCount(t.filter(s => s.busy).length); })
+      .catch(() => {});
+    poll();
+    const timer = setInterval(poll, 20_000);
+    return () => { stopped = true; clearInterval(timer); };
+  }, []);
+
   // F57: hash deep-links / browser back-forward used to only work at
   // first mount — the route was read once in useState and never updated
   // on later hash changes (manual URL edits, history navigation).
@@ -62,7 +76,7 @@ export default function App() {
 
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-void-950 font-sans text-slate-200">
-      <Sidebar route={route} onRoute={nav} runningCount={1} />
+      <Sidebar route={route} onRoute={nav} runningCount={runningCount} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
         <main className="min-h-0 flex-1 overflow-hidden bg-void-950">

@@ -8,87 +8,59 @@ import type {
 export const AGENTS: AgentMeta[] = [
   {
     id: 'autopwn', name: 'Orchestrator', codename: 'AutoPwn 主控',
-    desc: '接收目标后自主拆解任务图，调度各阶段 Agent，处理依赖、冲突与审批升级。',
-    status: 'idle', model: 'deepseek-v4-pro', version: 'v2.4.1',
-    skills: ['task-graph', 'scope-guard', 'debate-verify'], mcpServers: ['task-db', 'evidence-store'],
+    desc: '接收目标后自主拆解任务图，调度各阶段 Agent，处理依赖、冲突与审批升级。' model: 'deepseek-v4-pro', version: 'v2.4.1' mcpServers: ['task-db', 'evidence-store'],
   },
   {
     id: 'recon', name: 'Recon Agent', codename: '资产测绘 & 指纹',
-    desc: '子域枚举、端口测绘、Web 资产发现、指纹/CMS/中间件识别、攻击面建模。',
-    status: 'running', model: 'kimi-k3', version: 'v1.9.0',
-    skills: ['subdomain-enum', 'port-masscan', 'wappalyzer-plus', 'web-crawl'], mcpServers: ['amap-fofa', 'dns-resolver'],
+    desc: '子域枚举、端口测绘、Web 资产发现、指纹/CMS/中间件识别、攻击面建模。' model: 'kimi-k3', version: 'v1.9.0' mcpServers: ['amap-fofa', 'dns-resolver'],
   },
   {
     id: 'nday', name: 'NDay Agent', codename: 'N-Day & 变体',
-    desc: 'N-Day 漏洞匹配、变种发现、PoC 沙箱验证与误报反证。',
-    status: 'idle', model: 'kimi-k3', version: 'v1.7.3',
-    skills: ['nuclei-nday', 'variant-hunt', 'poc-verify'], mcpServers: ['cve-db', 'sandbox-runner'],
+    desc: 'N-Day 漏洞匹配、变种发现、PoC 沙箱验证与误报反证。' model: 'kimi-k3', version: 'v1.7.3' mcpServers: ['cve-db', 'sandbox-runner'],
   },
   {
     id: 'weakcred', name: 'WeakCred Agent', codename: '弱口令检测',
-    desc: '服务/后台弱口令检测、默认凭据库匹配、已获凭据跨服务复用测试。',
-    status: 'idle', model: 'kimi-k3', version: 'v1.1.2',
-    skills: ['weakcred-check', 'default-cred-db', 'cred-reuse'], mcpServers: ['wordlist-store'],
+    desc: '服务/后台弱口令检测、默认凭据库匹配、已获凭据跨服务复用测试。' model: 'kimi-k3', version: 'v1.1.2' mcpServers: ['wordlist-store'],
   },
   {
     id: 'api', name: 'API Agent', codename: 'API 渗透',
-    desc: 'API 资产发现、Schema 还原、越权/注入/业务逻辑漏洞测试。',
-    status: 'idle', model: 'kimi-k3', version: 'v1.0.4',
-    skills: ['api-discovery', 'schema-loot', 'bola-check'], mcpServers: ['http-replayer'],
+    desc: 'API 资产发现、Schema 还原、越权/注入/业务逻辑漏洞测试。' model: 'kimi-k3', version: 'v1.0.4' mcpServers: ['http-replayer'],
   },
   {
     id: 'exploit', name: 'VulnHunt Agent', codename: '漏洞挖掘',
-    desc: '通用 Web 漏洞利用：SQL 注入、XSS、文件上传、路径穿越、配置缺陷（管理页/调试端点/.git 泄露）等，除 API/弱口令/N-Day 外的漏洞路径。',
-    status: 'idle', model: 'deepseek-v4-pro', version: 'v2.1.0',
-    skills: ['sqli-suite', 'xss-probe', 'misconfig-audit', 'upload-bypass'], mcpServers: ['sandbox-runner', 'http-replayer'],
+    desc: '通用 Web 漏洞利用：SQL 注入、XSS、文件上传、路径穿越、配置缺陷（管理页/调试端点/.git 泄露）等，除 API/弱口令/N-Day 外的漏洞路径。' model: 'deepseek-v4-pro', version: 'v2.1.0' mcpServers: ['sandbox-runner', 'http-replayer'],
   },
   {
     id: 'phish', name: 'Phish Agent', codename: '钓鱼',
-    desc: '钓鱼页面克隆、钓鱼邮件生成、凭据收割通道与回传。',
-    status: 'idle', model: 'kimi-k3', version: 'v0.9.1',
-    skills: ['phish-clone', 'lure-craft', 'cred-harvest'], mcpServers: ['mail-relay'],
+    desc: '钓鱼页面克隆、钓鱼邮件生成、凭据收割通道与回传。' model: 'kimi-k3', version: 'v0.9.1' mcpServers: ['mail-relay'],
   },
   {
     id: 'c2', name: 'C2 Agent', codename: 'C2 免杀 & 内存马',
-    desc: '载荷免杀处理、内存马注入（Filter/Listener/Agent），通道建立。',
-    status: 'idle', model: 'deepseek-v4-pro', version: 'v1.4.2',
-    skills: ['shellcode-obf', 'memshell-inject', 'c2-profile'], mcpServers: ['c2-infra'],
+    desc: '载荷免杀处理、内存马注入（Filter/Listener/Agent），通道建立。' model: 'deepseek-v4-pro', version: 'v1.4.2' mcpServers: ['c2-infra'],
   },
   {
     id: 'persistence', name: 'Persistence Agent', codename: '权限维持',
-    desc: '隧道搭建（frp/iodine/sshuttle）、计划任务、凭据持久化。',
-    status: 'idle', model: 'kimi-k3', version: 'v1.2.8',
-    skills: ['tunnel-build', 'privesc-enum'], mcpServers: ['relay-pool'],
+    desc: '隧道搭建（frp/iodine/sshuttle）、计划任务、凭据持久化。' model: 'kimi-k3', version: 'v1.2.8' mcpServers: ['relay-pool'],
   },
   {
     id: 'postex', name: 'PostEx Agent', codename: '后渗透',
-    desc: '内网横向、凭据收集、敏感数据定位、域渗透路径推演。',
-    status: 'idle', model: 'deepseek-v4-pro', version: 'v1.6.5',
-    skills: ['lateral-move', 'cred-dump-sim', 'ad-path'], mcpServers: ['bloodhound-api'],
+    desc: '内网横向、凭据收集、敏感数据定位、域渗透路径推演。' model: 'deepseek-v4-pro', version: 'v1.6.5' mcpServers: ['bloodhound-api'],
   },
   {
     id: 'report', name: 'Report Agent', codename: '报告编写',
-    desc: '证据链汇总、CVSS 定级、复现步骤编排，输出可交付渗透报告。',
-    status: 'idle', model: 'kimi-k3', version: 'v1.3.1',
-    skills: ['report-render', 'cvss-score'], mcpServers: ['evidence-store'],
+    desc: '证据链汇总、CVSS 定级、复现步骤编排，输出可交付渗透报告。' model: 'kimi-k3', version: 'v1.3.1' mcpServers: ['evidence-store'],
   },
   {
     id: 'skill-config', name: 'Skill Config Agent', codename: '技能配置',
-    desc: '为指定智能体配置 skill:链接下载、上传包、从零撰写。',
-    status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
-    skills: [], mcpServers: [],
+    desc: '为指定智能体配置 skill:链接下载、上传包、从零撰写。' model: 'glm-5.3', version: 'v1.0.0' mcpServers: [],
   },
   {
     id: 'mcp-config', name: 'MCP Config Agent', codename: 'MCP配置',
-    desc: '为指定智能体配置 MCP server:注册、连通测试、挂载。',
-    status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
-    skills: [], mcpServers: [],
+    desc: '为指定智能体配置 MCP server:注册、连通测试、挂载。' model: 'glm-5.3', version: 'v1.0.0' mcpServers: [],
   },
   {
     id: 'cli-config', name: 'CLI Config Agent', codename: 'CLI配置',
-    desc: '向共享沙箱环境安装 CLI 工具(装一次全体智能体可用)。',
-    status: 'idle', model: 'glm-5.3', version: 'v1.0.0',
-    skills: [], mcpServers: [],
+    desc: '向共享沙箱环境安装 CLI 工具(装一次全体智能体可用)。' model: 'glm-5.3', version: 'v1.0.0' mcpServers: [],
   },
 
 ];
@@ -160,8 +132,7 @@ export const SKILLS: Skill[] = [
 export const MCP_SERVERS: McpServer[] = [
   {
     id: 'amap-fofa', name: 'fofa-search', transport: 'http',
-    endpoint: 'https://mcp.internal/fofa', desc: 'FOFA 网络空间测绘查询封装',
-    status: 'connected', envKeys: ['FOFA_KEY'],
+    endpoint: 'https://mcp.internal/fofa', desc: 'FOFA 网络空间测绘查询封装' envKeys: ['FOFA_KEY'],
     tools: [
       { name: 'fofa_query', desc: '按语法查询资产' },
       { name: 'fofa_stats', desc: '聚合统计' },
@@ -170,8 +141,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'cve-db', name: 'cve-intel', transport: 'sse',
-    endpoint: 'http://127.0.0.1:8788/sse', desc: 'CVE / 漏洞情报库（本地镜像，每日同步）',
-    status: 'connected', envKeys: [],
+    endpoint: 'http://127.0.0.1:8788/sse', desc: 'CVE / 漏洞情报库（本地镜像，每日同步）' envKeys: [],
     tools: [
       { name: 'cve_lookup', desc: '按 CVE 编号查询详情与 PoC 链接' },
       { name: 'cve_by_product', desc: '按产品+版本匹配 N-Day' },
@@ -180,8 +150,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'sandbox-runner', name: 'sandbox-runner', transport: 'stdio',
-    endpoint: 'sandboxd --mcp --profile=ephemeral', desc: '一次性隔离沙箱，执行 PoC / 利用验证',
-    status: 'connected', envKeys: ['SANDBOX_POOL'],
+    endpoint: 'sandboxd --mcp --profile=ephemeral', desc: '一次性隔离沙箱，执行 PoC / 利用验证' envKeys: ['SANDBOX_POOL'],
     tools: [
       { name: 'run_poc', desc: '在临时容器中执行 PoC 并回收输出' },
       { name: 'snapshot_destroy', desc: '销毁沙箱实例' },
@@ -190,8 +159,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'c2-infra', name: 'c2-infra', transport: 'stdio',
-    endpoint: 'c2d --mcp --profile=redteam', desc: 'C2 基础设施：监听器、profile、接入点管理',
-    status: 'disconnected', envKeys: ['C2_TOKEN'],
+    endpoint: 'c2d --mcp --profile=redteam', desc: 'C2 基础设施：监听器、profile、接入点管理' envKeys: ['C2_TOKEN'],
     tools: [
       { name: 'listener_create', desc: '创建 HTTPS/DNS 监听器' },
       { name: 'beacon_list', desc: '列出在线 beacon' },
@@ -200,8 +168,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'wordlist-store', name: 'wordlist-store', transport: 'http',
-    endpoint: 'https://mcp.internal/wordlists', desc: '字典与凭据库（分场景裁剪，只读下发）',
-    status: 'connected', envKeys: [],
+    endpoint: 'https://mcp.internal/wordlists', desc: '字典与凭据库（分场景裁剪，只读下发）' envKeys: [],
     tools: [
       { name: 'wordlist_get', desc: '按场景获取裁剪后字典' },
       { name: 'default_creds', desc: '按产品查询默认凭据' },
@@ -210,8 +177,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'http-replayer', name: 'http-replayer', transport: 'http',
-    endpoint: 'https://mcp.internal/replay', desc: 'HTTP 流量录制/重放/变异（Burp 风格）',
-    status: 'connected', envKeys: [],
+    endpoint: 'https://mcp.internal/replay', desc: 'HTTP 流量录制/重放/变异（Burp 风格）' envKeys: [],
     tools: [
       { name: 'replay', desc: '重放请求并支持参数变异' },
       { name: 'diff', desc: '对比两次响应差异' },
@@ -220,8 +186,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'mail-relay', name: 'mail-relay', transport: 'stdio',
-    endpoint: 'mailrelayd --mcp --profile=redteam', desc: '钓鱼邮件发送中继与投递状态回执',
-    status: 'disconnected', envKeys: ['RELAY_TOKEN'],
+    endpoint: 'mailrelayd --mcp --profile=redteam', desc: '钓鱼邮件发送中继与投递状态回执' envKeys: ['RELAY_TOKEN'],
     tools: [
       { name: 'send_lure', desc: '发送钓鱼邮件（需审批）' },
       { name: 'delivery_status', desc: '投递/打开状态查询' },
@@ -230,8 +195,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'evidence-store', name: 'evidence-store', transport: 'http',
-    endpoint: 'https://mcp.internal/evidence', desc: '证据链存储：截图、pcap、命令输出，SHA-256 固化',
-    status: 'connected', envKeys: [],
+    endpoint: 'https://mcp.internal/evidence', desc: '证据链存储：截图、pcap、命令输出，SHA-256 固化' envKeys: [],
     tools: [
       { name: 'evidence_put', desc: '写入证据并返回哈希' },
       { name: 'evidence_chain', desc: '导出完整证据链' },
@@ -240,8 +204,7 @@ export const MCP_SERVERS: McpServer[] = [
   },
   {
     id: 'bloodhound-api', name: 'bloodhound-api', transport: 'http',
-    endpoint: 'https://mcp.internal/bh', desc: 'BloodHound CE 图查询接口',
-    status: 'error', envKeys: ['BH_TOKEN_ID', 'BH_TOKEN_KEY'],
+    endpoint: 'https://mcp.internal/bh', desc: 'BloodHound CE 图查询接口' envKeys: ['BH_TOKEN_ID', 'BH_TOKEN_KEY'],
     tools: [
       { name: 'shortest_path', desc: '最短攻击路径' },
       { name: 'owned_mark', desc: '标记已控节点' },
@@ -305,38 +268,32 @@ export const SUBAGENT_STATES: SubAgentState[] = [
 
 export const SPANS: Span[] = [
   {
-    id: 'span-a1', agentId: 'recon', title: '组织名解析（orgresolve）',
-    status: 'done', startedAt: '02:01', finishedAt: '02:04', toolCalls: 1,
+    id: 'span-a1', agentId: 'recon', title: '组织名解析（orgresolve）' startedAt: '02:01', finishedAt: '02:04', toolCalls: 1,
     outputSummary: '3 主域 / 1 ASN / 自有网段',
     reason: '确定授权范围',
   },
   {
-    id: 'span-a2', agentId: 'recon', title: '子域枚举 & 存活探测',
-    status: 'done', startedAt: '02:04', finishedAt: '02:05', toolCalls: 1,
+    id: 'span-a2', agentId: 'recon', title: '子域枚举 & 存活探测' startedAt: '02:04', finishedAt: '02:05', toolCalls: 1,
     outputSummary: '14 子域 / 6 存活 Web / 2 管理后台',
     reason: '攻击面展开',
   },
   {
-    id: 'span-a3', agentId: 'recon', title: '端口测绘（203.0.113.0/28）',
-    status: 'done', startedAt: '02:05', finishedAt: '02:06', toolCalls: 1,
+    id: 'span-a3', agentId: 'recon', title: '端口测绘（203.0.113.0/28）' startedAt: '02:05', finishedAt: '02:06', toolCalls: 1,
     outputSummary: '47 开放端口 / 6 主机',
     reason: '服务面补全',
   },
   {
-    id: 'span-b', agentId: 'weakcred', title: '弱口令检测（Grafana + OWA + SSH）',
-    status: 'done', startedAt: '02:07', finishedAt: '02:10', toolCalls: 1,
+    id: 'span-b', agentId: 'weakcred', title: '弱口令检测（Grafana + OWA + SSH）' startedAt: '02:07', finishedAt: '02:10', toolCalls: 1,
     outputSummary: 'Grafana admin/admin 命中（凭据 #c1）',
     reason: 't1 发现登录口，凭据路径优先',
   },
   {
-    id: 'span-c', agentId: 'nday', title: 'N-Day 匹配 & 变体验证',
-    status: 'done', startedAt: '02:07', finishedAt: '02:11', toolCalls: 2,
+    id: 'span-c', agentId: 'nday', title: 'N-Day 匹配 & 变体验证' startedAt: '02:07', finishedAt: '02:11', toolCalls: 2,
     outputSummary: 'CVE-2023-22515 / CVE-2024-21887 confirmed + 1 变体',
     reason: '与 span-b 并行',
   },
   {
-    id: 'span-d', agentId: 'exploit', title: '利用链：Confluence 未授权 → RCE',
-    status: 'running', startedAt: '02:13', toolCalls: 1,
+    id: 'span-d', agentId: 'exploit', title: '利用链：Confluence 未授权 → RCE' startedAt: '02:13', toolCalls: 1,
     outputSummary: 'exploit-chain 执行中…',
     reason: '沙箱 PoC 已过，审批通过',
   },

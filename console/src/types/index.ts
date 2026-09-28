@@ -47,11 +47,6 @@ export interface AgentMeta {
   name: string;
   codename: string;
   desc: string;
-  status: AgentStatus;
-  model: string;
-  skills: string[];      // 已挂载 skill id
-  mcpServers: string[];  // 已挂载 mcp server id
-  version: string;
 }
 
 // ---------------- 会话 / 事件流 ----------------
