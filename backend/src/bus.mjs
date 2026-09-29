@@ -97,7 +97,12 @@ export class Bus {
   _broadcast(event) {
     const frame = `event: bus\ndata: ${JSON.stringify(event)}\n\n`;
     for (const client of this.clients) {
-      client.write(frame);
+      // R26-F4: 背压记账(sessions._broadcast 同款)
+      if (client.write(frame)) {
+        client.__congested = 0;
+      } else if ((client.__congested = (client.__congested || 0) + 1) >= 500) {
+        client.destroy();
+      }
     }
   }
 }

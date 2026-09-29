@@ -575,7 +575,14 @@ export class SessionStore {
   _broadcast(record, event) {
     const frame = `event: session\ndata: ${JSON.stringify(event)}\n\n`;
     for (const client of record.clients) {
-      client.write(frame);
+      // R26-F4: 半开/零窗连接(close 永不触发)使 Node 用户态缓冲无界
+      // 积压——write()===false 连续超限即销毁该连接(close 清理路径
+      // 接手; attach(since)+lastSeq 游标本为断线重连设计)。
+      if (client.write(frame)) {
+        client.__congested = 0;
+      } else if ((client.__congested = (client.__congested || 0) + 1) >= 500) {
+        client.destroy();
+      }
     }
   }
 
@@ -814,28 +821,31 @@ export class SessionStore {
    * or a delayed idle check (10min) at delta>=4. One job per session.
    */
   _maybeSummarize(record) {
-    if (!this.summarizer || record.summarizeBusy) return;
-    const run = async (job) => {
-      record.summarizeBusy = true;
-      try {
-        await job();
-      } catch (err) {
-        console.error(`[summarizer] ${record.id}:`, String(err));
-      } finally {
-        record.summarizeBusy = false;
-      }
-    };
+    if (!this.summarizer) return;
+    // R26-F2: 在飞时不再丢弃调度——记 pending, 作业落定后重评(空闲会话
+    // 的尾部消息此前永久漏出简述覆盖窗口)。
+    if (record.summarizeBusy) { record.summarizePending = true; return; }
     if (!record.title) {
-      run(() => this.summarizer.generateTitle(record));
+      // R26-F1: 标题作业落定后补评 brief 分支——此前标题分支独占
+      // return, 产不出标题的会话(问候开场 isLowSignal 短路等)其滚动
+      // 简述被永久饿死; decline 重试语义(displayTitle 投影注释自证)
+      // 保留——补评只走 brief 判据, 不重入标题分支。
+      this._runSummarizeJob(record,
+        () => this.summarizer.generateTitle(record),
+        () => this._maybeScheduleBrief(record));
       return;
     }
+    this._maybeScheduleBrief(record);
+  }
+
+  _maybeScheduleBrief(record) {
     const cfg = {
       minDelta: CONFIG.summaryMinDelta,
       eagerDelta: CONFIG.summaryEagerDelta,
       idleMs: CONFIG.summaryIdleMs,
     };
     if (Summarizer.shouldRefreshBrief(record, cfg)) {
-      run(() => this.summarizer.refreshBrief(record));
+      this._runSummarizeJob(record, () => this.summarizer.refreshBrief(record));
     } else if (record.agent.state.messages.length - record.briefUpTo
                >= cfg.minDelta) {
       const delay = Math.max(0,
@@ -843,12 +853,47 @@ export class SessionStore {
       setTimeout(() => {
         // still idle since schedule time and still enough new material
         const stillDelta = record.agent.state.messages.length - record.briefUpTo;
-        if (record.busy || record.summarizeBusy || stillDelta < cfg.minDelta) {
+        if (record.busy || stillDelta < cfg.minDelta) {
           return;
         }
-        run(() => this.summarizer.refreshBrief(record));
+        // R26-F2: 到点恰逢摘要作业在飞——改记 pending 待落定重评,
+        // 不再裸退吞掉本批消息的调度。
+        if (record.summarizeBusy) { record.summarizePending = true; return; }
+        this._runSummarizeJob(record, () => this.summarizer.refreshBrief(record));
       }, delay);
     }
+  }
+
+  _runSummarizeJob(record, job, after) {
+    // R26-F3: 捕获作业前摘要面——变异即追加 meta 落盘(镜像
+    // markReportSynthesized 纪律); 此前摘要成果只在下一次
+    // message_end/agent_end piggyback 才落盘, 空闲窗口内硬崩溃
+    // 丢失已花费 LLM 成本的标题与简述。
+    const before = { title: record.title, brief: record.brief,
+                     briefUpTo: record.briefUpTo };
+    record.summarizeBusy = true;
+    (async () => {
+      try {
+        await job();
+      } catch (err) {
+        console.error(`[summarizer] ${record.id}:`, String(err));
+      } finally {
+        record.summarizeBusy = false;
+        const mutated = record.title !== before.title
+          || record.brief !== before.brief
+          || record.briefUpTo !== before.briefUpTo;
+        if (mutated) {
+          safeWalAppend(this.wal, {
+            t: 'meta', d: { sid: record.id, meta: this._metaOf(record) },
+          });
+        }
+        if (after) after();
+        if (record.summarizePending) {
+          record.summarizePending = false;
+          this._maybeSummarize(record);
+        }
+      }
+    })();
   }
 
   _onAgentEvent(record, event) {

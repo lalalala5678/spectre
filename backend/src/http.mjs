@@ -40,7 +40,13 @@ export function sse(req, res) {
     'X-Accel-Buffering': 'no',
   });
   res.write(':ok\n\n');
-  const ping = setInterval(() => res.write(':ping\n\n'), 15_000);
+  // R26-F4: ping 连续 4 次(≈60s)写入背压——缓冲拥塞未排空的半开连
+  // 接主动断链, 防 ping+delta+重放无限积压(客户端可凭 since 重连)。
+  let congested = 0;
+  const ping = setInterval(() => {
+    if (res.write(':ping\n\n')) congested = 0;
+    else if (++congested >= 4) { clearInterval(ping); res.destroy(); }
+  }, 15_000);
   req.on('close', () => clearInterval(ping));
   return res;
 }
