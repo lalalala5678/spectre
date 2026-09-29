@@ -396,9 +396,15 @@ function realRouter({ store, bus, caps, wal }) {
           JSON.stringify(smtpHasSecret ? { host: smtpCfg.host, port: Number(smtpCfg.port) || 587,
             user: smtpCfg.user, pass: smtpCfg.password } : {}, null, 1), 'utf8');
 
+        // 最小权限: recon server 的配置文件只收 recon 组源——此前全量
+        // 落盘使 c2 组 key(virustotal/hybridanalysis)混入(server 虽按注
+        // 册表忽略, 但 key 材料不应越组落盘)。
         const withCreds = {};
         for (const [sid, cfg] of Object.entries(keys)) {
-          if (sid !== 'brute' && hasCred(cfg)) withCreds[sid] = cfg;
+          if (sid === 'brute' || !hasCred(cfg)) continue;
+          const def = RECON_SOURCES_INTERNAL[sid];
+          if (def && !(def.agents ?? ['recon']).includes('recon')) continue;
+          withCreds[sid] = cfg;
         }
         await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(withCreds), 'utf8');
         const list = await loadMcpConfig();

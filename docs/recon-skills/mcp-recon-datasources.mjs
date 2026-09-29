@@ -34,20 +34,26 @@ const clip = (s, n = 6000) => (s && s.length > n ? `${s.slice(0, n)}…[截断,l
 const SOURCES = {
   fofa: {
     tool: 'fofa_query',
-    desc: '[read-only] FOFA 资产检索。query 用 FOFA 完整语法(domain="x.com" / icp="备案号" / ip="1.2.3.4" / icon_hash=…)。size 默认 100。',
+    desc: '[read-only] FOFA 资产检索。参数: query(必填,FOFA 完整语法 domain="x.com" / icp="备案号" / ip="1.2.3.4" / icon_hash=…), size(可选,默认 100)。仅此两参。',
     async query(a) {
       const { baseUrl, email, key } = cfg.fofa ?? {};
       const base = baseUrl || 'https://fofa.info/api';
       const q = Buffer.from(a.query).toString('base64');
       const r = await call(`${base}/v1/search/all?email=${enc(email)}&key=${enc(key)}&qbase64=${enc(q)}&size=${a.size ?? 100}&fields=host,ip,port,title,server`);
-      if (r.body?.error !== null && r.body?.error !== undefined) return `✗ FOFA: ${r.body?.errmsg ?? r.status}`;
+      // FOFA 成功体是 "error":false(布尔)——此前 !==null 谓词把成功
+      // 误判为失败(回执"✗ FOFA: 200"自相矛盾, agent 实测抓出)。
+      if (r.body?.error) {
+        const msg = r.body?.errmsg || clip(J(r.body), 200);
+        const quota = /配额|quota|积分|f[- ]?point|权限/i.test(String(msg)) ? '(账号配额/权限不足——面板换 key 或升级套餐)' : '';
+        return `✗ FOFA: ${msg} ${quota}`;
+      }
       const rows = (r.body?.results ?? []).map(x => Array.isArray(x) ? x.join('|') : J(x));
       return `✓ FOFA ${r.body?.size ?? rows.length} 条(共 ${r.body?.size ?? '?'}):\n` + clip(rows.join('\n'));
     },
   },
   hunter: {
     tool: 'hunter_query',
-    desc: '[read-only] 鹰图 Hunter 资产检索。query 用 Hunter 语法(domain.suffix="x.com" / ip="1.2.3.4")。',
+    desc: '[read-only] 鹰图 Hunter 资产检索。参数: query(必填,Hunter 语法 domain.suffix="x.com" / ip="1.2.3.4"), size(可选,默认 100)。仅此两参。',
     async query(a) {
       const { key } = cfg.hunter ?? {};
       const r = await call(`https://hunter.qianxin.com/openApi/search?api-key=${enc(key)}&search=${enc(Buffer.from(a.query).toString('base64'))}&page=1&page_size=${a.size ?? 100}&is_web=3`);
@@ -58,22 +64,25 @@ const SOURCES = {
   },
   quake: {
     tool: 'quake_query',
-    desc: '[read-only] Quake360 资产检索。query 用 Quake 语法(domain:"x.com")。',
+    desc: '[read-only] Quake360 资产检索。参数: query(必填,Quake 语法 domain:"x.com"), size(可选,默认 100)。回执列: 子域|IP|端口|标题, 含总数。仅此两参。',
     async query(a) {
       const { key } = cfg.quake ?? {};
       const r = await call('https://quake.360.net/api/v3/search/quake_service', {
         method: 'POST',
         headers: { 'X-QuakeToken': key, 'Content-Type': 'application/json' },
-        body: J({ query: a.query, start: 0, size: a.size ?? 100, include: ['ip', 'port', 'hostname', 'service.http.title', 'service.http.server'] }),
+        body: J({ query: a.query, start: 0, size: a.size ?? 100, include: ['ip', 'port', 'hostname', 'service.http.host', 'service.http.title', 'service.http.server'] }),
       });
       if (r.body?.code !== 0) return `✗ Quake: ${r.body?.message ?? r.status}`;
-      const rows = (r.body?.data ?? []).map(x => `${x.hostname ?? '-'}|${x.ip}|${x.port}|${x.service?.http?.title ?? ''}`);
-      return `✓ Quake ${rows.length} 条:\n` + clip(rows.join('\n'));
+      // hostname 常为空串(非 null)——?? 不越空串, 此前子域列被空串
+      // 短路(agent 六轮实测抓出);用 || 落到 service.http.host。
+      const total = r.body?.meta?.pagination?.total;
+      const rows = (r.body?.data ?? []).map(x => `${x.hostname || x.service?.http?.host || '-'}|${x.ip}|${x.port}|${x.service?.http?.title || ''}`);
+      return `✓ Quake ${rows.length} 条${total !== undefined ? `(共 ${total})` : ''}:\n` + clip(rows.join('\n'));
     },
   },
   zoomeye: {
     tool: 'zoomeye_query',
-    desc: '[read-only] ZoomEye 资产检索。query 用 ZoomEye 语法(site:"x.com")。type: host/web。',
+    desc: '[read-only] ZoomEye 资产检索。参数: query(必填,语法 site:"x.com"), type(可选 host/web)。仅此两参。',
     async query(a) {
       const { key } = cfg.zoomeye ?? {};
       const t = a.type === 'host' ? 'host/search' : 'web/search';
@@ -85,7 +94,7 @@ const SOURCES = {
   },
   censys: {
     tool: 'censys_query',
-    desc: '[read-only] Censys 2.0 检索(hosts/certs)。query 用 Censys 语法。',
+    desc: '[read-only] Censys 2.0 检索。参数: query(必填), index(可选 hosts/certs), size(可选)。仅此三参。',
     async query(a) {
       const { id, secret } = cfg.censys ?? {};
       const idx = a.index === 'certs' ? 'certificates' : 'hosts';
@@ -99,7 +108,7 @@ const SOURCES = {
   },
   shodan: {
     tool: 'shodan_query',
-    desc: '[read-only] Shodan 检索。query 用 Shodan 语法(hostname:x.com)。',
+    desc: '[read-only] Shodan 检索。参数: query(必填,语法 hostname:x.com), size(可选)。仅此两参。',
     async query(a) {
       const { key } = cfg.shodan ?? {};
       const r = await call(`https://api.shodan.io/shodan/host/search?key=${enc(key)}&query=${enc(a.query)}&page=1&limit=${a.size ?? 100}`);
@@ -110,7 +119,7 @@ const SOURCES = {
   },
   github: {
     tool: 'github_search',
-    desc: '[read-only] GitHub 代码/仓库搜索(token 已配)。kind: code/repositories。',
+    desc: '[read-only] GitHub 代码/仓库搜索。参数: query(必填,支持限定符), kind(可选 code/repositories), size(可选)。仅此三参。',
     async query(a) {
       const { token } = cfg.github ?? {};
       const kind = a.kind === 'repositories' ? 'repositories' : 'code';
@@ -127,7 +136,7 @@ const SOURCES = {
   },
   cse: {
     tool: 'cse_search',
-    desc: '[read-only] Google CSE 搜索(完整 Google dork 语法:site:/filetype:/intitle:)。比搜索引擎抓取可靠,机器可读。',
+    desc: '[read-only] Google CSE 搜索(完整 dork 语法 site:/filetype:/intitle:)。参数: query(必填), start(可选,页起点)。仅此两参。',
     async query(a) {
       const { key, cx } = cfg.cse ?? {};
       const r = await call(`https://www.googleapis.com/customsearch/v1?key=${enc(key)}&cx=${enc(cx)}&q=${enc(a.query)}&num=10&start=${a.start ?? 1}`);
@@ -138,7 +147,7 @@ const SOURCES = {
   },
   ipinfo: {
     tool: 'ipinfo_lookup',
-    desc: '[read-only] IP 归属/ASN/geo 查询(C 段归属判定用)。',
+    desc: '[read-only] IP 归属/ASN/geo 查询。参数: ip(必填)。仅此一参。',
     async query(a) {
       const { token } = cfg.ipinfo ?? {};
       const r = await call(`https://ipinfo.io/${enc(a.ip)}/json?token=${enc(token)}`);
@@ -148,7 +157,7 @@ const SOURCES = {
   },
   threatbook: {
     tool: 'threatbook_dns',
-    desc: '[read-only] 微步被动 DNS/域名情报(历史解析、CDN 源站定位用)。',
+    desc: '[read-only] 微步被动 DNS/域名情报。参数: domain(必填)。仅此一参。',
     async query(a) {
       const { key } = cfg.threatbook ?? {};
       const r = await call(`https://x.threatbook.com/api/v2/domain/query?apikey=${enc(key)}&domain=${enc(a.domain)}`);
@@ -174,23 +183,39 @@ rl.on('line', line => {
   if (m.method === 'initialize') {
     result = { protocolVersion: '2025-06-18', capabilities: {}, serverInfo: { name: 'recon-datasources' } };
   } else if (m.method === 'tools/list') {
+    // 每工具只保留真实生效的参数(agent 实测反馈: 共享 schema 的
+    // "threatbook 用"类互引描述造成传参歧义)
+    const q = d => ({ type: 'string', description: d });
+    const sizeP = { type: 'number', description: '返回条数(默认 100)' };
+    const SCHEMAS = {
+      fofa: { query: q('FOFA 完整语法检索式, 如 domain="x.com" 或 icp="备案号"'), size: sizeP },
+      hunter: { query: q('Hunter 语法检索式, 如 domain.suffix="x.com"'), size: sizeP },
+      quake: { query: q('Quake 语法检索式, 如 domain:"x.com"'), size: sizeP },
+      zoomeye: { query: q('ZoomEye 语法检索式, 如 site:"x.com"'),
+        type: { type: 'string', enum: ['host', 'web'], description: '检索面(默认 web)' } },
+      censys: { query: q('Censys 2.0 语法检索式'), index: { type: 'string', enum: ['hosts', 'certs'], description: '索引(默认 hosts)' }, size: sizeP },
+      shodan: { query: q('Shodan 语法检索式, 如 hostname:x.com'), size: sizeP },
+      github: { query: q('搜索词(支持 GitHub 限定符, 如 memshell in:name language:java)'),
+        kind: { type: 'string', enum: ['code', 'repositories'], description: '默认 code' }, size: sizeP },
+      cse: { query: q('Google 完整 dork 语法, 如 site:x.com filetype:xlsx'),
+        start: { type: 'number', description: '结果页起点(默认 1, 每页 10)' } },
+      ipinfo: { ip: q('IP 地址, 如 8.8.8.8') },
+      threatbook: { domain: q('域名, 如 a.com') },
+    };
     result = { tools: active.map(([id, s]) => ({
       name: s.tool, description: s.desc,
-      inputSchema: { type: 'object', properties: {
-        query: { type: 'string', description: id === 'ipinfo' ? 'unused' : '检索式' },
-        ip: { type: 'string', description: 'ipinfo 用:IP 地址' },
-        domain: { type: 'string', description: 'threatbook 用:域名' },
-        size: { type: 'number' }, kind: { type: 'string' }, index: { type: 'string' }, type: { type: 'string' }, start: { type: 'number' },
-      } },
+      inputSchema: { type: 'object', properties: SCHEMAS[id] ?? { query: q('检索式') },
+        required: [id === 'ipinfo' ? 'ip' : id === 'threatbook' ? 'domain' : 'query'] },
     })) };
   } else if (m.method === 'tools/call') {
     const name = m.params?.name;
     const s = active.find(([, x]) => x.tool === name);
     // MCP 2025-06-18: 工具侧错误以 result.isError 报告(非协议级 error),
     // in-repo 桥接(mcp.mjs details.isError)已接此管线。
+    // 回执头部复读请求参数(agent 实测反馈: 审计链不再依赖调用方自记)
     const reply = (text, isError) => process.stdout.write(J({
       jsonrpc: '2.0', id: m.id,
-      result: { content: [{ type: 'text', text }], isError: Boolean(isError) },
+      result: { content: [{ type: 'text', text: `[${name} ${J(a)}]\n${text}` }], isError: Boolean(isError) },
     }) + '\n');
     if (!s) {
       reply(`✗ 工具未挂载(该数据源未配置):${name}`, true);

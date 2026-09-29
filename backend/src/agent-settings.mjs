@@ -67,7 +67,9 @@ const RECON_SOURCES = {
       const base = baseUrl || RECON_SOURCES.fofa.defaultBase;
       if (!email || !key) return { ok: false, error: 'FOFA 需要 email + key 两者' };
       return probe(`${base}/v1/info/my?email=${encodeURIComponent(email)}&key=${encodeURIComponent(key)}`,
-        {}, { okCheck: (s, b) => (b && b.error === null ? true : `FOFA: ${b?.errmsg || '认证失败'}`) });
+        // FOFA 成功响应是 "error":false(布尔)而非 null——此前谓词
+        // 要求 ===null 把所有有效 key 误判为认证失败(前端实测抓出)。
+        {}, { okCheck: (s, b) => (b && (b.error === false || b.error === null) ? true : `FOFA: ${b?.errmsg || '认证失败'}`) });
     },
   },
   hunter: {
@@ -124,7 +126,12 @@ const RECON_SOURCES = {
     defaultBase: 'https://api.shodan.io',
     fields: { key: 'API Key' },
     async validate({ key }) {
-      return probe(`${RECON_SOURCES.shodan.defaultBase}/api-info?key=${encodeURIComponent(key)}`, {});
+      // 前端实测: 无 okCheck 时 401 走通用分支, 报错带整页 HTML——
+      // 给干净的引导性文案(与 censys/vt 等一致)。
+      return probe(`${RECON_SOURCES.shodan.defaultBase}/api-info?key=${encodeURIComponent(key)}`,
+        {}, { okCheck: (s, b) => (s === 200 ? true
+          : s === 401 ? 'SHODAN: key 无效'
+          : s === 403 ? 'SHODAN: 权限不足' : `HTTP ${s}`) });
     },
   },
   metadefender: {
@@ -381,6 +388,16 @@ export async function saveSetting({ group, field, value }, wal) {
     }
     if (def.type === 'select' && !def.options.includes(v)) {
       return { ok: false, error: `必须是 ${def.options.join('/')}` };
+    }
+    // R30: webSearch.apiKey 保存前校验 provider 连通——坏 key 此前
+    // 直接落盘, 搜索回执把 401 吞成"0 命中"(api agent 四轮实测抓出)。
+    if (field === 'webSearch.apiKey' && v) {
+      const ws = { ...(getPrefs().commonSettings?.webSearch ?? {}), apiKey: v };
+      if (ws.provider && ws.provider !== 'none' && ws.provider !== 'searxng') {
+        const { probeSearchProvider } = await import('./sandbox/tooling-probe.mjs');
+        const r = await probeSearchProvider(ws.provider, ws);
+        if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+      }
     }
     const [top, leaf] = field.split('.');
     const leafVal = def.type === 'number' ? Number(v) : v;

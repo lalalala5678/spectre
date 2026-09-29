@@ -1026,18 +1026,13 @@ export function buildDirectTools(record, caps) {
   if (record.agentKey === 'report') {
     return [publishVuln, publishIntel];
   }
-  // recon (资产测绘) holds its OWN fetch_url instance — the shared-tool
-  // axiom: a capability needed by multiple agents = one instance each,
-  // never shared. search_web stays config-only: its vertical channels are
-  // tool-candidate search, useless for recon; dork needs go via fetch_url.
-  if (record.agentKey === 'recon' || record.agentKey === 'nday') {
-    // recon/nday hold their OWN fetch_url instance (shared-tool axiom).
-    // search_web stays recon-only (OSINT framing); nday queries GitHub/NVD
-    // raw endpoints via bash curl + fetch_url.
-    return [buildReportVulnerabilityTool(record, caps), publishIntel,
-      buildRequestRevisionTool(record, caps),
-      ...buildToolingTools({ agentKey: record.agentKey }, caps)];
-  }
+  // 共享工具铁律(AGENTS.md): 多智能体都需要的能力(如联网搜索/抓取)
+  // = 每个业务智能体各持独立实例, 不共享不缺席。此前仅 recon/nday 拼
+  // 装工具面, 其余业务 agent(api/exploit/weakcred/phish/c2/persistence/
+  // postex)搜索/抓取链完全不可达(api agent 实测反馈"search_web 未注册",
+  // 与旧注释"search_web stays config-only"同源于铁律冲突——按铁律修正)。
+  // report(writer)保持纯撰写面不扩张。
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
-    buildRequestRevisionTool(record, caps)];
+    buildRequestRevisionTool(record, caps),
+    ...buildToolingTools({ agentKey: record.agentKey }, caps)];
 }

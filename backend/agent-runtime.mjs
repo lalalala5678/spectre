@@ -361,7 +361,10 @@ loadSandboxConfig().then(async cfg => {
     ensured.error ?? '');
   const { rebuildMounts } = await import('./src/sandbox/mount.mjs');
   await rebuildMounts(AGENT_KEYS);
-  console.log('[sandbox] skill/MCP mounts warmed');
+  // rehydrate 早于暖机——重建存量 agent 使 MCP 工具进入老会话工具面
+  const remounted = store.rebuildSessionAgents();
+  console.log('[sandbox] skill/MCP mounts warmed;',
+    `rehydrated agents re-mounted: ${remounted}`);
 }).catch(err => console.warn('[sandbox] boot degraded:', err.message));
 
 const compactWal = () => wal.compact([

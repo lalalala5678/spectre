@@ -53,7 +53,7 @@ async function searchVertical(query) {
         ?? `https://registry.modelcontextprotocol.io/#servers/${encodeURIComponent(server?.name ?? '')}`,
       snippet: server?.description ?? '',
     }));
-    channels.push({ channel: 'mcp-registry', items });
+    channels.push({ channel: 'mcp-registry', items, query });
   } catch (e) {
     channels.push({ channel: 'mcp-registry', items: [], error: String(e?.message ?? e) });
   }
@@ -61,7 +61,11 @@ async function searchVertical(query) {
   //    outranks ★0 copycats (review round 1)
   try {
     const kind = /skill/.test(q) ? 'SKILL.md' : /mcp/.test(q) ? 'mcp package.json' : '';
-    const ghq = (kind ? `${query} ${kind}` : query) + ' in:name,description';
+    // R30 查询归一(agent A/B 实测: "WordPress plugin RCE poc 2025"=0,
+    // 去掉年份=5 条高质量命中)——GitHub 搜索全词 AND, 年份几乎总是
+    // 过度约束, 派发前剥离。
+    const ghQuery = query.replace(/\b(19|20)\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
+    const ghq = (kind ? `${ghQuery} ${kind}` : ghQuery) + ' in:name,description';
     const res = await fetch(
       `https://api.github.com/search/repositories?q=${encodeURIComponent(ghq)}`
       + `&sort=stars&order=desc&per_page=5`,
@@ -72,7 +76,7 @@ async function searchVertical(query) {
       title: r.full_name, url: r.html_url,
       snippet: (r.description ?? '') + ` ★${r.stargazers_count}`,
     }));
-    channels.push({ channel: 'github', items });
+    channels.push({ channel: 'github', items, query: ghq });
   } catch (e) {
     channels.push({ channel: 'github', items: [], error: String(e?.message ?? e) });
   }
@@ -88,7 +92,7 @@ async function searchVertical(query) {
       url: `https://www.npmjs.com/package/${o.package.name}`,
       snippet: `${o.package.description ?? ''} v${o.package.version}`,
     }));
-    channels.push({ channel: 'npm', items });
+    channels.push({ channel: 'npm', items, query });
   } catch (e) {
     channels.push({ channel: 'npm', items: [], error: String(e?.message ?? e) });
   }
@@ -122,6 +126,10 @@ const PROVIDERS = {
           search_query: q }),
         signal: AbortSignal.timeout(10000) });
     const data = await res.json();
+    // R30: 401/错误体此前被吞成"0 命中"(agent 四轮实测判读"挂名未通"
+    // 完全正确)——错误必须 throw 走 catch 显形。
+    if (data?.error) throw new Error(`zhipu: ${data.error.message ?? data.error.code ?? 'API 错误'}`);
+    if (!res.ok) throw new Error(`zhipu HTTP ${res.status}`);
     return (data?.search_result ?? []).map(r => ({
       title: r.title, url: r.link, snippet: r.content ?? '' }));
   },
@@ -132,6 +140,7 @@ const PROVIDERS = {
         'X-Subscription-Token': cfg.apiKey },
         signal: AbortSignal.timeout(10000) });
     const data = await res.json();
+    if (!res.ok || data?.error) throw new Error(`brave: ${data?.error?.message ?? `HTTP ${res.status}`}`);
     return (data?.web?.results ?? []).map(r => ({
       title: r.title, url: r.url, snippet: r.description ?? '' }));
   },
@@ -182,7 +191,11 @@ export function buildToolingTools(record, caps) {
       // NDay agent 的独立 fetch_url 实例(CVE 详情/POC readme/patch 页抓取)。
       return [all.fetchUrl];
     default:
-      return [];
+      // 其余业务智能体(api/exploit/weakcred/phish/c2/persistence/postex/
+      // autopwn/report)各持独立 search_web+fetch_url 实例——AGENTS.md
+      // 铁律"共享工具→各持独立实例";此前 default 空 数组使 7 个业务
+      // agent 搜索链完全不可达(api agent 实测反馈"search_web 未注册")。
+      return [all.searchWeb, all.fetchUrl];
   }
 }
 
@@ -388,7 +401,16 @@ function buildAllToolingTools(caps, sessionRecord) {
     const receipt = ['渠道分解:'];
     const hits = [];
     let othersHaveHits = false;
-    for (const ch of await searchVertical(p.query)) {
+    // 意图路由(agent 实测反馈): 漏洞/PoC 意图的查询打 npm/pip 包库
+    // 只有单 token 噪声命中(查"Spectre WordPress RCE"返回 WP 组件包,
+    // 情报价值为零)——此类意图跳过包管理通道。
+    const vulnIntent = /CVE-\d|\bRCE\b|\bSQLi\b|\bXSS\b|\b0day\b|\bnday\b|poc|exploit|漏洞|利用/i.test(p.query);
+    const channels = await searchVertical(p.query);
+    const usable = vulnIntent
+      ? channels.filter(ch => !['npm', 'pip'].includes(ch.channel))
+      : channels;
+    if (vulnIntent) receipt.push('- 意图路由:漏洞/PoC 查询已跳过 npm/pip 包库通道');
+    for (const ch of usable) {
       if (ch.error) {
         receipt.push(`- ${ch.channel}:0 命中(通道错误:${ch.error})`);
       } else if (ch.items.length) {
@@ -398,6 +420,7 @@ function buildAllToolingTools(caps, sessionRecord) {
       } else {
         receipt.push(`- ${ch.channel}:0 命中${othersHaveHits ? '(该通道可能异常或无此类目)' : ''}`);
       }
+      receipt[receipt.length - 1] += ` [下发: ${String(ch.query ?? p.query).slice(0, 80)}]`;
     }
     const cfg = await getPrefs();
     // U2: 唯一来源=设置面板 common.webSearch(旧顶层 webSearchProvider
@@ -407,7 +430,7 @@ function buildAllToolingTools(caps, sessionRecord) {
     if (provider !== 'none') {
       try {
         const generic = await PROVIDERS[provider](p.query, ws);
-        receipt.push(`- 通用web(${provider}):${generic.length} 命中`);
+        receipt.push(`- 通用web(${provider}):${generic.length} 命中 [下发: ${String(p.query).slice(0, 80)}]`);
         hits.push(...generic);
       } catch (e) {
       receipt.push(`- 通用web(${provider}):错误 ${String(e?.message ?? e)}`);

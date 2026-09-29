@@ -165,6 +165,26 @@ export class SessionStore {
   }
 
   /** Construct the pi Agent for a record (fresh or rehydrated transcript). */
+  /**
+   * Boot warm-up race fix: rehydrate builds agents synchronously with an
+   * EMPTY mount cache; rebuildMounts fills it later (async boot block).
+   * Rehydrated sessions therefore kept tool surfaces without MCP tools —
+   * forever, on every restart (live regression: round-3 interview agent
+   * saw zero mcp_* tools after a restart, fresh sessions were fine).
+   * Called once after rebuildMounts; never touches busy sessions.
+   */
+  rebuildSessionAgents() {
+    let n = 0;
+    for (const record of this.sessions.values()) {
+      if (!record.agent || record.busy) continue;
+      try {
+        record.agent = this._buildAgent(record, record.agent.state.messages);
+        n += 1;
+      } catch { /* keep old agent — must never be fatal */ }
+    }
+    return n;
+  }
+
   _buildAgent(record, messages = []) {
     const isOrchestrator = record.agentKey === ORCHESTRATOR_KEY;
     const hasParent = Boolean(record.engagementId || record.parentSessionId);
