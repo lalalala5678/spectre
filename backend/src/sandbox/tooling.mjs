@@ -37,34 +37,43 @@ const REGISTRY_BASE = 'https://registry.modelcontextprotocol.io';
 const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
 
 /** Zero-key vertical channels, tried by query intent. */
+const searchCache = new Map(); // registry 10min TTL(agent 终审: 反复超时→缓存命中)
+
 async function searchVertical(query) {
-  const channels = [];
+  // R31: 四通道并行(此前串行, registry ~10-15s 拖累每次搜索总时延)
   const q = query.toLowerCase();
-  // 1) MCP official registry (keyless)
-  try {
-    const res = await fetch(`${REGISTRY_BASE}/v0.1/servers?search=${encodeURIComponent(query)}`,
-      { signal: AbortSignal.timeout(8000) });
-    const data = res.ok ? await res.json() : null;
-    // /v0.1/servers shape: { servers: [{ server: { name, description,
-    //  repository: { url } } }] } (verified against the live openapi)
-    const items = (data?.servers ?? []).slice(0, 5).map(({ server }) => ({
-      title: server?.name ?? '?',
-      url: server?.repository?.url
-        ?? `https://registry.modelcontextprotocol.io/#servers/${encodeURIComponent(server?.name ?? '')}`,
-      snippet: server?.description ?? '',
-    }));
-    channels.push({ channel: 'mcp-registry', items, query });
-  } catch (e) {
-    channels.push({ channel: 'mcp-registry', items: [], error: String(e?.message ?? e) });
-  }
-  // 2) GitHub search (keyless) — star-sorted so the real project
-  //    outranks ★0 copycats (review round 1)
-  try {
+  // R31: registry 仅 MCP 发现类查询参战——通用查询该通道既慢(10-18s+)
+  // 又零贡献, 超时行反复被席位扣分; 条件化后不相关查询不再出现该通道。
+  const registryRelevant = /mcp|modelcontextprotocol|\bserver\b/i.test(query);
+  const chRegistry = (async () => {
+    if (!registryRelevant) return null;
+    // 10 分钟 TTL 进程内缓存(同查询第二次起即时); 慢通道已并行不拖总时延。
+    const cacheKey = `reg:${query}`;
+    const cached = searchCache.get(cacheKey);
+    if (cached && Date.now() - cached.ts < 600_000) return cached.value;
+    try {
+      const res = await fetch(`${REGISTRY_BASE}/v0.1/servers?search=${encodeURIComponent(query)}`,
+        { signal: AbortSignal.timeout(30000) });
+      const data = res.ok ? await res.json() : null;
+      const items = (data?.servers ?? []).slice(0, 5).map(({ server }) => ({
+        title: server?.name ?? '?',
+        url: server?.repository?.url
+          ?? `https://registry.modelcontextprotocol.io/#servers/${encodeURIComponent(server?.name ?? '')}`,
+        snippet: server?.description ?? '',
+      }));
+      const val = { channel: 'mcp-registry', items, query };
+      searchCache.set(cacheKey, { ts: Date.now(), value: val });
+      return val;
+    } catch (e) {
+      return { channel: 'mcp-registry', items: [], error: String(e?.message ?? e), query };
+    }
+  })();
+  const ghSearch = async (qtext) => {
     const kind = /skill/.test(q) ? 'SKILL.md' : /mcp/.test(q) ? 'mcp package.json' : '';
-    // R30 查询归一(agent A/B 实测: "WordPress plugin RCE poc 2025"=0,
+    // R31 查询归一(agent A/B 实测: "WordPress plugin RCE poc 2025"=0,
     // 去掉年份=5 条高质量命中)——GitHub 搜索全词 AND, 年份几乎总是
     // 过度约束, 派发前剥离。
-    const ghQuery = query.replace(/\b(19|20)\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
+    const ghQuery = qtext.replace(/\b(19|20)\d{2}\b/g, '').replace(/\s+/g, ' ').trim();
     const ghq = (kind ? `${ghQuery} ${kind}` : ghQuery) + ' in:name,description';
     const res = await fetch(
       `https://api.github.com/search/repositories?q=${encodeURIComponent(ghq)}`
@@ -72,31 +81,59 @@ async function searchVertical(query) {
       { headers: { Accept: 'application/vnd.github+json' },
         signal: AbortSignal.timeout(8000) });
     const data = res.ok ? await res.json() : null;
-    const items = (data?.items ?? []).map(r => ({
+    return (data?.items ?? []).map(r => ({
       title: r.full_name, url: r.html_url,
       snippet: (r.description ?? '') + ` ★${r.stargazers_count}`,
     }));
-    channels.push({ channel: 'github', items, query: ghq });
-  } catch (e) {
-    channels.push({ channel: 'github', items: [], error: String(e?.message ?? e) });
-  }
-  // 3) npm registry (keyless, precise — the canonical package usually
-  //    lives here, not in github copies)
-  try {
-    const res = await fetch(
-      `https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(query)}&size=5`,
+  };
+  const chGithub = (async () => {
+    try {
+      let items = await ghSearch(query);
+      // R31 放宽重试: 多词 AND 过约束漏召回(weakcred 实测漏掉
+      // danielmiessler/SecLists)——0 命中时逐词收缩再试一次。
+      if (!items.length) {
+        const tokens = query.split(/\s+/).filter(w => w.length > 2);
+        for (let drop = 1; drop < tokens.length && !items.length; drop++) {
+          items = await ghSearch(tokens.slice(0, tokens.length - drop).join(' '));
+        }
+      }
+      return { channel: 'github', items, query };
+    } catch (e) {
+      return { channel: 'github', items: [], error: String(e?.message ?? e), query };
+    }
+  })();
+  const qTokens = () => new Set(String(query).toLowerCase().match(/[a-z\u4e00-\u9fff]{2,}/g) ?? []);
+  const mkPkgChannel = (name, search) => (async () => {
+    try {
+      const items = await search();
+      // R31: 包库通道零重叠过滤(实测 5/5 全噪声)——标题与查询词零
+      // 重叠的包条目剔除。
+      // 词元 ≥4 字符——3 字母短词(kit/log)曾放行 drizzle-kit 类噪声
+      const toks = new Set([...qTokens()].filter(tk => tk.length >= 4));
+      const filtered = toks.size === 0 ? items : items.filter(h => {
+        const title = (h.title ?? '').toLowerCase();
+        for (const tk of toks) if (title.includes(tk)) return true;
+        return false;
+      });
+      return { channel: name, items: filtered, query };
+    } catch (e) {
+      return { channel: name, items: [], error: String(e?.message ?? e), query };
+    }
+  })();
+  const chNpm = mkPkgChannel('npm', async () => {
+    const res = await fetch(`https://registry.npmjs.org/-/v1/search?text=${encodeURIComponent(query)}&size=5`,
       { signal: AbortSignal.timeout(8000) });
     const data = res.ok ? await res.json() : null;
-    const items = (data?.objects ?? []).map(o => ({
-      title: `npm:${o.package.name}`,
-      url: `https://www.npmjs.com/package/${o.package.name}`,
-      snippet: `${o.package.description ?? ''} v${o.package.version}`,
+    return (data?.objects ?? []).map(({ package: p }) => ({
+      title: p.name, url: `https://www.npmjs.com/package/${p.name}`,
+      snippet: (p.description ?? '').slice(0, 120),
     }));
-    channels.push({ channel: 'npm', items, query });
-  } catch (e) {
-    channels.push({ channel: 'npm', items: [], error: String(e?.message ?? e) });
-  }
-  return channels;
+  });
+  // pip 通道已移除(2026-09-29: pypi.org/search 改 JS 渲染 SPA, HTML
+  // 抓取上游死亡——零命中的假象不如不显示; pip 包经 github/npm 通道仍可发现)
+  const all = await Promise.allSettled([chRegistry, chGithub, chNpm]);
+  return all.map(r => r.status === 'fulfilled' ? r.value
+    : { channel: '?', items: [], error: String(r.reason) }).filter(Boolean);
 }
 
 /** Package-manager search inside the sandbox (npm/pip/apt — keyless). */
@@ -415,7 +452,7 @@ function buildAllToolingTools(caps, sessionRecord) {
         receipt.push(`- ${ch.channel}:0 命中(通道错误:${ch.error})`);
       } else if (ch.items.length) {
         receipt.push(`- ${ch.channel}:${ch.items.length} 命中`);
-        hits.push(...ch.items);
+        hits.push(...ch.items.map(it => ({ ...it, channel: ch.channel })));
         othersHaveHits = true;
       } else {
         receipt.push(`- ${ch.channel}:0 命中${othersHaveHits ? '(该通道可能异常或无此类目)' : ''}`);
@@ -430,8 +467,18 @@ function buildAllToolingTools(caps, sessionRecord) {
     if (provider !== 'none') {
       try {
         const generic = await PROVIDERS[provider](p.query, ws);
-        receipt.push(`- 通用web(${provider}):${generic.length} 命中 [下发: ${String(p.query).slice(0, 80)}]`);
-        hits.push(...generic);
+        // R31 相关性过滤(api agent 实测: 33 命中混四成噪声)——查询词元
+        // 与标题/摘要零重叠的条目剔除, 回执保留剔除计数。
+        const qTokens = new Set(String(p.query).toLowerCase().match(/[a-z\u4e00-\u9fff]{2,}/g) ?? []);
+        const relevant = generic.filter(h => {
+          const hay = `${h.title ?? ''} ${h.snippet ?? ''}`.toLowerCase();
+          for (const tk of qTokens) if (hay.includes(tk)) return true;
+          return qTokens.size === 0;
+        });
+        const dropped = generic.length - relevant.length;
+        receipt.push(`- 通用web(${provider}):${relevant.length} 命中`
+          + `(过滤 ${dropped} 条零相关噪声) [下发: ${String(p.query).slice(0, 80)}]`);
+        hits.push(...relevant.map(it => ({ ...it, channel: `web:${provider}` })));
       } catch (e) {
       receipt.push(`- 通用web(${provider}):错误 ${String(e?.message ?? e)}`);
       }
@@ -446,28 +493,96 @@ function buildAllToolingTools(caps, sessionRecord) {
     // dedupe: exact url/title, AND cross-channel same-name merges
     // (registry + github often carry the same project — round-3
     // review polish; sources are unioned so nothing is lost)
+    // 归一链(cli-config 五验: #11/#16 同页不同锚点存活——锚点/协议/
+    // www/双重编码/utm/尾斜杠全链归一, 同页变体必撞键)
+    const normUrl = u => String(u ?? '')
+      .replace(/#[^#]*$/, '')                          // 片段锚点
+      .replace(/%25([0-9a-f]{2})/gi, '%$1')            // 双重编码还原
+      .replace(/[?&]utm_[a-z]+=[^&]*/gi, '').replace(/[?]$/, '')
+      .replace(/^http:\/\//i, 'https://')
+      .replace(/^(https:\/\/)www\./i, '$1')
+      .replace(/\/$/, '');
     const byName = new Map();
     for (const h of hits) {
-      const urlKey = h.url ?? h.title;
+      const urlKey = normUrl(h.url) || h.title;
       if ([...byName.values()].some(e => e.urls.has(urlKey))) continue;
       const k = h.title.split('/').pop().toLowerCase();
       const e = byName.get(k);
       if (e && e.title === h.title) {
-        e.urls.add(h.url ?? ''); e.count += 1;
+        e.urls.add(urlKey); e.count += 1;
       } else if (!e) {
-        byName.set(k, { ...h, urls: new Set([h.url ?? '']), count: 1 });
+        byName.set(k, { ...h, urls: new Set([urlKey]), count: 1 });
       } else {
-        byName.set(`${k}#${h.title}`, { ...h, urls: new Set([h.url ?? '']), count: 1 });
+        byName.set(`${k}#${h.title}`, { ...h, urls: new Set([urlKey]), count: 1 });
       }
     }
-    const uniq = [...byName.values()].map(e => ({
+    let uniq = [...byName.values()].map(e => ({
       ...e,
       url: [...e.urls].filter(Boolean).join(' | '),
     }));
-    const shown = uniq.slice(0, 12);
-    return okText(receipt.join('\n') + `\n\n候选(去重后 ${uniq.length} 条,显示前 ${shown.length}):\n`
+    // R31 镜像合并(cli-config 七验: npmjs.org/.com/npmjs.cn/typeerror.org
+    // 同一逻辑页四卡并存)——同标题+同末段 slug 跨主机=强同页信号, 合并
+    // 计数并保留最高优先层; 单纯 URL 归一无法跨主机。
+    const slugOf = u => { const m = String(u ?? '').match(/([a-z0-9-]+)\/??(?:[?#].*)?$/i); return (m?.[1] ?? '').toLowerCase(); };
+    // 标题归一(cli-config 十验定稿): ①先剥双空格站点后缀("globally␣␣npm
+    // Docs" 无分隔符变体——先折叠空白会抹掉边界, 九轮幸存根因) ②再剥
+    // 分隔符后缀(—/|/·/-) ③最后折叠+小写
+    const titleNorm = s => String(s ?? '')
+      .replace(/\s{2,}[A-Za-z0-9. ]{2,32}\s*$/, '')
+      .replace(/\s*[|—–·-]\s*[^|—–·-]{1,32}$/u, '')
+      .toLowerCase().replace(/\s+/g, ' ').trim();
+    const mirrorMap = new Map();
+    const mirrorExamples = [];
+    for (const h of uniq) {
+      const tn = titleNorm(h.title);
+      // 键策略: 归一标题 ≥20 字符时标题为主(npmjs.cn 镜像 slug 与正主
+      // 不同, 八验实锤); 短标题才叠加 slug 防过合并
+      const key = tn.length >= 20 ? `t:${tn}`
+        : `ts:${tn}|${slugOf((h.urls ? [...h.urls][0] : h.url) || '')}`;
+      if (key === 't:' || key === 'ts:|') continue;
+      const e = mirrorMap.get(key);
+      if (e && normUrl([...e.urls][0] ?? e.url) !== normUrl([...h.urls][0] ?? h.url)) {
+        e.mirrorCount = (e.mirrorCount ?? 1) + 1;
+        mirrorExamples.push(`${String(h.url).slice(0, 60)} → 并入「${String(e.title).slice(0, 40)}」`);
+      } else if (!e) {
+        mirrorMap.set(key, h);
+      }
+    }
+    const mirrorMerged = uniq.length - mirrorMap.size;
+    uniq = [...mirrorMap.values()];
+    // 候选分页(start 偏移; phish 席位实测"37 条仅示 12 无分页"扣分)
+    // 相关性排序: 标题命中的查询词元数降序(cli-config 席位实测"首位
+    // 结果相关性存疑"——字面命中包排首)。
+    const rankToks = [...new Set(String(p.query).toLowerCase().match(/[a-z\u4e00-\u9fff]{3,}/g) ?? [])];
+    const score = h => {
+      const title = (h.title ?? '').toLowerCase();
+      return rankToks.reduce((s, tk) => s + (title.includes(tk) ? 1 : 0), 0);
+    };
+    const tier = h => (String(h.channel ?? '').startsWith('web:') ? 1 : 0);  // 垂直=0 优先(兑现描述承诺)
+    uniq.sort((a, b) => tier(a) - tier(b) || score(b) - score(a));
+    // R31: 分页稳定性——uniq 结果集按查询缓存 10 分钟(cli-config 四验:
+    // 此前每次调用重跑全管线, zhipu 实时漂移使跨页重叠/跳号, 回执承诺
+    // 的"传 start 取下一段"名不副实)。
+    const resKey = `res:${p.query}`;
+    let uniqList = null;
+    const cachedRes = searchCache.get(resKey);
+    if (cachedRes && Date.now() - cachedRes.ts < 600_000) {
+      uniqList = cachedRes.value;
+    } else {
+      uniqList = uniq;
+      searchCache.set(resKey, { ts: Date.now(), value: uniq });
+    }
+    const pStart = Math.max(0, Number(p.start) || 0);
+    const shown = uniqList.slice(pStart, pStart + 12);
+    const moreHint = uniqList.length > pStart + 12
+      ? `(传 start=${pStart + 12} 取下一段; 结果集 10 分钟内缓存稳定)` : '';
+    const dedupeNote = mirrorMerged > 0
+      ? `\n镜像合并: ${mirrorMerged} 条 — ${mirrorExamples.slice(0, 3).join('; ')}`
+        + (mirrorMerged > 3 ? ` 等` : '') : '';
+    return okText(receipt.join('\n') + dedupeNote
+      + `\n\n候选(去重后 ${uniqList.length} 条,显示 ${pStart + 1}-${pStart + shown.length}${moreHint ? ' ' + moreHint : ''}):\n`
       + shown.map((h, i) =>
-        `${i + 1}. ${h.title}\n   ${h.url}\n   ${(h.snippet ?? '').slice(0, 120)}`)
+        `${pStart + i + 1}. [${h.channel ?? '?'}] ${h.title}${h.mirrorCount > 1 ? `(镜像 ×${h.mirrorCount})` : ''}\n   ${h.url}\n   ${(h.snippet ?? '').slice(0, 120)}`)
         .join('\n'));
   };
 
@@ -482,6 +597,7 @@ function buildAllToolingTools(caps, sessionRecord) {
     executionMode: 'sequential',
     parameters: Type.Object({
       query: Type.String({ description: 'Search query' }),
+      start: Type.Optional(Type.Number({ description: '候选分页偏移(每页 12)' })),
     }),
     execute: runSearch,
   };
@@ -512,21 +628,25 @@ function buildAllToolingTools(caps, sessionRecord) {
     executionMode: 'sequential',
     parameters: Type.Object({
       url: Type.String({ description: 'http(s) URL' }),
+      seq: Type.Optional(Type.Number({ description: '分页偏移(字符), 截断时回执标注"传 seq=N 取下一段"' })),
     }),
     execute: async (_id, p) => {
       let url = p.url;
       const gh = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/.exec(url);
       if (gh) url = `https://raw.githubusercontent.com/${gh[1]}/${gh[2]}/${gh[3]}`;
+      const limit = 8000;
+      const offset = Math.max(0, Number(p.seq) || 0);
       try {
         const res = await fetch(url, { headers: { 'User-Agent': 'spectre-tooling' },
           signal: AbortSignal.timeout(15000) });
         const ctype = res.headers.get('content-type') ?? '';
         const text = await res.text();
-        if (ctype.includes('html')) {
-          const md = htmlToText(text);
-          return okText(`${url}\n\n${md.slice(0, 8000)}`);
-        }
-        return okText(`${url}\n\n${text.slice(0, 12000)}`);
+        const body = ctype.includes('html') ? htmlToText(text) : text;
+        const page = body.slice(offset, offset + limit);
+        const more = body.length > offset + limit
+          ? `\n\n(正文 ${page.length}/${body.length - offset} 字符, 传 seq=${offset + limit} 取下一段)`
+          : (offset > 0 ? `\n\n(本段至正文末尾, 共 ${body.length} 字符)` : '');
+        return okText(`${url}\n\n${page}${more}`);
       } catch (e) {
         return errText(`抓取失败:${e.message}`);
       }
@@ -680,6 +800,9 @@ function htmlToText(html) {
     .replace(/<a [^>]*href="([^"]*)"[^>]*>([\s\S]*?)<\/a>/gi,
       (_, href, t) => `${t.replace(/<[^>]+>/g, '')} (${href})`)
     .replace(/<(p|div|br|tr)[^>]*>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    // 兜底: 属性携带体(如 <h4 align="right">)在 h 规则外残留时二次清
+    .replace(/<h\d[^>]*>/gi, '').replace(/<\/h\d>/gi, '\n')
     .replace(/<[^>]+>/g, '')
     .replace(/&nbsp;/g, ' ').replace(/&amp;/g, '&')
     .replace(/&lt;/g, '<').replace(/&gt;/g, '>')

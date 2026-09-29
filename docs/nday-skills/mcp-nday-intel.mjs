@@ -56,26 +56,40 @@ async function nvdGet(params) {
 const clip = (s, n) => String(s ?? '').replace(/\s+/g, ' ').trim().slice(0, n);
 
 function fmtCve(cve) {
+  const clipMark = (s, n) => (s.length > n ? `${s.slice(0, n)}…` : s);
   const desc = (cve.descriptions ?? []).find(d => d.lang === 'en')?.value
     ?? (cve.descriptions ?? [])[0]?.value ?? '';
-  const m = cve.metrics?.cvssMetricV31?.[0] ?? cve.metrics?.cvssMetricV30?.[0]
-    ?? cve.metrics?.cvssMetricV2?.[0];
+  // CVSS 带 版本标签(v2/v3.x 混排此前可误读为"CVSS 2.1")
+  const m31 = cve.metrics?.cvssMetricV31?.[0];
+  const m30 = cve.metrics?.cvssMetricV30?.[0];
+  const m2 = cve.metrics?.cvssMetricV2?.[0];
+  const m = m31 ?? m30 ?? m2;
+  const ver = m31 ? 'v3.1' : m30 ? 'v3.0' : m2 ? 'v2' : '?';
   const score = m?.cvssData?.baseScore ?? '?';
   const vector = m?.cvssData?.vectorString ?? '';
   const cwe = (cve.weaknesses ?? [])[0]?.description?.[0]?.value ?? '';
-  const cpes = [];
-  for (const node of cve.configurations?.[0]?.nodes ?? []) {
-    for (const cm of node.cpeMatch ?? []) {
-      if (cm.criteria) cpes.push(cm.criteria);
-      if (cpes.length >= 3) break;
+  // CPE 全量遍历所有 configuration(nday R1 实测: 此前只取首个配置的
+  // 前 3 条, CVE-2021-44228 呈现的全是 Siemens 固件——影响面误判)
+  const allCpes = [];
+  const seen = new Set();
+  for (const conf of cve.configurations ?? []) {
+    for (const node of conf?.nodes ?? []) {
+      for (const cm of node.cpeMatch ?? []) {
+        if (cm.criteria && !seen.has(cm.criteria)) {
+          seen.add(cm.criteria); allCpes.push(cm.criteria);
+        }
+      }
     }
-    if (cpes.length >= 3) break;
   }
-  const refs = (cve.references ?? []).slice(0, 2).map(r => r.url);
-  return [`✓ ${cve.id} · CVSS ${score}${vector ? ` (${clip(vector, 60)})` : ''}${cwe ? ` · ${cwe}` : ''}`,
-    `  影响: ${cpes.join(' | ') || '(无 CPE 数据)'}`,
-    `  描述: ${clip(desc, 260)}`,
-    refs.length ? `  Ref: ${refs.join(' ')}` : '',
+  const cpeLine = allCpes.length
+    ? `  影响: 共 ${allCpes.length} 个 CPE${allCpes.length > 3 ? `(显示前 3,按上游配置序; 全量影响面以 cvelistV5/cpe 参数检索为准)`: ''}: ${allCpes.slice(0, 3).join(' | ')}`
+    : '  影响: (无 CPE 数据)';
+  const refsAll = cve.references ?? [];
+  const refs = refsAll.slice(0, 2).map(r => r.url);
+  return [`✓ ${cve.id} · CVSS ${score}(${ver})${vector ? ` ${clipMark(vector, 60)}` : ''}${cwe ? ` · ${cwe}` : ''}`,
+    cpeLine,
+    `  描述: ${clipMark(desc, 300)}`,
+    refs.length ? `  Ref: 共 ${refsAll.length} 条(显示 2): ${refs.join(' ')}` : '',
   ].filter(Boolean).join('\n');
 }
 
@@ -88,18 +102,24 @@ async function query(a) {
     if (!v) return `✗ NVD 返回空:${a.id}`;
     return fmtCve(v);
   }
-  // 检索模式:keyword 优先,cpe 次之
+  // 检索模式:keyword 优先,cpe 次之;日期窗必须成对(单传静默失效是坑)
   const params = { resultsPerPage: String(Math.min(Number(a.size) || 5, 20)) };
+  if (a.start !== undefined) params.startIndex = String(Math.max(0, Number(a.start) || 0));
   if (a.keyword) params.keywordSearch = String(a.keyword);
-  else if (a.cpe) params.cpeName = String(a.cpe);
-  else if (a.pubStartDate) {
-    params.pubStartDate = a.pubStartDate; params.pubEndDate = a.pubEndDate;
+  else if (a.cpe) params.virtualMatchString = String(a.cpe);  // 前缀匹配语义(cpeName 要求全量精确, 无版本恒 0 命中)
+  else if (a.pubStartDate || a.pubEndDate) {
+    if (!a.pubStartDate || !a.pubEndDate) {
+      return '✗ 日期窗检索需 pubStartDate+pubEndDate 成对(ISO8601), 单传不生效';
+    }
+    params.pubStartDate = String(a.pubStartDate);
+    params.pubEndDate = String(a.pubEndDate);
   }
   const r = await nvdGet(params);
   if (r.err) return `✗ ${r.err}`;
   const vulns = r.body?.vulnerabilities ?? [];
-  if (!vulns.length) return `✗ 无命中(总结果 ${r.body?.totalResults ?? 0}):换关键词或用 cpe 精确匹配`;
-  return `共 ${r.body?.totalResults ?? '?'} 条,显示 ${vulns.length} 条:\n\n`
+  if (!vulns.length) return `✗ 无命中:keyword 换检索词, 或 cpe 用前缀形式(如 cpe:2.3:a:apache:log4j)`;
+  const startAt = Number(params.startIndex ?? 0);
+  return `共 ${r.body?.totalResults ?? '?'} 条,显示 ${startAt + 1}-${startAt + vulns.length}${Number(r.body?.totalResults ?? 0) > startAt + vulns.length ? `(继续翻页: start=${startAt + vulns.length})` : ''}:\n\n`
     + vulns.map(v => fmtCve(v.cve)).join('\n\n');
 }
 
@@ -107,7 +127,9 @@ const TOOL = {
   name: 'nvd_cve',
   desc: ('[read-only] NVD 2.0 查询:按 CVE 编号取详情(CVSS/CWE/CPE/描述/参考),'
     + '或按 keyword/cpe 检索候选(keyless 5req/30s,已配 key 50req/30s)。'
-    + '用于 CVE 候选台账构建与 CPE 标准化(本地 cvelistV5 之外的权威第四源)。'),
+    + '用于 CVE 候选台账构建与 CPE 标准化(本地 cvelistV5 之外的权威第四源)。'
+    + ' NVD API 不支持排序(结果为上游默认序, 新旧混杂)——按时间收敛用'
+    + ' pubStartDate+pubEndDate 日期窗, 深翻用 start。'),
 };
 
 const rl = readline.createInterface({ input: process.stdin });
@@ -128,6 +150,7 @@ rl.on('line', line => {
           keyword: { type: 'string', description: '产品/组件关键词检索' },
           cpe: { type: 'string', description: 'CPE 名精确匹配,如 cpe:2.3:a:apache:log4j' },
           size: { type: 'number', description: '检索条数(默认 5,上限 20)' },
+          start: { type: 'number', description: '翻页偏移 startIndex(默认 0, 与 size 配合取全量)' },
           pubStartDate: { type: 'string', description: '发布窗起(ISO8601,需配 pubEndDate)' },
           pubEndDate: { type: 'string', description: '发布窗止(ISO8601)' },
         } } }] } }) + '\n');

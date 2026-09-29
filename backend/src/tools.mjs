@@ -1024,7 +1024,11 @@ export function buildDirectTools(record, caps) {
   };
 
   if (record.agentKey === 'report') {
-    return [publishVuln, publishIntel];
+    // R31: report(writer)原 early-return 无 tooling 实例——撰写引用/
+    // CVE 背景核验需要各持独立 search_web/fetch_url(共享工具铁律;
+    // report 席位实测"search_web 终审缺席")。
+    return [publishVuln, publishIntel,
+      ...buildToolingTools({ agentKey: record.agentKey }, caps)];
   }
   // 共享工具铁律(AGENTS.md): 多智能体都需要的能力(如联网搜索/抓取)
   // = 每个业务智能体各持独立实例, 不共享不缺席。此前仅 recon/nday 拼
