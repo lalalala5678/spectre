@@ -227,6 +227,10 @@ export async function applyLlmPrefs() {
   if (liveModel) {
     liveModel.id = eff.model;
     liveModel.name = eff.model;
+    // R21-F2: baseUrl 此前烘死在构建期——注释承诺每调用重读, 改
+    // baseUrl 不重启永不生效。openai-completions 每请求现读
+    // model.baseUrl, liveModel 与 summarizer/sessions 共享引用。
+    liveModel.baseUrl = eff.baseUrl;
     liveModel.contextWindow = eff.contextWindow;
     liveModel.maxTokens = Math.min(eff.maxTokens, eff.contextWindow);
   }

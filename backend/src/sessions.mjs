@@ -435,7 +435,13 @@ export class SessionStore {
       if (used + size > keepChars && tail.length >= 4) break;
       tail.unshift(m); used += size;
     }
-    const head = msgs.slice(0, msgs.length - tail.length);
+    // R21-F4: 前导 toolResult 越过配对边界归入 head——悬挂的无主
+    // role:'tool'(其配对 assistant 在 head)会让后续每轮请求 400
+    // 且随压缩固化。
+    let cut = msgs.length - tail.length;
+    while (cut < msgs.length && msgs[cut].role === 'toolResult') cut += 1;
+    tail = msgs.slice(cut);
+    const head = msgs.slice(0, cut);
     if (!head.length) return;
     // one summarizer call through the SAME streamFn/model
     const transcript = head.map(m => `${m.role}: ${typeof m.content === 'string'
@@ -449,6 +455,7 @@ export class SessionStore {
       content: `【上下文压缩】此前 ${head.length} 条消息已压缩为摘要,近期 ${tail.length} 条保留原文:\n\n${summaryText}`,
     };
     record.agent.state.messages = [compactMsg, ...tail];
+    record.briefUpTo = 0;  // R21-F3: 消息数骤降, 滚动简述游标归零重算
     this._journal(record, 'compaction', {
       summarized: head.length, kept: tail.length,
       tokensBefore: ctx, tokensAfter: '~' + Math.ceil(summaryText.length / 4),
