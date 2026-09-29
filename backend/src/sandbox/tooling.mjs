@@ -400,10 +400,13 @@ function buildAllToolingTools(caps, sessionRecord) {
       }
     }
     const cfg = await getPrefs();
-    const provider = cfg.webSearchProvider ?? 'none';
+    // U2: 唯一来源=设置面板 common.webSearch(旧顶层 webSearchProvider
+    // 从未被任何部署设置过,零迁移直接切换)
+    const ws = cfg.commonSettings?.webSearch ?? {};
+    const provider = ws.provider ?? 'none';
     if (provider !== 'none') {
       try {
-        const generic = await PROVIDERS[provider](p.query, cfg.webSearch ?? cfg);
+        const generic = await PROVIDERS[provider](p.query, ws);
         receipt.push(`- 通用web(${provider}):${generic.length} 命中`);
         hits.push(...generic);
       } catch (e) {

@@ -266,6 +266,15 @@ export function settingsSchema() {
         { id: 'llm.maxTokens', label: '最大输出 Tokens', type: 'number', check: num(256, 262144), default: 32768 },
         { id: 'llm.contextWindow', label: '上下文窗口 Tokens', type: 'number', check: num(8192, 4194304), default: 786432 },
         { id: 'compaction.enabled', label: '上下文压缩', type: 'select', options: ['开启', '关闭'], default: '开启' },
+        // U2: 通用 web 搜索 provider 从"仅 PUT /api/prefs 裸写"收编进面板——
+        // 此前是全平台唯一不经面板的 key 面(消费方 tooling.mjs PROVIDERS)。
+        { id: 'webSearch.provider', label: '通用 Web 搜索 Provider', type: 'select',
+          options: ['none', 'zhipu', 'brave', 'tavily', 'searxng'], default: 'none',
+          hint: '全员 search_web 兜底通道;none=仅垂直通道(MCP registry/GitHub/npm/pip,零 key)且回执如实声明' },
+        { id: 'webSearch.apiKey', label: '搜索 API Key', type: 'password',
+          hint: 'zhipu(智谱 web_search)/brave/tavily 需要;searxng 自建免 key' },
+        { id: 'webSearch.baseUrl', label: 'SearXNG 地址', type: 'text',
+          placeholder: 'http://127.0.0.1:8080', hint: '仅 provider=searxng 时使用(JSON API 端点)' },
         { id: 'compaction.reserveTokens', label: '压缩触发预留量(reserveTokens)', type: 'number', check: num(1024, 1048576), default: 16384, hint: '上下文剩余低于该值即触发压缩' },
         { id: 'compaction.keepRecentTokens', label: '压缩保留近期量(keepRecentTokens)', type: 'number', check: num(1024, 1048576), default: 20000 },
       ],
