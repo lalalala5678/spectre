@@ -168,12 +168,17 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
                 return next;
               }
             }
-            // Optimistically-shown user prompts arrive once via SSE;
-            // drop the echo so they never display twice.
-            if (msg.role === 'user' && next.some(
-              m => m.role === 'user' && m.text === msg.text,
-            )) {
-              return next;
+            // R23-F4: echo 只消费带乐观标记的气泡——纯文本等值去重
+            // 会吞掉 steer 等合法重复消息(与任一历史用户消息同文即
+            // 被整条丢弃, 实时转录缺失, 重载才恢复)。匹配即清除标记。
+            if (msg.role === 'user') {
+              const i = next.findIndex(m =>
+                m.role === 'user' && m.text === msg.text && (m as any).__optimistic);
+              if (i >= 0) {
+                const copy = [...next];
+                delete (copy[i] as any).__optimistic;
+                return copy;
+              }
             }
             return next.concat(msg);
           });
@@ -195,7 +200,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
     setError('');
     const opTs = Date.now();
     if (mode === 'prompt') {
-      setMessages(prev => [...prev, { role: 'user', ts: opTs, text }]);
+      setMessages(prev => [...prev, { role: 'user', ts: opTs, text, __optimistic: true } as never]);
     }
     try {
       await api(`/sessions/${sessionId}/${mode === 'prompt' ? 'messages' : 'steer'}`, {
@@ -227,9 +232,15 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   //             via the sentinel's IntersectionObserver, anchored)
   useEffect(() => { setStartIdx(null); }, [sessionId]);
   const effectiveStart = startIdx ?? Math.max(0, messages.length - 30);
-  const olderCount = effectiveStart;
-  const visible = useMemo(() => messages.slice(effectiveStart),
-    [messages, effectiveStart]);
+  // R23-F5: 起点落在 assistant(toolCalls) 与 toolResult 之间时配对
+  // 断裂渲染成孤立'工具'步骤——回退越过前导 toolResult 使配对的
+  // assistant 进入窗口。
+  const visible = useMemo(() => {
+    let start = effectiveStart;
+    while (start > 0 && messages[start]?.role === 'toolResult') start -= 1;
+    return messages.slice(start);
+  }, [messages, effectiveStart]);
+  const olderCount = messages.length - visible.length;
   // Hot path: streaming deltas patch `messages` every chunk — the item
   // rebuild is memoized and the bubbles below are memo'd so history
   // entries skip re-render; only the trailing streaming bubble re-renders.
@@ -367,6 +378,12 @@ type RenderItem =
  *  the group and render as ordinary bubbles. */
 function buildItems(messages: ApiMessage[], busy: boolean): RenderItem[] {
   const items: RenderItem[] = [];
+  // R23-F3: 前沿索引=最后一个非 toolResult 消息——尾部始终延伸,
+  // 只有前沿的未配对调用才真正在途。
+  let frontierIdx = -1;
+  for (let i = messages.length - 1; i >= 0; i--) {
+    if (messages[i].role !== 'toolResult') { frontierIdx = i; break; }
+  }
   let steps: ToolStep[] | null = null;
   const flush = () => {
     if (steps && steps.length) items.push({ kind: 'activity', steps });
@@ -396,7 +413,9 @@ function buildItems(messages: ApiMessage[], busy: boolean): RenderItem[] {
           key: `${m.ts}#${tc.id ?? tc.name ?? idx}`,
           name: tc.name ?? '工具',
           args: tc.args,
-          running: busy,
+          // R23-F3: running=前沿派生——此前全局 busy 让历史残留的
+          // 未配对调用在新运行时全部复活转圈(空闲时亦然)。
+          running: busy && idx === frontierIdx,
         });
       }
       return;
@@ -478,7 +497,7 @@ function ToolStepRow({ step, open, onToggle }: {
   onToggle: () => void;
 }) {
   const err = step.result?.isError;
-  const pending = !step.result;
+  const pending = step.running ?? !step.result;  // R23-F3: 行级 pending 由前沿派生, 历史未配对不再永久转圈
   const firstLine = (step.result?.text ?? '')
     .split('\n').find(l => l.trim()) ?? '';
   const argsJson = step.args != null && typeof step.args === 'object'
