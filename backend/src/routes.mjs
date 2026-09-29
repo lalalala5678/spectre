@@ -638,7 +638,9 @@ function realRouter({ store, bus, caps, wal }) {
       }
       const fields = {};
       for (const k of ['title', 'severity', 'status', 'text']) {
-        if (body[k] !== undefined) fields[k] = body[k];
+        // R27-F4: 显式 null 归一为未提供——status=null 此前落库并把
+        // summary 拼成 'null · x'(R2-F3 同类 null 语义分裂)
+        if (body[k] !== undefined && body[k] !== null) fields[k] = body[k];
       }
       if (!Object.keys(fields).length) {
         return bad(res, 400, 'nothing to revise');

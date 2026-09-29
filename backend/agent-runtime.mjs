@@ -374,9 +374,14 @@ const compactWal = () => wal.compact([
 ]);
 compactWal();
 process.on('SIGTERM', () => {
-  try { compactWal(); wal.close(); } catch { /* best effort */ }
-  server.close(() => process.exit(0));
-  setTimeout(() => process.exit(0), 1500).unref();
+  // R27-F2: WAL 关闭必须后于连接排空——此前先 close 再等 server, 排空
+  // 窗口(≤1.5s)内完成的消息 safeWalAppend 吞异常后永久丢(已流给 SSE
+  // 的回复重启消失), Bus.emit 直连 append 抛错 500。compact 后 fd 以 a
+  // 模式重开, 窗口期增量落在其上, WAL 形状=快照基线+增量尾, replay 兼容。
+  try { compactWal(); } catch { /* best effort */ }
+  const seal = () => { try { wal.close(); } catch { /* already closed */ } process.exit(0); };
+  server.close(() => seal());
+  setTimeout(seal, 1500).unref();
 });
 const route = createRouter({ store, bus, caps, wal });
 
