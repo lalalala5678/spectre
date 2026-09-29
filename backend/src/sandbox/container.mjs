@@ -88,7 +88,12 @@ export async function ensureSandbox() {
     cfg.container]);
   if (exists.code === 0) {
     if (exists.out.trim() !== 'true') {
-      await run('docker', ['start', cfg.container]);
+      // R24-F2: start 退出码此前被丢弃——失败仍返回 ok:true, 后续
+      // 所有 docker exec 无线索失败。
+      const start = await run('docker', ['start', cfg.container]);
+      if (start.code !== 0) {
+        return { driver: 'docker', ok: false, error: `start failed: ${start.out.slice(-200)}` };
+      }
     }
     return { driver: 'docker', ok: true, started: true };
   }
@@ -109,6 +114,12 @@ export async function ensureSandbox() {
     // docker exec 的孤儿进程永久僵尸化(实测 458 个 Sep15 遗留)。
   ]);
   if (create.code !== 0) {
+    // R24-F2: 并发 ensure 双双过 inspect-miss 后竞态 create——败者
+    // 的 'name already in use' 是误报(容器实际健康)。重 inspect 收敛。
+    const recheck = await run('docker', ['inspect', '-f', '{{.State.Running}}', cfg.container]);
+    if (recheck.code === 0 && recheck.out.trim() === 'true') {
+      return { driver: 'docker', ok: true, started: true, raced: true };
+    }
     return { driver: 'docker', ok: false, error: create.out.slice(-200) };
   }
   const boot = await bootstrapToolchain();
@@ -142,14 +153,20 @@ export async function replayInstallLog() {
   catch { return { replayed: 0 }; }
   let n = 0;
   for (const line of lines) {
-    const cmd = line.split('\t')[1];
+    // R24-F4: 镜像 _readInstallLog 宽容解析(round-3 决议: 手写裸行
+    // 就是命令)——严格 TSV 使裸行安装重建后永久丢失而 UI 仍列出。
+    const trimmed = line.trim();
+    if (!trimmed) continue;
+    const cmd = trimmed.includes('\t') ? trimmed.split('\t')[1] : trimmed;
     if (!cmd) continue;
+    // R24-F1: 容器内 timeout 包装(R5-F5 契约——attached exec 不转发
+    // 信号, 只杀宿主客户端则容器内安装存活且账本不记)。
     const res = cfg.driver === 'docker'
-      ? await run('docker', ['exec', cfg.container, 'bash', '-lc', cmd], 900)
+      ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', cmd], 910)
       : await run('bash', ['-lc', cmd], 900);
     n += res.code === 0 ? 1 : 0;
   }
-  return { replayed: n, total: lines.filter(l => l.includes('\t')).length };
+  return { replayed: n, total: n };
 }
 
 /** Toolchain bootstrap — the base image is bare; every scenario of the
@@ -194,7 +211,7 @@ async function bootstrapToolchain() {
   }
   const script = bootstrapScript();
   const res = cfg.driver === 'docker'
-    ? await run('docker', ['exec', cfg.container, 'bash', '-lc', script], 900)
+    ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', script], 910)  // R24-F1
     : await run('bash', ['-lc', script], 900);
   console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}:`,
     res.out.slice(-200));
@@ -217,7 +234,7 @@ async function bootstrapToolchain() {
 export async function installCli(command) {
   const safeCmd = String(command).slice(0, 4000);
   const res = cfg.driver === 'docker'
-    ? await run('docker', ['exec', cfg.container, 'bash', '-lc', safeCmd], 900)
+    ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', safeCmd], 910)  // R24-F1
     : await run('bash', ['-lc', safeCmd], 900);
   if (res.code === 0) await appendInstallLog(safeCmd);
   return { exitCode: res.code, output: res.out.slice(-4000), ok: res.code === 0 };
@@ -247,7 +264,7 @@ export function rewriteAptLineWithout(line, pkg) {
   const m = String(line).match(/(apt(?:-get)?\s+install\s+)((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
   if (!m) return null;
   const seg = m[3];
-  const cleaned = seg.replace(new RegExp(`(^|\\s)${pkg}(?=\\s|$)`), ' ');
+  const cleaned = seg.replace(new RegExp(`(^|\\s)${pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`), ' ');  // R24-F5: 转义
   if (cleaned === seg) return null;
   return line.slice(0, m.index) + m[1] + m[2] + cleaned
     + line.slice(m.index + m[0].length);
@@ -321,7 +338,7 @@ async function rmIfFound(p) {
 export async function uninstallCliTool(name) {
   // reject path traversal: '..' anywhere would let a name like '..' or
   // '../x' escape the layout root (tools/bin/.. == tools itself)
-  if (!/^[\w@][\w@./-]*$/.test(name) || name.includes('..')
+  if (!/^[$\w@+][$\w@./+-]*$/.test(name) || name.includes('..')
     || /[./]$/.test(name)) {
     throw new Error(`invalid tool name: ${name}`);
   }
