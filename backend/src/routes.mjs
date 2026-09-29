@@ -402,12 +402,23 @@ function realRouter({ store, bus, caps, wal }) {
         }
         await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(withCreds), 'utf8');
         const list = await loadMcpConfig();
-        const rest = list.filter(s => s.name !== 'recon-datasources');
+        const rest = list.filter(s => s.name !== 'recon-datasources'
+          && s.name !== 'nday-intel');
         if (enabledReconSources().length) {
           rest.push({
             name: 'recon-datasources', transport: 'stdio', agents: ['recon'],
             enabled: true,
             command: ['node', join(root, 'mcp-recon-datasources.mjs')],
+            env: {}, where: 'host',
+          });
+        }
+        // nday 情报 MCP:NVD key 验证落盘⇄挂载(镜像 recon-datasources 闸门;
+        // 裸 API 不给智能体——key 读取/限流/格式化都在工具内)。
+        if (ndayOut.nvd?.key) {
+          rest.push({
+            name: 'nday-intel', transport: 'stdio', agents: ['nday'],
+            enabled: true,
+            command: ['node', join(root, 'mcp-nday-intel.mjs')],
             env: {}, where: 'host',
           });
         }
