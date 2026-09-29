@@ -48,6 +48,23 @@ export async function saveMcpConfig(next) {
   return servers;
 }
 
+/** R22-F2: 互斥读改写——五写入方(routes POST/DELETE/agent-settings 同步/
+ * tooling configure/remove)此前各自裸 load→filter→save, 并发窗口内后写
+ * 者以旧快照整文件覆盖, 静默丢整条 server 配置(R17-F1 同款)。
+ * 锁内 load→fn(list)→save, 保留 corrupt-latch 语义。 */
+let mcpMutateChain = Promise.resolve();
+export function mutateMcpConfig(fn) {
+  const run = mcpMutateChain.then(async () => {
+    const list = await loadMcpConfig();
+    const next = await fn(list);
+    if (next !== undefined && next !== null) await saveMcpConfig(next);
+    return next;
+  });
+  // 链上错误不阻断后续调用
+  mcpMutateChain = run.catch(() => {});
+  return run;
+}
+
 export function mcpServersFor(agentKey) {
   return servers.filter(s => (s.agents ?? []).includes(agentKey)
     && s.enabled !== false);

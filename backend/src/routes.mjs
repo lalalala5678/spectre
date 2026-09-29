@@ -19,7 +19,7 @@ import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
-import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
+import { loadMcpConfig, saveMcpConfig, mutateMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 
@@ -538,6 +538,12 @@ function realRouter({ store, bus, caps, wal }) {
       if (transport === 'http' && !body.url) {
         return bad(res, 400, 'http transport 需要 url');
       }
+      // R22-F3: tooling 侧前置拒绝的镜像——where=sandbox 的 stdio
+      // 在 local driver 下永远 spawn 失败, 持久化即永久死挂载。
+      if (transport === 'stdio' && body.where === 'sandbox'
+          && sandboxConfig().driver !== 'docker') {
+        return bad(res, 400, 'where=sandbox 需要 docker driver(当前 local)——请改 where=host');
+      }
       const entry = {
         name: String(body.name).slice(0, 60),
         transport,
@@ -549,14 +555,14 @@ function realRouter({ store, bus, caps, wal }) {
           : { command: body.command, env: body.env ?? {},
               where: body.where === 'sandbox' ? 'sandbox' : 'host' }),
       };
-      const list = (await loadMcpConfig())
-        .filter(s => s.name !== entry.name);
       // R5-F2: 同名更新必须失效旧连接——POST 此前从不关闭, 新
       // command/env 永不生效, 旧 stdio 子进程滞留到重启(与 DELETE
       // 路径'removed or CHANGED 都不得存活'的注释矛盾)。
       const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
       closeMcpConnection(entry.name);
-      const next = await saveMcpConfig([...list, entry]);
+      // R22-F2: 互斥读改写
+      const next = await mutateMcpConfig(list =>
+        [...list.filter(s => s.name !== entry.name), entry]);
       const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 201, next.find(s => s.name === entry.name));
@@ -564,8 +570,8 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/mcp' && method === 'DELETE') {
       const url2 = new URL(req.url, 'http://x');
       const name = url2.searchParams.get('name');
-      const next = (await loadMcpConfig()).filter(s => s.name !== name);
-      await saveMcpConfig(next);
+      const next = await mutateMcpConfig(list =>
+        list.filter(s => s.name !== name));
       const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
       closeMcpConnection(name);
       const { rebuildMounts } = await import('./sandbox/mount.mjs');

@@ -13,7 +13,7 @@
 import { Type } from '@earendil-works/pi-ai';
 
 import { saveSkill, deleteSkill, listSkillsTree } from './skills.mjs';
-import { saveMcpConfig, loadMcpConfig, testMcpServer, closeMcpConnection } from './mcp.mjs';
+import { saveMcpConfig, loadMcpConfig, testMcpServer, closeMcpConnection, mutateMcpConfig } from './mcp.mjs';
 import { listInstalledTools, sandboxConfig, uninstallCliTool, readInstallLog } from './container.mjs';
 import { AGENT_KEYS } from '../agents.mjs';
 import { makeExecutionEnv, ensureWorkspaceSync } from './exec-env.mjs';
@@ -162,7 +162,7 @@ const PROVIDERS = {
  * instances (independent per agent — never a 4th role).
  */
 export function buildToolingTools(record, caps) {
-  const all = buildAllToolingTools(caps);
+  const all = buildAllToolingTools(caps, record);
   switch (record.agentKey) {
     case 'skill-config':
       return [all.configureSkill, all.deleteSkillTool, all.listToolConfig,
@@ -186,8 +186,11 @@ export function buildToolingTools(record, caps) {
   }
 }
 
-function buildAllToolingTools(caps) {
-  const record = { agentKey: '_all' }; // builders only use caps
+function buildAllToolingTools(caps, sessionRecord) {
+  // R22-F4: 真实会话 record——wake_agent 需 requester 的 workSessionId
+  // (此前 '_all' 占位符令目标会话恒落 _default 工作区+提示词身份
+  // 失真, 且回执承诺的 read_session 复盘被 R12-F1 作用域判死)。
+  const record = sessionRecord ?? { agentKey: '_all' };
   const configureSkill = {
     name: 'configure_skill',
     label: '配置技能',
@@ -272,10 +275,13 @@ function buildAllToolingTools(caps) {
         return okText('✗ 拒绝:where=sandbox 需要 docker driver(当前=local)。'
           + '请改 where=host,或先启用 docker 沙箱。');
       }
-      const existed = (await loadMcpConfig()).some(x => x.name === p.name);
+      // R22-F2: 锁内合一判存+写(两次独立 load 自带 TOCTOU)
+      let existed = false;
       closeMcpConnection(p.name); // re-config: drop the stale connection
-      const list = (await loadMcpConfig()).filter(s => s.name !== p.name);
-      await saveMcpConfig([...list, p]);
+      await mutateMcpConfig(list => {
+        existed = list.some(x => x.name === p.name);
+        return [...list.filter(s => s.name !== p.name), p];
+      });
       await rebuildMounts();
       const desc = p.transport === 'http'
         ? `url=${p.url}` : `command=[${p.command.join(' ')}] where=${p.where ?? 'host'}`;
@@ -352,6 +358,11 @@ function buildAllToolingTools(caps) {
       }
       if (!p.name && !p.url && p.transport !== 'stdio' && !p.command) {
         return okText('✗ 内联测试缺少目标:请传 url+transport=http,或 command+transport=stdio。');
+      }
+      // R22-F5: {transport:'stdio'} 无/空 command 穿透原守卫第三支
+      // → StdioRpc undefined argv → 回执是原始 TypeError 非引导性拒绝。
+      if (!p.name && p.transport === 'stdio' && !(p.command?.length)) {
+        return okText('✗ 拒绝:stdio 内联测试必须提供 command(非空字符串数组)。');
       }
       let server = p.name
         ? registered.find(s => s.name === p.name) : null;
@@ -549,7 +560,8 @@ function buildAllToolingTools(caps) {
         return okText(`✗ 未注册的 server:${p.name}。当前已注册:`
           + (cfg.map(s => s.name).join(', ') || '(无)'));
       }
-      await saveMcpConfig(cfg.filter(s => s.name !== p.name));
+      // R22-F2: 互斥删写
+      await mutateMcpConfig(list => list.filter(s => s.name !== p.name));
       await rebuildMounts();
       closeMcpConnection(p.name); // kill the pooled stdio child, if any
       return okText(`✓ 已注销 MCP server ${p.name}(对新会话生效,后台连接已关闭)。`);
