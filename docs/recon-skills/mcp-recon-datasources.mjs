@@ -160,7 +160,10 @@ const SOURCES = {
 
 const active = Object.entries(SOURCES).filter(([id]) => {
   const c = cfg[id] ?? {};
-  return Boolean(c.key || c.token || c.secret || c.id);
+  // R25-F2: id 是参数型字段非凭据(R10-F1)——计入闸门令 id-only
+  // censys 挂载 Basic base64("id:undefined") 必败工具, 违反零污染
+  // 契约; 与 save/verify/enabledReconSources 三处规范谓词对齐。
+  return Boolean(c.key || c.token || c.secret);
 });
 
 const rl = readline.createInterface({ input: process.stdin });
@@ -183,20 +186,35 @@ rl.on('line', line => {
   } else if (m.method === 'tools/call') {
     const name = m.params?.name;
     const s = active.find(([, x]) => x.tool === name);
+    // MCP 2025-06-18: 工具侧错误以 result.isError 报告(非协议级 error),
+    // in-repo 桥接(mcp.mjs details.isError)已接此管线。
+    const reply = (text, isError) => process.stdout.write(J({
+      jsonrpc: '2.0', id: m.id,
+      result: { content: [{ type: 'text', text }], isError: Boolean(isError) },
+    }) + '\n');
     if (!s) {
-      result = { content: [{ type: 'text', text: `✗ 工具未挂载(该数据源未配置):${name}` }] };
-    } else {
-      // async bridge — respond out-of-band is not possible on stdio sync loop;
-      // queue via promise chain to preserve ordering
-      s[1].query(m.params?.arguments ?? {}).then(text => {
-        process.stdout.write(J({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text }] } }) + '\n');
-      }).catch(e => {
-        process.stdout.write(J({ jsonrpc: '2.0', id: m.id, result: { content: [{ type: 'text', text: `✗ 调用失败:${String(e?.message ?? e).slice(0, 300)}` }] } }) + '\n');
-      });
-      return; // async response
+      reply(`✗ 工具未挂载(该数据源未配置):${name}`, true);
+      return;
     }
+    // R25-F4: 必填参数运行时校验——缺参此前打到 /undefined 等携凭据
+    // 垃圾上游请求(配额灼烧)。运行时守卫胜过 schema 复杂度(tooling
+    // 先例)。
+    const a = m.params?.arguments ?? {};
+    const required = s[0] === 'ipinfo' ? 'ip' : s[0] === 'threatbook' ? 'domain' : 'query';
+    if (!a[required]) { reply(`✗ 缺少必填参数 ${required}`, true); return; }
+    // async bridge — respond out-of-band is not possible on stdio sync loop;
+    // queue via promise chain to preserve ordering
+    s[1].query(a).then(text => {
+      reply(text, /^✗/.test(String(text)));
+    }).catch(e => {
+      reply(`✗ 调用失败:${String(e?.message ?? e).slice(0, 300)}`, true);
+    });
+    return; // async response
   } else {
-    result = {};
+    // JSON-RPC 2.0: 未知方法 MUST -32601(回空 result 是假成功)
+    process.stdout.write(J({ jsonrpc: '2.0', id: m.id,
+      error: { code: -32601, message: 'Method not found' } }) + '\n');
+    return;
   }
   process.stdout.write(J({ jsonrpc: '2.0', id: m.id, result }) + '\n');
 });
