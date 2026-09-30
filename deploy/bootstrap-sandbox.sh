@@ -1,5 +1,7 @@
 #!/bin/bash
-# 沙箱容器初始化 —— 在 spectre-sandbox 容器内执行(或经 /api/sandbox/cli 派发)
+# 沙箱容器初始化 —— 在 spectre-sandbox 容器内执行!
+# 警告: 直接在宿主机运行会 apt 安装系统级包(需 root 且改动宿机)——
+# 除非你明确要裸机部署, 否则经 docker exec / API 通道派发。
 # 幂等: 重复执行安全; 安装账本(install-log)由平台 installCli 通道自动维护
 set -e
 

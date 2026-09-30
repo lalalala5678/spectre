@@ -8,7 +8,6 @@
 |---|---|
 | Node | **≥ 22.19**（全仓统一：@earendil-works/* 依赖链 engines 下限） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
-
 | Docker | 仅沙箱 driver 需要 |
 
 > Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。
@@ -61,7 +60,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtim
 
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
 export SPECTRE_DATA_DIR=${SPECTRE_DATA_DIR:-/var/lib/spectre}   # 三脚本统一数据根
-bash deploy/bootstrap-sandbox.sh      # 面杀引擎/JDK/运行时 + 病毒库持久化
+docker exec spectre-sandbox bash /opt/tools/bootstrap-sandbox.sh   # 容器内执行! 宿主机直跑会装系统包
 bash deploy/fetch-jars.sh             # 第三方 jar(40MB, 不入 git)
 bash deploy/tools-sync.sh             # 仓库工具链 → 运行时数据目录
 bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_DIR/skills

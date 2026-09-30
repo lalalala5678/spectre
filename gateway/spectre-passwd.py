@@ -36,7 +36,24 @@ def read_lines():
         return []
 
 
+def _write_guard():
+    # D3(部署审计十轮): 非 root 对系统路径的 PermissionError 此前裸栈
+    try:
+        os.makedirs(AUTH_DIR, mode=0o750, exist_ok=True)
+        probe = os.path.join(AUTH_DIR, '.probe')
+        with open(probe, 'w') as f:
+            f.write('x')
+        os.unlink(probe)
+    except PermissionError:
+        import sys
+        sys.exit(f"[spectre-passwd] 无权写入 {AUTH_DIR} — 用 sudo, 或设 SPECTRE_AUTH_DIR 指向可写目录")
+
 def write_lines(lines):
+    if os.path.exists(PASSWD) and not os.environ.get('SPECTRE_AUTH_DIR'):
+        # D1(部署审计十轮): 缺省 /etc/spectre-auth 已有凭据(可能是既有装机
+        # 生产账号)——追加/覆盖前提示确认; 隔离目录不受限。
+        import sys as _sys
+        print(f"[spectre-passwd] 注意: 正在修改缺省凭据文件 {PASSWD}(既有装机账号将受影响); 测试请设 SPECTRE_AUTH_DIR 隔离", file=_sys.stderr)
     os.makedirs(AUTH_DIR, mode=0o750, exist_ok=True)
     existed = os.path.exists(PASSWD)
     with open(PASSWD, "w", encoding="utf-8") as f:
@@ -62,6 +79,7 @@ def main():
     user = argv[1]
     if ":" in user or not user.strip():
         sys.exit("用户名不允许含冒号/空白")
+    _write_guard()
     lines = read_lines()
     rest = [l for l in lines if l.split(":", 1)[0] != user]
     if cmd == "del":
