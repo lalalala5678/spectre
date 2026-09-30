@@ -90,6 +90,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
         split = urllib.parse.urlsplit(self.path)
         path = split.path
         if not path.startswith(config.PREFIX):
+            # 根路径/杂路径直接引到应用前缀(首次访问体验)
+            if path in ("", "/"):
+                return self._send(302, headers={"Location": config.PREFIX + "/"})
             return self._send(404, b"not found")
         rel = path[len(config.PREFIX):] or "/"
 
