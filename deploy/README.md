@@ -57,6 +57,7 @@ sudo cp deploy/systemd/spectre-*.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtime spectre-console
 
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
+export SPECTRE_DATA_DIR=${SPECTRE_DATA_DIR:-/var/lib/spectre}   # 三脚本统一数据根
 bash deploy/bootstrap-sandbox.sh      # 面杀引擎/JDK/运行时 + 病毒库持久化
 bash deploy/fetch-jars.sh             # 第三方 jar(40MB, 不入 git)
 bash deploy/tools-sync.sh             # 仓库工具链 → 运行时数据目录
@@ -73,6 +74,7 @@ bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_
 python3 gateway/spectre-passwd.py add <user>   # PASS=环境变量可非交互
 python3 gateway/spectre-passwd.py del <user>
 python3 gateway/spectre-passwd.py list
+curl 集成: 登录 POST 字段为 `user`/`pw`——`curl -d 'user=admin&pw=...' http://<gw>:8081/spectre/login`。
 ```
 
 ## 数据目录

@@ -31,11 +31,21 @@ if (_nv[0] < 22) {
     `[config] Node ${process.versions.node} 低于受支持版本 22 — 升级 Node 后重试(console 构建同为硬门)`);
 }
 
+// G3(部署审计六轮): .env.example 的占位值(change-me*)静默过闸——公开
+// 仓库的已知值等于无令牌, 直接拒启。
+function rejectPlaceholder(name, value) {
+  if (/^change-me/i.test(String(value))) {
+    throw new Error(
+      `[config] ${name} 仍是 .env.example 占位值 —— 填入真实随机值后重启(INTERNAL_TOKEN 用 openssl rand -hex 32 生成)`);
+  }
+}
+
 function required(name) {
   const value = process.env[name];
   if (!value) {
     throw new Error(`missing required env var: ${name} — 复制 backend/.env.example 为 .env 并填值后重启`);
   }
+  rejectPlaceholder(name, value);
   return value;
 }
 

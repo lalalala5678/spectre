@@ -11,7 +11,8 @@ F12 加固(2026-09-27 QA 循环6,公网 IP 已实际触达):
 import socket, threading, time, os, datetime
 from collections import defaultdict, deque
 
-OUT = '/var/lib/spectre/oob'
+import os
+OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
 QUOTA_BYTES = 512 * 1024 * 1024      # 目录总量上限
 RATE_PER_IP = 10                     # 每 IP 每分钟连接数
 RATE_WINDOW = 60.0

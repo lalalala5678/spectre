@@ -281,6 +281,9 @@ def serve():
     if not config.RUNTIME_TOKEN:
         raise SystemExit(
             "FATAL: INTERNAL_TOKEN 未设置 — 网关反代 /api 需要 runtime 相同的令牌(backend/.env 里的 INTERNAL_TOKEN)")
+    if config.RUNTIME_TOKEN.lower().startswith('change-me'):
+        raise SystemExit(
+            "FATAL: INTERNAL_TOKEN 仍是占位值 — 填入与 backend/.env 相同的真实随机令牌")
 
     GatewayHandler.security = Security()
     server = ThreadingHTTPServer(

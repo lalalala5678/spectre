@@ -37,6 +37,14 @@ import fs from 'node:fs';
 // 端口 bind 之前, 多实例共用数据目录时"先原子重写 WAL 再 EADDRINUSE
 // 崩溃"(实测静默覆写生产 state.wal)。任何读取/重写前先原子占锁
 // ('wx' 独占创建); 持有者已死(PID 不存活)则收尸重取。
+// G4(部署审计六轮): 未显式指定数据目录而回落系统缺省路径时显著横幅
+// ——该路径常为生产/多实例共用, 本轮审计亲证足枪。
+if (!process.env.SPECTRE_DATA_DIR && !process.env.SPECTRE_SANDBOX_ROOT) {
+  console.warn('='.repeat(72));
+  console.warn(`[runtime] 未设置 SPECTRE_DATA_DIR —— 使用缺省 ${CONFIG.dataDir}`);
+  console.warn('[runtime] 多实例/测试部署请显式指定独立目录(如 SPECTRE_DATA_DIR=/tmp/spectre-data)');
+  console.warn('='.repeat(72));
+}
 const lockPath = path.join(CONFIG.dataDir, '.instance.lock');
 fs.mkdirSync(CONFIG.dataDir, { recursive: true });
 const pidAlive = pid => {

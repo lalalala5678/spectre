@@ -4,7 +4,7 @@ After=docker.service spectre-agent-runtime.service
 
 [Service]
 EnvironmentFile=/etc/spectre/spectre.env
-ExecStart=/bin/sh -c 'exec /usr/bin/python3 ${SPECTRE_DATA}/tools/c2/private-qa-server.py 8899'
+ExecStart=/bin/sh -c 'exec /usr/bin/python3 ${SPECTRE_DATA_DIR}/tools/c2/private-qa-server.py 8899'
 Environment=SPECTRE_SANDBOX_CONTAINER=spectre-sandbox
 Restart=on-failure
 RestartSec=3
