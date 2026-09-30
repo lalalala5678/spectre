@@ -71,6 +71,8 @@ def main():
         write_lines(rest)
         print(f"[spectre-passwd] 已删除 {user}")
         return
+    if len(rest) != len(lines):
+        print(f"[spectre-passwd] 注意: 用户 {user} 已存在, 本次将覆盖其密码")
     pw = os.environ.get("PASS") or getpass.getpass(f"为 {user} 设置密码: ")
     if len(pw) < 8:
         sys.exit("密码至少 8 位")

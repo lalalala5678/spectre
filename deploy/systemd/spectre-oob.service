@@ -24,3 +24,6 @@ MemoryDenyWriteExecute=true
 SystemCallArchitectures=native
 # 源码验证唯一写路径是数据目录
 ReadWritePaths=/var/lib/spectre/oob
+
+[Install]
+WantedBy=multi-user.target

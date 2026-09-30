@@ -7,7 +7,8 @@
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "prebuild": "node -e \"const v=process.versions.node.split(/[.]/).map(Number);if(v[0]<20||(v[0]===20&&v[1]<19)){console.error(\"Node >= 20.19 required (current \"+process.versions.node+\") — 升级 Node 后重试\");process.exit(1)}\""
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",

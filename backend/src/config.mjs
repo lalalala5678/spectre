@@ -24,7 +24,7 @@ loadEnvFile(new URL('../.env', import.meta.url).pathname);
 function required(name) {
   const value = process.env[name];
   if (!value) {
-    throw new Error(`missing required env var: ${name}`);
+    throw new Error(`missing required env var: ${name} — 复制 backend/.env.example 为 .env 并填值后重启`);
   }
   return value;
 }

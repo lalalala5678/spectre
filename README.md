@@ -2,6 +2,10 @@
 
 多智能体渗透测试平台。14 个阶段智能体 + MCP 工具面 + Temporal 工作流，从资产测绘到报告交付全链路闭环。
 
+## 界面
+
+![console](console/screenshots/autopwn-full.png)
+
 ## 架构
 
 ```

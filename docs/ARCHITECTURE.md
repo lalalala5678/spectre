@@ -83,7 +83,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 ├── deploy/                        # 运维物料
 │   ├── systemd/                   # 单元文件(或符号链接说明)
 │   ├── caddy/                     # Caddyfile 备份 + 接入片段
-│   └── credentials.txt            # 控制台登录凭据(600)
+│   └── passwd                       # spectre-passwd CLI 生成(scrypt)
 │
 └── (运行时数据,不在仓库)
     /etc/spectre-auth/             #   passwd(多用户 scrypt)
@@ -170,7 +170,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 ## 7. 已知限制与后续路线
 
 1. **会话内存态**:runtime 重启丢会话 → 接 pi SQLite session backend + 会话恢复
-2. **智能体零定制**:backend/agents/ 目录已预留,接入逐智能体 SYSTEM.md/tools/skills
+2. **智能体零定制**:逐智能体定制在 backend/src/agents.mjs 注册表+sessions.mjs 提示词层接入(无 backend/agents/ 目录)
 3. **无工具、无沙箱**:渗透工具接入必须先落 beforeToolCall 审批门 + 容器隔离(pi 官方:pi 无内置权限系统)
 4. **审计链未接 Merkle**:auth.log 已有,业务事件(journal)待对账入链
 5. **Temporal dev server**:单机开发态;生产需换正式集群 + PostgreSQL
