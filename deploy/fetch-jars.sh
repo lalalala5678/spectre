@@ -2,8 +2,9 @@
 # 第三方 jar 依赖装载(~40MB 不入 git, 首次部署下载)
 # 目标: /opt/tools/c2/libs 与 /opt/tools/c2/generators(挂载到容器同路径)
 # 任何一项失败都会在结尾汇总报错并以非零退出(不静默吞)。
-LIBS=${LIBS_DIR:-/opt/tools/c2/libs}
-GEN=${GEN_DIR:-/opt/tools/c2/generators}
+ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
+LIBS=${LIBS_DIR:-$ROOT/tools/c2/libs}
+GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
 mkdir -p "$LIBS" "$GEN"
 FAILED=()
 fetch() { # fetch <目录> <完整URL> <文件名>
