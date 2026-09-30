@@ -68,9 +68,9 @@ bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据�
 # spectre-sbx-<sha256(数据根)前8位>, 缺省数据根才是 spectre-sandbox)
 SBX="spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8)"
 docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
-  || echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2
+  || { echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2; exit 1; }
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
-PORT=$PORT INTERNAL_TOKEN=$TOK bash deploy/skills-seed.sh  # 55 技能; 即时刷新挂载需 PORT/INTERNAL_TOKEN 与 runtime 同源
+PORT=18090 INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 即时刷新需两变量与 runtime 同源(缺省回落 8090)
 
 # 7) 数据源凭据
 #    控制台「Agent 配置」页填入(验证通过才落盘, 未配置不注入);
