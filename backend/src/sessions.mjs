@@ -420,7 +420,8 @@ export class SessionStore {
             record.busy = false;  // run never started — don't strand waitIdle
             // R15-F4: 事件驱动等待者(reportWriter 等 awaitCompletion)
             // 此前被困 300s——agent_end 永不来, busy 快路径已过。
-            for (const fn of record.completionWaiters ?? []) { try { fn(); } catch {} }
+            for (const fn of record.completionWaiters ?? [])
+              { try { fn(); } catch { /* best-effort: 单 waiter 异常不阻断其余 */ } }
             record.completionWaiters = [];
           }
           this._journal(record, 'error', { message: String(err) });
@@ -527,7 +528,8 @@ export class SessionStore {
       // R1-F2: 同 prompt()——输给竞态时不清 busy(见上)。
       if (!record.agent.state.isStreaming) {
         record.busy = false;
-        for (const fn of record.completionWaiters ?? []) { try { fn(); } catch {} }  // R15-F4
+        for (const fn of record.completionWaiters ?? [])
+        { try { fn(); } catch { /* best-effort(同上) */ } }  // R15-F4
         record.completionWaiters = [];
       }
       queue();

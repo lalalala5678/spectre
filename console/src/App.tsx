@@ -7,10 +7,10 @@ import { getAgent } from './api/agentMeta';
 import { SkillsPage } from './pages/SkillsPage';
 import { McpPage } from './pages/McpPage';
 import { CliPage } from './pages/CliPage';
-import SettingsPage from './pages/SettingsPage';
+import { SettingsPage } from './pages/SettingsPage';
 import { getPrefs } from './api/worksession';
 import { AuditPage } from './pages/AuditPage';
-import ShellPage from './pages/ShellPage';
+import { ShellPage } from './pages/ShellPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
 import type { RouteKey } from './types';
 
@@ -100,23 +100,16 @@ export default function App() {
         <main className="min-h-0 flex-1 overflow-hidden bg-void-950">
           {STAGE_ROUTES.includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(AGENT_OF_ROUTE[route])} />
-          ) : route === 'skills' ? (
+          ) : ['skills', 'mcp', 'cli'].includes(route) ? (
+            // CS1-R9: 三配置页同构外壳收敛(页面组件查表)
             <div className="h-full overflow-hidden p-4">
               {wsId === null
                 ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
-                : wsId ? <SkillsPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
-            </div>
-          ) : route === 'mcp' ? (
-            <div className="h-full overflow-hidden p-4">
-              {wsId === null
-                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
-                : wsId ? <McpPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
-            </div>
-          ) : route === 'cli' ? (
-            <div className="h-full overflow-hidden p-4">
-              {wsId === null
-                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
-                : wsId ? <CliPage wsId={wsId} /> : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
+                : wsId
+                  ? (route === 'skills' ? <SkillsPage wsId={wsId} />
+                    : route === 'mcp' ? <McpPage wsId={wsId} />
+                    : <CliPage wsId={wsId} />)
+                  : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
             </div>
           ) : route === 'shells' ? (
             <ShellPage />

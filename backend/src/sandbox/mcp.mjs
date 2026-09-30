@@ -216,7 +216,7 @@ function tieToParentExit(rpc) {
   exitTied.add(rpc);
   if (handlersArmed) return;
   handlersArmed = true;
-  const killAll = () => { for (const r of exitTied) { try { r.close(); } catch {} } };
+  const killAll = () => { for (const r of exitTied) { try { r.close(); } catch { /* best-effort: 进程退出期 close 幂等 */ } } };
   process.once('exit', killAll);
   process.once('SIGTERM', () => { killAll(); process.exit(0); });
   process.once('SIGINT', () => { killAll(); process.exit(0); });
@@ -404,7 +404,7 @@ export async function testMcpServer(server) {
       _testMcpServer(server),
       new Promise(resolve => setTimeout(() => {
         const c = testConns.get(server.name);
-        if (c) { try { c.close(); } catch {} testConns.delete(server.name); }
+        if (c) { try { c.close(); } catch { /* best-effort: 已断开 */ } testConns.delete(server.name); }
         resolve({ ok: false, error: 'timeout (10s)' });
       }, 10000)),
     ]);
@@ -433,7 +433,7 @@ async function _testMcpServer(server) {
       protocol: init?.protocolVersion ?? '?',
       tools: (tools ?? []).map(t => t.name) };
   } catch (err) {
-    if (rpc) { try { rpc.close(); } catch {} }
+    if (rpc) { try { rpc.close(); } catch { /* best-effort: 服务器已退出 */ } }
     testConns.delete(server.name);
     return { ok: false, error: err.message };
   }

@@ -19,11 +19,11 @@ import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
-import { loadMcpConfig, saveMcpConfig, mutateMcpConfig, testMcpServer, closeMcpConnection } from './sandbox/mcp.mjs';
+import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
+import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 import { getSettings, saveSetting, enabledReconSources, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
-import { rebuildMounts } from './sandbox/mount.mjs';
 import { HOST } from './sandbox/exec-env.mjs';
 import { sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
 import { existsSync, readFileSync, readdirSync } from 'node:fs';
@@ -449,7 +449,7 @@ function realRouter({ store, bus, caps, wal }) {
           });
         }
         await saveMcpConfig(rest);
-        await rebuildMounts(AGENT_KEYS);
+        await applyMcpAndMounts();
       }
       return json(res, 200, r);
     }
@@ -490,7 +490,7 @@ function realRouter({ store, bus, caps, wal }) {
         image: body.image ? String(body.image).slice(0, 200) : undefined,
       });
       const ensured = await ensureSandbox();
-      await rebuildMounts(AGENT_KEYS);
+      await applyMcpAndMounts();
       return json(res, 200, { ...cfg, ensured });
     }
     if (path === '/api/sandbox/cli' && method === 'POST') {
@@ -507,7 +507,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/skills/rebuild' && method === 'POST') {
       // P1-B(五审): skills-seed 播种后挂载缓存不刷新——"新会话生效"
       // 承诺此前为假(需重启或碰巧触发技能 CRUD)。
-      const r2 = await rebuildMounts(AGENT_KEYS);
+      const r2 = await applyMcpAndMounts();
       store.rebuildSessionAgents();
       return json(res, 200, r2);
     }
@@ -530,7 +530,7 @@ function realRouter({ store, bus, caps, wal }) {
         description: String(body.description ?? '').slice(0, 200),
         content: String(body.content).slice(0, 50000),
       });
-      await rebuildMounts(AGENT_KEYS);
+      await applyMcpAndMounts();
       return json(res, 201, { filePath });
     }
     if (path === '/api/sandbox/skills' && method === 'DELETE') {
@@ -541,7 +541,7 @@ function realRouter({ store, bus, caps, wal }) {
         return bad(res, 400, 'agentKey 或 name 非法');
       }
       await deleteSkill(agentKey, name);
-      await rebuildMounts(AGENT_KEYS);
+      await applyMcpAndMounts();
       return json(res, 200, { deleted: true });
     }
     // MCP servers CRUD + test (remote http or stdio; future config-agent
@@ -595,19 +595,19 @@ function realRouter({ store, bus, caps, wal }) {
       // R5-F2: 同名更新必须失效旧连接——POST 此前从不关闭, 新
       // command/env 永不生效, 旧 stdio 子进程滞留到重启(与 DELETE
       // 路径'removed or CHANGED 都不得存活'的注释矛盾)。
-      closeMcpConnection(entry.name);
-      // R22-F2: 互斥读改写
-      const next = await mutateMcpConfig(list =>
-        [...list.filter(s => s.name !== entry.name), entry]);
-      await rebuildMounts(AGENT_KEYS);
+      // R5-F2(连接失效先行)+R22-F2(互斥读改写)语义在 applyMcpAndMounts 固化
+      const next = await applyMcpAndMounts({
+        closeName: entry.name, closeFirst: true,
+        mutate: list => [...list.filter(s => s.name !== entry.name), entry],
+      });
       return json(res, 201, next.find(s => s.name === entry.name));
     }
     if (path === '/api/sandbox/mcp' && method === 'DELETE') {
       const name = url.searchParams.get('name');
-      await mutateMcpConfig(list =>
-        list.filter(s => s.name !== name));
-      closeMcpConnection(name);
-      await rebuildMounts(AGENT_KEYS);
+      await applyMcpAndMounts({
+        closeName: name,
+        mutate: list => list.filter(s => s.name !== name),
+      });
       return json(res, 200, { deleted: true });
     }
     if (path === '/api/sandbox/cli/installed' && method === 'GET') {

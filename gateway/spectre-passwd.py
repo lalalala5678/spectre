@@ -88,7 +88,7 @@ def main():
     cmd = argv[0]
     if cmd == "list":
         for line in read_lines():
-            print(l.split(":", 1)[0])
+            print(line.split(":", 1)[0])
         return
     if len(argv) != 2:
         print("用法: spectre-passwd add|del <user>", file=sys.stderr)
@@ -97,7 +97,7 @@ def main():
     if ":" in user or not user.strip():
         sys.exit("用户名不允许含冒号/空白")
     lines = read_lines()
-    rest = [line for line in lines if l.split(":", 1)[0] != user]
+    rest = [line for line in lines if line.split(":", 1)[0] != user]
     if cmd == "del":
         if len(rest) == len(lines):
             sys.exit(f"用户不存在: {user}")

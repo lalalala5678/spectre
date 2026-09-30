@@ -101,7 +101,10 @@ class Security:
         now = time.time()
         with self._lock:
             state = self._failtrack.get(ip)
-            stale = now - state["window_start"] > config.FAIL_WINDOW_SECS
+            # short-circuit: state 首次失败时为 None, 必须先判存在再取键
+            # (CS1 批重排曾让 None["window_start"] 直接炸 handler 线程)
+            window = state["window_start"] if state else 0
+            stale = now - window > config.FAIL_WINDOW_SECS
             if not state or stale:
                 state = {"n": 0, "window_start": now, "locked_until": 0}
                 self._failtrack[ip] = state

@@ -3,34 +3,22 @@
  * 与 tooling.mjs PROVIDERS 同实现的探针:同 key 同端点打一发最小查询,
  * 认证/权限错误显形为保存失败, 不落盘。
  */
+// CS1-R17: 请求形状单源 provider-specs.mjs; 探针语义 = count=1 最小查询,
+// 认证/权限错误显形为 {ok:false}。
 const PROBES = {
   zhipu: async (cfg) => {
-    const res = await fetch('https://open.bigmodel.cn/api/paas/v4/web_search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${cfg.apiKey}` },
-      body: JSON.stringify({ search_engine: 'search_std', count: 1, search_query: 'test' }),
-      signal: AbortSignal.timeout(10_000),
-    });
-    const data = await res.json().catch(() => null);
+    const { res, data } = await providerFetch('zhipu', cfg, { query: 'test', count: 1 });
     if (data?.error) return { ok: false, error: `zhipu: ${data.error.message ?? data.error.code}` };
     if (!res.ok) return { ok: false, error: `zhipu HTTP ${res.status}` };
     return { ok: true };
   },
   brave: async (cfg) => {
-    const res = await fetch('https://api.search.brave.com/res/v1/web/search?q=test&count=1', {
-      headers: { Accept: 'application/json', 'X-Subscription-Token': cfg.apiKey },
-      signal: AbortSignal.timeout(10_000),
-    });
+    const { res } = await providerFetch('brave', cfg, { query: 'test', count: 1 });
     if (!res.ok) return { ok: false, error: `brave HTTP ${res.status}${res.status === 401 ? '(key 无效)' : ''}` };
     return { ok: true };
   },
   tavily: async (cfg) => {
-    const res = await fetch('https://api.tavily.com/search', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: cfg.apiKey, query: 'test', max_results: 1 }),
-      signal: AbortSignal.timeout(10_000),
-    });
+    const { res } = await providerFetch('tavily', cfg, { query: 'test', count: 1 });
     if (!res.ok) return { ok: false, error: `tavily HTTP ${res.status}${res.status === 401 ? '(key 无效)' : ''}` };
     return { ok: true };
   },

@@ -164,60 +164,52 @@ class GatewayHandler(BaseHTTPRequestHandler):
             headers={"Cache-Control": static_files.cache_policy(rel)},
         )
 
-    # ---------- POST ----------
+    # ---------- POST / PUT / DELETE ----------
+
+    def do_POST(self):
+        split = urllib.parse.urlsplit(self.path)
+        handled = self._proxy_api_or_none(split)
+        if handled is not None:
+            return handled
+        if split.path[len(config.PREFIX):] == "/login":
+            return self._handle_login()
+        return self._send(404, b"not found")
 
     def do_PUT(self):
         # API mutations (projects/prefs/revise…) ride PUT through the
         # same authenticated proxy path as POST.
-        split = urllib.parse.urlsplit(self.path)
-        path = split.path
-        if not path.startswith(config.PREFIX):
-            return self._send(404, b"not found")
-        # keep the QUERY STRING — DELETE/PUT endpoints address resources
-        # by query params (?agentKey=&name= / ?name=); dropping it once
-        # turned every such call into a 400 (button E2E caught it).
-        rel = _rel_with_query(split)
-        if rel.split('?')[0].startswith("/api/"):
-            if not self._session():
-                audit("auth_redirect", ip=self.client_ip(), path=rel)
-                self._drain()  # R4-2: keep-alive 体排空
-                return self._redirect(config.PREFIX + "/login")
-            return self._proxy(rel)
-        return self._send(405, b"method not allowed")
+        return self._api_method_response(
+            urllib.parse.urlsplit(self.path), fallback_status=405)
 
     def do_DELETE(self):
-        split = urllib.parse.urlsplit(self.path)
-        path = split.path
-        if not path.startswith(config.PREFIX):
-            return self._send(404, b"not found")
-        # keep the QUERY STRING — DELETE/PUT endpoints address resources
-        # by query params (?agentKey=&name= / ?name=); dropping it once
-        # turned every such call into a 400 (button E2E caught it).
-        rel = _rel_with_query(split)
-        if rel.split('?')[0].startswith("/api/"):
-            if not self._session():
-                audit("auth_redirect", ip=self.client_ip(), path=rel)
-                self._drain()  # R4-2: keep-alive 体排空
-                return self._redirect(config.PREFIX + "/login")
-            return self._proxy(rel)
-        return self._send(405, b"method not allowed")
+        return self._api_method_response(
+            urllib.parse.urlsplit(self.path), fallback_status=405)
 
-    def do_POST(self):
-        split = urllib.parse.urlsplit(self.path)
-        path = split.path
-        if not path.startswith(config.PREFIX):
+    def _api_method_response(self, split, fallback_status):
+        """PUT/DELETE 共用体(CS1-C4: 两方法逐字重复收敛)。"""
+        handled = self._proxy_api_or_none(split)
+        if handled is not None:
+            return handled
+        return self._send(fallback_status, b"method not allowed")
+
+    def _proxy_api_or_none(self, split):
+        """Authenticate + proxy an /api/* request; None when not API.
+
+        Shared by POST/PUT/DELETE (CS1-C4). keeps the QUERY STRING —
+        DELETE/PUT endpoints address resources by query params
+        (?agentKey=&name= / ?name=); dropping it once turned every such
+        call into a 400 (button E2E caught it).
+        """
+        if not split.path.startswith(config.PREFIX):
             return self._send(404, b"not found")
         rel = _rel_with_query(split)
-
-        if rel.split('?')[0].startswith("/api/"):
-            if not self._session():
-                audit("auth_redirect", ip=self.client_ip(), path=rel)
-                self._drain()  # R4-2: keep-alive 体排空
-                return self._redirect(config.PREFIX + "/login")
-            return self._proxy(rel)
-        if rel.split("?")[0] == "/login":
-            return self._handle_login()
-        return self._send(404, b"not found")
+        if not rel.split('?')[0].startswith("/api/"):
+            return None
+        if not self._session():
+            audit("auth_redirect", ip=self.client_ip(), path=rel)
+            self._drain()  # R4-2: keep-alive 体排空
+            return self._redirect(config.PREFIX + "/login")
+        return self._proxy(rel)
 
     def _handle_login(self):
         ip = self.client_ip()

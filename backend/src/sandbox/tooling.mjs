@@ -13,19 +13,16 @@
 import { Type } from '@earendil-works/pi-ai';
 
 import { saveSkill, deleteSkill, listSkillsTree } from './skills.mjs';
-import { loadMcpConfig, testMcpServer, closeMcpConnection, mutateMcpConfig } from './mcp.mjs';
+import { loadMcpConfig, testMcpServer } from './mcp.mjs';
 import { listInstalledTools, sandboxConfig, uninstallCliTool, readInstallLog } from './container.mjs';
 import { AGENT_KEYS } from '../agents.mjs';
 import { getPrefs } from '../projects.mjs';
 // CS1-R12: 信封单源 pi.mjs(errText 曾与 okText 逐字同——双胞胎漂移过)
 import { sayText as okText, sayError as errText } from '../pi.mjs';
+import { applyMcpAndMounts } from './apply-config.mjs';
+import { providerFetch } from './provider-specs.mjs';
 
 // ------------------------------------------------------------- helpers
-
-async function rebuildMounts() {
-  const { rebuildMounts: rb } = await import('./mount.mjs');
-  await rb(AGENT_KEYS);
-}
 
 // ------------------------------------------------- vertical discovery
 
@@ -136,49 +133,37 @@ async function searchVertical(query) {
 
 // -------------------------------------------------- generic providers
 
+// CS1-R17: 请求形状(endpoint/headers/body)单源 provider-specs.mjs——
+// 响应映射与错误语义留在此层(探针侧另有 ok/error 语义)。
+const RESULT_SHAPES = {
+  zhipu: data => (data?.search_result ?? []).map(r => ({
+    title: r.title, url: r.link, snippet: r.content ?? '' })),
+  brave: data => (data?.web?.results ?? []).map(r => ({
+    title: r.title, url: r.url, snippet: r.description ?? '' })),
+  tavily: data => (data?.results ?? []).map(r => ({
+    title: r.title, url: r.url, snippet: r.content ?? '' })),
+};
 const PROVIDERS = {
   zhipu: async (q, cfg) => {
-    const res = await fetch(
-      'https://open.bigmodel.cn/api/paas/v4/web_search',
-      { method: 'POST',
-        headers: { 'Content-Type': 'application/json',
-          Authorization: `Bearer ${cfg.apiKey}` },
-        body: JSON.stringify({ search_engine: 'search_std', count: 8,
-          search_query: q }),
-        signal: AbortSignal.timeout(10000) });
-    const data = await res.json();
+    const { res, data } = await providerFetch('zhipu', cfg, { query: q, count: 8 });
     // R30: 401/错误体此前被吞成"0 命中"(agent 四轮实测判读"挂名未通"
     // 完全正确)——错误必须 throw 走 catch 显形。
     if (data?.error) throw new Error(`zhipu: ${data.error.message ?? data.error.code ?? 'API 错误'}`);
     if (!res.ok) throw new Error(`zhipu HTTP ${res.status}`);
-    return (data?.search_result ?? []).map(r => ({
-      title: r.title, url: r.link, snippet: r.content ?? '' }));
+    return RESULT_SHAPES.zhipu(data);
   },
   brave: async (q, cfg) => {
-    const res = await fetch(
-      `https://api.search.brave.com/res/v1/web/search?q=${encodeURIComponent(q)}&count=8`,
-      { headers: { Accept: 'application/json',
-        'X-Subscription-Token': cfg.apiKey },
-        signal: AbortSignal.timeout(10000) });
-    const data = await res.json();
+    const { res, data } = await providerFetch('brave', cfg, { query: q, count: 8 });
     if (!res.ok || data?.error) throw new Error(`brave: ${data?.error?.message ?? `HTTP ${res.status}`}`);
-    return (data?.web?.results ?? []).map(r => ({
-      title: r.title, url: r.url, snippet: r.description ?? '' }));
+    return RESULT_SHAPES.brave(data);
   },
   tavily: async (q, cfg) => {
-    const res = await fetch('https://api.tavily.com/search', {
-      method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ api_key: cfg.apiKey, query: q, max_results: 8 }),
-      signal: AbortSignal.timeout(10000) });
-    const data = await res.json();
-    return (data?.results ?? []).map(r => ({
-      title: r.title, url: r.url, snippet: r.content ?? '' }));
+    const { data } = await providerFetch('tavily', cfg, { query: q, count: 8 });
+    return RESULT_SHAPES.tavily(data);
   },
   searxng: async (q, cfg) => {
-    const res = await fetch(
-      `${cfg.baseUrl}/search?q=${encodeURIComponent(q)}&format=json`,
-      { signal: AbortSignal.timeout(10000) });
-    const data = await res.json();
+    const { res, data } = await providerFetch('searxng', cfg, { query: q, count: 8 });
+    if (!res.ok) throw new Error(`searxng HTTP ${res.status}`);
     return (data?.results ?? []).slice(0, 8).map(r => ({
       title: r.title, url: r.url, snippet: r.content ?? '' }));
   },
@@ -255,7 +240,7 @@ function buildAllToolingTools(caps, sessionRecord) {
       for (const key of p.agentKeys.filter(k => AGENT_KEYS.includes(k))) {
         paths.push(await saveSkill(key, p));
       }
-      await rebuildMounts();
+      await applyMcpAndMounts();
       const warn = bad.length
         ? `\n⚠️ 跳过无效智能体:${bad.join(',')}(合法值:${AGENT_KEYS.join(',')})` : '';
       return okText(`✓ 技能 ${p.name} 已挂载:\n`
@@ -309,14 +294,16 @@ function buildAllToolingTools(caps, sessionRecord) {
         return okText('✗ 拒绝:where=sandbox 需要 docker driver(当前=local)。'
           + '请改 where=host,或先启用 docker 沙箱。');
       }
-      // R22-F2: 锁内合一判存+写(两次独立 load 自带 TOCTOU)
+      // R22-F2: 锁内合一判存+写(两次独立 load 自带 TOCTOU)——组合
+      // 语义(close 先行)由 applyMcpAndMounts 固化
       let existed = false;
-      closeMcpConnection(p.name); // re-config: drop the stale connection
-      await mutateMcpConfig(list => {
-        existed = list.some(x => x.name === p.name);
-        return [...list.filter(s => s.name !== p.name), p];
+      await applyMcpAndMounts({
+        closeName: p.name, closeFirst: true,
+        mutate: list => {
+          existed = list.some(x => x.name === p.name);
+          return [...list.filter(x => x.name !== p.name), p];
+        },
       });
-      await rebuildMounts();
       const desc = p.transport === 'http'
         ? `url=${p.url}` : `command=[${p.command.join(' ')}] where=${p.where ?? 'host'}`;
       const warn = bad.length

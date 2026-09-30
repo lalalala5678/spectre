@@ -65,20 +65,21 @@ const takeLock = () => {
 };
 if (!takeLock()) {
   let holder = null;
-  try { holder = Number(fs.readFileSync(lockPath, 'utf8').trim()); } catch {}
+  try { holder = Number(fs.readFileSync(lockPath, 'utf8').trim()); }
+  catch { /* 无 holder=陈旧锁, 走下方防误杀 */ }
   if (pidAlive(holder)) {
     console.error(
       `[runtime] FATAL: 数据目录 ${CONFIG.dataDir} 已被实例 PID ${holder} 持有——共用数据目录的第二实例会互相覆写 WAL; 设置 SPECTRE_DATA_DIR 指向独立目录`);
     process.exit(1);
   }
   console.warn(`[runtime] 清理残留锁(持有者 PID ${holder} 已退出)`);
-  try { fs.unlinkSync(lockPath); } catch {}
+  try { fs.unlinkSync(lockPath); } catch { /* best-effort: 锁文件已不存在 */ }
   if (!takeLock()) {
     console.error(`[runtime] FATAL: 实例锁竞争失败(${lockPath})`);
     process.exit(1);
   }
 }
-process.on('exit', () => { try { fs.unlinkSync(lockPath); } catch {} });
+process.on('exit', () => { try { fs.unlinkSync(lockPath); } catch { /* best-effort: 锁文件已不存在 */ } });
 
 const { model, streamFn } = await buildPi();
 const wal = new Wal(path.join(CONFIG.dataDir, 'state.wal'));

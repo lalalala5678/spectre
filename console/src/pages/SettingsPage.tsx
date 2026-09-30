@@ -170,7 +170,7 @@ function SourceCard({ src, cfg, onSave, verify }: {
     </div>
   );
 }
-export default function SettingsPage() {
+export function SettingsPage() {
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [err, setErr] = useState('');
   const [verify, setVerify] = useState<Record<string, { ok: boolean; error?: string | null }> | null>(null);

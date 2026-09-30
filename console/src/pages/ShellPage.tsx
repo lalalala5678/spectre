@@ -17,7 +17,7 @@ interface ShellHandle {
 interface ExecResult { ok: boolean; stdout?: string; stderr?: string; code?: number; error?: string; ms?: number }
 
 /** Shell 控制台 — C2 植入通道的运维终端(SSH 式) */
-export default function ShellPage() {
+export function ShellPage() {
   const [shells, setShells] = useState<ShellHandle[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [cmd, setCmd] = useState('');

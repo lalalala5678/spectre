@@ -5,9 +5,12 @@ import { api } from '../api/client';
 import { ToolingChat } from '../components/ToolingChat';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
+import { AGENTS as REGISTRY } from '../api/agentRegistry';
 
-const AGENTS = ['autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit',
-  'phish', 'c2', 'persistence', 'postex', 'report'];
+// CS1-R13: 挂载目标单源 agentRegistry(此前本地 11 键, 增删 agent 双处
+// 漂移); 语义保持"业务面"——配置三键不进 MCP 挂载目标(与原 11 键一致)。
+const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
+const AGENTS = REGISTRY.map(a => a.id).filter(id => !CONFIG_AGENT_KEYS.includes(id));
 
 interface McpServer {
   name: string;
