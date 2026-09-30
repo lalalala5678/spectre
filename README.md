@@ -26,17 +26,27 @@
 - **MCP**：recon-datasources(fofa/quake/hunter/zoomeye/censys/shodan/github/cse/ipinfo/threatbook)、nday-intel(nvd_cve)、自定义 server 热挂载
 - **共享工具独立实例**：每智能体各持 search_web / fetch_url(垂直通道零 key + 可选 provider 兜底)
 - **沙箱 CLI**：c2-qa(多引擎面杀矩阵+私架端点)、c2-variant/functest/bind(载荷流水线)、nuclei/hydra/nmap 等(安装账本化，容器重建自动重放)
-- **技能**：agentskills.io 格式，55 个方法论技能按智能体挂载
+- **技能**：agentskills.io 格式（SKILL.md），按智能体分组挂载于 docs/*-skills/
 
 ## 快速开始
 
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
-cd backend && cp .env.example .env && npm i && node agent-runtime.mjs   # Node ≥ 20.19
-cd ../console && npm i && npm run build                                 # Node ≥ 20.19
+
+# ① 后端(Node ≥ 22.19)——先编辑 .env 填 INTERNAL_TOKEN(自定随机串)与 LLM_API_KEY
+cd backend && cp .env.example .env && $EDITOR .env
+SPECTRE_DATA_DIR=/tmp/spectre-data npm i && \
+SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # 测试隔离数据目录(生产缺省 /var/lib/spectre)
+
+# ② 前端(Node ≥ 22.19; 与 ① 同一 Node 版本)
+cd ../console && npm i && npm run build
+
+# ③ 网关(纯 stdlib)——INTERNAL_TOKEN 必须=① 中 .env 的值, 否则 API 反代全 401
 cd ../gateway && python3 spectre-passwd.py add admin && \
-  SPECTRE_DATA_DIR=/tmp/spectre-data python3 server.py   # 纯 stdlib; 测试数据目录隔离
+  INTERNAL_TOKEN=<同①> SPECTRE_DATA_DIR=/tmp/spectre-data python3 server.py
 ```
+
+打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
 
 完整部署(systemd/沙箱/私架面杀/凭据边界)见 [deploy/README.md](deploy/README.md)。
 

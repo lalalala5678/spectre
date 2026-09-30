@@ -1,7 +1,5 @@
 import { cn } from '../../utils/cn';
-
-export type BadgeTone =
-  | 'green' | 'cyan' | 'red' | 'rose' | 'amber' | 'blue' | 'slate' | 'violet' | 'orange';
+import type { BadgeTone } from './badgeTones';
 
 /**
  * 朴素标签：统一灰底细边，仅文本着色。
@@ -76,45 +74,5 @@ export function Dot({
   );
 }
 
-export function severityTone(sev: string): BadgeTone {
-  switch (sev) {
-    case 'critical': return 'red';
-    case 'high': return 'orange';
-    case 'medium': return 'amber';
-    case 'low': return 'blue';
-    default: return 'slate';
-  }
-}
 
-export function riskTone(risk: string): BadgeTone {
-  switch (risk) {
-    case 'exploit': return 'red';
-    case 'credential': return 'red';
-    case 'intrusive': return 'amber';
-    default: return 'slate';
-  }
-}
 
-export function statusTone(status: string): BadgeTone {
-  switch (status) {
-    case 'running':
-    case 'active':
-      return 'orange';
-    case 'connected':
-    case 'success':
-    case 'verified':
-      return 'slate';
-    case 'waiting_approval':
-    case 'blocked':
-    case 'paused':
-      return 'slate';
-    case 'error':
-    case 'failed':
-    case 'disconnected':
-      return 'red';
-    case 'idle':
-    case 'pending':
-    default:
-      return 'slate';
-  }
-}

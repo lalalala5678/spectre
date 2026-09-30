@@ -22,7 +22,19 @@ export class Wal {
 
   open() {
     fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
-    this.fd = fs.openSync(this.file, 'a');
+    let fd;
+    try {
+      fd = fs.openSync(this.file, 'a');
+    } catch (e) {
+      // F5(部署审计四轮): 非根用户对默认 /var/lib/spectre 的 EACCES 此前
+      // 裸栈崩溃——给出一行指引。
+      if (e.code === 'EACCES' || e.code === 'ENOENT') {
+        throw new Error(
+          `无法打开 WAL ${this.file}(${e.code})——设置 SPECTRE_DATA_DIR 指向可写目录后重启, 例如 SPECTRE_DATA_DIR=/tmp/spectre-data`);
+      }
+      throw e;
+    }
+    this.fd = fd;
   }
 
   /** Durable append: fsync completes before this returns. */

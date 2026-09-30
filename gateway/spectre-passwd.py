@@ -15,7 +15,6 @@ import base64
 
 AUTH_DIR = os.environ.get("SPECTRE_AUTH_DIR", "/etc/spectre-auth")
 PASSWD = os.path.join(AUTH_DIR, "passwd")
-# 与 backend/.env 及网关 RUNTIME_TOKEN 同源的内部令牌(仅 add 时提示)
 SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
 
 

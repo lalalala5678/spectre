@@ -6,7 +6,7 @@
 
 | 组件 | 要求 |
 |---|---|
-| Node | **≥ 20.19**（全仓统一：构建链硬性 + 依赖声明的运行时下限） |
+| Node | **≥ 22.19**（全仓统一：@earendil-works/* 依赖链 engines 下限） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
 | Docker | 仅沙箱 driver 需要 |
 
@@ -16,7 +16,7 @@
 |---|---|---|---|
 | agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `LLM_API_KEY` |
 | console | `console/` (vite build) | — | — |
-| gateway | `gateway/server.py` | 8081 | `GATEWAY_PORT` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
+| gateway | `gateway/server.py` | 8081 | `GATEWAY_BIND_HOST` `GATEWAY_PORT` `RUNTIME_HOST` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
 | worker | Temporal activities | — | 同 runtime |
 | oob-collector | `deploy/oob-collector.py` | 19999 | — |
 | private-qa | `deploy/systemd/spectre-private-qa.service` | 8899 | — |
@@ -27,9 +27,10 @@
 # 0) 获取与布局(任意目录皆可; systemd 部署建议 /opt/spectre)
 git clone https://github.com/lalalala5678/spectre /opt/spectre && cd /opt/spectre
 
-# 1) 后端
+# 1) 后端(state.wal 属主——多实例共用数据目录会互相覆写, 测试务必隔离)
 cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN(自定义随机串) 与 LLM_API_KEY
-npm i && node agent-runtime.mjs      # PORT/SPECTRE_DATA_DIR 可环境变量覆盖
+SPECTRE_DATA_DIR=/tmp/spectre-data npm i
+SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # PORT 可覆盖; 生产缺省 /var/lib/spectre
 
 # 2) 前端(Node ≥ 20.19)
 cd ../console && npm i && npm run build
@@ -38,8 +39,7 @@ cd ../console && npm i && npm run build
 cd ../gateway
 python3 spectre-passwd.py add admin          # 创建首个登录账号(交互输密码)
 export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
-export SPECTRE_DATA_DIR=/tmp/spectre-data      # 测试隔离! 生产缺省 /var/lib/spectre——
-                                               # 多实例共用会互相覆写会话文件
+export SPECTRE_DATA_DIR=/tmp/spectre-data      # 与后端①同目录即可(网关只写会话文件)
 python3 server.py                             # dist 默认 ../console/dist
 
 # 4) 登录验证
@@ -58,6 +58,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtim
 bash deploy/bootstrap-sandbox.sh      # 面杀引擎/JDK/运行时 + 病毒库持久化
 bash deploy/fetch-jars.sh             # 第三方 jar(40MB, 不入 git)
 bash deploy/tools-sync.sh             # 仓库工具链 → 运行时数据目录
+bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_DIR/skills
 
 # 7) 数据源凭据
 #    控制台「Agent 配置」页填入(验证通过才落盘, 未配置不注入);

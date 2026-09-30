@@ -25,7 +25,10 @@ import { BACKGROUND_CONTEXT } from '@earendil-works/chord/context';
 /** Official context constant — harness helpers accept it directly. */
 export const PI_CONTEXT = BACKGROUND_CONTEXT;
 
+// F4(部署审计四轮): 沙箱根默认跟随 SPECTRE_DATA_DIR——此前独立硬编码
+// /var/lib/spectre, 设了 DATA_DIR 隔离的实例仍会挂载生产 workspace/skills。
 export const SANDBOX_ROOT = process.env.SPECTRE_SANDBOX_ROOT
+  ?? process.env.SPECTRE_DATA_DIR
   ?? '/var/lib/spectre';
 export const HOST = {
   workspace: path.join(SANDBOX_ROOT, 'workspace'),

@@ -17,7 +17,6 @@ class GatewayHandler(BaseHTTPRequestHandler):
     sys_version = ""
     def version_string(self):
         return self.server_version  # 消灭默认拼接的尾随空格
-    sys_version = ""
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
@@ -266,12 +265,19 @@ def serve():
     import os
     from http.server import ThreadingHTTPServer
 
+    if config.BIND_HOST not in ("127.0.0.1", "localhost") and config.TRUST_PROXY:
+        print("[gateway] 警告: 公网绑定且信任 XFF——直连者可自旋 X-Forwarded-For "
+              "绕过锁定; 建议仅绑定环回由反代暴露, 或设 GATEWAY_TRUST_PROXY=0", flush=True)
     try:
         os.makedirs(config.LOG_DIR, exist_ok=True)
     except OSError as e:
         print(f"[gateway] 日志目录不可用({config.LOG_DIR}): {e} — 审计日志将只写 stdout", flush=True)
     if not os.path.isfile(config.PASSWD_FILE):
-        raise SystemExit(f"FATAL: {config.PASSWD_FILE} missing")
+        raise SystemExit(f"FATAL: {config.PASSWD_FILE} missing — 先运行 python3 spectre-passwd.py add <user> 创建账号")
+    # F9(部署审计四轮): 空 INTERNAL_TOKEN 此前静默启动, 登录后所有 API 401
+    if not config.RUNTIME_TOKEN:
+        raise SystemExit(
+            "FATAL: INTERNAL_TOKEN 未设置 — 网关反代 /api 需要 runtime 相同的令牌(backend/.env 里的 INTERNAL_TOKEN)")
 
     GatewayHandler.security = Security()
     server = ThreadingHTTPServer(

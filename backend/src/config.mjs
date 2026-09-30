@@ -21,6 +21,13 @@ function loadEnvFile(path) {
 
 loadEnvFile(new URL('../.env', import.meta.url).pathname);
 
+// F10(部署审计四轮): 运行时版本横幅——依赖声明 node>=22.19, 低版本
+// 装机(npm 警告被略过)在此给出明确提示而非运行中诡异失败。
+const _nv = process.versions.node.split('.').map(Number);
+if (_nv[0] < 22) {
+  console.warn(`[config] Node ${process.versions.node} 低于受支持版本 22 —— 已观察到可运行, 但未受支持; 建议升级`);
+}
+
 function required(name) {
   const value = process.env[name];
   if (!value) {
