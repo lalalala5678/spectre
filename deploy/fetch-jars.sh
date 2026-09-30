@@ -1,8 +1,18 @@
 #!/bin/bash
 # 第三方 jar 依赖装载(~40MB 不入 git, 首次部署下载)
-# 目标: /opt/tools/c2/libs 与 /opt/tools/c2/generators(挂载到容器同路径)
+# 目标: $SPECTRE_DATA_DIR/tools/c2/{libs,generators}(挂载进容器为 /opt/tools/c2/*)
 # 任何一项失败都会在结尾汇总报错并以非零退出(不静默吞)。
 ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
+# R14-1(十四轮): 生产缺省守卫——同族 tools-sync/skills-seed 已三修, 此为
+# 最后缺位者(漏 env 直跑即静默写 ~25MB jar 进生产路径)。
+if [ -z "$SPECTRE_DATA_DIR" ] && [ "$ROOT" = "/var/lib/spectre" ]; then
+  if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
+    echo "[fetch-jars] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $ROOT" >&2
+    echo "[fetch-jars] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
+    exit 1
+  fi
+  echo "[fetch-jars] 警告: SPECTRE_ALLOW_DEFAULT_DATA=1 —— 写入生产路径 $ROOT" >&2
+fi
 LIBS=${LIBS_DIR:-$ROOT/tools/c2/libs}
 GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
 mkdir -p "$LIBS" "$GEN"

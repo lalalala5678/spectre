@@ -8,17 +8,17 @@
 |---|---|
 | Node | **≥ 22.19**（全仓统一：@earendil-works/* 依赖链 engines 下限） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
-| Docker | 仅沙箱 driver 需要 |
+| Docker | 沙箱 driver 需要——**装了 Docker 的机器上 runtime 启动即自动建沙箱容器并 apt 装工具链(数百 MB 网络/磁盘)**; 设 `SPECTRE_SANDBOX_DRIVER=local` 可免 Docker 冒烟(工具链降级为宿主机直跑) |
 
 > Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。
 
-> npm 故障排障: 安装若以 `npm error Exit handler never called!` 崩溃, 先 `npm config get registry` 检查是否指向不可达镜像; 切换 `--registry=https://registry.npmjs.org` 并**删除半装的 node_modules 后重装**。
+> npm 故障排障: 安装若以 `npm error Exit handler never called!` 或 `ENOTFOUND mirrors.tencentyun.com` 等网络错误崩溃, 先 `npm config get registry` 检查是否指向不可达镜像; 切换 `--registry=https://registry.npmjs.org` 并**删除半装的 node_modules 后重装**。
 
 ## 组件清单
 
 | 组件 | 入口 | 默认端口 | 环境变量 |
 |---|---|---|---|
-| agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `LLM_API_KEY` |
+| agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `LLM_API_KEY` `SPECTRE_SANDBOX_DRIVER` |
 | console | `console/` (vite build) | — | — |
 | gateway | `gateway/server.py` | 8081 | `GATEWAY_BIND_HOST` `GATEWAY_PORT` `RUNTIME_HOST` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
 | worker | Temporal activities | — | 同 runtime |
@@ -62,7 +62,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtim
 export SPECTRE_DATA_DIR=${SPECTRE_DATA_DIR:-/var/lib/spectre}   # 四脚本统一数据根
 bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据根(先行: 交付容器内引导)
 docker exec spectre-sandbox bash /opt/tools/bootstrap-sandbox.sh   # 容器内! 宿主机直跑会装系统包
-bash deploy/fetch-jars.sh             # 第三方 jar(40MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
+bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
 bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_DIR/skills
 
 # 7) 数据源凭据
