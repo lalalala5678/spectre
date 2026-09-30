@@ -305,6 +305,8 @@ export class SessionStore {
         brief: s.brief,
         briefUpTo: s.briefUpTo,
         lastActivityTs: s.lastActivityTs,
+        title: s.title,
+        rawTitle: s.rawTitle,  // R32D31-E1: compaction 保未截断标题
       },
     }));
   }
@@ -313,6 +315,7 @@ export class SessionStore {
   _metaOf(record) {
     return {
       title: record.title,
+      rawTitle: record.rawTitle,  // R32D31-E1: 未截断标题随 WAL 持久化
       brief: record.brief,
       briefUpTo: record.briefUpTo,
       spawnName: record.spawnName,
@@ -361,6 +364,9 @@ export class SessionStore {
       id: s.id,
       agentKey: s.agentKey,
       title: this._displayTitle(s),
+      // R32D31-E1: 搜索面用未截断原始标题(截断只管显示); 无 LLM 标题
+      // 的会话回落截断显示值(首消息摘录本身 ≤40+…)。
+      rawTitle: s.rawTitle ?? this._displayTitle(s),
       createdAt: s.createdAt,
       busy: s.busy,
       messages: s.agent?.state.messages.length ?? 0,

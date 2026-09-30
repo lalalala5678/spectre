@@ -7,7 +7,7 @@ import { api, subscribeBus } from '../api/client';
  * 用户无从得知。状态栏 30s 轮询展示(ok 掉线变红)。 */
 interface HealthInfo { ok: boolean; model: string; sessions: number; bus: number; }
 
-interface TreeSess { id: string; agentKey: string; title: string | null; busy?: boolean; workSessionId?: string | null }
+interface TreeSess { id: string; agentKey: string; title: string | null; rawTitle?: string | null; busy?: boolean; workSessionId?: string | null }
 interface BusEvt { seq: number; ts?: string; type: string | null; title: string | null; summary: string | null; severity?: string | null; status?: string | null; revises?: number | null }
 
 /** F69: 顶栏搜索此前是空壳(placeholder 承诺"会话/资产/发现/CVE"但无任何
@@ -51,6 +51,7 @@ export function Topbar() {
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [sessHits, setSessHits] = useState<TreeSess[]>([]);
+  const [sessTotal, setSessTotal] = useState(0);  // R32D31-N3: 截断计数提示
   const [busHits, setBusHits] = useState<BusEvt[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
 
@@ -119,9 +120,13 @@ export function Topbar() {
           api<BusEvt[]>('/bus'),
         ]);
         if (cancelled) return;
-        setSessHits(tree.filter(s =>
-          (s.title ?? '').toLowerCase().includes(lower) || s.id.includes(lower),
-        ).slice(0, 5));
+        // R32D31-N3: 静默截断 5 条此前无提示(其余命中不可见不可达)
+        const allSess = tree.filter(s =>
+          // R32D31-E1: 匹配未截断 rawTitle(旧会话无此字段回落 title)
+          (s.rawTitle ?? s.title ?? '').toLowerCase().includes(lower) || s.id.includes(lower),
+        );
+        setSessTotal(allSess.length);
+        setSessHits(allSess.slice(0, 5));
         setBusHits(bus.filter(e =>
           SEARCHABLE.has(String(e.type))
           && ((e.title ?? '').toLowerCase().includes(lower)
@@ -174,6 +179,9 @@ export function Topbar() {
             )}
             {sessHits.length === 0 && busHits.length > 0 && (
               <p className="px-3 pb-1 pt-0.5 text-[10.5px] text-zinc-500">无会话命中——以下为总线条目</p>
+            )}
+            {sessTotal > sessHits.length && (
+              <p className="px-3 pb-1 text-[10px] text-zinc-500">会话命中 {sessTotal} 条, 仅显示前 {sessHits.length}(换更精确关键词)</p>
             )}
             {sessHits.map(s => (
               <button key={s.id} onClick={() => {

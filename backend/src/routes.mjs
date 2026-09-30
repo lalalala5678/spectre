@@ -149,6 +149,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sessions/tree' && method === 'GET') {
       return json(res, 200, store.list().map(s => ({
         id: s.id, agentKey: s.agentKey, title: s.title,
+        rawTitle: s.rawTitle ?? null,  // R32D31-E1: 搜索面用未截断值
         createdAt: s.createdAt,
         engagementId: s.engagementId,
         orchestratorSessionId: s.orchestratorSessionId,
@@ -229,19 +230,23 @@ function realRouter({ store, bus, caps, wal }) {
           return bad(res, 401, 'internal only');
         }
         const body = await readJson(req);
-        const text = String(body.text || '').slice(0, CONFIG.maxPromptChars);
-        if (!text) {
-          return bad(res, 400, 'text required');
+        // R32D31-N2: 非字符串 text 此前 String() 落库 '[object Object]'
+        // 永久污染会话与一次性标题——直接 400。
+        if (typeof body.text !== 'string' || !body.text.trim()) {
+          return bad(res, 400, 'text required (non-empty string)');
         }
+        const text = body.text.slice(0, CONFIG.maxPromptChars);
         store.followUp(record, text);
         return json(res, 202, { ok: true });
       }
       if ((action === '/messages' || action === '/steer') && method === 'POST') {
         const body = await readJson(req);
-        const text = String(body.text || '').slice(0, CONFIG.maxPromptChars);
-        if (!text) {
-          return bad(res, 400, 'text required');
+        // R32D31-N2: 非字符串 text 此前 String() 落库 '[object Object]'
+        // 永久污染会话与一次性标题——直接 400。
+        if (typeof body.text !== 'string' || !body.text.trim()) {
+          return bad(res, 400, 'text required (non-empty string)');
         }
+        const text = body.text.slice(0, CONFIG.maxPromptChars);
         // Agent-impersonating injections (Temporal activities) need the
         // internal token; plain console users ride their own session auth.
         if (body.source === 'agent' && !isInternalCaller(req)) {
@@ -309,7 +314,11 @@ function realRouter({ store, bus, caps, wal }) {
         return json(res, 201, listProjects());
       }
       const created = createProject(String(body.label ?? ''), wal);
-      setPrefs({ currentWs: created.id }, wal);
+      // R32D31-N1: 此前无条件 setPrefs(currentWs)——API/CLI 建项目会
+      // 静默劫持控制台活跃项目(全局单租户偏好), 后续 UI 消息被错分
+      // 组。改为显式 opt-in: 仅 body.activate=true 才切换(console 的
+      // 内联新建传它保持原体验; curl 集成不再带副作用)。
+      if (body.activate === true) setPrefs({ currentWs: created.id }, wal);
       return json(res, 201, created);
     }
     const projMatch = path.match(/^\/api\/projects\/([a-z0-9-]+)$/);

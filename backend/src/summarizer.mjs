@@ -49,6 +49,13 @@ function extractTitle(raw) {
   if (!m || m[1] === undefined) return null;
   const title = (m[1] ?? '').replace(/[\r\n]+/g, ' ').trim();
   if (!title || /^(none|null|无)$/i.test(title)) return null;
+  return truncateTitle(title);  // R32D31: 截断只管显示, 原始串由调用方取
+}
+
+/** R32D31-E1: 显示截断(词边界+剥尾); 原始串走 rawTitle 供搜索。 */
+function truncateTitle(full) {
+  const title = full;
+  if (title.length <= 60) return title;
   // R28-N5: 32 字硬截断会切断 ASCII 连续 token(NDAY-R32D28→NDAY-R3,
   // 全局搜索按完整串找不到)。词边界截断, 超长才回退硬切, 上限 60。
   if (title.length <= 60) return title;
@@ -126,7 +133,14 @@ export class Summarizer {
       1024,
     );
     const title = extractTitle(raw);
-    if (title) record.title = title;
+    // R32D31-E1: 搜索面用未截断 rawTitle(截断只管显示)——跨切点查询
+    // 对被截断会话此前彻底不可检索(树投影只带截断 title)。原始串
+    // 剥 <title> 包裹后截 200 字。
+    if (title) {
+      record.title = title;
+      record.rawTitle = (raw.match(TITLE_TAG_RE)?.[1] ?? title)
+        .replace(/[\r\n]+/g, ' ').trim().slice(0, 200);
+    }
     return title;
   }
 

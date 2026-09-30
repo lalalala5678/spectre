@@ -115,14 +115,14 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 - `POST /api/sessions`: 必填 `agentKey`(14 键之一: autopwn/recon/nday/weakcred/api/exploit/phish/c2/persistence/postex/report/skill-config/mcp-config/cli-config); 可选 `workSessionId`(项目归组)
 - `POST /api/sessions/:id/messages`: 必填 `text`(202 异步——回执走 SSE `event: session`); `source=agent` 伪装注入需内部令牌
 - `GET /api/sessions/:id`: 会话摘要(消息内联在会话对象中——`GET .../messages` 端点不存在, 非对称属设计)
-- `POST /api/projects`: 必填 `label`(项目名; 其它字段名如 `name` 被静默忽略); `PUT /api/projects/:id` 同字段可改名
+- `POST /api/projects`: 可选 `label`(缺省=「未命名项目」; 其它字段名如 `name` 被静默忽略); `activate: true` 才切换控制台活跃项目(缺省不动——API/CLI 建项目不劫持 UI); `PUT /api/projects/:id` 用 `label` 改名
 - 全部 `/api/*`(除 health): 头 `X-Internal-Token`
 
 ## 行为备注
 
 - API 裸建会话(无 workSessionId)不进项目历史列表——顶部全局搜索按标题/ID 可找回, 点击结果直接打开该会话(任何项目/任何 agent 的会话均可); UI 建会自动归组
 - POST /api/sessions 的 title 字段被忽略——标题由 summarizer 在首轮对话后自动生成(设计)
-- 登录后 UI 会在最近工作会话自动创建 AutoPwn 会话(编排器常驻入口); 切换项目时同样会在目标项目建一个 0-msg AutoPwn 锚点会话; 首次浏览某 agent 页会在当前项目为该 agent 建一个 0-msg 会话(下次进入直接恢复)——均为锚点行为, 非泄漏
+- 登录后 UI 会在最近工作会话自动创建 AutoPwn 会话(编排器常驻入口); 切换项目时在 autopwn 页在位则建 AutoPwn 锚点、在其它 agent 页则建该 agent 锚点(agent 页 bootstrap 机制); 首次浏览某 agent 页会在当前项目为该 agent 建一个 0-msg 会话(下次进入直接恢复)——均为锚点行为, 非泄漏
 - 首次打开 Skill 管理/MCP Server/CLI 工具页会各自静默创建对应配置智能体会话(按需惰性单例, 复访不增殖)
 - 登录失败锁定为网关内存态(5 次/15 分钟, 重启即清); 登录成败同为 303, CLI 集成读 Location 的 `?e=` 参数(`e=cred`/`e=lock`)区分
 

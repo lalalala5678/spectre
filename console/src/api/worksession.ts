@@ -63,7 +63,9 @@ export async function switchWorkSession(id: string): Promise<WorkSession | null>
 
 /** Create a user-named project and make it current. */
 export async function newWorkSession(name: string): Promise<WorkSession> {
-  return api<WorkSession>('/projects', { method: 'POST', json: { label: name } });
+  // R32D31-N1: activate=true 显式切换活跃项目(保持内联新建原体验);
+  // API/CLI 裸调不再劫持控制台 currentWs。
+  return api<WorkSession>('/projects', { method: 'POST', json: { label: name, activate: true } });
 }
 
 /**
