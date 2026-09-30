@@ -42,7 +42,9 @@ cd ../console && npm i && npm run build
 # 3) 网关(纯 stdlib, 无需 pip; Python ≥ 3.7)
 #    共享机/生产机测试: 加 SPECTRE_AUTH_DIR=<隔离目录> GATEWAY_LOG_DIR=<隔离目录> 前缀
 cd ../gateway
-SPECTRE_AUTH_DIR=<与网关同值> python3 spectre-passwd.py add admin   # 建号(交互输密码); 与网关同 AUTH_DIR
+# 建号与网关必须同一 SPECTRE_AUTH_DIR(env 前缀不穿透 &&——export 后两段共用)
+export SPECTRE_AUTH_DIR=/var/lib/spectre/auth
+python3 spectre-passwd.py add admin           # 交互输密码
 export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
 export SPECTRE_DATA_DIR=/tmp/spectre-data      # 与后端①同目录即可(网关只写会话文件)
 python3 server.py                             # dist 默认 ../console/dist
@@ -80,6 +82,18 @@ python3 gateway/spectre-passwd.py list
 curl 集成: 登录 POST 字段为 `user`/`pw`——`curl -d 'user=admin&pw=...' http://<gw>:8081/spectre/login`。
 ```
 
+## Temporal(可选编排链)
+
+worker/AutoPwn 战役调度依赖 Temporal server; 未安装时 worker 静默重试、
+战役发起时才失败。单机开发用 server-dev:
+
+```bash
+# temporal CLI(任一): brew install temporal / 或从 github.com/temporalio/cli/releases 下载
+temporal server start-dev --port 7233    # 前台; systemd 部署用 deploy/systemd/temporal-dev.service
+```
+
+步骤 5 systemd 全家桶: `sudo systemctl enable --now spectre-agent-runtime spectre-console temporal-dev spectre-worker spectre-oob`。
+
 ## 手工运行 oob-collector
 
 ```bash
@@ -87,6 +101,7 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 ```
 
 两个变量显式带上——缺省数据根即生产路径, 测试时务必指向隔离目录。
+语义: 裸 TCP 字节收集器非 HTTP——curl 探测会挂起(属预期), 测试用 `nc 127.0.0.1 <port>` 或 `/dev/tcp`。
 
 ## 行为备注
 

@@ -28,6 +28,10 @@
 - **沙箱 CLI**：c2-qa(多引擎面杀矩阵+私架端点)、c2-variant/functest/bind(载荷流水线)、nuclei/hydra/nmap 等(安装账本化，容器重建自动重放)
 - **技能**：agentskills.io 格式（SKILL.md），按智能体分组挂载于 docs/*-skills/
 
+## 环境要求
+
+- Node ≥ 22(获取: `nvm install 22` 或 [NodeSource](https://github.com/nodesource/distributions)); Python ≥ 3.7; Docker 可选(沙箱)
+
 ## 快速开始
 
 ```bash
@@ -45,7 +49,8 @@ cd ../console && npm i && npm run build
 cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
   python3 spectre-passwd.py add admin && \
   INTERNAL_TOKEN=<同①> SPECTRE_DATA_DIR=/tmp/spectre-data \
-  GATEWAY_LOG_DIR=/tmp/spectre-logs python3 server.py   # 建号与网关同 AUTH_DIR
+  SPECTRE_AUTH_DIR=/tmp/spectre-auth GATEWAY_LOG_DIR=/tmp/spectre-logs \
+  python3 server.py   # env 前缀不穿透 && ——每段都要带 SPECTRE_AUTH_DIR
 ```
 
 打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
