@@ -107,7 +107,7 @@ export function parseMultipart(body, contentType) {
     const nameM = /name="([^"]*)"/.exec(head);
     const fileM = /filename="([^"]*)"/.exec(head);
     if (fileM && nameM) {
-      file = { field: nameM[1], filename: fileM[1].replace(/[\/]/g, '_'),
+      file = { field: nameM[1], filename: fileM[1].replace(/\//g, '_'),
         data: content };
     } else if (nameM) {
       fields[nameM[1]] = content.toString('utf8');

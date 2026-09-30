@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2 } from 'lucide-react';
-import { AGENTS } from '../mock/data';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Dot } from '../components/ui/Badge';
@@ -72,6 +71,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // 本就是"渲染任意会话转录"的既有机制(EntryDetail onOpenSession 同路)。
   // ref 镜像: boot 的乐观清场据此保留深链(N1 时序竞争修复)。
   const deepLinkRef = useRef<string | null>(null);
+  const bootDoneRef = useRef(false);  // R32D32-R3: 在位点击不再写 deepLinkRef 的判据
   // R32D29-N2: 应用内点击走 pendingOpen 通道(不走 hash——旧页消费
   // effect 会抢在路由提交前洗掉 ?s=, fiber 实锤 ≈50% 丢目标); 冷
   // 加载/URL 直达仍走 ?s=(仅挂载时一次性读)。ref 只在此写入, 由
@@ -79,7 +79,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const consumePending = useCallback(() => {
     const id = takePendingOpen(liveKey);
     if (!id) return;
-    deepLinkRef.current = id;
+    // R32D32-R3: ref 只在 boot 未完成的挂载窗口写入(供乐观清场保留
+    // drill + R28-N2 跳过误建); 组件已在位(boot 已跑完)时写 ref 会
+    // 让下一次项目切换复用旧 drill 并抑制新项目锚点(跨项目残留)。
+    if (!bootDoneRef.current) deepLinkRef.current = id;
     setDrillSession(id);
   }, [liveKey]);
   useEffect(() => {
@@ -167,6 +170,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       // R28-N1: 深链在场到此结束——boot 全路径走完后清 ref, 后续
       // 项目切换/agent 切换的乐观清场恢复正常语义。
       deepLinkRef.current = null;
+      bootDoneRef.current = true;  // R32D32-R3
     })().catch((err: unknown) => {
       // Bootstrap failures (runtime down, auth expired, …) must surface —
       // never a silent empty workspace.
@@ -604,10 +608,6 @@ function RealSkillsPanel({ agentKey }: { agentKey: string }) {
       ))}
     </div>
   );
-}
-
-export function getAgent(id: string): AgentMeta {
-  return AGENTS.find((a) => a.id === id) ?? AGENTS[0];
 }
 
 interface SpawnSettings {

@@ -26,7 +26,9 @@ async function call(method, path, body, timeoutMs = 30_000) {
         'Content-Type': 'application/json',
         'X-Internal-Token': CONFIG.internalToken,
       },
-      body: body === undefined ? undefined : JSON.stringify(body),
+      ...(method === 'GET' ? {} : {
+        body: body === undefined ? undefined : JSON.stringify(body),
+      }),
       signal: controller.signal,
     });
     const data = await res.json().catch(() => ({}));

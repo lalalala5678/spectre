@@ -136,8 +136,11 @@ class StdioRpc {
         if (msg.id !== undefined && this.pending.has(msg.id)) {
           const { resolve, reject } = this.pending.get(msg.id);
           this.pending.delete(msg.id);
-          msg.error ? reject(new Error(msg.error.message ?? 'MCP error'))
-            : resolve(msg.result);
+          if (msg.error) {
+            reject(new Error(msg.error.message ?? 'MCP error'));
+          } else {
+            resolve(msg.result);
+          }
         }
       } catch { /* non-JSON line (server logs) — ignore */ }
     }
@@ -188,7 +191,6 @@ async function connectStdio(server) {
     // R5-F1: attached docker exec 不转发信号——杀宿主客户端只产生
     // stdin EOF, 容器内进程存活(实测 sleep 600 残留)。sh -c 先回显
     // 容器侧 PID(首行), close() 时 docker exec kill 该 PID。
-    const { spawn: sp } = await import('node:child_process');
     const argv = ['docker', 'exec', '-i',
       server.container ?? 'spectre-sandbox', 'sh', '-c',
       'echo $$; exec "$@"', '--', ...server.command];
@@ -315,7 +317,7 @@ async function connection(server) {
       : await connectStdio(server);
     // initialize WITH a timeout — a hung server must fail fast, not
     // hang rebuildMounts (and every route that awaits it) forever
-    const init = await withTimeout(rpc.call('initialize', {
+    await withTimeout(rpc.call('initialize', {
       protocolVersion: '2025-06-18',
       capabilities: {},
       clientInfo: { name: 'spectre', version: '1.0.0' },
@@ -351,7 +353,7 @@ export function closeMcpConnection(name) {
 export async function purgeStaleMcpConnections() {
   const names = new Set((await loadMcpConfig()).map(s => s.name));
   const closed = [];
-  for (const n of [...running.keys()]) {
+  for (const n of running.keys()) {
     if (!names.has(n) && closeMcpConnection(n)) closed.push(n);
   }
   return closed;
@@ -393,9 +395,9 @@ export async function mcpToolsFor(agentKey) {
   return lists.flat();
 }
 
-/** Connectivity test used by the console MCP page. */
-/** Bounded wrapper: a hung server must fail fast AND its spawned child
- *  must be reaped — the old race leaked the stdio process on timeout. */
+/** Connectivity test used by the console MCP page. Bounded wrapper: a
+ *  hung server must fail fast AND its spawned child must be reaped — the
+ *  old race leaked the stdio process on timeout. */
 export async function testMcpServer(server) {
   try {
     return await Promise.race([

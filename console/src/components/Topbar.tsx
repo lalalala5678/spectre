@@ -115,14 +115,16 @@ export function Topbar() {
       try {
         const lower = query.toLowerCase();
         const cve = /cve-\d{4}-\d+/i.test(query);
+        // R32D32-R6: q 下推服务端过滤, 不再每次击键全量拉树
         const [tree, bus] = await Promise.all([
-          api<TreeSess[]>('/sessions/tree'),
-          api<BusEvt[]>('/bus'),
+          api<TreeSess[]>(`/sessions/tree?q=${encodeURIComponent(query)}`),
+          api<BusEvt[]>(`/bus?q=${encodeURIComponent(query)}`),
         ]);
         if (cancelled) return;
         // R32D31-N3: 静默截断 5 条此前无提示(其余命中不可见不可达)
+        // R32D32-R6: 服务端已按 q 过滤, 此处保留兜底匹配(兼容未带 q
+        // 的旧后端/代理缓存)
         const allSess = tree.filter(s =>
-          // R32D31-E1: 匹配未截断 rawTitle(旧会话无此字段回落 title)
           (s.rawTitle ?? s.title ?? '').toLowerCase().includes(lower) || s.id.includes(lower),
         );
         setSessTotal(allSess.length);

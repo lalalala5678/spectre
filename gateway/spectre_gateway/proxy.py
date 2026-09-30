@@ -68,5 +68,15 @@ def proxy(handler, api_path):
         handler.wfile.write(b"0\r\n\r\n")
     except (BrokenPipeError, ConnectionResetError, TimeoutError):
         pass  # client went away mid-stream (normal for SSE)
+    except ValueError:
+        # R32D32-R1: upstream died mid-chunk (runtime restart) leaves a
+        # torn chunk header — http.client raises on int('') parse. The
+        # stream is unrecoverable; end the chunked body cleanly so the
+        # browser reconnects its SSE instead of spraying tracebacks.
+        try:
+            handler.wfile.write(b"0\r\n\r\n")
+            handler.wfile.flush()
+        except OSError:
+            pass
     finally:
         upstream.close()

@@ -54,13 +54,6 @@ export function skillsFor(agentKey) {
   return mounted.get(agentKey) ?? [];
 }
 
-/** Official system-prompt index block for one agent's skills. */
-export function skillIndexPrompt(agentKey, formatter) {
-  const skills = skillsFor(agentKey);
-  if (!skills.length) return '';
-  return formatter(skills);
-}
-
 /** Persist a skill (create/overwrite) in an agent's directory. */
 export async function saveSkill(agentKey, { name, description, content }) {
   // R22-F1: name 遍历守卫下沉到唯一入口——routes 侧有此校验(注释

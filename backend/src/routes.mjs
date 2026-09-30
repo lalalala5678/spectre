@@ -30,7 +30,7 @@ function bad(res, code, message) {
 function requireFields(res, body, fields) {
   for (const field of fields) {
     if (!body[field]) {
-      bad(res, 400, `${field} required`);
+      bad(res, 400, `${field} 必填`);
       return false;
     }
   }
@@ -90,7 +90,7 @@ function realRouter({ store, bus, caps, wal }) {
       if (!body?.command) return bad(res, 400, 'command 必填');
       // F63: 不存在的 shell 此前返回 200+ok:false——与 /sessions/{id}
       // 的 404 语义不一致(接口实测)。统一 404。
-      if (!caps.shells.get(id)) return bad(res, 404, 'shell not found');
+      if (!caps.shells.get(id)) return bad(res, 404, 'shell 不存在');
       const r = await caps.shells.exec(id, String(body.command), { timeoutMs: Math.min(Number(body.timeoutMs) || 30000, 120000) });
       return json(res, 200, r);
     }
@@ -112,7 +112,7 @@ function realRouter({ store, bus, caps, wal }) {
         const n = Number(body[k]);
         const max = k === 'spawnMaxDepth' ? 10 : 64;
         if (!Number.isFinite(n) || n < 1 || n > max) {
-          return bad(res, 400, `${k} must be a number in [1, ${max}]`);
+          return bad(res, 400, `${k} 必须是 [1, ${max}] 内的数字`);
         }
       }
       return json(res, 200, setSpawnSettings(body, wal));
@@ -147,7 +147,17 @@ function realRouter({ store, bus, caps, wal }) {
     // Tree-only projection: the dispatch panel polls every 4s and only
     // needs topology/state fields — 41KB full list → ~6KB per poll.
     if (path === '/api/sessions/tree' && method === 'GET') {
-      return json(res, 200, store.list().map(s => ({
+      // R32D32-R6: ?q= 服务端过滤(标题 rawTitle/截断值/ID 不区分大小
+      // 写包含)——控制台全局搜索此前每次击键全量拉树, 会话数大时是
+      // 全量下载。q 缺省行为不变(全量)。
+      const qRaw = new URL(req.url, 'http://x').searchParams.get('q');
+      const q = qRaw ? qRaw.trim().toLowerCase() : '';
+      return json(res, 200, store.list()
+        .filter(s => !q
+          || (s.rawTitle ?? '').toLowerCase().includes(q)
+          || (s.title ?? '').toLowerCase().includes(q)
+          || s.id.toLowerCase().includes(q))
+        .map(s => ({
         id: s.id, agentKey: s.agentKey, title: s.title,
         rawTitle: s.rawTitle ?? null,  // R32D31-E1: 搜索面用未截断值
         createdAt: s.createdAt,
@@ -162,13 +172,11 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readJson(req);
       // R12-1(十二轮): requireFields 失败时已发送 400, 再 bad() 双发
       // headers → ERR_HTTP_HEADERS_SENT 裸栈(缺 agentKey 即触发); 对齐
-      // :649 的 if(...){ return; } 模式。
+      // 本文件"requireFields 后先查 headersSent 再 return"的既有模式。
       if (!requireFields(res, body, ['agentKey']) || !isAgentKey(body.agentKey)) {
         if (res.headersSent) return;
-        return bad(res, 400, 'unknown agentKey');
+        return bad(res, 400, '未知 agentKey(14 键之一)');
       }
-      // Engagement metadata marks AutoPwn children — internal only, a
-      // console user must not forge orchestrator-linked sessions.
       // Engagement metadata marks AutoPwn children — internal only, a
       // console user must not forge orchestrator-linked sessions. The
       // workSessionId grouping key is ordinary user state.
@@ -184,7 +192,7 @@ function realRouter({ store, bus, caps, wal }) {
         // F13: 长度上限——100KB 全 A 实测被接受,永久入 WAL 放大全量响应
         if (!/^[\w-]+$/.test(String(body.workSessionId))
             || String(body.workSessionId).length > 64) {
-          return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]{1,64} only');
+          return bad(res, 400, 'workSessionId 仅允许 [a-zA-Z0-9_-]{1,64}');
         }
         opts.workSessionId = String(body.workSessionId).slice(0, 64);
         // auto-register unknown project ids (sessions may arrive before
@@ -215,7 +223,7 @@ function realRouter({ store, bus, caps, wal }) {
       const record = store.get(match[1]);
       const action = match[2] || '';
       if (!record) {
-        return bad(res, 404, 'no such session');
+        return bad(res, 404, '会话不存在');
       }
 
       if (!action && method === 'GET') {
@@ -227,13 +235,13 @@ function realRouter({ store, bus, caps, wal }) {
       }
       if (action === '/followup' && method === 'POST') {
         if (!isInternalCaller(req)) {
-          return bad(res, 401, 'internal only');
+          return bad(res, 401, '仅限内部调用');
         }
         const body = await readJson(req);
         // R32D31-N2: 非字符串 text 此前 String() 落库 '[object Object]'
         // 永久污染会话与一次性标题——直接 400。
         if (typeof body.text !== 'string' || !body.text.trim()) {
-          return bad(res, 400, 'text required (non-empty string)');
+          return bad(res, 400, 'text 必填(非空字符串)');
         }
         const text = body.text.slice(0, CONFIG.maxPromptChars);
         store.followUp(record, text);
@@ -244,13 +252,13 @@ function realRouter({ store, bus, caps, wal }) {
         // R32D31-N2: 非字符串 text 此前 String() 落库 '[object Object]'
         // 永久污染会话与一次性标题——直接 400。
         if (typeof body.text !== 'string' || !body.text.trim()) {
-          return bad(res, 400, 'text required (non-empty string)');
+          return bad(res, 400, 'text 必填(非空字符串)');
         }
         const text = body.text.slice(0, CONFIG.maxPromptChars);
         // Agent-impersonating injections (Temporal activities) need the
         // internal token; plain console users ride their own session auth.
         if (body.source === 'agent' && !isInternalCaller(req)) {
-          return bad(res, 401, 'agent source requires internal token');
+          return bad(res, 401, 'source=agent 需要内部令牌');
         }
         try {
           // body.source==='agent' marks Temporal-side injections (internal
@@ -270,13 +278,13 @@ function realRouter({ store, bus, caps, wal }) {
       }
       if (action === '/wait-idle' && method === 'POST') {
         if (!isInternalCaller(req)) {
-          return bad(res, 401, 'internal only');
+          return bad(res, 401, '仅限内部调用');
         }
         return json(res, 200, await store.waitIdle(record));
       }
       if (action === '/report-state' && method === 'GET') {
         if (!isInternalCaller(req)) {
-          return bad(res, 401, 'internal only');
+          return bad(res, 401, '仅限内部调用');
         }
         // Workflow-side task-report gate reads this (agentTaskWorkflow).
         return json(res, 200, {
@@ -287,7 +295,7 @@ function realRouter({ store, bus, caps, wal }) {
       }
       if (action === '/mark-report-synthesized' && method === 'POST') {
         if (!isInternalCaller(req)) {
-          return bad(res, 401, 'internal only');
+          return bad(res, 401, '仅限内部调用');
         }
         // Workflow-synthesized fallback report: bump the counter so the
         // activeOnly spawn quota releases the slot (P2 fix closing leg).
@@ -326,7 +334,7 @@ function realRouter({ store, bus, caps, wal }) {
       const pid = projMatch[1];
       const body = await readJson(req);
       const p = getProject(pid);
-      if (!p) return bad(res, 404, 'project not found');
+      if (!p) return bad(res, 404, '项目不存在');
       if (body.label !== undefined) renameProject(pid, body.label, wal);
       if (body.agentKey && body.sessionId) {
         setLastSession(pid, body.agentKey, body.sessionId, wal);
@@ -338,7 +346,7 @@ function realRouter({ store, bus, caps, wal }) {
       // F58: projects were immortal — no delete API, no UI entry; test
       // and abandoned projects accumulated forever.
       const pid = projDelMatch[1];
-      if (!deleteProject(pid, wal)) return bad(res, 404, 'project not found');
+      if (!deleteProject(pid, wal)) return bad(res, 404, '项目不存在');
       return json(res, 200, { deleted: true, id: pid });
     }
     if (path === '/api/prefs' && method === 'GET') {
@@ -457,7 +465,7 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readRawBody(req);
       const { fields, file } = parseMultipart(body,
         req.headers['content-type'] ?? '');
-      if (!file) return bad(res, 400, 'file part required');
+      if (!file) return bad(res, 400, 'file 字段必填(multipart)');
       const { mkdir, writeFile } = await import('node:fs/promises');
       const { HOST } = await import('./sandbox/exec-env.mjs');
       const safeName = file.filename.slice(0, 120) || `upload-${Date.now()}`;
@@ -493,7 +501,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/cli' && method === 'POST') {
       const body = await readJson(req);
       const cmd = String(body.command || '').trim();
-      if (!cmd) return bad(res, 400, 'command required');
+      if (!cmd) return bad(res, 400, 'command 必填');
       const result = await installCli(cmd);
       return json(res, 200, result);
     }
@@ -515,13 +523,13 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/skills' && method === 'POST') {
       const body = await readJson(req);
       if (!body.agentKey || !body.name || !body.content) {
-        return bad(res, 400, 'agentKey, name, content required');
+        return bad(res, 400, 'agentKey、name、content 必填');
       }
       // traversal guard: agentKey must be a real agent, name a plain
       // identifier — a crafted name once reached rm -rf on arbitrary
       // host paths via saveSkill/deleteSkill string concatenation
       if (!isAgentKey(body.agentKey) || !/^[\w-]+$/.test(String(body.name))) {
-        return bad(res, 400, 'invalid agentKey or name (name: [a-zA-Z0-9_-]+)');
+        return bad(res, 400, 'agentKey 或 name 非法(name: [a-zA-Z0-9_-]+)');
       }
       const filePath = await saveSkill(body.agentKey, {
         name: String(body.name).slice(0, 60),
@@ -536,9 +544,9 @@ function realRouter({ store, bus, caps, wal }) {
       const url2 = new URL(req.url, 'http://x');
       const agentKey = url2.searchParams.get('agentKey');
       const name = url2.searchParams.get('name');
-      if (!agentKey || !name) return bad(res, 400, 'agentKey, name required');
+      if (!agentKey || !name) return bad(res, 400, 'agentKey、name 必填');
       if (!isAgentKey(agentKey) || !/^[\w-]+$/.test(name)) {
-        return bad(res, 400, 'invalid agentKey or name');
+        return bad(res, 400, 'agentKey 或 name 非法');
       }
       await deleteSkill(agentKey, name);
       const { rebuildMounts } = await import('./sandbox/mount.mjs');
@@ -559,7 +567,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/mcp' && method === 'POST') {
       const body = await readJson(req);
       if (!body.name) {
-        return bad(res, 400, 'name required');
+        return bad(res, 400, 'name 必填');
       }
       // R5-F3: 归一化+形状校验(与 tooling.mjs configure_mcp 对齐)——
       // 此前任意 transport 字符串/字符串 command 被持久化, 每轮
@@ -608,7 +616,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/mcp' && method === 'DELETE') {
       const url2 = new URL(req.url, 'http://x');
       const name = url2.searchParams.get('name');
-      const next = await mutateMcpConfig(list =>
+      await mutateMcpConfig(list =>
         list.filter(s => s.name !== name));
       const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
       closeMcpConnection(name);
@@ -623,7 +631,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/cli' && method === 'DELETE') {
       const url2 = new URL(req.url, 'http://x');
       const name = url2.searchParams.get('name');
-      if (!name) return bad(res, 400, 'name required');
+      if (!name) return bad(res, 400, 'name 必填');
       const { uninstallCliTool } = await import('./sandbox/container.mjs');
       const r = await uninstallCliTool(name);
       return json(res, 200, r);
@@ -632,7 +640,7 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readJson(req);
       const server = (await loadMcpConfig())
         .find(s => s.name === body.name);
-      if (!server) return bad(res, 404, 'server not found');
+      if (!server) return bad(res, 404, 'MCP 服务器不存在');
       // re-attach fresh headers when the caller is saving (secrets are
       // masked in GET; the console sends them back on save)
       if (body.headers) server.headers = body.headers;
@@ -646,9 +654,21 @@ function realRouter({ store, bus, caps, wal }) {
       // (292KB at 224 events) and filter client-side ×3 panels per switch.
       // ?ws= cuts the payload to the project's own entries.
       const ws = url.searchParams.get('ws');
+      // R32D32-R6: ?q= 服务端过滤(title/summary 包含, 不区分大小写)——
+      // 全局搜索此前全量拉总线再前端滤。
+      const qRaw = url.searchParams.get('q');
+      const q = qRaw ? qRaw.trim().toLowerCase() : '';
       const events = bus.list(since);
       return json(res, 200, ws
-        ? events.filter(e => e.workSessionId === ws) : events);
+        ? events.filter(e => e.workSessionId === ws
+          && (!q
+            || `${e.title ?? ''}`.toLowerCase().includes(q)
+            || `${e.summary ?? ''}`.toLowerCase().includes(q)))
+        : (q
+          ? events.filter(e =>
+            `${e.title ?? ''}`.toLowerCase().includes(q)
+            || `${e.summary ?? ''}`.toLowerCase().includes(q))
+          : events));
     }
     if (path === '/api/bus/events' && method === 'GET') {
       const since = Number(url.searchParams.get('since') || 0);
@@ -656,7 +676,7 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/bus' && method === 'POST') {
       if (!isInternalCaller(req)) {
-        return bad(res, 401, 'internal only');
+        return bad(res, 401, '仅限内部调用');
       }
       const body = await readJson(req);
       if (!requireFields(res, body, ['channel', 'from', 'summary'])) {
@@ -672,7 +692,7 @@ function realRouter({ store, bus, caps, wal }) {
       const target = bus.list().find(e => e.seq === Number(body.seq)
         && !e.revises && e.workSessionId === (body.workSessionId ?? e.workSessionId));
       if (!target) {
-        return bad(res, 404, 'entry not found');
+        return bad(res, 404, '总线条目不存在');
       }
       const fields = {};
       for (const k of ['title', 'severity', 'status', 'text']) {
@@ -681,7 +701,7 @@ function realRouter({ store, bus, caps, wal }) {
         if (body[k] !== undefined && body[k] !== null) fields[k] = body[k];
       }
       if (!Object.keys(fields).length) {
-        return bad(res, 400, 'nothing to revise');
+        return bad(res, 400, '无可修订字段');
       }
       const event = emitRevision(bus, {
         target, fields, reason: String(body.reason || '用户直接编辑'),
@@ -700,11 +720,11 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readJson(req);
       const instruction = String(body.instruction || '').slice(0, 2000);
       if (!instruction) {
-        return bad(res, 400, 'instruction required');
+        return bad(res, 400, 'instruction 必填');
       }
       const target = bus.list().find(e => e.seq === Number(body.seq) && !e.revises);
       if (!target) {
-        return bad(res, 404, 'entry not found');
+        return bad(res, 404, '总线条目不存在');
       }
       const kind = entryKindOf(target);
       if (kind === 'vulnerability' && target.payloadRef?.startsWith('sess:')) {
@@ -746,14 +766,14 @@ function realRouter({ store, bus, caps, wal }) {
       // F17: 只允许可派发键——report 是服务 agent(writer 唤醒制),config 三兄弟非 stage
       const agents = (body.agents || []).filter(k => SPAWNABLE_KEYS.includes(k));
       if (!instruction || agents.length === 0) {
-        return bad(res, 400, 'instruction and agents required (spawnable only)');
+        return bad(res, 400, 'instruction 与 agents 必填(仅可派生 agent)');
       }
       // F54: 外部启动的 engagement 此前不携带 workSessionId →
       // orchestrator 及全部子会话/share/task-report 事件 ws=None,
       // 在任何项目面板都不可见(全链"蒸发")。接受可选 ws 并透传。
       const wsParam = String(body.workSessionId || '').slice(0, 64);
       if (wsParam && !/^[\w-]+$/.test(wsParam)) {
-        return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]{1,64} only');
+        return bad(res, 400, 'workSessionId 仅允许 [a-zA-Z0-9_-]{1,64}');
       }
       const started = await startAutopwn({
         engagementId: undefined, instruction, agents,
@@ -767,7 +787,7 @@ function realRouter({ store, bus, caps, wal }) {
       const prevId = String(body.engagementId || '');
       const instruction = String(body.instruction || '').slice(0, 8000);
       if (!prevId || !instruction) {
-        return bad(res, 400, 'engagementId and instruction required');
+        return bad(res, 400, 'engagementId 与 instruction 必填');
       }
       const prevEngagement = `autopwn-${prevId}`;
       // F1 修复:存在性校验——bus 有事件 OR Temporal describe 成功(双通道:
@@ -778,7 +798,7 @@ function realRouter({ store, bus, caps, wal }) {
         try {
           await describeWorkflow(prevEngagement);
         } catch {
-          return bad(res, 404, 'engagement not found, use POST /api/autopwn');
+          return bad(res, 404, 'engagement 不存在, 请先 POST /api/autopwn');
         }
       }
       // 从 bus 提取旧战役的完成信号: result/share 事件按 agent 归类
@@ -807,7 +827,7 @@ function realRouter({ store, bus, caps, wal }) {
       }
       const wsResume = String(body.workSessionId || '').slice(0, 64);
       if (wsResume && !/^[\w-]+$/.test(wsResume)) {
-        return bad(res, 400, 'workSessionId: [a-zA-Z0-9_-]{1,64} only');
+        return bad(res, 400, 'workSessionId 仅允许 [a-zA-Z0-9_-]{1,64}');
       }
       const started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun,
         workSessionId: wsResume || undefined });
@@ -818,7 +838,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/autopwn' && method === 'GET') {
       const workflowId = url.searchParams.get('workflowId');
       if (!workflowId) {
-        return bad(res, 400, 'workflowId required');
+        return bad(res, 400, 'workflowId 必填');
       }
       try {
         const desc = await describeWorkflow(workflowId);
@@ -905,7 +925,7 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, { campaigns });
     }
 
-    return bad(res, 404, 'not found');
+    return bad(res, 404, '资源不存在');
   };
   return route;
 }

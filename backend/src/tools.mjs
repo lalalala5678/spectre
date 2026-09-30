@@ -55,7 +55,7 @@ const spawnStageEnum = Type.Enum(
 export function buildIntelTools(record, caps) {
   /** Case/punct-insensitive title match for dangling-reference checks. */
   const normTitle = s => String(s ?? '').toLowerCase()
-    .replace(/[\s·,。,.;:;:()\[\]()【】《》"'\'\"-]/g, '');
+    .replace(/[\s·,。,.;:;:()[]()【】《》""''-]/g, '');
   const queryIntel = {
     name: 'query_intel',
     label: '查询情报',
@@ -449,11 +449,6 @@ export function buildIntelTools(record, caps) {
 }
 
 /**
- * @param {object} record  session record (holds activeEngagement)
- * @param {object} caps    { dispatch, signalEngagement, emitBus }
- */
-
-/**
  * report_vulnerability — the DISCOVERER-side tool. One sentence in;
  * a dedicated report-writer session does the rest (reads the caller's
  * transcript, cross-validates, then publishes or declines). Registered
@@ -611,6 +606,8 @@ function buildSpawnAgentTool(record, caps) {
   };
 }
 
+/** @param {object} record  session record (holds activeEngagement)
+ * @param {object} caps    { dispatch, signalEngagement, emitBus } */
 export function buildOrchestratorTools(record, caps) {
   const dispatchAgents = {
     name: 'dispatch_agents',
@@ -711,7 +708,7 @@ export function buildOrchestratorTools(record, caps) {
           to: [...params.agents],
           text: params.text,
         });
-      } catch (err) {
+      } catch {
         // Fix-J (P8): distinguish "never existed" from "already finished"
         // via describeWorkflow instead of matching Temporal's server-side
         // English error string (unstable across versions). No more
@@ -760,11 +757,6 @@ export function buildOrchestratorTools(record, caps) {
 
 
 /**
- * Bus-entry kind normalization. Legacy WAL data carries vulnerability events
- * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
- * intel notes use 'intel-note' to avoid the collision.
- */
-/**
  * Shell tool — operate C2 implant handles handed over by the C2 agent or
  * the operator (SSH-like channel over the compromise). Same tool instance
  * per agent (independence axiom): c2 (register+handoff), persistence and
@@ -804,12 +796,6 @@ export function buildShellTools(record, caps) {
     }),
     execute: async (_id, p) => {
       // pi tool protocol: results must be content-block envelopes.
-/** R12-F3 helper: slice 截断必附标记。模块级(say 是工具闭包内)。 */
-function markClipped(text, cap, how) {
-  const s = String(text ?? '');
-  if (s.length <= cap) return s;
-  return s.slice(0, cap) + `\n[已截断 ${cap}/${s.length} 字符——${how}]`;
-}
 
       const say = (obj) => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
       const R = caps.shells;
@@ -864,6 +850,17 @@ function markClipped(text, cap, how) {
   return [sh];
 }
 
+/** R12-F3 helper: slice 截断必附标记。真模块级——此前误嵌在 shell 工具
+ * execute 闭包体内零缩进(CS1-B11), 同时破坏全文件缩进。 */
+function markClipped(text, cap, how) {
+  const s = String(text ?? '');
+  if (s.length <= cap) return s;
+  return s.slice(0, cap) + `\n[已截断 ${cap}/${s.length} 字符——${how}]`;
+}
+
+/** Bus-entry kind normalization. Legacy WAL data carries vulnerability events
+ * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
+ * intel notes use 'intel-note' to avoid the collision. */
 export function entryKind(e) {
   if (e.type === 'vulnerability' || e.type === 'intel') return 'vulnerability';
   if (e.type === 'intel-note') return 'intel-note';

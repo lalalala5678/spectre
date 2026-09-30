@@ -1,8 +1,9 @@
 /**
- * Registry of SPECTRE stage agents.
+ * Registry of SPECTRE stage agents — metadata only(键/标签/描述/路由).
  *
- * Base phase: metadata only — every agent runs the identical base pi config.
- * Customization (per-agent prompts/tools/skills) plugs in here later.
+ * 差异化行为不在此层: 专属系统提示词在 pi.mjs, 每会话工具面与技能
+ * 挂载在 sessions.mjs(_buildAgent)。本表是 agentKey 的权威单源,
+ * 增删 agent 从这里开始(路由校验/前端花名册派生自 /api/agents)。
  */
 
 export const AGENTS = Object.freeze([

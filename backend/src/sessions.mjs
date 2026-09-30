@@ -52,14 +52,9 @@ import { Summarizer } from './summarizer.mjs';
 
 const ORCHESTRATOR_KEY = 'autopwn';
 
-/**
- * Report nudge text — twin constant lives in workflows.mjs (architecture
- * rule: workflows must not import runtime modules).
- */
-const REPORT_NUDGE_TEXT = '【系统要求】本段运行尚未提交任务报告。请立即调用 ' +
-  'submit_task_report(字段:title/task/actions/outcome;status 建议填写,' +
-  '遗漏时系统会按 outcome 推断),说明做了什么、结果或失败原因与全部必要信息——' +
-  '即使没有任何发现也必须提交。这是结束任务的必要条件;提交后本任务即告完成。';
+// CS1-A4: 单源常量(此前与 workflows.mjs 双胞胎漂移, workflows 侧曾把
+// status 说成必填——与工具 schema 矛盾)。
+import { REPORT_NUDGE_TEXT } from './nudge-text.mjs';
 
 
 /**
@@ -98,12 +93,6 @@ export class SessionStore {
    */
   create(agentKey, opts = {}) {
     const id = `sess-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
-    const isOrchestrator = agentKey === ORCHESTRATOR_KEY;
-    // Tree membership: workflow engagement children carry engagementId;
-    // runtime-spawned descendants carry parentSessionId (and may have neither
-    // engagementId nor an orchestrator ancestor beyond the root session).
-    const hasParent = Boolean(opts.engagementId || opts.parentSessionId);
-    const isEngagementChild = hasParent && !isOrchestrator;
     const record = {
       id,
       agentKey,
@@ -155,6 +144,7 @@ export class SessionStore {
       parentSessionId: record.parentSessionId,
       activeEngagement: record.activeEngagement,
       title: record.title,
+      rawTitle: record.rawTitle ?? record.title,  // R32D32-R2: detail 对齐 list/tree 投影
       spawnName: record.spawnName,
       spawnDescription: record.spawnDescription,
       spawnReports: record.spawnReports,
@@ -164,7 +154,6 @@ export class SessionStore {
     };
   }
 
-  /** Construct the pi Agent for a record (fresh or rehydrated transcript). */
   /**
    * Boot warm-up race fix: rehydrate builds agents synchronously with an
    * EMPTY mount cache; rebuildMounts fills it later (async boot block).
@@ -185,6 +174,7 @@ export class SessionStore {
     return n;
   }
 
+  /** Construct the pi Agent for a record (fresh or rehydrated transcript). */
   _buildAgent(record, messages = []) {
     const isOrchestrator = record.agentKey === ORCHESTRATOR_KEY;
     const hasParent = Boolean(record.engagementId || record.parentSessionId);
@@ -385,6 +375,7 @@ export class SessionStore {
       id: record.id,
       agentKey: record.agentKey,
       title: this._displayTitle(record),
+      rawTitle: record.rawTitle ?? this._displayTitle(record),  // R32D32-R2: 对齐 list/tree
       createdAt: record.createdAt,
       busy: record.busy,
       engagementId: record.engagementId,
@@ -677,8 +668,6 @@ export class SessionStore {
     };
     safeWalAppend(this.wal, { t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
   }
-
-  /**
 
   /** Resolve when the session's current run ends (agent_end). Purely
    *  event-driven — used by the synchronous report_vulnerability tool

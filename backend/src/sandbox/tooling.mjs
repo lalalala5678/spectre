@@ -13,10 +13,9 @@
 import { Type } from '@earendil-works/pi-ai';
 
 import { saveSkill, deleteSkill, listSkillsTree } from './skills.mjs';
-import { saveMcpConfig, loadMcpConfig, testMcpServer, closeMcpConnection, mutateMcpConfig } from './mcp.mjs';
+import { loadMcpConfig, testMcpServer, closeMcpConnection, mutateMcpConfig } from './mcp.mjs';
 import { listInstalledTools, sandboxConfig, uninstallCliTool, readInstallLog } from './container.mjs';
 import { AGENT_KEYS } from '../agents.mjs';
-import { makeExecutionEnv, ensureWorkspaceSync } from './exec-env.mjs';
 import { getPrefs } from '../projects.mjs';
 
 // ------------------------------------------------------------- helpers
@@ -27,7 +26,9 @@ async function rebuildMounts() {
 }
 
 const okText = t => ({ content: [{ type: 'text', text: t }] });
-const errText = t => ({ content: [{ type: 'text', text: t }] });
+// CS1-C3②: errText 此前与 okText 逐字相同(两个名字一个实现)——错误
+// 回执必须是 isError 信封(MCP 规范), 否则调用方无法区分成败。
+const errText = t => ({ content: [{ type: 'text', text: t }], isError: true });
 
 // ------------------------------------------------- vertical discovery
 
@@ -134,20 +135,6 @@ async function searchVertical(query) {
   const all = await Promise.allSettled([chRegistry, chGithub, chNpm]);
   return all.map(r => r.status === 'fulfilled' ? r.value
     : { channel: '?', items: [], error: String(r.reason) }).filter(Boolean);
-}
-
-/** Package-manager search inside the sandbox (npm/pip/apt — keyless). */
-async function searchPackages(query) {
-  const env = makeExecutionEnv({ driver: 'local' }, '_tooling');
-  const results = [];
-  for (const cmd of [
-    `npm search --json ${JSON.stringify(query)} 2>/dev/null | head -c 3000`,
-    `pip3 index versions ${JSON.stringify(query)} 2>&1 | head -2`,
-  ]) {
-    const r = await env.exec(cmd, {}).catch(() => null);
-    if (r?.ok) results.push(String(cmd.split(' ')[0]) + ':\n' + (r.value ? '' : ''));
-  }
-  return results;
 }
 
 // -------------------------------------------------- generic providers

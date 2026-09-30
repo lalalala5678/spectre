@@ -15,6 +15,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
     security: Security = None  # set at startup
     server_version = "spectre-gw"
     sys_version = ""
+
     def version_string(self):
         return self.server_version  # 消灭默认拼接的尾随空格
     protocol_version = "HTTP/1.1"
@@ -92,7 +93,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         if not path.startswith(config.PREFIX):
             # 根路径/杂路径直接引到应用前缀(首次访问体验)
             if path in ("", "/"):
-                return self._send(302, headers={"Location": config.PREFIX + "/"})
+                return self._send(
+                    302, headers={"Location": config.PREFIX + "/"})
             return self._send(404, b"not found")
         rel = path[len(config.PREFIX):] or "/"
 
@@ -124,7 +126,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 audit("logout", ip=self.client_ip())
             clear = (
                 f"{config.COOKIE_NAME}=; Path={config.PREFIX}; Max-Age=0; "
-                "HttpOnly; SameSite=Strict" + ("; Secure" if config.COOKIE_SECURE else "")
+                "HttpOnly; SameSite=Strict"
+                + ("; Secure" if config.COOKIE_SECURE else "")
             )
             return self._redirect(
                 config.PREFIX + "/login", headers={"Set-Cookie": clear},
@@ -167,7 +170,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         # keep the QUERY STRING — DELETE/PUT endpoints address resources
         # by query params (?agentKey=&name= / ?name=); dropping it once
         # turned every such call into a 400 (button E2E caught it).
-        rel = path[len(config.PREFIX):] + (('?' + split.query) if split.query else '')
+        rel = path[len(config.PREFIX):] + (
+            ('?' + split.query) if split.query else '')
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
@@ -184,7 +188,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         # keep the QUERY STRING — DELETE/PUT endpoints address resources
         # by query params (?agentKey=&name= / ?name=); dropping it once
         # turned every such call into a 400 (button E2E caught it).
-        rel = path[len(config.PREFIX):] + (('?' + split.query) if split.query else '')
+        rel = path[len(config.PREFIX):] + (
+            ('?' + split.query) if split.query else '')
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
@@ -198,7 +203,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         path = split.path
         if not path.startswith(config.PREFIX):
             return self._send(404, b"not found")
-        rel = path[len(config.PREFIX):] + (('?' + split.query) if split.query else '')
+        rel = path[len(config.PREFIX):] + (
+            ('?' + split.query) if split.query else '')
 
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
@@ -247,7 +253,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
         cookie = (
             f"{config.COOKIE_NAME}={token}; Path={config.PREFIX}; "
             f"Max-Age={config.SESSION_ABSOLUTE_SECS}; "
-            "HttpOnly; SameSite=Strict" + ("; Secure" if config.COOKIE_SECURE else "")
+            "HttpOnly; SameSite=Strict"
+            + ("; Secure" if config.COOKIE_SECURE else "")
         )
         return self._redirect(
             config.PREFIX + "/", headers={"Set-Cookie": cookie},
@@ -268,21 +275,25 @@ def serve():
     import os
     from http.server import ThreadingHTTPServer
 
-    if config.BIND_HOST not in ("127.0.0.1", "localhost") and config.TRUST_PROXY:
+    loopback = ("127.0.0.1", "localhost")
+    if config.BIND_HOST not in loopback and config.TRUST_PROXY:
         print("[gateway] 警告: 公网绑定且信任 XFF——直连者可自旋 X-Forwarded-For "
               "绕过锁定; 建议仅绑定环回由反代暴露, 或设 GATEWAY_TRUST_PROXY=0", flush=True)
     try:
         os.makedirs(config.LOG_DIR, exist_ok=True)
     except OSError as e:
-        print(f"[gateway] 日志目录不可用({config.LOG_DIR}): {e} — 审计日志将只写 stdout", flush=True)
+        print(f"[gateway] 日志目录不可用({config.LOG_DIR}): {e}"
+              f" — 审计日志将只写 stdout", flush=True)
     if not os.path.isfile(config.PASSWD_FILE):
         raise SystemExit(
-            f"FATAL: {config.PASSWD_FILE} missing — 先运行 python3 spectre-passwd.py add <user> 创建账号"
+            f"FATAL: {config.PASSWD_FILE} missing — 先运行 "
+            f"python3 spectre-passwd.py add <user> 创建账号"
             f"(注意: 建号与网关须同一 SPECTRE_AUTH_DIR, 两边不一致即此错)")
     # F9(部署审计四轮): 空 INTERNAL_TOKEN 此前静默启动, 登录后所有 API 401
     if not config.RUNTIME_TOKEN:
         raise SystemExit(
-            "FATAL: INTERNAL_TOKEN 未设置 — 网关反代 /api 需要 runtime 相同的令牌(backend/.env 里的 INTERNAL_TOKEN)")
+            "FATAL: INTERNAL_TOKEN 未设置 — 网关反代 /api 需要 "
+            "runtime 相同的令牌(backend/.env 里的 INTERNAL_TOKEN)")
     if config.RUNTIME_TOKEN.lower().startswith('change-me'):
         raise SystemExit(
             "FATAL: INTERNAL_TOKEN 仍是占位值 — 填入与 backend/.env 相同的真实随机令牌")

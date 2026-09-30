@@ -10,7 +10,8 @@ import threading
 import time
 
 import os
-STORE = os.environ.get("SPECTRE_DATA_DIR", "/var/lib/spectre") + "/gateway-sessions.json"
+DATA_DIR = os.environ.get("SPECTRE_DATA_DIR", "/var/lib/spectre")
+STORE = DATA_DIR + "/gateway-sessions.json"
 _DEBOUNKE = 0.5
 
 
@@ -33,8 +34,9 @@ class SessionPersistence:
         live = {}
         for key, s in data.items():
             try:
-                if (now - s["last_ts"] <= config.SESSION_IDLE_SECS
-                        and now - s["login_ts"] <= config.SESSION_ABSOLUTE_SECS):
+                idle_ok = now - s["last_ts"] <= config.SESSION_IDLE_SECS
+                abs_ok = now - s["login_ts"] <= config.SESSION_ABSOLUTE_SECS
+                if idle_ok and abs_ok:
                     live[key] = s
             except (KeyError, TypeError):
                 continue

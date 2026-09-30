@@ -6,7 +6,7 @@ from . import config
 
 
 def resolve(dist_rel):
-    """Map a URL path to a file inside DIST_DIR, or None when unsafe/missing."""
+    """Map URL path to file in DIST_DIR; None if unsafe/missing."""
     root = os.path.realpath(config.DIST_DIR)
     target = os.path.realpath(os.path.join(root, dist_rel.lstrip("/")))
     if target != root and not target.startswith(root + os.sep):

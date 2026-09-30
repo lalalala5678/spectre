@@ -69,14 +69,9 @@ function clipMarked(value, max) {
 const CHILD_SUMMARY_MAX = 2000;
 
 
-/**
- * Report nudge text — twin constant lives in sessions.mjs (architecture
- * rule: workflows must not import runtime modules).
- */
-const REPORT_NUDGE_TEXT = '【系统要求】本段运行尚未提交任务报告。请立即调用 ' +
-  'submit_task_report(必需字段:title/status/task/actions/outcome),说明做了什么、' +
-  '结果或失败原因与全部必要信息——即使没有任何发现也必须提交。这是结束任务的必要条件;' +
-  '提交后本任务即告完成。';
+// CS1-A4: 单源常量——nudge-text.mjs 是纯字符串模块(零 import/零副作
+// 用), 满足 Temporal workflow 的 determinism 约束, 可安全引用。
+import { REPORT_NUDGE_TEXT } from './src/nudge-text.mjs';
 /**
  * @param {{engagementId: string, instruction: string, agents: string[],
  *          orchestratorSessionId?: string|null}} input
@@ -216,7 +211,7 @@ export async function autoPwnWorkflow(input) {
       engagementId,
       summary: summaryLines,
     });
-  } catch (e) {
+  } catch {
     // R7-F4: 编排会话 404/runtime 停机曾把已完成战役标 FAILED——
     // 汇总全丢。bus 兜底(落 WAL, 面板可见, 不依赖会话存活); 再失败
     // 也让 workflow 正常完成(结果在返回值+bus)。

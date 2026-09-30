@@ -3,7 +3,8 @@
   "version": "0.1.0",
   "main": "index.js",
   "scripts": {
-    "test": "node --test tests/*.test.mjs"
+    "test": "node --test tests/*.test.mjs",
+    "lint": "oxlint src/ *.mjs"
   },
   "keywords": [],
   "author": "",
@@ -20,5 +21,8 @@
   },
   "engines": {
     "node": ">=22"
+  },
+  "devDependencies": {
+    "oxlint": "^1.86.0"
   }
 }

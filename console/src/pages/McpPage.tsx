@@ -48,19 +48,20 @@ export function McpPage({ wsId }: { wsId: string }) {
   const create = async () => {
     if (busy) return;
     if (!form.name.trim()) { setMsg('name 必填'); return; }
-    let headers: Record<string, string> | null = {};
+    let headers: Record<string, string> = {};
     if (form.transport === 'http') {
       try {
         headers = JSON.parse(form.headersJson || '{}');
         // R11-F3: JSON.parse 只验'是 JSON'——'x'/[1]/5 标量数组穿透
         // 到后端持久化(R5-F3 未覆盖 headers 类型)。
-        if (typeof headers !== 'object' || headers === null || Array.isArray(headers)) {
+        const parsed: unknown = JSON.parse(form.headersJson || '{}');
+        if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
           setMsg('headers 必须为 {"k":"v"} JSON 对象');
           return;
         }
+        headers = parsed as Record<string, string>;
       } catch { setMsg('headers 非法 JSON'); return; }
     }
-    if (headers === null) return;
     const body = form.transport === 'http'
       ? { name: form.name, transport: 'http', url: form.url,
           headers, agents: form.agents }

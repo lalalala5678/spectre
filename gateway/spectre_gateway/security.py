@@ -43,7 +43,8 @@ class Security:
 
     def __init__(self):
         self._lock = threading.Lock()
-        self._sessions = {}   # sha256(token) -> {user, ip, ua, login_ts, last_ts}
+        # sha256(token) -> {user, ip, ua, login_ts, last_ts}
+        self._sessions = {}
         self._failtrack = {}  # ip -> {n, window_start, locked_until}
         # memory-only sessions logged everyone out on every deploy
         # (spectre-console restart IS the gateway restart). Load the
@@ -82,7 +83,8 @@ class Security:
             _, n, r, p, salt_b64, hash_b64 = record.split("$")
             salt = base64.b64decode(salt_b64)
             want = base64.b64decode(hash_b64)
-            got = self._scrypt(pw or "", salt, int(n), int(r), int(p), len(want))
+            got = self._scrypt(
+                pw or "", salt, int(n), int(r), int(p), len(want))
         except Exception:
             return False
         return hmac.compare_digest(got, want)
@@ -99,7 +101,8 @@ class Security:
         now = time.time()
         with self._lock:
             state = self._failtrack.get(ip)
-            if not state or now - state["window_start"] > config.FAIL_WINDOW_SECS:
+            stale = now - state["window_start"] > config.FAIL_WINDOW_SECS
+            if not state or stale:
                 state = {"n": 0, "window_start": now, "locked_until": 0}
                 self._failtrack[ip] = state
             state["n"] += 1

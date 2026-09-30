@@ -12,7 +12,7 @@
 import { makeExecutionEnv, ensureWorkspaceSync, CONTAINER } from './exec-env.mjs';
 import { buildOfficialTools } from './harness-adapter.mjs';
 import { mcpToolsFor, loadMcpConfig } from './mcp.mjs';
-import { refreshSkillMounts, skillsFor } from './skills.mjs';
+import { refreshSkillMounts } from './skills.mjs';  // CS1-C3④: skillsFor 死 import 已清
 import { sandboxConfig } from './container.mjs';
 
 let skillIndexCache = new Map();  // agentKey → Skill[]

@@ -92,6 +92,17 @@
 | `spawn_agent` | 编排器+子 | [spawns agent] | 派生子智能体 |
 | `dispatch_agents` | 编排器 | [starts engagement] | Temporal 批量调度 |
 | `relay_to_agents` | 编排器 | [sends DM] | 定向转发情报 |
+| `shell` | c2/persistence/postex/autopwn | [runs commands; side-effects] | C2 植入通道操作(注册/移交/执行/读文件/指纹) |
+| `configure_skill` | 仅 skill-config | [writes config] | 给指定智能体挂载自定义技能 |
+| `delete_skill` | 仅 skill-config | [destructive] | 卸载指定智能体的技能 |
+| `configure_mcp` | 仅 mcp-config | [writes config] | 注册 MCP 服务器(http/stdio) |
+| `remove_mcp_server` | 仅 mcp-config | [destructive] | 删除 MCP 服务器注册 |
+| `test_mcp_server` | 仅 mcp-config | [read-only] | MCP 连通性探测 |
+| `uninstall_cli` | 仅 cli-config | [destructive] | 卸载 CLI 工具 |
+| `list_tool_config` | 配置三键 | [read-only] | 盘点共享层已装工具 |
+| `wake_agent` | 编排器+子 | [spawns turn] | 唤醒空闲智能体一轮 |
+| `search_web` | 全部(各持独立实例) | [read-only] | 联网搜索(provider 可配) |
+| `fetch_url` | 全部(各持独立实例) | [read-only] | 抓取网页正文(带截断标记) |
 
 ## 历史教训(防止回归)
 

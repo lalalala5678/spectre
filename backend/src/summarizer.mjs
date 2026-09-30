@@ -17,7 +17,6 @@
 
 import { Agent } from '@earendil-works/pi-agent-core';
 
-import { CONFIG } from './config.mjs';
 import { normalizeMessage } from './pi.mjs';
 
 const GREETING_RE = /^(你好|您好|hi|hello|hey|ok|okay|好的|收到|嗯+|test|在吗|在不在)[!。.!?\s]*$/i;
@@ -52,19 +51,19 @@ function extractTitle(raw) {
   return truncateTitle(title);  // R32D31: 截断只管显示, 原始串由调用方取
 }
 
-/** R32D31-E1: 显示截断(词边界+剥尾); 原始串走 rawTitle 供搜索。 */
+/** R32D31-E1: 显示截断(词边界+剥尾+省略号); 原始串走 rawTitle 供搜索。 */
 function truncateTitle(full) {
-  const title = full;
-  if (title.length <= 60) return title;
   // R28-N5: 32 字硬截断会切断 ASCII 连续 token(NDAY-R32D28→NDAY-R3,
   // 全局搜索按完整串找不到)。词边界截断, 超长才回退硬切, 上限 60。
-  if (title.length <= 60) return title;
-  const hard = title.slice(0, 60);
+  if (full.length <= 60) return full;
+  const hard = full.slice(0, 60);
   const cut = hard.match(/^[\s\S]*[\s-]/);  // 空格或连字符(NDAY-R32D28 类 token 的自然边界)
   // R32D30-E1: 剥离悬挂尾部分隔符——保留 '- ' 尾巴会让跨切点查询
   // ('OGSL-CVE' 对被截成 '...OGSL-' 的标题)检索丢会话。
   const trimmed = cut ? cut[0].trim().replace(/[\s-]+$/, '') : '';
-  return trimmed.length >= 20 ? trimmed : hard;
+  // R32D32-R4: 截断显示补省略号——悬垂半截代号(…ZSL-CVE-2026)让侧栏
+  // /搜索下拉观感"截坏了"; 检索走 rawTitle 不受影响。
+  return trimmed.length >= 20 ? `${trimmed}…` : `${hard}…`;
 }
 
 /** pi transcript slice as flat text, newest last, bounded by chars. */

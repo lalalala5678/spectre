@@ -11,7 +11,7 @@ import { getSpawnSettings } from './settings.mjs';
 
 export function makeSpawnPolicy(store) {
   return {
-    spawnCheck(parentRecord, agentKey) {
+    spawnCheck(parentRecord, _agentKey) {
       const { spawnMaxDepth, spawnMaxAgents } = getSpawnSettings();
       const rootId = store.rootIdOf(parentRecord.id);
       const childDepth = store.depthOf(parentRecord.id) + 1;

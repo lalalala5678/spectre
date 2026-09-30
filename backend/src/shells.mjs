@@ -59,7 +59,7 @@ loadShells();
 
 const MAX_OUT = 64 * 1024;
 
-export function createShellRegistry({ bus, wal, listScope } = {}) {
+export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
   const audit = (kind, data) => {
     try { bus?.emit?.('shell-event', { kind, at: new Date().toISOString(), ...data }); } catch { /* bus optional */ }
   };
@@ -146,7 +146,6 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
       tasks: [],          // tasking history (Mythic): {n, command, code, ms, at}
       host: null, user: null, os: null,  // auto-fingerprint (Sliver session meta)
     };
-    if (sh.error) return sh;
     shells.set(id, sh); persistShells();
     audit('shell-register', { id, target, transport, createdBy, name: nm });
     return sh;
@@ -177,7 +176,7 @@ export function createShellRegistry({ bus, wal, listScope } = {}) {
    * configured exec box (docker container) — benchmark-grade fidelity.
    * Returns { ok, stdout, stderr, code, ms }.
    */
-  async function exec(id, command, { timeoutMs = 30_000, box = null } = {}) {
+  async function exec(id, command, { timeoutMs = 30_000, box: _box = null } = {}) {
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
     if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}` };

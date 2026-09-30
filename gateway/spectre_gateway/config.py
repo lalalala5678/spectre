@@ -22,10 +22,15 @@ LOG_FILE = os.path.join(LOG_DIR, "auth.log")
 #: Upstream agent runtime for /spectre/api/*.
 RUNTIME_HOST = os.environ.get("RUNTIME_HOST", "127.0.0.1")
 RUNTIME_PORT = int(os.environ.get("RUNTIME_PORT", "8090"))
-#: 是否信任 X-Forwarded-For(经 Caddy/Nginx 反代时保持开; 网关直接暴露
-#: 公网时置 0——否则直连者可自旋 XFF 绕过登录失败锁定, 锁定退化为
-#: socket 地址)。
-TRUST_PROXY = os.environ.get("GATEWAY_TRUST_PROXY", "1") != "0"
+#: 是否信任 X-Forwarded-For。缺省按绑定面取安全侧(R32D32-R5):
+#: loopback 绑定(默认, 前面必有反代或本机使用)保持信任; 非 loopback
+#: 绑定(GATEWAY_BIND_HOST 指向外部网卡)缺省不信——否则直连者可自旋
+#: XFF 绕过登录失败锁定, 锁定退化为 socket 地址。经可信反代暴露时
+#: 显式 GATEWAY_TRUST_PROXY=1。
+_LOOPBACK_BIND = BIND_HOST in ("127.0.0.1", "localhost", "::1")
+TRUST_PROXY = os.environ.get(
+    "GATEWAY_TRUST_PROXY", "1" if _LOOPBACK_BIND else "0",
+) != "0"
 #: Internal token the runtime enforces on /api/* (except /api/health).
 RUNTIME_TOKEN = os.environ.get("INTERNAL_TOKEN", "")
 
@@ -72,4 +77,3 @@ MIME_TYPES = {
     ".ico": "image/x-icon",
     ".woff2": "font/woff2",
 }
-

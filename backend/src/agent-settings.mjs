@@ -129,7 +129,7 @@ const RECON_SOURCES = {
       // 前端实测: 无 okCheck 时 401 走通用分支, 报错带整页 HTML——
       // 给干净的引导性文案(与 censys/vt 等一致)。
       return probe(`${RECON_SOURCES.shodan.defaultBase}/api-info?key=${encodeURIComponent(key)}`,
-        {}, { okCheck: (s, b) => (s === 200 ? true
+        {}, { okCheck: s => (s === 200 ? true
           : s === 401 ? 'SHODAN: key 无效'
           : s === 403 ? 'SHODAN: 权限不足' : `HTTP ${s}`) });
     },
@@ -144,7 +144,7 @@ const RECON_SOURCES = {
       const base = baseUrl || RECON_SOURCES.metadefender.defaultBase;
       return probe(`${base}/v4/key/${encodeURIComponent(key)}`, {
         headers: { apikey: key },
-      }, { okCheck: (st, b) => (st === 200 ? true : st === 401 || st === 403 ? 'MetaDefender: key 无效' : `HTTP ${st}`) });
+      }, { okCheck: st => (st === 200 ? true : st === 401 || st === 403 ? 'MetaDefender: key 无效' : `HTTP ${st}`) });
     },
   },
   hybridanalysis: {
@@ -235,7 +235,7 @@ const RECON_SOURCES = {
     tier: 'P0', why: '钓鱼 agent 邮件发送通道(直连/中继)',
     agents: ['phish'],
     fields: { host: 'SMTP 主机', port: '端口', user: '账号', password: '密码' },
-    async validate({ host, port, user, password }) {
+    async validate({ host, port, user, password: _password }) {
       if (!host || !user) return { ok: false, error: 'SMTP 需要 host + user' };
       const p = Number(port) || 587;
       try {
@@ -364,7 +364,7 @@ export function settingsSchema() {
 export function getSettings() {
   const p = getPrefs();
   const bp = p.bruteParams ?? {};
-  const reconSources = { ...p.reconApiKeys ?? {} };
+  const reconSources = { ...p.reconApiKeys };
   // weakced brute params ride in reconSources under the pseudo-source id
   reconSources.brute = bp;
   return {
@@ -392,7 +392,7 @@ export async function saveSetting({ group, field, value }, wal) {
     // R30: webSearch.apiKey 保存前校验 provider 连通——坏 key 此前
     // 直接落盘, 搜索回执把 401 吞成"0 命中"(api agent 四轮实测抓出)。
     if (field === 'webSearch.apiKey' && v) {
-      const ws = { ...(getPrefs().commonSettings?.webSearch ?? {}), apiKey: v };
+      const ws = { ...getPrefs().commonSettings?.webSearch, apiKey: v };
       if (ws.provider && ws.provider !== 'none' && ws.provider !== 'searxng') {
         const { probeSearchProvider } = await import('./sandbox/tooling-probe.mjs');
         const r = await probeSearchProvider(ws.provider, ws);
@@ -413,14 +413,14 @@ export async function saveSetting({ group, field, value }, wal) {
     }
     // R10-F2: probe 是 20s 网络窗口——窗口后重读 prefs 只合并本叶子,
     // 并发保存的另一字段不被陈旧快照覆盖。
-    const fresh = { ...(getPrefs().commonSettings ?? {}) };
-    fresh[top] = { ...(fresh[top] ?? {}), [leaf]: leafVal };
+    const fresh = { ...getPrefs().commonSettings };
+    fresh[top] = { ...fresh[top], [leaf]: leafVal };
     setPrefs({ commonSettings: fresh }, wal);
     return { ok: true };
   }
 
   if (group === 'weakcred') {
-    const cur = { ...(getPrefs().bruteParams ?? {}) };
+    const cur = { ...getPrefs().bruteParams };
     const [top, leaf] = field.split('.');
     if (top !== 'brute') return { ok: false, error: '未知配置项' };
     const v = Number(clean(value));
@@ -447,14 +447,14 @@ export async function saveSetting({ group, field, value }, wal) {
     const src = RECON_SOURCES[srcId];
     if (!src) return { ok: false, error: '未知数据源' };
     const leafVal = clean(value);
-    const cur = { ...(getPrefs().reconApiKeys?.[srcId] ?? {}), [leaf]: leafVal };
+    const cur = { ...getPrefs().reconApiKeys?.[srcId], [leaf]: leafVal };
     // R10-F1: id 不算 secret——censys.id 参数化(同 cse.cx), 先存免探
     // 测落盘; 此前含 cur.id 使 censys 逐字段保存永久死锁(任一先存都
     // 触发双字段整体验证)。
     const hasSecret = cur.key || cur.token || cur.secret
       || (srcId === 'smtp' && (cur.user || cur.password));
     if (!hasSecret) {
-      const all0 = { ...(getPrefs().reconApiKeys ?? {}), [srcId]: cur };
+      const all0 = { ...getPrefs().reconApiKeys, [srcId]: cur };
       setPrefs({ reconApiKeys: all0 }, wal);
       return { ok: true, mounted: false };
     }
@@ -462,8 +462,8 @@ export async function saveSetting({ group, field, value }, wal) {
     if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
     // R10-F2: validate(~15s 网络窗口)后重读——并发保存的兄弟字段不被
     // 陈旧快照覆盖(丢更新)。
-    const freshAll = { ...(getPrefs().reconApiKeys ?? {}) };
-    freshAll[srcId] = { ...(freshAll[srcId] ?? {}), [leaf]: leafVal };
+    const freshAll = { ...getPrefs().reconApiKeys };
+    freshAll[srcId] = { ...freshAll[srcId], [leaf]: leafVal };
     setPrefs({ reconApiKeys: freshAll }, wal);
     return { ok: true, mounted: true };
   }

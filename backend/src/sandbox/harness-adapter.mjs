@@ -9,7 +9,6 @@ import { looksLikeInstall, appendInstallLog } from './container.mjs';
 import {
   createBashTool, createReadTool, createWriteTool, createEditTool,
 } from '@earendil-works/pi-agent-core';
-import { Type } from '@earendil-works/pi-ai';
 
 import { PI_CONTEXT } from './exec-env.mjs';
 

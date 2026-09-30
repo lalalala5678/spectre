@@ -174,7 +174,7 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
     : (containerPathToHost(cwdContainer) ?? cwdContainer);
   return new Promise(resolve => {
     const child = spawn(argvv[0], argvv.slice(1), {
-      env: { ...process.env, ...(extraEnv ?? {}) },
+      env: { ...process.env, ...extraEnv },
       cwd: cwdHost,
     });
     let text = '';
@@ -204,7 +204,6 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
  * paths (local driver) pass through.
  */
 function makeFileSystem(cwdContainer) {
-  const cwdHost = containerPathToHost(cwdContainer) ?? cwdContainer;
   const resolve = p => {
     const s = String(p ?? '');
     const host = containerPathToHost(s);
@@ -224,13 +223,6 @@ function makeFileSystem(cwdContainer) {
     }
     return null;
   };
-  /** Relative paths resolve against the SESSION's project cwd (mapped to
-   *  its host path), never the runtime process cwd. */
-  const resolveFull = p => {
-    const s = String(p ?? '');
-    return path.isAbsolute(s) ? resolve(s)
-      : path.join(cwdHost, s);
-  };
   const wrap = async fn => {
     try { return ok(await fn()); } catch (e) { return fsErr(e); }
   };
@@ -239,7 +231,7 @@ function makeFileSystem(cwdContainer) {
     // F30-A: 返回容器视图路径——官方 write 拿 absolutePath 的结果原样传回
     // env.writeFile,若此处给宿主路径,守卫(按容器路径判定)会把相对路径
     // 解析结果当"未映射绝对路径"拦杀(weakcred 实战两轮谎报成功的根因)。
-    absolutePath: async (p, ctx) => wrap(async () => {
+    absolutePath: async (p, _ctx) => wrap(async () => {
       const str = String(p ?? '');
       if (path.isAbsolute(str)) {
         // 已是容器路径(或宿主路径→转容器视图);未映射的保持原样由守卫拒
@@ -250,10 +242,10 @@ function makeFileSystem(cwdContainer) {
       }
       return path.join(cwdContainer, str);
     }),
-    joinPath: async (parts, ctx) => wrap(async () => path.join(...parts)),
-    readTextFile: async (p, ctx) => wrap(async () =>
+    joinPath: async (parts, _ctx) => wrap(async () => path.join(...parts)),
+    readTextFile: async (p, _ctx) => wrap(async () =>
       await fsp.readFile(resolve(p), 'utf8')),
-    readTextLines: async (p, opts, ctx) => wrap(async () => {
+    readTextLines: async (p, opts, _ctx) => wrap(async () => {
       const max = opts?.maxLines ?? Infinity;
       const lines = [];
       const content = await fsp.readFile(resolve(p), 'utf8');
@@ -263,9 +255,9 @@ function makeFileSystem(cwdContainer) {
       }
       return lines;
     }),
-    readBinaryFile: async (p, ctx) => wrap(async () =>
+    readBinaryFile: async (p, _ctx) => wrap(async () =>
       new Uint8Array(await fsp.readFile(resolve(p)))),
-    writeFile: async (p, content, ctx) => {
+    writeFile: async (p, content, _ctx) => {
       // F30-B: 拍平双层 Result——wrap(ok(inner)) 会把内层 {ok:false} 当
       // 成功值,pi 的 getOrThrow 不抛→官方工具谎报 Successfully wrote。
       const deny = denyMutate(p);
@@ -276,7 +268,7 @@ function makeFileSystem(cwdContainer) {
         return ok(undefined);
       } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
     },
-    appendFile: async (p, content, ctx) => {
+    appendFile: async (p, content, _ctx) => {
       const deny = denyMutate(p);
       if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
       try {
@@ -285,7 +277,7 @@ function makeFileSystem(cwdContainer) {
         return ok(undefined);
       } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
     },
-    renameFile: async (s, d, ctx) => {
+    renameFile: async (s, d, _ctx) => {
       const deny = denyMutate(s) ?? denyMutate(d);
       if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
       try {
@@ -293,7 +285,7 @@ function makeFileSystem(cwdContainer) {
         return ok(undefined);
       } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
     },
-    fileInfo: async (p, ctx) => wrap(async () => {
+    fileInfo: async (p, _ctx) => wrap(async () => {
       const host = resolve(p);
       const st = await fsp.lstat(host);
       return {
@@ -304,7 +296,7 @@ function makeFileSystem(cwdContainer) {
         size: st.size, mtimeMs: st.mtimeMs,
       };
     }),
-    listDir: async (p, ctx) => wrap(async () => {
+    listDir: async (p, _ctx) => wrap(async () => {
       const entries = await fsp.readdir(resolve(p), { withFileTypes: true });
       return Promise.all(entries.map(async e => {
         const st = await fsp.lstat(path.join(resolve(p), e.name)).catch(() => null);
@@ -318,11 +310,11 @@ function makeFileSystem(cwdContainer) {
         };
       }));
     }),
-    canonicalPath: async (p, ctx) => wrap(async () =>
+    canonicalPath: async (p, _ctx) => wrap(async () =>
       await fsp.realpath(resolve(p))),
-    exists: async (p, ctx) => wrap(async () =>
+    exists: async (p, _ctx) => wrap(async () =>
       fs.existsSync(resolve(p))),
-    createDir: async (p, opts, ctx) => {
+    createDir: async (p, opts, _ctx) => {
       const deny = denyMutate(p);
       if (deny) return err(Object.assign(new Error(deny), { code: 'permission_denied' }));
       try {
@@ -330,15 +322,10 @@ function makeFileSystem(cwdContainer) {
         return ok(undefined);
       } catch (e) { return err(e instanceof Error ? e : new Error(String(e))); }
     },
-    cleanup: async ctx => { /* host fs needs no cleanup */ },
+    cleanup: async _ctx => { /* host fs needs no cleanup */ },
   };
 }
 
-/**
- * Build an ExecutionEnv for one project workspace.
- * @param {{driver: 'local'|'docker', container?: string}} cfg
- * @param {string} wsId project id — cwd = /workspace/<wsId>
- */
 /** Local driver: rewrite container-style absolute paths inside bash
  *  commands to their host mounts — agents reason in CONTAINER paths
  *  (/workspace /opt/uploads …) regardless of the driver underneath. */
@@ -367,6 +354,11 @@ export function sharedToolPath() {
   ].join(':');
 }
 
+/**
+ * Build an ExecutionEnv for one project workspace.
+ * @param {{driver: 'local'|'docker', container?: string}} cfg
+ * @param {string} wsId project id — cwd = /workspace/<wsId>
+ */
 export function makeExecutionEnv(cfg, wsId) {
   const cwdContainer = `${CONTAINER.workspace}/${wsId}`;
   const fsEnv = makeFileSystem(cwdContainer);
@@ -381,7 +373,7 @@ export function makeExecutionEnv(cfg, wsId) {
       cfg.container ?? 'spectre-sandbox']
     : [];
   const shell = {
-    exec: (command, options, ctx) => {
+    exec: (command, options, _ctx) => {
       const runner = cfg.driver === 'docker'
         ? (cmd, timeout) => spawnShell(execArgv, cmd, timeout, cwdContainer)
         : (cmd, timeout) => spawnShell([], rewritePathsForLocal(cmd), timeout, cwdContainer,
@@ -389,7 +381,7 @@ export function makeExecutionEnv(cfg, wsId) {
             ?? toolPath.split(':')[0]}:${process.env.PATH}` });
       return runShell(runner, command, { cwd: cwdContainer, ...options });
     },
-    cleanup: async ctx => {},
+    cleanup: async _ctx => {},
   };
   return { ...fsEnv, ...shell };
 }

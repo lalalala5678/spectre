@@ -1,13 +1,14 @@
 /**
  * pi agent construction.
  *
- * All SPECTRE stage agents share one identical base configuration in this
- * phase (no per-agent customization yet): same system prompt, same model,
- * no tools. `buildPi()` wires a custom OpenAI-compatible provider from
- * CONFIG so switching LLM vendors is a pure .env change.
+ * 分层: 本模块只提供 LLM 接入与消息基建——buildPi() 从 CONFIG 接线
+ * OpenAI 兼容 provider(换厂商=改 .env), textOf/normalizeMessage 是
+ * 全仓消息形状工具。各 agent 的差异化(12+ 专属业务提示词
+ * RECON/NDAY/BRUTE/API/VULNHUNT/C2/PERSIST/POSTEX/PHISH+配置三)在
+ * 本模块 prompt 常量区; 每会话的工具面组装在 sessions.mjs。
  */
 
-import { createModels, createProvider, envApiKeyAuth } from '@earendil-works/pi-ai';
+import { createModels, createProvider } from '@earendil-works/pi-ai';
 import * as openaiCompletions from '@earendil-works/pi-ai/api/openai-completions';
 
 import { CONFIG } from './config.mjs';
@@ -155,13 +156,13 @@ function modelCatalog(eff = {}) {
   }];
 }
 
-/**
- * @returns {{ models: import('@earendil-works/pi-ai').MutableModels,
- *             model: object,
- *             streamFn: Function }}
- */
 let liveModel = null;
 
+/**
+ * @returns {Promise<{ models: import('@earendil-works/pi-ai').MutableModels,
+ *                     model: object,
+ *                     streamFn: Function }}>}
+ */
 export async function buildPi() {
   // User-facing settings override env (settings.mjs): baseUrl/apiKey/
   // model/maxTokens/contextWindow — every save passed a live probe, so
@@ -237,11 +238,6 @@ export async function applyLlmPrefs() {
   return eff;
 }
 
-/**
- * Convert a pi AgentMessage into the flat shape the console UI consumes.
- * Keeps payloads bounded; tool results are truncated.
- */
-
 /** Unwrap tool-result content blocks into plain display text. */
 function toolResultText(content) {
   if (typeof content === 'string') return content;
@@ -254,6 +250,10 @@ function toolResultText(content) {
   return content;  // exotic shapes: truncate() stringifies as fallback
 }
 
+/**
+ * Convert a pi AgentMessage into the flat shape the console UI consumes.
+ * Keeps payloads bounded; tool results are truncated.
+ */
 export function normalizeMessage(message, truncate = truncateText) {
   const out = { role: message.role, ts: message.timestamp || Date.now() };
   if (message.role === 'user') {
@@ -558,7 +558,7 @@ export const NDAY_PROMPT = [
   '',
   '# 尝试预算与低置信上报',
   '- 单资产×单CVE:常规尝试 ≤3 次;判定性实验组(如走私双响应/布尔差/对照',
-  '  实验)单独计为一组,组内 ≤6 发——预算管的是\"发散乱试\",不是\"科学验证\"',
+  '  实验)单独计为一组,组内 ≤6 发——预算管的是"发散乱试",不是"科学验证"',
   '- 版本命中+行为信号型(如版本区间权威+响应行为异常但未完全闭环):允许',
   '  低置信 report_vulnerability 上报,一句话写明置信档位,由报告 agent 裁决',
   '  ——驳回成本远低于漏报,禁止过度保守压着不报',
