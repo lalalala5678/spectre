@@ -9,8 +9,9 @@
 | Node | **≥ 22.19**（全仓统一：@earendil-works/* 依赖链 engines 下限） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
 
-> Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。|
 | Docker | 仅沙箱 driver 需要 |
+
+> Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。
 
 > npm 故障排障: 安装若以 `npm error Exit handler never called!` 崩溃, 先 `npm config get registry` 检查是否指向不可达镜像; 切换 `--registry=https://registry.npmjs.org` 并**删除半装的 node_modules 后重装**。
 
@@ -22,7 +23,7 @@
 | console | `console/` (vite build) | — | — |
 | gateway | `gateway/server.py` | 8081 | `GATEWAY_BIND_HOST` `GATEWAY_PORT` `RUNTIME_HOST` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
 | worker | Temporal activities | — | 同 runtime |
-| oob-collector | `deploy/oob-collector.py` | 19999 | — |
+| oob-collector | `deploy/oob-collector.py` | 19999 | `OOB_PORT` `SPECTRE_DATA_DIR` |
 | private-qa | `deploy/systemd/spectre-private-qa.service` | 8899 | — |
 
 ## 步骤
@@ -78,6 +79,14 @@ python3 gateway/spectre-passwd.py del <user>
 python3 gateway/spectre-passwd.py list
 curl 集成: 登录 POST 字段为 `user`/`pw`——`curl -d 'user=admin&pw=...' http://<gw>:8081/spectre/login`。
 ```
+
+## 手工运行 oob-collector
+
+```bash
+OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
+```
+
+两个变量显式带上——缺省数据根即生产路径, 测试时务必指向隔离目录。
 
 ## 行为备注
 

@@ -13,6 +13,8 @@ from collections import defaultdict, deque
 
 import os
 OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
+if not os.environ.get('SPECTRE_DATA_DIR'):
+    print('[oob] 提示: 未设置 SPECTRE_DATA_DIR —— 使用缺省 %s(生产路径; 测试请显式指定隔离目录)' % OUT, flush=True)
 QUOTA_BYTES = 512 * 1024 * 1024      # 目录总量上限
 RATE_PER_IP = 10                     # 每 IP 每分钟连接数
 RATE_WINDOW = 60.0
