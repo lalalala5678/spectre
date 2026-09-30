@@ -64,14 +64,13 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtim
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
 export SPECTRE_DATA_DIR=${SPECTRE_DATA_DIR:-/var/lib/spectre}   # 四脚本统一数据根
 bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据根(先行: 交付容器内引导)
-# 容器名按数据根派生: 缺省 spectre-sandbox; 隔离 SPECTRE_DATA_DIR 时为
-# spectre-sbx-<sha256(数据根)前8位>(docker ps 查实际名, 共享机勿盲打缺省名!)
-# 容器名按数据根哈希精确派生(隔离实例 spectre-sbx-<sha256 前8位>)
-docker exec spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8) \
-  bash /opt/tools/bootstrap-sandbox.sh 2>/dev/null \
-  || docker exec spectre-sandbox bash /opt/tools/bootstrap-sandbox.sh   # 缺省数据根回落
+# 容器名按数据根哈希精确派生(共享机勿盲打缺省名——隔离实例是
+# spectre-sbx-<sha256(数据根)前8位>, 缺省数据根才是 spectre-sandbox)
+SBX="spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8)"
+docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
+  || echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
-bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_DIR/skills
+PORT=$PORT INTERNAL_TOKEN=$TOK bash deploy/skills-seed.sh  # 55 技能; 即时刷新挂载需 PORT/INTERNAL_TOKEN 与 runtime 同源
 
 # 7) 数据源凭据
 #    控制台「Agent 配置」页填入(验证通过才落盘, 未配置不注入);
