@@ -28,7 +28,12 @@ def proxy(handler, api_path):
         length = int(handler.headers.get("Content-Length") or 0)
     except ValueError:
         length = 0
-    body = handler.rfile.read(length) if length else None
+    # CS4-M3: 负值穿 int() 守卫后 rfile.read(-5) 按"读到 EOF"语义
+    # 阻塞——客户端不关连接即囤积线程(_drain 自持 length<=0 臂)。
+    if length <= 0:
+        body = None
+    else:
+        body = handler.rfile.read(length)
 
     upstream = http.client.HTTPConnection(
         config.RUNTIME_HOST, config.RUNTIME_PORT, timeout=600,

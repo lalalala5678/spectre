@@ -225,7 +225,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
             length = int(self.headers.get("Content-Length", "0"))
         except ValueError:
             length = config.MAX_BODY_BYTES + 1
-        if length > config.MAX_BODY_BYTES:
+        # CS4-M3: 负值同拒——read(-5) 是"读到 EOF"的阻塞语义。
+        if length <= 0 or length > config.MAX_BODY_BYTES:
             audit("request_413", ip=ip, length=length)  # R4-2: 记账补齐
             self.close_connection = True
             return self._send(413, b"too large")

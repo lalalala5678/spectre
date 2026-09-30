@@ -7,8 +7,12 @@
  * 虚高(实测 100%); 存量旧库无 sent 时回退互动分母以免面板清空。
  */
 import { existsSync, readdirSync, readFileSync } from 'node:fs';
+import path_mod from 'node:path';
+import { CONFIG } from './config.mjs';
 
-const TRACK_DIR = '/var/lib/spectre/tools/phish';
+// CS4-M4: 跟随 SPECTRE_DATA_DIR(同 config/keyfiles 单源)——硬编码曾使
+// 隔离实例的漏斗读生产库、自身永远为空。
+const TRACK_DIR = path_mod.join(CONFIG.dataDir, 'tools/phish');
 
 /** 聚合全部 campaign 的漏斗/比率/时间线。 */
 export function phishCampaignFunnel() {

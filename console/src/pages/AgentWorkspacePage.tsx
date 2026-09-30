@@ -264,7 +264,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // 有意最小 deps 保稳定身份(见上方注释); workSession.id 变化由 bootstrapNonce 吸收
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSessionGone = useCallback(() => {
-            // server-side slot heals itself (bootstrap falls back to latest)
+    // server-side slot heals itself (bootstrap falls back to latest)
     setDrillSession(null);
     setEntryView(null);
     setSessionId(null);

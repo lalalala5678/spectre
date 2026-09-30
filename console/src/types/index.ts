@@ -49,16 +49,3 @@ export type MessageChannel =
   | 'dm'        // 私信：点对点（dispatch/result/handoff）
   | 'share';    // 情报共享：某 agent → 广播给相关方（如凭据、攻击面情报）
 
-export interface AgentMessage {
-  id: string;
-  ts: string;
-  from: AgentId;
-  to: AgentId | 'all';      // announce/share 时为 all
-  channel: MessageChannel;
-  type: 'dispatch' | 'result' | 'handoff' | 'context';
-  /** payload 摘要；敏感内容只给引用 */
-  summary: string;
-  payloadRef?: string;      // 如 凭据 #c1 / ev://xxx
-  sensitive?: boolean;
-  spanId?: string;          // 关联的 span
-}

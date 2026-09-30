@@ -25,7 +25,6 @@ const fmtTime = (iso: string) => {
 export function BusView({ workSessionId }: { workSessionId: string }) {
   const [filter, setFilter] = useState<MessageChannel | 'all'>('all');
   const [events, setEvents] = useState<ApiBusEvent[]>([]);
-  const [, setLive] = useState(false);  // CS3-N20: live 值无读者(曾用于指示灯), 仅保留写侧以最小改动
   const cursor = useRef(0);
 
   const [connError, setConnError] = useState('');
@@ -70,7 +69,7 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
             }
           }
         }
-        if (!cancelled) { setLive(true); setConnError(''); }
+        if (!cancelled) { setConnError(''); }
       } catch (e) {
         if (!cancelled) setConnError(e instanceof Error ? e.message : String(e));
       }

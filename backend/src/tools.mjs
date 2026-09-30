@@ -9,7 +9,10 @@
  * Tool matrix (LLM-facing; usability rule: one obvious tool per intent,
  * never a hard reject when a sensible default exists; CS2-#4 按 14924dc
  * 漏洞撰写收权后的现行实况重写——publish_vulnerability 仅 report 会话持有):
- *   orchestrator session  → dispatch_agents, relay_to_agents, spawn_agent, submit/query
+ *   orchestrator session  → dispatch_agents, relay_to_agents, spawn_agent,
+ *                           submit/query + report_vulnerability, publish_intel,
+ *                           request_vulnerability_revision(CS4-M1: 编排器
+ *                           叠 buildChildTools 尾巴, matrix.test 机锁)
  *   engagement/spawn child→ report_vulnerability, publish_intel,
  *                           request_vulnerability_revision, spawn_agent, submit/query
  *   direct user session   → report_vulnerability, publish_intel,
@@ -56,9 +59,6 @@ const spawnStageEnum = Type.Enum(
  * @param {object} caps    { emitBus, authorOf, listBus }
  */
 export function buildIntelTools(record, caps) {
-  /** Case/punct-insensitive title match for dangling-reference checks. */
-  const normTitle = s => String(s ?? '').toLowerCase()
-    .replace(/[\s·,。,.;:;:()[\]()（）【】《》""''-]/g, '');
   const queryIntel = {
     name: 'query_intel',
     label: '查询情报',
@@ -1035,3 +1035,10 @@ export function buildDirectTools(record, caps) {
     buildRequestRevisionTool(record, caps),
     ...buildToolingTools({ agentKey: record.agentKey }, caps)];
 }
+/**
+ * Case/punct-insensitive title match for dangling-reference checks
+ * (悬空漏洞引用模糊匹配). CS4-M5: 模块级导出——tests/norm-title.test.mjs
+ * 锁真实现(此前测试锁逐字副本, 实现回归时测试仍绿)。
+ */
+export const normTitle = s => String(s ?? '').toLowerCase()
+  .replace(/[\s·,。,.;:;:()[\]()（）【】《》""''-]/g, '');

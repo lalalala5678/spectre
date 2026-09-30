@@ -81,14 +81,14 @@
 
 | 工具 | 会话类型 | 副作用 | 说明 |
 |---|---|---|---|
-| `query_intel` | 全部 | [read-only] | 查询项目条目(kind=vulnerability/intel/task-report) |
-| `read_session` | 全部 | [read-only] | 按 sessionId/payloadRef 读源会话消息 |
-| `submit_task_report` | 全部 | [creates event] | 提交任务报告(status 可选+推断;vulns 字段引用漏洞标题) |
-| `report_vulnerability` | 子任务+非report直连 | [runs writer; synchronous] | 一句话上报漏洞线索——报告agent 读发现者会话上下文、验证后落账或驳回(回执判定) |
-| `revise_entry` | 全部(writer 全类型;其它仅情报/任务报告) | [creates event] | 修订条目——append-only 修订链(revises+revision.n),现行版=最新修订;漏洞仅 writer 可改 |
-| `request_vulnerability_revision` | 子任务+非report直连 | [runs writer; synchronous] | 漏洞修订申请——writer 审核必要性+正确性后落账或驳回(回执判定) |
+| `query_intel` | 业务面全部(配置三键除外) | [read-only] | 查询项目条目(kind=vulnerability/intel/task-report) |
+| `read_session` | 业务面全部(配置三键除外) | [read-only] | 按 sessionId/payloadRef 读源会话消息 |
+| `submit_task_report` | 业务面全部(配置三键除外) | [creates event] | 提交任务报告(status 可选+推断;vulns 字段引用漏洞标题) |
+| `report_vulnerability` | 编排器+子任务+非report直连 | [runs writer; synchronous] | 一句话上报漏洞线索——报告agent 读发现者会话上下文、验证后落账或驳回(回执判定) |
+| `revise_entry` | 业务面全部(writer 全类型;其它仅情报/任务报告;配置三键除外) | [creates event] | 修订条目——append-only 修订链(revises+revision.n),现行版=最新修订;漏洞仅 writer 可改 |
+| `request_vulnerability_revision` | 编排器+子任务+非report直连 | [runs writer; synchronous] | 漏洞修订申请——writer 审核必要性+正确性后落账或驳回(回执判定) |
 | `publish_vulnerability` | 仅report会话(撰写agent) | [creates event] | 漏洞落账唯一入口——由报告agent持有;带 payloadRef+requester 溯源 |
-| `publish_intel` | 子任务+直连 | [creates event] | 发布情报——任何可能对任务有利的信息,低门槛 |
+| `publish_intel` | 编排器+子任务+直连 | [creates event] | 发布情报——任何可能对任务有利的信息,低门槛 |
 | `spawn_agent` | 编排器+子 | [spawns agent] | 派生子智能体 |
 | `dispatch_agents` | 编排器 | [starts engagement] | Temporal 批量调度 |
 | `relay_to_agents` | 编排器 | [sends DM] | 定向转发情报 |

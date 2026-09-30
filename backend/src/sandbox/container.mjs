@@ -429,7 +429,7 @@ export async function uninstallCliTool(name) {
       return m ? m[2].trim().split(/\s+/)
         // strict package-name shape: redirects (2>/dev/null), env
         // assignments and shell tokens can never look like this
-        .filter(w => /^[\w.+:~-]+$/.test(w)) : [];
+        .filter(w => PKG_WORD_RE.test(w)) : [];
     }))];
     // P0: zero extracted names must ABORT — a bare `apt-get remove
     // --purge` exits 0 having removed nothing, the receipt would then

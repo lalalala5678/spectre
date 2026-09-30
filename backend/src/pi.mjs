@@ -177,7 +177,7 @@ export async function buildPi() {
       apiKey: {
         name: 'spectre-llm',
         resolve: async () => {
-                    const key = effectiveCommon().apiKey;
+            const key = effectiveCommon().apiKey;
           return key
             ? { auth: { apiKey: key }, source: 'settings' }
             : { auth: { apiKey: process.env.LLM_API_KEY }, source: 'LLM_API_KEY' };

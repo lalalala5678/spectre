@@ -3,7 +3,6 @@
  * 重复的条目元部件——⟳ 修订徽标 + 溯源行 + 已作废标。R18 曾只抽 ProvenanceLine
  * 的计划作废, 本组件覆盖整个尾块。
  */
-import type { ApiBusEvent } from '../../api/client';
 import type { FoldedEntry } from '../../api/useBusPanelEntries';
 import { ChevronRight } from 'lucide-react';
 
@@ -33,8 +32,3 @@ export function PanelEntryMeta({ event, voidable }: {
   );
 }
 
-/** 溯源行的纯文本形态(author 描述), 供非 JSX 场景复用。 */
-export const provenanceText = (e: ApiBusEvent): string => {
-  const a = e.author;
-  return a ? `${a.name}（${a.typeLabel}${a.parent ? ` · 父:${a.parent.name}` : ''} · L${a.depth}）` : '';
-};

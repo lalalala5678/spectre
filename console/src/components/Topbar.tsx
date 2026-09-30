@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Activity, Bell, LogOut, Search } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
+import { setPendingOpen } from '../api/openSessionChannel';
 
 /** F60: /api/health 前端零消费——模型名/会话总量/总线事件总量后端有、
  * 用户无从得知。状态栏 30s 轮询展示(ok 掉线变红)。 */
@@ -14,7 +15,6 @@ interface BusEvt { seq: number; ts?: string; type: string | null; title: string 
  * 逻辑)。实现: ≥2 字符防抖搜索会话(/sessions/tree 轻投影)+总线条目
  * (intel/vulnerability/task-report 的 title/summary, CVE 正则加权)。 */
 const SEARCHABLE = new Set(['intel', 'intel-note', 'vulnerability', 'task-report']);
-import { setPendingOpen } from '../api/openSessionChannel';
 
 /** F70: 通知铃铛此前是纯装饰(硬编码红点+无逻辑)。实装:
  * - 漏洞发布(vulnerability)与新失败报告(task-report failed)推送为通知

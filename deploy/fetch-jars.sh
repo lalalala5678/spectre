@@ -6,8 +6,12 @@ ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
 # R14-1(十四轮): 生产缺省守卫——同族 tools-sync/skills-seed 已三修, 此为
 # 最后缺位者(漏 env 直跑即静默写 ~25MB jar 进生产路径)。
 # CS3-N19: 守卫判实际写目标(LIBS/GEN 可覆盖 ROOT), 而非仅 ROOT
-GUARD_BASE=${LIBS_DIR:-$ROOT/tools/c2/libs}
-if [ -z "$SPECTRE_DATA_DIR" ] && [ "$GUARD_BASE" = "/var/lib/spectre/tools/c2/libs" ]; then
+# CS3-N19/CS4-M11: 守卫判全部实际写目标(LIBS 与 GEN 任一落在生产路径即拦)
+GUARD_LIBS=${LIBS_DIR:-$ROOT/tools/c2/libs}
+GUARD_GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
+if [ -z "$SPECTRE_DATA_DIR" ] \
+   && { [ "$GUARD_LIBS" = "/var/lib/spectre/tools/c2/libs" ] \
+     || [ "$GUARD_GEN" = "/var/lib/spectre/tools/c2/generators" ]; }; then
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
     echo "[fetch-jars] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $ROOT" >&2
     echo "[fetch-jars] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2

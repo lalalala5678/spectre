@@ -5,8 +5,8 @@
  */
 import { finish } from './helpers.mjs';
 
-const NORM_RE = /[\s·,。,.;:;:()[\]()（）【】《》""''-]/g;
-const norm = s => String(s ?? '').toLowerCase().replace(NORM_RE, '');
+// CS4-M5: import 真实现(此前锁的是逐字副本——实现回归测试仍绿)
+import { normTitle as norm } from '../src/tools.mjs';
 
 function ck(label, ok) {
   console.log(`${ok ? '✓' : '✗ FAIL'}  ${label}`);

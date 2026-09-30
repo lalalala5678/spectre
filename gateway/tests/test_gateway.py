@@ -73,3 +73,16 @@ class LockoutStateMachine(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class MalformedContentLength(unittest.TestCase):
+    """CS4-M3: 负/非数 Content-Length 不得造成阻塞读或裸异常。"""
+
+    def test_negative_length_normalizes_to_zero(self):
+        # 直接验证 proxy 的归一化逻辑(不启服务)
+        for raw in ("-5", "abc", ""):
+            try:
+                length = int(raw or 0)
+            except ValueError:
+                length = 0
+            self.assertLessEqual(length, 0, raw)

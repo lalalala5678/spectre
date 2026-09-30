@@ -27,6 +27,16 @@ ck('编排器持有 publish_intel', built.includes('publish_intel'));
 ck('编排器持有 request_vulnerability_revision', built.includes('request_vulnerability_revision'));
 ck('编排器 spawn_agent 不重复', built.filter(n => n === 'spawn_agent').length === 1);
 ck('编排器持有 dispatch/relay', built.includes('dispatch_agents') && built.includes('relay_to_agents'));
+// CS4-M1/M2: 配置三键"有且只有"公理机锁——不持任何 intel 业务工具
+const cfgAgent = store.create('skill-config', { workSessionId: 'ws' });
+const cfgNames = cfgAgent.agent.state.tools.map(t => t.name);
+ck('配置三键不持 intel 工具',
+  !cfgNames.includes('query_intel') && !cfgNames.includes('publish_intel')
+  && !cfgNames.includes('submit_task_report') && !cfgNames.includes('revise_entry'));
+ck('配置三键不持输出工具',
+  !cfgNames.includes('report_vulnerability') && !cfgNames.includes('publish_vulnerability'));
+// 编排器持有共享工具实例(CS3-N4 补面)
+ck('编排器持 search_web 实例', built.includes('search_web'));
 
 // ---------- dynamic prompt roster (kills prompt/matrix drift) ----------
 const sys = orch.agent.state.systemPrompt;

@@ -20,7 +20,7 @@ export async function readJson(req) {
   for await (const chunk of req) {
     size += chunk.length;
     if (size > CONFIG.maxBodyBytes) {
-      throw Object.assign(new Error('request body too large'), { statusCode: 413 });
+      throw Object.assign(new Error('请求体过大'), { statusCode: 413 });
     }
     chunks.push(chunk);
   }
@@ -74,7 +74,7 @@ export async function readRawBody(req, maxBytes) {
   for await (const chunk of req) {
     size += chunk.length;
     if (size > cap) {
-      throw Object.assign(new Error('request body too large'), { statusCode: 413 });
+      throw Object.assign(new Error('请求体过大'), { statusCode: 413 });
     }
     chunks.push(chunk);
   }
