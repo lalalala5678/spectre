@@ -25,7 +25,10 @@ loadEnvFile(new URL('../.env', import.meta.url).pathname);
 // 装机(npm 警告被略过)在此给出明确提示而非运行中诡异失败。
 const _nv = process.versions.node.split('.').map(Number);
 if (_nv[0] < 22) {
-  console.warn(`[config] Node ${process.versions.node} 低于受支持版本 22 —— 已观察到可运行, 但未受支持; 建议升级`);
+  // N8(部署审计五轮): 与 console prebuild 同门槛硬拒——非对称策略
+  //(一硬一软)此前被列为反直觉点。
+  throw new Error(
+    `[config] Node ${process.versions.node} 低于受支持版本 22 — 升级 Node 后重试(console 构建同为硬门)`);
 }
 
 function required(name) {

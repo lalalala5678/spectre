@@ -54,7 +54,7 @@ export function Markdown({ children }: { children: string }) {
           // R23-F1: 无语言围栏块不产出 language- class, 此前被误判为
           // 行内 chip 且外层裸 pre 无滚动——块级样式整体搬 pre, code 只
           // 承载行内样式, pre 内 code 以任意变体中和。
-          code: ({ className, children: c, ...rest }) => (
+          code: ({ children: c, ...rest }) => (
             <code
               className="rounded-sm bg-void-950 px-1 py-px font-mono text-[12px] text-orange-300/90"
               {...rest}

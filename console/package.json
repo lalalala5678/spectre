@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
-    "lint": "oxlint",
+    "lint": "oxlint # 规则裁剪见 .oxlintrc.json: SSE 流式/命令式 DOM 模式豁免风格类规则, correctness 全开",
     "preview": "vite preview",
     "prebuild": "node -e 'const v=process.versions.node.split(/[.]/).map(Number);if(v[0]<22){console.error(\"Node >= 22 required (current \"+process.versions.node+\") — 升级 Node 后重试\");process.exit(1)}'"
   },

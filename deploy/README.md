@@ -32,7 +32,7 @@ cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN(自定义随机串) �
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # PORT 可覆盖; 生产缺省 /var/lib/spectre
 
-# 2) 前端(Node ≥ 20.19)
+# 2) 前端(Node ≥ 22)
 cd ../console && npm i && npm run build
 
 # 3) 网关(纯 stdlib, 无需 pip; Python ≥ 3.7)
@@ -46,7 +46,7 @@ python3 server.py                             # dist 默认 ../console/dist
 #    本机: http://127.0.0.1:8081/spectre/ → admin 登录
 #    远程纯 HTTP: cookie 带 Secure 位会静默无法登录——要么 GATEWAY_INSECURE_COOKIE=1(仅测试),
 #    要么经 TLS(Caddy 样例见 deploy/Caddyfile; 网关默认只绑 127.0.0.1, 远程需 GATEWAY_BIND_HOST 或隧道)
-#    注意: 前端 npm i 与 npm run build 需同一 Node ≥ 20.19(混版本装出的原生依赖会损坏)
+#    注意: 前端 npm i 与 npm run build 需同一 Node ≥ 22(混版本装出的原生依赖会损坏)
 
 # 5) systemd(可选, 路径经环境文件驱动)
 sudo mkdir -p /etc/spectre && sudo cp deploy/spectre.env.example /etc/spectre/spectre.env

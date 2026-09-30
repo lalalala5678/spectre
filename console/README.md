@@ -3,7 +3,7 @@
 SPECTRE 控制台前端（React 19 + Vite 8 + Tailwind 4）。
 
 ```bash
-npm i && npm run build   # Node ≥ 20.19; 产物 dist/ 由网关静态服务
+npm i && npm run build   # Node ≥ 22; 产物 dist/ 由网关静态服务
 npm run dev              # 本地开发(代理到 :8081 网关)
 ```
 

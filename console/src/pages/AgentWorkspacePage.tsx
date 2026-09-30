@@ -55,6 +55,20 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     return () => { cancelled = true; };
   }, []);
   const [uiReady, setUiReady] = useState(false);
+  useEffect(() => {
+    let cancelled = false;
+    Promise.all([ensureWorkSession(), getPrefs()]).then(async ([ws, prefs]) => {
+      if (cancelled) return;
+      uiPrefsRef.current = prefs.ui ?? {};
+      const saved = Number(prefs.ui?.rightRatio);
+      if (saved > 0.02 && saved < 0.98) setRightRatio(saved);  // R13-F2
+      setWorkSession(ws);
+      setUiReady(true);
+      setProjects(await listWorkSessions());
+    }).catch(err => setWsError(errText(err)));
+    return () => { cancelled = true; };
+  }, []);
+
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);

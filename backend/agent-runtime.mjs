@@ -31,6 +31,45 @@ import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
 import { projectsFromWal, listProjects, getPrefs, tombstonesAll } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
+import fs from 'node:fs';
+
+// N7(部署审计五轮, P0): 数据目录实例锁——boot compaction 原先发生在
+// 端口 bind 之前, 多实例共用数据目录时"先原子重写 WAL 再 EADDRINUSE
+// 崩溃"(实测静默覆写生产 state.wal)。任何读取/重写前先原子占锁
+// ('wx' 独占创建); 持有者已死(PID 不存活)则收尸重取。
+const lockPath = path.join(CONFIG.dataDir, '.instance.lock');
+fs.mkdirSync(CONFIG.dataDir, { recursive: true });
+const pidAlive = pid => {
+  if (!pid) return false;
+  try { process.kill(pid, 0); return true; } catch (e) { return e.code === 'EPERM'; }
+};
+const takeLock = () => {
+  try {
+    const fd = fs.openSync(lockPath, 'wx');
+    fs.writeSync(fd, String(process.pid));
+    fs.closeSync(fd);
+    return true;
+  } catch (e) {
+    if (e.code !== 'EEXIST') throw e;
+    return false;
+  }
+};
+if (!takeLock()) {
+  let holder = null;
+  try { holder = Number(fs.readFileSync(lockPath, 'utf8').trim()); } catch {}
+  if (pidAlive(holder)) {
+    console.error(
+      `[runtime] FATAL: 数据目录 ${CONFIG.dataDir} 已被实例 PID ${holder} 持有——共用数据目录的第二实例会互相覆写 WAL; 设置 SPECTRE_DATA_DIR 指向独立目录`);
+    process.exit(1);
+  }
+  console.warn(`[runtime] 清理残留锁(持有者 PID ${holder} 已退出)`);
+  try { fs.unlinkSync(lockPath); } catch {}
+  if (!takeLock()) {
+    console.error(`[runtime] FATAL: 实例锁竞争失败(${lockPath})`);
+    process.exit(1);
+  }
+}
+process.on('exit', () => { try { fs.unlinkSync(lockPath); } catch {} });
 
 const { model, streamFn } = await buildPi();
 const wal = new Wal(path.join(CONFIG.dataDir, 'state.wal'));

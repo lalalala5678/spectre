@@ -111,8 +111,8 @@ export async function api<T>(
   const res = await fetch(`${API_BASE}${path}`, {
     ...rest,
     headers: {
-      ...(json !== undefined ? { 'Content-Type': 'application/json' } : {}),
-      ...(rest.headers ?? {}),
+      ...(json !== undefined && { 'Content-Type': 'application/json' }),
+      ...(rest.headers),
     },
     body: json !== undefined ? JSON.stringify(json) : rest.body,
   });

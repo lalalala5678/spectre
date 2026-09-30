@@ -48,6 +48,8 @@ cd ../gateway && python3 spectre-passwd.py add admin && \
 
 打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
 
+> Node 22.x(低于 22.19)安装时 npm 会打印 EBADENGINE 警告——依赖链的版本声明比实际需求严格, 22.x 实测可运行, 警告可忽略。
+
 完整部署(systemd/沙箱/私架面杀/凭据边界)见 [deploy/README.md](deploy/README.md)。
 
 数据源凭据在设置页配置（验证通过才落盘，未配置的源不注入智能体工具面）；LLM 凭据经 `backend/.env` 启动装载。
