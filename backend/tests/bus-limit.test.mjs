@@ -1,6 +1,7 @@
 /** F67: bus journal 上限(5000)截断契约——确定性。
  * seq 单调续增 / list 封顶 / 修订孤儿在原事件被截后的折叠。 */
 import { Bus } from '../src/bus.mjs';
+import { foldRevisions } from '../src/revision.mjs';
 import { nullWal, ck, finish } from './helpers.mjs';
 
 const bus = new Bus(nullWal);
@@ -26,7 +27,6 @@ ck('原事件已被截', !bus.list().some(e => e.seq === orig.seq));
 ck('修订事件仍在', bus.list().some(e => e.seq === rev.seq && e.revises === orig.seq));
 
 // R2-F2: 孤儿链现行版=最新修订(n 最大)——截断后 ≥2 修订, fold 应出 newest
-import { foldRevisions } from '../src/revision.mjs';
 const bus2 = new Bus(nullWal);
 for (let i = 0; i < 5000; i++) {
   bus2.emit({ channel: 'share', from: 'recon', summary: `f-${i}` });

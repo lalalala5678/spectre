@@ -387,14 +387,8 @@ export function makeExecutionEnv(cfg, wsId) {
   return { ...fsEnv, ...shell };
 }
 
-/** Ensure a project workspace exists (host side of the mount). */
-export async function ensureWorkspace(wsId) {
-  const dir = path.join(HOST.workspace, wsId);
-  await fsp.mkdir(dir, { recursive: true });
-  return dir;
-}
-
-/** Sync variant for session-creation assembly (mkdir is cheap). */
+/** Ensure a project workspace exists (host side of the mount; sync 变体——
+ * CS6-F2: 异步版零引用已删, 全仓唯一消费点是会话创建的同步装配). */
 export function ensureWorkspaceSync(wsId) {
   const dir = path.join(HOST.workspace, wsId);
   fs.mkdirSync(dir, { recursive: true });

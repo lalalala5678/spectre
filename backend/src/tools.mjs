@@ -27,7 +27,6 @@ import { clipMarked } from './pi.mjs';
 import { foldRevisions } from './revision.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 
-
 /** Stage agents(10)——CS2-#21 单源导出(routes 此前内联同款字面量)。 */
 export const STAGE_KEYS = [
   'recon', 'nday', 'weakcred', 'api', 'exploit',
@@ -45,7 +44,6 @@ export const SPAWNABLE_KEYS = STAGE_KEYS.filter(k => k !== 'report');
 const spawnStageEnum = Type.Enum(
   Object.fromEntries(SPAWNABLE_KEYS.map((key) => [key, key])),
 );
-
 
 /**
  * Shared intel tools — the project intel base every agent reads and
@@ -407,8 +405,6 @@ export function buildIntelTools(record, caps) {
     },
   };
 
-
-
   const readSession = {
     name: 'read_session',
     label: '读取会话',
@@ -492,7 +488,6 @@ function buildReportVulnerabilityTool(record, caps) {
     },
   };
 }
-
 
 /**
  * request_vulnerability_revision — writer-reviewed vulnerability
@@ -757,7 +752,6 @@ export function buildOrchestratorTools(record, caps) {
   return [dispatchAgents, relayToAgents, spawnAgent];
 }
 
-
 /**
  * Shell tool — operate C2 implant handles handed over by the C2 agent or
  * the operator (SSH-like channel over the compromise). Same tool instance
@@ -877,7 +871,6 @@ function entryLabel(e) {
   if (k === 'task-report') return `任务报告|${e.status ?? '?'}`;
   return e.type ?? '?';
 }
-
 
 /**
  * buildPublishIntelTool (CS1-R15/C2/D2): engagement child 与 direct 两处
@@ -1013,7 +1006,6 @@ export function buildDirectTools(record, caps) {
       };
     },
   };
-
 
   const publishIntel = buildPublishIntelTool(record, caps,
     { to: 'user', origin: 'direct', dm: false, verbose: false });

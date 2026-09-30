@@ -20,7 +20,8 @@ class ProxyError(Exception):
 def normalize_content_length(raw):
     """Parse Content-Length safely (CS4-M3/CS5-N3).
 
-    非数 → 0; 负值 → 0(read(-n) 是"读到 EOF"的阻塞语义); 其余原值。
+    不可解析为 int → 0; 负值 → 0(read(-n) 是"读到 EOF"的阻塞语义);
+    其余(int 可解析且 >0)原值返回。
     """
     try:
         length = int(raw or 0)

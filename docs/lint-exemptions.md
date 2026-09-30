@@ -4,7 +4,7 @@ commit 4ce5e1d 曾把 console oxlint 告警从 34 清到 0, 提交信息自称"�
 lint script"——但 JSON 配置无法注释、lint script 就是裸 `oxlint`, 理由实际
 无处落盘(CS1-B12)。本文件是唯一记载处, 改动豁免必须同步改这里。
 
-## console/.oxlintrc.json 关闭的 5 条规则
+## console/.oxlintrc.json 关闭的规则(CS6-F8: 现役 3 条——only-export-components/exhaustive-deps 已恢复全局)
 
 | 规则 | 关闭理由 | 复核结论(CS1) |
 |---|---|---|

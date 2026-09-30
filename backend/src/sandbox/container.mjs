@@ -54,11 +54,6 @@ const APT_INSTALL_RE = /(apt(?:-get)?\s+install\s+)((?:-{1,2}[\w-]+\s+)*)([^;&|]
 const APT_ACT_RE = /apt(?:-get)?\s+(?:install|remove)\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/;
 const PKG_WORD_RE = /^[\w.+:~-]+$/;
 
-/** Parse package names out of an apt install command line (CS1-R3). */
-export function parseAptPackages(cmd) {
-  return String(cmd).split(/\s+/).filter(t => /^[a-z0-9][a-z0-9.+-]*$/i.test(t) && !t.startsWith('-'));
-}
-
 async function dockerAvailable() {
   return new Promise(resolve => {
     const p = spawn('docker', ['version', '--format', '{{.Server.Version}}'],

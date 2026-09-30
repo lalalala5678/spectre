@@ -53,8 +53,6 @@ const BUSINESS_PROMPTS = {
 
 const ORCHESTRATOR_KEY = 'autopwn';
 
-
-
 /**
  * Origin heuristic for system-injected user-role turns. Our own DM
  * emissions carry a "[DM from x]" prefix → 'agent'; every other

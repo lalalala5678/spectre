@@ -51,7 +51,6 @@ export async function putPrefsSync(
   catch { /* UI prefs are best-effort */ }
 }
 
-export type UiPrefs = Prefs['ui'];
 
 /** Switch the active project (server-side preference). */
 export async function switchWorkSession(id: string): Promise<WorkSession | null> {

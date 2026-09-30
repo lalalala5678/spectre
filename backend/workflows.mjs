@@ -31,6 +31,8 @@ import {
   setHandler,
   startChild,
 } from '@temporalio/workflow';
+// CS1-A4: 单源常量——nudge-text.mjs 纯字符串模块(零副作用), Temporal determinism 安全。
+import { REPORT_NUDGE_TEXT } from './src/nudge-text.mjs';
 
 const signals = {
   agentShare: defineSignal('agentShare'),
@@ -70,9 +72,6 @@ function clipMarked(value, max) {
 const CHILD_SUMMARY_MAX = 2000;
 
 
-// CS1-A4: 单源常量——nudge-text.mjs 是纯字符串模块(零 import/零副作
-// 用), 满足 Temporal workflow 的 determinism 约束, 可安全引用。
-import { REPORT_NUDGE_TEXT } from './src/nudge-text.mjs';
 /**
  * @param {{engagementId: string, instruction: string, agents: string[],
  *          orchestratorSessionId?: string|null}} input
