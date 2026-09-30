@@ -90,6 +90,7 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 ## 行为备注
 
 - API 裸建会话(无 workSessionId)不进项目历史列表——顶部全局搜索按标题/ID 可找回; UI 建会自动归组
+- POST /api/sessions 的 title 字段被忽略——标题由 summarizer 在首轮对话后自动生成(设计)
 - 登录失败锁定为网关内存态(5 次/15 分钟, 重启即清); 登录成败同为 303, CLI 集成读 Location 的 `?e=` 参数(`e=cred`/`e=lock`)区分
 
 ## CLI 验证备注

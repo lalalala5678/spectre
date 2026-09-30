@@ -117,7 +117,9 @@ bus.load(replay.busEvents);
 const shellScope = () => {
   // Read-per-call: benchmark windows open/close live; a boot-cached scope
   // would reject freshly authorized exercises.
-  try { return JSON.parse(readFileSync('/var/lib/spectre/tools/c2/scope.json', 'utf8')); }
+  // NEW-D(十一轮): 跟随 CONFIG.dataDir——此前硬编码 /var/lib/spectre,
+  // 隔离实例的 C2 shell 硬门读到的是生产 scope。
+  try { return JSON.parse(readFileSync(path.join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8')); }
   catch { return null; }
 };
 
