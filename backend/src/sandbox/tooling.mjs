@@ -193,8 +193,10 @@ export function buildToolingTools(record, caps) {
       // 无配置智能体专属工具 — 那些永远不属于业务 agent。
       return [all.reconSearchWeb, all.fetchUrl];
     case 'nday':
-      // NDay agent 的独立 fetch_url 实例(CVE 详情/POC readme/patch 页抓取)。
-      return [all.fetchUrl];
+      // NDay agent 独立实例: fetch_url(CVE 详情/POC readme/patch 页)+
+      // search_web(CS5-N1: 此前缺席——铁律'各持独立实例'应含两者,
+      // AGENTS.md'全部'行因此失真)。
+      return [all.searchWeb, all.fetchUrl];
     default:
       // 其余业务智能体(api/exploit/weakcred/phish/c2/persistence/postex/
       // autopwn/report)各持独立 search_web+fetch_url 实例——AGENTS.md

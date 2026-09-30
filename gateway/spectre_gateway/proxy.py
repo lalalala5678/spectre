@@ -17,23 +17,26 @@ class ProxyError(Exception):
         self.status = status
 
 
+def normalize_content_length(raw):
+    """Parse Content-Length safely (CS4-M3/CS5-N3).
+
+    非数 → 0; 负值 → 0(read(-n) 是"读到 EOF"的阻塞语义); 其余原值。
+    """
+    try:
+        length = int(raw or 0)
+    except ValueError:
+        return 0
+    return length if length > 0 else 0
+
+
 def proxy(handler, api_path):
     """Forward the current request to the runtime; stream the response back.
 
     `api_path` is the runtime-relative path (PREFIX already stripped).
     """
-    # CS3-N7: malformed Content-Length must not escape as a bare
-    # ValueError — every other parse site in the handler guards.
-    try:
-        length = int(handler.headers.get("Content-Length") or 0)
-    except ValueError:
-        length = 0
-    # CS4-M3: 负值穿 int() 守卫后 rfile.read(-5) 按"读到 EOF"语义
-    # 阻塞——客户端不关连接即囤积线程(_drain 自持 length<=0 臂)。
-    if length <= 0:
-        body = None
-    else:
-        body = handler.rfile.read(length)
+    # CS4-M3/CS5-N3: 非数与负值的归一化单源 normalize_content_length
+    length = normalize_content_length(handler.headers.get("Content-Length"))
+    body = handler.rfile.read(length) if length else None
 
     upstream = http.client.HTTPConnection(
         config.RUNTIME_HOST, config.RUNTIME_PORT, timeout=600,

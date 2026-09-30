@@ -7,16 +7,15 @@
  */
 
 import { AGENTS, AGENT_KEYS, isAgentKey } from './agents.mjs';
-import { SPAWNABLE_KEYS, STAGE_KEYS } from './tools.mjs';
+import { SPAWNABLE_KEYS, STAGE_KEYS, entryKind as entryKindOf } from './tools.mjs';
 import { CONFIG } from './config.mjs';
 import { hasInternalToken, isInternalCaller, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
 import * as path_mod from 'node:path';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
 import { injectionOriginOf } from './sessions.mjs';
-import { entryKind as entryKindOf } from './tools.mjs';
 import { emitRevision } from './revision.mjs';
-import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
+import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools, sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
 import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
@@ -27,7 +26,6 @@ import { getSettings, saveSetting, RECON_SOURCES_INTERNAL } from './agent-settin
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
-import { sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 const PROJECT_ID = /^\/api\/projects\/([a-z0-9-]+)$/;  // CS3-N22: PUT/DELETE 双胞胎正则单源

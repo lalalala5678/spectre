@@ -9,15 +9,18 @@
 
 import crypto from 'node:crypto';
 
-import { Agent } from '@earendil-works/pi-agent-core';
+import { Agent, formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf, CONFIG_AGENT_KEYS } from './agents.mjs';
 import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
-import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
+import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
+import { Summarizer } from './summarizer.mjs';
+// CS1-A4: 单源常量(此前与 workflows.mjs 双胞胎漂移, workflows 侧曾把 status 说成必填)。
+import { REPORT_NUDGE_TEXT } from './nudge-text.mjs';
 
 /** Disk-full resilience: a failing WAL append must degrade to a log
  *  line, never crash the agent loop at the exact moment durability
@@ -47,14 +50,9 @@ const BUSINESS_PROMPTS = {
   phish: PHISH_PROMPT,
   postex: POSTEX_PROMPT,
 };
-import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
-import { Summarizer } from './summarizer.mjs';
 
 const ORCHESTRATOR_KEY = 'autopwn';
 
-// CS1-A4: 单源常量(此前与 workflows.mjs 双胞胎漂移, workflows 侧曾把
-// status 说成必填——与工具 schema 矛盾)。
-import { REPORT_NUDGE_TEXT } from './nudge-text.mjs';
 
 
 /**

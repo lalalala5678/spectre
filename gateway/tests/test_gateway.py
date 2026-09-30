@@ -71,18 +71,18 @@ class LockoutStateMachine(unittest.TestCase):
         self.assertFalse(locked)  # 过期重开窗口, 计数归零
 
 
+class NormalizeContentLength(unittest.TestCase):
+    """CS4-M3/CS5-N3: 真防线——import proxy.normalize_content_length。"""
+
+    def test_malformed_values_normalize_to_zero(self):
+        from spectre_gateway.proxy import normalize_content_length
+        for raw in ("-5", "abc", "", None, "0"):
+            self.assertEqual(normalize_content_length(raw), 0, raw)
+
+    def test_positive_passthrough(self):
+        from spectre_gateway.proxy import normalize_content_length
+        self.assertEqual(normalize_content_length("128"), 128)
+
+
 if __name__ == "__main__":
     unittest.main()
-
-
-class MalformedContentLength(unittest.TestCase):
-    """CS4-M3: 负/非数 Content-Length 不得造成阻塞读或裸异常。"""
-
-    def test_negative_length_normalizes_to_zero(self):
-        # 直接验证 proxy 的归一化逻辑(不启服务)
-        for raw in ("-5", "abc", ""):
-            try:
-                length = int(raw or 0)
-            except ValueError:
-                length = 0
-            self.assertLessEqual(length, 0, raw)

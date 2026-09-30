@@ -1,7 +1,7 @@
 /**
- * CS3-N1: normTitle 标点剥离行为锁定——tools.mjs 的字符类转义错误
- * ([\] 失转义致字符类提前闭合)曾让它静默失效两轮审计。实现与
- * tools.mjs buildIntelTools.normTitle 同源; 改动须两侧同步。
+ * CS3-N1/CS5-N6: normTitle 标点剥离行为锁定——字符类转义错误曾静默
+ * 失效两轮审计。CS4-M5 起 import tools.mjs 导出的真实现(单一事实源,
+ * 实现回归即红)。
  */
 import { finish } from './helpers.mjs';
 

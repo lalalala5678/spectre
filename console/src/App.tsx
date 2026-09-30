@@ -19,8 +19,6 @@ const STAGE_ROUTES: RouteKey[] = [
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
 ];
 
-
-
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段

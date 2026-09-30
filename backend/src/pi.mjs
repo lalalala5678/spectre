@@ -177,7 +177,7 @@ export async function buildPi() {
       apiKey: {
         name: 'spectre-llm',
         resolve: async () => {
-            const key = effectiveCommon().apiKey;
+          const key = effectiveCommon().apiKey;
           return key
             ? { auth: { apiKey: key }, source: 'settings' }
             : { auth: { apiKey: process.env.LLM_API_KEY }, source: 'LLM_API_KEY' };
@@ -538,7 +538,7 @@ export const NDAY_PROMPT = [
   '',
   '# 四阶段循环',
   'P0 情报构建(零目标流量):指纹项目→本地 CVE 模板索引',
-  '   (/var/lib/spectre/tools/fingerprints/,3015 个含 CVE 的 yaml,',
+  '   (/opt/tools/fingerprints/,3015 个含 CVE 的 yaml,',  // CS5-N2: 容器视角路径(宿主=dataDir/tools, 挂载同源)
   '   0x727 目录按 vendor/product 组织)+ cvelistV5 本地检索',
   '   (/opt/tools/cvelistV5,cves/年/月/CVE-*.json 的 affected 版本区间)+',
   '   NVD 单查补 CPE(免 key 慢,单查够用)+ GHSA references +',
