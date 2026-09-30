@@ -156,7 +156,7 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
         setConnError(true);
         // R16-F5: 退避链上限 1——失败期 4s 轮询仍在触发, 每个 catch 各
         // 自派生一条 setTimeout 链会无界叠加(请求量随停机时长线性涨)。
-        if (retryTimer.current == null) {
+        if (retryTimer.current === null) {
           const ms = retryMs;
           retryTimer.current = setTimeout(() => {
             retryTimer.current = null;

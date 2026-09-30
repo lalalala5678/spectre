@@ -36,6 +36,8 @@ export function AuditPage() {
     a.href = URL.createObjectURL(blob);
     a.download = `spectre-audit-${Date.now()}.json`;
     a.click();
+  // 导出动作读当时的 events 快照, 不需要在 events 变化时重触发
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportTick]);
 
   const shown = (events ?? []).slice(0, limit);

@@ -1,10 +1,12 @@
 /**
  * tooling-probe — search provider 连通校验(设置面板保存 webSearch.apiKey 用)。
- * 与 tooling.mjs PROVIDERS 同实现的探针:同 key 同端点打一发最小查询,
- * 认证/权限错误显形为保存失败, 不落盘。
+ * 请求形状与 tooling.mjs PROVIDERS 同源(provider-specs.mjs 单源派生):
+ * 同 key 同端点打一发最小查询, 认证/权限错误显形为保存失败, 不落盘。
  */
-// CS1-R17: 请求形状单源 provider-specs.mjs; 探针语义 = count=1 最小查询,
-// 认证/权限错误显形为 {ok:false}。
+import { providerFetch } from './provider-specs.mjs';
+
+// CS2-#1: 此 import 在 R17 重构时曾丢失(替换锚未命中且无 assert),
+// 探针全链 ReferenceError 被吞成"连通失败"——搜索 Key 保存全线误杀。
 const PROBES = {
   zhipu: async (cfg) => {
     const { res, data } = await providerFetch('zhipu', cfg, { query: 'test', count: 1 });

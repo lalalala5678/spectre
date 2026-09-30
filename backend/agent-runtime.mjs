@@ -25,6 +25,7 @@ import { buildPi } from './src/pi.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
 import { textOf } from './src/pi.mjs';
+import { rebuildMounts } from './src/sandbox/mount.mjs';
 import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
 import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
@@ -416,7 +417,6 @@ loadSandboxConfig().then(async cfg => {
   const ensured = await ensureSandbox();
   console.log(`[sandbox] driver=${cfg.driver} ok=${ensured.ok}`,
     ensured.error ?? '');
-  const { rebuildMounts } = await import('./src/sandbox/mount.mjs');
   await rebuildMounts(AGENT_KEYS);
   // rehydrate 早于暖机——重建存量 agent 使 MCP 工具进入老会话工具面
   const remounted = store.rebuildSessionAgents();

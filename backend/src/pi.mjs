@@ -9,6 +9,7 @@
  */
 
 import { createModels, createProvider } from '@earendil-works/pi-ai';
+import { effectiveCommon } from './agent-settings.mjs';
 import * as openaiCompletions from '@earendil-works/pi-ai/api/openai-completions';
 
 import { CONFIG } from './config.mjs';
@@ -167,8 +168,7 @@ export async function buildPi() {
   // User-facing settings override env (settings.mjs): baseUrl/apiKey/
   // model/maxTokens/contextWindow — every save passed a live probe, so
   // values arriving here were connectivity-verified at save time.
-  const { effectiveCommon } = await import('./agent-settings.mjs');
-  const eff = effectiveCommon();
+    const eff = effectiveCommon();
   const models = createModels();
   models.setProvider(createProvider({
     id: PROVIDER_ID,
@@ -177,8 +177,7 @@ export async function buildPi() {
       apiKey: {
         name: 'spectre-llm',
         resolve: async () => {
-          const { effectiveCommon } = await import('./agent-settings.mjs');
-          const key = effectiveCommon().apiKey;
+                    const key = effectiveCommon().apiKey;
           return key
             ? { auth: { apiKey: key }, source: 'settings' }
             : { auth: { apiKey: process.env.LLM_API_KEY }, source: 'LLM_API_KEY' };
@@ -223,8 +222,7 @@ export async function buildPi() {
  *  object — existing + new sessions pick up changes without a restart.
  *  baseUrl/auth are re-read per call; model identity fields mutate here. */
 export async function applyLlmPrefs() {
-  const { effectiveCommon } = await import('./agent-settings.mjs');
-  const eff = effectiveCommon();
+    const eff = effectiveCommon();
   if (liveModel) {
     liveModel.id = eff.model;
     liveModel.name = eff.model;

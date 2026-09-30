@@ -5,9 +5,13 @@ import { api } from '../api/client';
 import { ToolingChat } from '../components/ToolingChat';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
+import { AGENTS as REGISTRY } from '../api/agentRegistry';
 
-const AGENTS = ['autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit',
-  'phish', 'c2', 'persistence', 'postex', 'report'];
+// CS2-#6: 挂载目标单源 agentRegistry 派生(与 McpPage 同式; 过滤配置
+// 三键, 语义=业务面)。CRUD 外壳刻意不抽象为通用 hook——四页差异面
+// 远大于共性, 见 CS1-R19 决策。
+const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
+const AGENTS = REGISTRY.map(a => a.id).filter(id => !CONFIG_AGENT_KEYS.includes(id));
 
 interface SkillRow {
   agentKey: string;

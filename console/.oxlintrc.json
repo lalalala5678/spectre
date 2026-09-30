@@ -1,10 +1,9 @@
 {
-  "$schema": "./node_modules/oxlint/configuration_schema.json",
+  "plugins": ["react", "react-hooks", "unicorn", "typescript"],
+  "categories": { "correctness": "error" },
   "rules": {
     "react/set-state-in-effect": "off",
-    "react-hooks/exhaustive-deps": "off",
     "react/immutability": "off",
-    "react/refs": "off",
-    "react/only-export-components": "off"
+    "react/refs": "off"
   }
 }

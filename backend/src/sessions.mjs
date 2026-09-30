@@ -12,7 +12,7 @@ import crypto from 'node:crypto';
 import { Agent } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
-import { typeLabelOf } from './agents.mjs';
+import { typeLabelOf, CONFIG_AGENT_KEYS } from './agents.mjs';
 import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
@@ -187,7 +187,7 @@ export class SessionStore {
     // +官方 bash/read/write/edit;业务工具集(report_vulnerability/
     // publish_intel/...)不属于它们。此前落入 buildDirectTools 默认尾
     // =全套业务工具(CONFIG_AGENT_KEYS 死代码从未接线)。
-    const isConfigAgent = ['skill-config', 'mcp-config', 'cli-config'].includes(record.agentKey);
+    const isConfigAgent = CONFIG_AGENT_KEYS.includes(record.agentKey);  // CS2-#5 单源
     const base = isOrchestrator
       ? [
         ...buildOrchestratorTools(record, this.caps),
@@ -323,12 +323,6 @@ export class SessionStore {
     return this.sessions.get(id) ?? null;
   }
 
-  /**
-   * Display title projection: the LLM one-shot title when present, else a
-   * first-user-message excerpt. Projection only — record.title stays null
-   * until the summarizer sets it, so the `!record.title` generation gate
-   * (and the `<title/>` decline path) is unaffected.
-   */
   /** R1-F4: inert 会话(agent=null, WAL 毒记录)入口守卫——返回 503
    * 而非卡 busy=true + 未处理 rejection(可能进程退出)。 */
   _requireLiveAgent(record) {
@@ -339,6 +333,12 @@ export class SessionStore {
     }
   }
 
+  /**
+   * Display title projection: the LLM one-shot title when present, else a
+   * first-user-message excerpt. Projection only — record.title stays null
+   * until the summarizer sets it, so the `!record.title` generation gate
+   * (and the `<title/>` decline path) is unaffected.
+   */
   _displayTitle(record) {
     if (record.title) return record.title;
     const first = record.agent?.state.messages.find(m => m.role === 'user') ?? null;
@@ -398,7 +398,7 @@ export class SessionStore {
   prompt(record, text, source) {
     this._requireLiveAgent(record);
     if (record.busy) {
-      throw Object.assign(new Error('agent busy; use steer'), { statusCode: 409 });
+      throw Object.assign(new Error('agent 忙(并发锁定)——请用 steer'), { statusCode: 409 });
     }
     record.busy = true;
     // Context compaction (user-configurable window): when the running

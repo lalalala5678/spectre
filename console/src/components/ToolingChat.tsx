@@ -44,6 +44,8 @@ export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; wor
       setError(String(e));
     }
   };
+  // boot 每渲染新引用, 入 deps 即循环; 语义=键变化重建会话
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void boot(); }, [agentKey, workSessionId]);
 
   return (

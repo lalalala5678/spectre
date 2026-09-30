@@ -13,6 +13,7 @@
  * official read tool resolves skill file paths inside the same env the
  * bash tool runs in. For the local driver the host path IS the path.
  */
+import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
 import { loadSkills } from '@earendil-works/pi-agent-core';
 
 import { HOST, CONTAINER, containerPathToHost, makeExecutionEnv }
@@ -34,8 +35,7 @@ export async function refreshSkillMounts(agentKeys, sandboxCfg) {
     // P1-A(五审): frontmatter 损坏的 SKILL.md 此前被官方 loader 静默
     // 丢弃(exploit 5 技能只挂 1)——对账目录文件数, 丢弃即告警。
     try {
-      const files = await (await import('node:fs/promises'))
-        .readdir(hostDir, { withFileTypes: true });
+      const files = await readdir(hostDir, { withFileTypes: true });
       const dirs = files.filter(d => d.isDirectory());
       const dropped = dirs.length - skills.length;
       if (dropped > 0) {
@@ -47,11 +47,6 @@ export async function refreshSkillMounts(agentKeys, sandboxCfg) {
   }
   mounted = next;
   return next;
-}
-
-/** Skills mounted for one agent (snapshot for session creation). */
-export function skillsFor(agentKey) {
-  return mounted.get(agentKey) ?? [];
 }
 
 /**
@@ -72,7 +67,6 @@ export async function saveSkill(agentKey, { name, description, content }) {
   // delete_skill, LLM 可控输入)漏防; ../../.. 即逃逸 HOST.skills。
   assertSkillName(name);
   const dir = `${HOST.skills}/${agentKey}/${name}`;
-  const { mkdir, writeFile } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
   // R5-F4: description 含换行/--- 可伪造第二 frontmatter 块污染解析
   // ——JSON 字符串是合法 YAML 双引号标量, 换行/引号/冒号全转义。
@@ -88,14 +82,12 @@ export async function saveSkill(agentKey, { name, description, content }) {
 export async function deleteSkill(agentKey, name) {
   // R22-F1: 同 saveSkill——删除面是 rm -rf recursive+force。
   assertSkillName(name);
-  const { rm } = await import('node:fs/promises');
   await rm(`${HOST.skills}/${agentKey}/${name}`,
     { recursive: true, force: true });
 }
 
 /** List the raw host tree (management UI). */
 export async function listSkillsTree(agentKeys) {
-  const { readdir } = await import('node:fs/promises');
   const out = [];
   for (const key of agentKeys) {
     const base = `${HOST.skills}/${key}`;

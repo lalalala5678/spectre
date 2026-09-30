@@ -11,7 +11,7 @@
  */
 import { makeExecutionEnv, ensureWorkspaceSync, CONTAINER } from './exec-env.mjs';
 import { buildOfficialTools } from './harness-adapter.mjs';
-import { mcpToolsFor, loadMcpConfig } from './mcp.mjs';
+import { mcpToolsFor, loadMcpConfig, purgeStaleMcpConnections } from './mcp.mjs';
 import { refreshSkillMounts } from './skills.mjs';  // CS1-C3④: skillsFor 死 import 已清
 import { sandboxConfig } from './container.mjs';
 
@@ -29,7 +29,6 @@ export async function rebuildMounts(agentKeys) {
   }
   // reconcile the connection pool: a server deleted mid-flight must not
   // leave an orphaned stdio child under the runtime process
-  const { purgeStaleMcpConnections } = await import('./mcp.mjs');
   const closed = await purgeStaleMcpConnections();
   return { agents: agentKeys.length, closedConnections: closed };
 }

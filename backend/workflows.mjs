@@ -5,8 +5,9 @@
  *   - announces the engagement (公告) and dispatches one agentTaskWorkflow
  *     child per selected stage agent (私信 dispatch)
  *   - message policy (per product decision):
- *       · child → orchestrator: publish_vulnerability/publish_intel tool → bus 私信
- *         + followUp into the orchestrator pi session (LLM decides relays)
+ *       · child → orchestrator: report_vulnerability/publish_intel tool → bus 私信
+ *         + followUp into the orchestrator pi session (LLM decides relays;
+ *           report_vulnerability 走独立 writer 会话, CS2-#4)
  *       · orchestrator → children: relay_to_agents tool → orchestratorRelay
  *         signal → targeted dm into child pi sessions
  *       · child ↔ child: never direct; shares journal on the bus (共享) but

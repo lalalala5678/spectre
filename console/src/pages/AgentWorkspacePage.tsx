@@ -117,8 +117,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   useEffect(() => {
     if (!workSession) return;  // still resolving the project (server boot)
     const ws = workSession;
-    const scope = `${ws.id}:${liveKey}`;
-    void scope;
     // Optimistic clear (project-switch perceived latency): the OLD
     // project's transcript used to linger until this async finished —
     // clear the stage synchronously so the skeleton shows immediately.
@@ -182,9 +180,13 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // Keep the sessions panel live: the runtime generates title/brief a few
   // seconds after each exchange — without polling the panel stays on the
   // bootstrap snapshot forever.
+  // workSession 对象每轮快照重建, 入 deps 会每 4s 拆装定时器; 语义键=ws.id
+  // 语义键=ws.id(先取标量, effect 内不引用 workSession 整对象——
+  // 对象每轮快照重建, 入 deps 会每 4s 拆装定时器)
+  const panelWsId = workSession?.id;
   useEffect(() => {
-    if (!workSession) return;
-    const wsId = workSession.id;
+    if (!panelWsId) return;
+    const wsId = panelWsId;
     let stopped = false;
     const load = async () => {
       try {
@@ -206,7 +208,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     };
     const timer = setInterval(load, 4000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [liveKey, workSession?.id]);
+  }, [liveKey, panelWsId]);
 
   const switchSession = (id: string) => {
     setSessionId(id);
@@ -259,6 +261,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
   /** A held session id died (runtime restart — known limitation #1).
    *  Drop the stale slot and re-bootstrap this workspace. */
+  // 有意最小 deps 保稳定身份(见上方注释); workSession.id 变化由 bootstrapNonce 吸收
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   const handleSessionGone = useCallback(() => {
             // server-side slot heals itself (bootstrap falls back to latest)
     setDrillSession(null);
@@ -268,6 +272,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // Stable identity: LiveSession's fetch effect depends on onGone — a
     // fresh function per render made it refetch (and scroll to bottom)
     // on every poll tick.
+    // 有意最小 deps(见上注释); ws.id 变化由 bootstrapNonce 吸收
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workSession?.id, liveKey]);
   const closeDrill = useCallback(() => setDrillSession(null), []);
   const onResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {

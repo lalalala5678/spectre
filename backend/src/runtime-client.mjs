@@ -11,7 +11,7 @@ const BASE = `http://127.0.0.1:${CONFIG.port}`;
 
 class RuntimeError extends Error {
   constructor(status, body) {
-    super(`runtime ${status}: ${body?.error ?? 'request failed'}`);
+    super(`runtime ${status}: ${body?.error ?? '请求失败'}`);
     this.status = status;
   }
 }

@@ -7,6 +7,7 @@ import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
 
+// CRUD 外壳刻意不抽象为通用 hook——四管理页差异面远大于共性(CS1-R19)。
 // CS1-R13: 挂载目标单源 agentRegistry(此前本地 11 键, 增删 agent 双处
 // 漂移); 语义保持"业务面"——配置三键不进 MCP 挂载目标(与原 11 键一致)。
 const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];

@@ -109,7 +109,9 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
         // The runtime is in-memory (known limitation #1): a restart kills
         // every session id this browser still holds. Report upward so the
         // workspace re-bootstraps instead of showing a permanent error.
-        if (/no such session/i.test(String(err))) {
+        // CS2-#3: 判 status 而非文案——错误文案中文化(A1)曾击穿此处
+        // 正则, 恢复路径死代码化(错误文案也是一种跨层契约)。
+        if ((err as { status?: number }).status === 404) {
           onGone?.();
         }
       }

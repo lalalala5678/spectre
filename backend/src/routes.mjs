@@ -7,7 +7,7 @@
  */
 
 import { AGENTS, AGENT_KEYS, isAgentKey } from './agents.mjs';
-import { SPAWNABLE_KEYS } from './tools.mjs';
+import { SPAWNABLE_KEYS, STAGE_KEYS } from './tools.mjs';
 import { CONFIG } from './config.mjs';
 import { hasInternalToken, isInternalCaller, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
 import * as path_mod from 'node:path';
@@ -59,7 +59,7 @@ export function createRouter({ store, bus, caps, wal }) {
   const route = realRouter({ store, bus, caps, wal });
   return async function gatedRoute(req, res, url) {
     if (url.pathname !== '/api/health' && !hasInternalToken(req)) {
-      return json(res, 401, { error: 'internal token required' });
+      return json(res, 401, { error: '需要内部令牌' });
     }
     return route(req, res, url);
   };
@@ -604,6 +604,7 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/sandbox/mcp' && method === 'DELETE') {
       const name = url.searchParams.get('name');
+      if (!name) return bad(res, 400, 'name 必填');  // CS2-#8: 缺参此前静默假成功
       await applyMcpAndMounts({
         closeName: name,
         mutate: list => list.filter(s => s.name !== name),
@@ -789,8 +790,7 @@ function realRouter({ store, bus, caps, wal }) {
       for (const ev of bus.list()) {
         if (ev.engagement !== prevEngagement) continue;
         const from = ev.from || '';
-        if (['recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2',
-             'persistence', 'postex', 'report'].includes(from)
+        if (STAGE_KEYS.includes(from)  // CS2-#21 单源
             && (ev.channel === 'share' || (ev.channel === 'dm' && ev.type === 'result'))) {
           completed.add(from);
         }

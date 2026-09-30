@@ -28,7 +28,7 @@ export async function readJson(req) {
   try {
     return JSON.parse(raw);
   } catch {
-    throw Object.assign(new Error('invalid JSON body'), { statusCode: 400 });
+    throw Object.assign(new Error('请求体不是合法 JSON'), { statusCode: 400 });
   }
 }
 
@@ -87,7 +87,7 @@ export async function readRawBody(req, maxBytes) {
  */
 export function parseMultipart(body, contentType) {
   const m = /boundary=(?:"([^"]+)"|([^;]+))/i.exec(contentType ?? '');
-  if (!m) throw Object.assign(new Error('multipart boundary missing'), { statusCode: 400 });
+  if (!m) throw Object.assign(new Error('multipart 缺少 boundary'), { statusCode: 400 });
   const boundary = `--${m[1] ?? m[2]}`;
   const fields = {};
   let file = null;

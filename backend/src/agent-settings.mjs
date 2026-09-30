@@ -14,6 +14,7 @@
  * settings.mjs (spawn policy, pre-existing).
  */
 import { getPrefs, setPrefs } from './projects.mjs';
+import { probeSearchProvider } from './sandbox/tooling-probe.mjs';
 import { CONFIG } from './config.mjs';
 
 /** pi canonical thinking levels — passed to the vendor AS-IS. No vendor
@@ -394,7 +395,6 @@ export async function saveSetting({ group, field, value }, wal) {
     if (field === 'webSearch.apiKey' && v) {
       const ws = { ...getPrefs().commonSettings?.webSearch, apiKey: v };
       if (ws.provider && ws.provider !== 'none' && ws.provider !== 'searxng') {
-        const { probeSearchProvider } = await import('./sandbox/tooling-probe.mjs');
         const r = await probeSearchProvider(ws.provider, ws);
         if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
       }

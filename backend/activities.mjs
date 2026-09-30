@@ -10,7 +10,8 @@ import { runtime } from './src/runtime-client.mjs';
 
 /**
  * Create a pi session bound to a stage agent. Engagement metadata marks
- * AutoPwn children (they carry the publish_vulnerability tool).
+ * AutoPwn children (they carry report_vulnerability — the discoverer-side
+ * tool; publish_vulnerability is writer-only since 14924dc, CS2-#4).
  */
 export async function createSession(agentKey, opts = {}) {
   const created = await runtime.createSession(agentKey, opts);

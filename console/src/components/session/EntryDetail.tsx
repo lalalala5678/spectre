@@ -49,6 +49,8 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
       setChain(all.filter(e => e.seq === rootSeq || e.revises === rootSeq));
     } catch { /* SSE will heal */ }
   };
+  // loadChain 每渲染新引用; 语义=根 seq 变化重取修订链
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void loadChain(); }, [rootSeq]);
   useEffect(() => subscribeBus((name, raw) => {
     if (name !== 'bus') return;
@@ -58,6 +60,8 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
       setDialogDone(`修订已落账（第 ${e.revision?.n ?? '?'} 次）`);
       setDialogBusy(false);
     }
+  // 同上(loadChain 闭包)
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [rootSeq]);
 
   const folded = useMemo(

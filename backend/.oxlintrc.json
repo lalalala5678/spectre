@@ -1,3 +1,6 @@
 {
-  "rules": {}
+  "env": { "node": true },
+  "rules": {
+    "no-undef": "error"
+  }
 }

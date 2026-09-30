@@ -7,10 +7,14 @@
  * "worker/runtime only meet through injected capabilities" holds.
  *
  * Tool matrix (LLM-facing; usability rule: one obvious tool per intent,
- * never a hard reject when a sensible default exists):
+ * never a hard reject when a sensible default exists; CS2-#4 按 14924dc
+ * 漏洞撰写收权后的现行实况重写——publish_vulnerability 仅 report 会话持有):
  *   orchestrator session  → dispatch_agents, relay_to_agents, spawn_agent, submit/query
- *   engagement/spawn child→ publish_vulnerability, publish_intel, spawn_agent, submit/query
- *   direct user session   → publish_vulnerability, publish_intel, submit/query
+ *   engagement/spawn child→ report_vulnerability, publish_intel,
+ *                           request_vulnerability_revision, spawn_agent, submit/query
+ *   direct user session   → report_vulnerability, publish_intel,
+ *                           request_vulnerability_revision, submit/query
+ *   report(writer) session→ publish_vulnerability, revise_entry, publish_intel
  */
 
 import { Type } from '@earendil-works/pi-ai';
@@ -20,10 +24,9 @@ import { clipMarked } from './pi.mjs';
 import { foldRevisions } from './revision.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 
-// (E1 清理: CONFIG_AGENT_KEYS 死常量已删——唯一权威来源在 agents.mjs 导出)
-export { CONFIG_AGENT_KEYS } from './agents.mjs';
 
-const STAGE_KEYS = [
+/** Stage agents(10)——CS2-#21 单源导出(routes 此前内联同款字面量)。 */
+export const STAGE_KEYS = [
   'recon', 'nday', 'weakcred', 'api', 'exploit',
   'phish', 'c2', 'persistence', 'postex', 'report',
 ];
@@ -340,7 +343,6 @@ export function buildIntelTools(record, caps) {
         // R12-F4: 核对标题空间=查询展示空间——折修订取现行标题且滤
         // void(此前读原始事件: 作废漏洞仍算'已发布'悬空不告警; 引用
         // 旧标题与现行标题空间不一致)。
-        const { foldRevisions } = await import('./revision.mjs');
         const published = foldRevisions((caps.listBus?.() ?? [])
           .filter(e => e.workSessionId === (record.workSessionId ?? null)
             && entryKind(e) !== null))

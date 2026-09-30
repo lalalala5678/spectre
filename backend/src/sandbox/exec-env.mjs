@@ -50,10 +50,11 @@ const err = error => ({ ok: false, error });
  *  queue, path utils etc. branch on `not_found`/`permission_denied`). */
 const fsErr = e => {
   const code = e?.code ?? 'io_error';
+  // CS2-#15: 'ENOTDIRDIR' 不是 Node 错误码(fs.constants 实证), 且
+  // ENOTDIR 已映为 not_found——死分支删除, not_directory 映射不可达。
   const mapped = code === 'ENOENT' || code === 'ENOTDIR' ? 'not_found'
     : code === 'EACCES' || code === 'EPERM' ? 'permission_denied'
-    : code === 'EISDIR' ? 'is_directory'
-    : code === 'ENOTDIRDIR' ? 'not_directory' : 'unknown';
+    : code === 'EISDIR' ? 'is_directory' : 'unknown';
   return { ok: false, error: { code: mapped, message: String(e?.message ?? code) } };
 };
 

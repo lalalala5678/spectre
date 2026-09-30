@@ -10,7 +10,7 @@ from .security import Security, audit
 
 
 def _rel_with_query(split):
-    """Runtime-relative path incl. query (CS1-R14: 四方法逐字收敛)."""
+    """Runtime-relative path incl. query (CS1-R14)."""
     rel = split.path[len(config.PREFIX):]
     return rel + (('?' + split.query) if split.query else '')
 
@@ -104,9 +104,11 @@ class GatewayHandler(BaseHTTPRequestHandler):
             return self._send(404, b"not found")
         rel = path[len(config.PREFIX):] or "/"
 
-        if rel.startswith("/api/") and split.query:
+        # CS2-#13: GET 的静态资源路径不带 query(缓存键语义), 仅 /api/
+        # 转发拼 query——与 _rel_with_query 同源不同条件, 收敛为:
+        if rel.startswith("/api/"):
 
-            rel += "?" + split.query  # ?since=/?ws= must reach upstream
+            rel = _rel_with_query(split)
 
         if rel.split("?")[0] == "/login":
             query = urllib.parse.parse_qs(

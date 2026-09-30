@@ -21,6 +21,8 @@ import { getPrefs } from '../projects.mjs';
 import { sayText as okText, sayError as errText } from '../pi.mjs';
 import { applyMcpAndMounts } from './apply-config.mjs';
 import { providerFetch } from './provider-specs.mjs';
+import { access } from 'node:fs/promises';
+import { HOST, CONTAINER } from './exec-env.mjs';
 
 // ------------------------------------------------------------- helpers
 
@@ -28,8 +30,8 @@ import { providerFetch } from './provider-specs.mjs';
 
 const REGISTRY_BASE = 'https://registry.modelcontextprotocol.io';
 
-/** The exactly-three config agents (mirror of tools.mjs). */
-const CONFIG_AGENT_KEYS = ['skill-config', 'mcp-config', 'cli-config'];
+/** The exactly-three config agents — CS2-#5: 消费 agents.mjs 权威导出。 */
+import { CONFIG_AGENT_KEYS } from '../agents.mjs';
 
 /** Zero-key vertical channels, tried by query intent. */
 const searchCache = new Map(); // registry 10min TTL(agent 终审: 反复超时→缓存命中)
@@ -451,7 +453,7 @@ function buildAllToolingTools(caps, sessionRecord) {
           + `(过滤 ${dropped} 条零相关噪声) [下发: ${String(p.query).slice(0, 80)}]`);
         hits.push(...relevant.map(it => ({ ...it, channel: `web:${provider}` })));
       } catch (e) {
-      receipt.push(`- 通用web(${provider}):错误 ${String(e?.message ?? e)}`);
+        receipt.push(`- 通用web(${provider}):错误 ${String(e?.message ?? e)}`);
       }
     } else {
       receipt.push('- 通用web:未配置 provider(当前=none,仅以上垂直结果;不假装搜过)');
@@ -643,8 +645,6 @@ function buildAllToolingTools(caps, sessionRecord) {
       }
       // Existence check: "deleted" vs "never existed" must differ — a
       // typo'd skill name otherwise vanishes silently (review round 1).
-      const { access } = await import('node:fs/promises');
-      const { HOST, CONTAINER } = await import('./exec-env.mjs');
       const dir = HOST.skills; // probe on the HOST fs
       try {
         await access(`${dir}/${p.agentKey}/${p.name}`);
@@ -652,7 +652,7 @@ function buildAllToolingTools(caps, sessionRecord) {
         return okText(`✗ 技能不存在:${p.agentKey}/${p.name}(先 list_tool_config 核对名称拼写)。`);
       }
       await deleteSkill(p.agentKey, p.name);
-      await rebuildMounts();
+      await applyMcpAndMounts();  // CS2-#2: 此前直接调 rebuildMounts 未导入(ReferenceError)
       // Receipt path keeps the CONTAINER vocabulary (agents think in
       // container paths — same convention configure_skill returns).
       return okText(`✓ 已删除 ${CONTAINER.skills}/${p.agentKey}/${p.name}`
@@ -677,10 +677,12 @@ function buildAllToolingTools(caps, sessionRecord) {
         return okText(`✗ 未注册的 server:${p.name}。当前已注册:`
           + (cfg.map(s => s.name).join(', ') || '(无)'));
       }
-      // R22-F2: 互斥删写
-      await mutateMcpConfig(list => list.filter(s => s.name !== p.name));
-      await rebuildMounts();
-      closeMcpConnection(p.name); // kill the pooled stdio child, if any
+      // R22-F2(互斥删写)+连接失效语义收敛在 applyMcpAndMounts(CS2-#2:
+      // 此前三函数直接调用均未导入, 注销工具面全链 ReferenceError)
+      await applyMcpAndMounts({
+        closeName: p.name,
+        mutate: list => list.filter(s => s.name !== p.name),
+      });
       return okText(`✓ 已注销 MCP server ${p.name}(对新会话生效,后台连接已关闭)。`);
     },
   };
