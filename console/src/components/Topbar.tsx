@@ -166,6 +166,9 @@ export function Topbar() {
             {sessHits.length > 0 && (
               <div className="mb-1 px-2 py-0.5 text-[9px] uppercase tracking-widest text-zinc-600">会话</div>
             )}
+            {sessHits.length === 0 && busHits.length > 0 && (
+              <p className="px-3 pb-1 pt-0.5 text-[10.5px] text-zinc-500">无会话命中——以下为总线条目</p>
+            )}
             {sessHits.map(s => (
               <button key={s.id} onClick={() => {
                 // R26: 深链直达——#<agent>?s=<id> 由工作区 boot 消费

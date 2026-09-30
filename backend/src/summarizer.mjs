@@ -49,7 +49,12 @@ function extractTitle(raw) {
   if (!m || m[1] === undefined) return null;
   const title = (m[1] ?? '').replace(/[\r\n]+/g, ' ').trim();
   if (!title || /^(none|null|无)$/i.test(title)) return null;
-  return title.slice(0, 32);  // N-c: 长指令观感(UI 投影回退线 40)
+  // R28-N5: 32 字硬截断会切断 ASCII 连续 token(NDAY-R32D28→NDAY-R3,
+  // 全局搜索按完整串找不到)。词边界截断, 超长才回退硬切, 上限 60。
+  if (title.length <= 60) return title;
+  const hard = title.slice(0, 60);
+  const cut = hard.match(/^[\s\S]*[\s]/);
+  return (cut && cut[0].trim().length >= 20) ? cut[0].trim() : hard;
 }
 
 /** pi transcript slice as flat text, newest last, bounded by chars. */

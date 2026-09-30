@@ -86,14 +86,17 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // 本就是"渲染任意会话转录"的既有机制(EntryDetail onOpenSession 同路)。
   // ref 镜像: boot 的乐观清场据此保留深链(N1 时序竞争修复)。
   const deepLinkRef = useRef<string | null>(null);
-  deepLinkRef.current = deepLink;
   useEffect(() => {
     if (!deepLink) return;
+    // R28-N1 根治(pending 一次性消费模型): ref 只在此写入, 不在渲染体
+    // 镜像——镜像会在消费后的重渲染里把它清回 null, 与 boot 重跑竞态
+    // (二十八轮审计实锤: 冷加载/跨 agent 路径非确定性丢深链)。ref 由
+    // boot 首次运行末尾清零; state 保留不影响 deps 语义(hash 已被
+    // replaceState 清洗, 重挂载读不到旧参)。
+    deepLinkRef.current = deepLink;
     setDrillSession(deepLink);
     const base = window.location.hash.split('?')[0].replace('#', '');
     history.replaceState(null, '', `${window.location.pathname}#${base}`);
-    setDeepLink(null);
-    deepLinkRef.current = null;
   }, [deepLink]);
   const [entryView, setEntryView] = useState<ApiBusEvent | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -164,6 +167,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         setMySessions([created]);
         setSessionId(created.id);
       }
+      // R28-N1: 深链在场到此结束——boot 全路径走完后清 ref, 后续
+      // 项目切换/agent 切换的乐观清场恢复正常语义。
+      deepLinkRef.current = null;
     })().catch((err: unknown) => {
       // Bootstrap failures (runtime down, auth expired, …) must surface —
       // never a silent empty workspace.
