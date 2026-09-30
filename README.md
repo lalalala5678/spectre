@@ -30,19 +30,19 @@
 
 ## 环境要求
 
-- Node ≥ 22(获取: `nvm install 22` 或 [NodeSource](https://github.com/nodesource/distributions)); Python ≥ 3.7; Docker 可选(沙箱)
+- Node ≥ 22(获取: `nvm install 22` 或 [NodeSource](https://github.com/nodesource/distributions); 22.19+ 零依赖警告); Python ≥ 3.7; Docker 可选(沙箱)
 
 ## 快速开始
 
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
 
-# ① 后端(Node ≥ 22.19)——先编辑 .env 填 INTERNAL_TOKEN(自定随机串)与 LLM_API_KEY
+# ① 后端(Node ≥ 22)——先编辑 .env 填 INTERNAL_TOKEN(自定随机串)与 LLM_API_KEY
 cd backend && cp .env.example .env && ${EDITOR:-vi} .env
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test && \
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # npm 崩溃→deploy/README 排障节   # 测试隔离数据目录(生产缺省 /var/lib/spectre)
 
-# ② 前端(Node ≥ 22.19; 与 ① 同一 Node 版本)
+# ② 前端(Node ≥ 22; 与 ① 同一 Node 版本)
 cd ../console && npm i && npm run build  # npm 崩溃(Exit handler/ENOTFOUND)→ deploy/README 排障节
 
 # ③ 网关(纯 stdlib)——INTERNAL_TOKEN 必须=① 中 .env 的值, 否则 API 反代全 401

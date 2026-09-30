@@ -185,15 +185,22 @@ function bootstrapScript() {
   // (the local driver runs on the host — container paths must not leak).
   const base = cfg.driver === 'docker' ? '/opt/tools' : HOST.tools;
   const uploads = cfg.driver === 'docker' ? '/opt/uploads' : HOST.uploads;
+  // R24-1(二十四轮): local driver 此前直接 `npm/pip3 config set`——写的是
+  // 宿主用户级 ~/.npmrc 与 pip 全局配置, 数据目录删除后宿主 pip/npm 即坏。
+  // 改为只写 base 内的项目级配置文件, 宿主配置零触碰。
+  const cfgFiles = cfg.driver === 'docker'
+    ? [`npm config set prefix ${base}/npm-global || true`,
+       `pip3 config set global.target ${base}/py || true`]
+    : [`printf 'prefix=%s/npm-global\n' '${base}' > ${base}/.npmrc || true`,
+       `mkdir -p ${base}/pip && printf '[global]\ntarget = %s/py\n' '${base}' > ${base}/pip/pip.conf || true`];
   return [
     'set -e',
     'export DEBIAN_FRONTEND=noninteractive',
     `mkdir -p ${base}/bin ${base}/npm-global ${uploads}`,
     'if command -v apt-get >/dev/null 2>&1; then '
-    + 'apt-get update -qq && apt-get install -y -qq '
+    + 'apt-get update -qq && apt install -y -qq '
     + 'nodejs npm python3 python3-pip git curl unzip build-essential jq >/dev/null; fi',
-    `npm config set prefix ${base}/npm-global || true`,
-    `pip3 config set global.target ${base}/py || true`,
+    ...cfgFiles,
     `date -Iseconds > ${base}/.bootstrapped`,
   ].join('\n');
 }
@@ -220,12 +227,16 @@ async function bootstrapToolchain() {
   const res = cfg.driver === 'docker'
     ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', script], 910)  // R24-F1
     : await run('bash', ['-lc', script], 900);
-  console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}:`,
-    res.out.slice(-200));
+  // R24-3: 输出单行化——此前多行 apt 输出与状态粘连不可读
+  const bootLog = String(res.out).split('\n').filter(Boolean).slice(-1)[0] ?? '';
+  console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}${bootLog ? `: ${bootLog.slice(0, 120)}` : ''}`);
   if (res.code === 0) {
     // write the identity marker + ledger the apt toolchain so a rebuild
     // can replay it even if the marker path itself is ever lost
-    const write = `printf '%s' ${identity} > /opt/tools/.bootstrapped`;
+    // R24-2: marker 路径与读路径同源(base)——local 此前硬编码 /opt/tools
+    // (写穿隔离且与 markerHost 不匹配, 每次启动全量重跑 bootstrap)。
+    const writeBase = cfg.driver === 'docker' ? '/opt/tools' : HOST.tools;
+    const write = `printf '%s' ${identity} > ${writeBase}/.bootstrapped`;
     if (cfg.driver === 'docker') {
       await run('docker', ['exec', cfg.container, 'sh', '-c', write], 30);
     } else {
