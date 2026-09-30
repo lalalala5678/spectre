@@ -15,7 +15,7 @@ import { Type } from '@earendil-works/pi-ai';
 import { saveSkill, deleteSkill, listSkillsTree } from './skills.mjs';
 import { loadMcpConfig, testMcpServer } from './mcp.mjs';
 import { listInstalledTools, sandboxConfig, uninstallCliTool, readInstallLog } from './container.mjs';
-import { AGENT_KEYS } from '../agents.mjs';
+import { AGENT_KEYS, CONFIG_AGENT_KEYS } from '../agents.mjs';
 import { getPrefs } from '../projects.mjs';
 // CS1-R12: 信封单源 pi.mjs(errText 曾与 okText 逐字同——双胞胎漂移过)
 import { sayText as okText, sayError as errText } from '../pi.mjs';
@@ -29,9 +29,6 @@ import { HOST, CONTAINER } from './exec-env.mjs';
 // ------------------------------------------------- vertical discovery
 
 const REGISTRY_BASE = 'https://registry.modelcontextprotocol.io';
-
-/** The exactly-three config agents — CS2-#5: 消费 agents.mjs 权威导出。 */
-import { CONFIG_AGENT_KEYS } from '../agents.mjs';
 
 /** Zero-key vertical channels, tried by query intent. */
 const searchCache = new Map(); // registry 10min TTL(agent 终审: 反复超时→缓存命中)

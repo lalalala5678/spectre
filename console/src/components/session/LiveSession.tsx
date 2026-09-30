@@ -499,7 +499,7 @@ function ToolStepRow({ step, open, onToggle }: {
   onToggle: () => void;
 }) {
   const err = step.result?.isError;
-  const pending = step.running ?? !step.result;  // R23-F3: 行级 pending 由前沿派生, 历史未配对不再永久转圈
+  const pending = step.running;  // R23-F3: 行级 pending 由前沿派生(running 非 optional, ?? 右臂死——CS3-N20)
   const firstLine = (step.result?.text ?? '')
     .split('\n').find(l => l.trim()) ?? '';
   const argsJson = step.args != null && typeof step.args === 'object'

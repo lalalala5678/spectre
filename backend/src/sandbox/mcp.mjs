@@ -11,8 +11,8 @@
  * tools/call are the entire surface the bridge needs. Tools are merged
  * into the bare-Agent tool matrix at session creation (snapshot).
  *
- * Config storage is a plain JSON file + management API — the future
- * "MCP configuration agent" will edit the same store through the API.
+ * Config storage is a plain JSON file + management API — the mcp-config
+ * agent (CS3-N11: 已存在, 非未来时) edits the same store through the API.
  */
 import { spawn } from 'node:child_process';
 import fsp from 'node:fs/promises';

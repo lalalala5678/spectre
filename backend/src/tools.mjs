@@ -58,7 +58,7 @@ const spawnStageEnum = Type.Enum(
 export function buildIntelTools(record, caps) {
   /** Case/punct-insensitive title match for dangling-reference checks. */
   const normTitle = s => String(s ?? '').toLowerCase()
-    .replace(/[\s·,。,.;:;:()[]()【】《》""''-]/g, '');
+    .replace(/[\s·,。,.;:;:()[\]()（）【】《》""''-]/g, '');
   const queryIntel = {
     name: 'query_intel',
     label: '查询情报',

@@ -165,7 +165,7 @@ const caps = {
   followUp: (sessionId, text) => {
     const record = store.get(sessionId);
     if (!record) {
-      throw Object.assign(new Error(`no orchestrator session ${sessionId}`),
+      throw Object.assign(new Error(`编排器会话不存在: ${sessionId}`),
         { statusCode: 404 });
     }
     store.followUp(record, text);

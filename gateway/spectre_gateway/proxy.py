@@ -22,7 +22,12 @@ def proxy(handler, api_path):
 
     `api_path` is the runtime-relative path (PREFIX already stripped).
     """
-    length = int(handler.headers.get("Content-Length") or 0)
+    # CS3-N7: malformed Content-Length must not escape as a bare
+    # ValueError — every other parse site in the handler guards.
+    try:
+        length = int(handler.headers.get("Content-Length") or 0)
+    except ValueError:
+        length = 0
     body = handler.rfile.read(length) if length else None
 
     upstream = http.client.HTTPConnection(

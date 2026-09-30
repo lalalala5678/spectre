@@ -1,8 +1,9 @@
 /**
  * Runtime-editable spawn policy (dispatch-tree limits).
  *
- * Enforced server-side; the console's 配置 tab is just one editor. Values
- * live in memory (dev-phase persistence note in ARCHITECTURE §7).
+ * Enforced server-side; the console's 配置 tab is just one editor.
+ * 持久化: WAL 'spawn' 条目(F68)——重启恢复, 非内存态(CS3-N10 纠偏
+ * 旧注释)。
  */
 
 const DEFAULTS = Object.freeze({

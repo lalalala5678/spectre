@@ -87,9 +87,13 @@ export class SessionStore {
 
   /**
    * @param {string} agentKey
-   * @param {{engagementId?: string, orchestratorSessionId?: string}} [opts]
-   *   engagement metadata marks the session as an AutoPwn child; those
-   *   sessions carry the publish_vulnerability / publish_intel tools.
+   * @param {{engagementId?: string, orchestratorSessionId?: string,
+   *          workSessionId?: string, parentSessionId?: string,
+   *          name?: string, description?: string}} [opts]
+   *   engagementId/orchestratorSessionId mark the session as an AutoPwn
+   *   child — those carry report_vulnerability / publish_intel /
+   *   request_vulnerability_revision / spawn_agent (CS3-N2: 漏洞撰写
+   *   收权后子会话不持 publish_vulnerability, 见 tools.mjs 矩阵)。
    */
   create(agentKey, opts = {}) {
     const id = `sess-${Date.now().toString(36)}-${crypto.randomBytes(3).toString('hex')}`;
@@ -188,16 +192,21 @@ export class SessionStore {
     // publish_intel/...)不属于它们。此前落入 buildDirectTools 默认尾
     // =全套业务工具(CONFIG_AGENT_KEYS 死代码从未接线)。
     const isConfigAgent = CONFIG_AGENT_KEYS.includes(record.agentKey);  // CS2-#5 单源
+    // CS3-N4(共享工具铁律补面): R31 只给 direct 会话补了各持独立的
+    // search_web/fetch_url——engagement 子会话与编排器同样需要(RECON_
+    // PROMPT 指挥被派发的 recon 用 fetch_url 核验, 此前子会话无此工具)。
     const base = isOrchestrator
       ? [
         ...buildOrchestratorTools(record, this.caps),
         ...buildChildTools(record, this.caps).filter(t => t.name !== 'spawn_agent'),
         ...buildIntelTools(record, this.caps),
+        ...buildToolingTools(record, this.caps),
       ]
       : isConfigAgent
         ? buildToolingTools(record, this.caps)
         : hasParent
-          ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps)]
+          ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps),
+            ...buildToolingTools(record, this.caps)]
           : [...buildDirectTools(record, this.caps),
             ...buildIntelTools(record, this.caps)];
     // Sandbox layer: official bash/read/write/edit (ExecutionEnv-bound,
@@ -328,7 +337,7 @@ export class SessionStore {
   _requireLiveAgent(record) {
     if (!record.agent) {
       throw Object.assign(
-        new Error('session inert (corrupt record) — see runtime log'),
+        new Error('会话惰性(WAL 毒记录)——见 runtime 日志'),
         { statusCode: 503 });
     }
   }
@@ -382,9 +391,9 @@ export class SessionStore {
       spawnName: record.spawnName,
       spawnDescription: record.spawnDescription,
       messages: (record.agent?.state.messages ?? []).map(m => normalizeMessage(m)),
+      brief: record.brief,
       // SSE cursor: clients subscribe with ?since=lastSeq to avoid
       // replaying the history they just fetched.
-      brief: record.brief,
       lastSeq: this.lastSeq(record),
     };
   }

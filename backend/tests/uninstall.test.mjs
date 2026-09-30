@@ -1,7 +1,6 @@
 import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import fsp from 'node:fs/promises';
-import path from 'node:path';
 
 // Isolated sandbox root BEFORE importing container.mjs (HOST is derived
 // from SPECTRE_SANDBOX_ROOT at module load).

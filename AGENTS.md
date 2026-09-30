@@ -100,7 +100,7 @@
 | `test_mcp_server` | 仅 mcp-config | [read-only] | MCP 连通性探测 |
 | `uninstall_cli` | 仅 cli-config | [destructive] | 卸载 CLI 工具 |
 | `list_tool_config` | 配置三键 | [read-only] | 盘点共享层已装工具 |
-| `wake_agent` | 编排器+子 | [spawns turn] | 唤醒空闲智能体一轮 |
+| `wake_agent` | 仅配置三键 | [spawns turn] | 唤醒空闲智能体一轮(配置验证用) |
 | `search_web` | 全部(各持独立实例) | [read-only] | 联网搜索(provider 可配) |
 | `fetch_url` | 全部(各持独立实例) | [read-only] | 抓取网页正文(带截断标记) |
 
@@ -138,5 +138,5 @@
 - **ExecutionEnv 驱动抽象**(官方接口,自建实现):local(零依赖)/docker(单长寿命容器+bind mount)——官方 bash/read/write/edit 工具跑在 env 上,沙箱化 env 即沙箱化全部官方工具
 - **项目工作目录**:/workspace/<wsId>(跨项目可读=特性);CLI 共享层 /opt/tools 装一次全员可用
 - **Skill=官方 agentskills.io 格式**:loadSkills 从 per-agent 目录挂载,formatSkillsForSystemPrompt 生成索引注入,模型按需 read 全文(动态加载,非全量 prompt 注入)
-- **MCP 双传输**:远程 http(用户自建机器直连,streamable-HTTP)与 stdio(host/sandbox 进程);会话创建时快照合并进工具面;配置存储 API 化(为未来 MCP 配置 agent 预留)
+- **MCP 双传输**:远程 http(用户自建机器直连,streamable-HTTP)与 stdio(host/sandbox 进程);会话创建时快照合并进工具面;配置存储 API 化(mcp-config agent 经此编辑)
 - 官方契约对齐点:FileError 码表(not_found/permission_denied/…)、ShellOutputView 平铺形状、TruncationResult 字段、FileInfo.kind/mtimeMs——适配层逐一对齐,勿凭记忆

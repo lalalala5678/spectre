@@ -1,20 +1,18 @@
-import { ChevronRight, MessageSquareText } from 'lucide-react';
+import { MessageSquareText } from 'lucide-react';
 
 import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
+import { PanelEntryMeta } from './PanelEntryMeta';
 import { cn } from '../../utils/cn';
 
+// CS3-N21: 大小写双胞胎删除——severity 在修订/发布入口已归一小写;
+// 显示侧兜底 toLowerCase。
 const SEVERITY_STYLES: Record<string, string> = {
   critical: 'border-red-600 bg-red-950/70 text-red-300',
-  CRITICAL: 'border-red-600 bg-red-950/70 text-red-300',
   high: 'border-orange-600 bg-orange-950/70 text-orange-300',
-  HIGH: 'border-orange-600 bg-orange-950/70 text-orange-300',
   medium: 'border-amber-600 bg-amber-950/60 text-amber-300',
-  MEDIUM: 'border-amber-600 bg-amber-950/60 text-amber-300',
   low: 'border-sky-700 bg-sky-950/60 text-sky-300',
-  LOW: 'border-sky-700 bg-sky-950/60 text-sky-300',
   info: 'border-zinc-600 bg-void-800 text-zinc-400',
-  INFO: 'border-zinc-600 bg-void-800 text-zinc-400',
 };
 
 export function SeverityBadge({ severity }: { severity: string }) {
@@ -88,10 +86,9 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
           : <p className="py-3 text-center text-[11px] text-zinc-700">暂无漏洞</p>
         )}
         {events.map(event => {
-          const severity = event.current.severity ?? event.severity ?? 'INFO';
+          const severity = String(event.current.severity ?? event.severity ?? 'info').toLowerCase();  // CS3-N21
           const title = event.current.title ?? event.title
             ?? event.summary.replace(/^(情报上报|产出)[:：]?/, '').slice(0, 60);
-          const a = event.author;
           return (
             <button
               key={event.seq}
@@ -116,18 +113,8 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
                     <MessageSquareText className="h-3 w-3" />
                   </span>
                 )}
-                {event.revisedCount > 0 && (
-                  <span className="shrink-0 rounded-sm border border-sky-800 bg-sky-950/40 px-1 py-0.5 font-mono text-[8.5px] tracking-widest text-sky-300">
-                    ⟳{event.revisedCount}
-                  </span>
-                )}
-                <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
+                <PanelEntryMeta event={event} />
               </div>
-              {a && (
-                <p className="truncate pl-1 text-[10px] leading-tight text-zinc-600">
-                  {a.name}（{a.typeLabel}{a.parent ? ` · 父:${a.parent.name}` : ''} · L{a.depth}）
-                </p>
-              )}
             </button>
           );
         })}

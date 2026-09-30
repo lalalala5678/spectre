@@ -20,15 +20,17 @@ import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstal
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
 import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
-import { loadMcpConfig, saveMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
-import { getSettings, saveSetting, enabledReconSources, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { syncSourceKeyFiles } from './keyfiles.mjs';
+import { phishCampaignFunnel } from './phish-funnel.mjs';
+import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
+import { getSettings, saveSetting, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
 import { sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
-import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
+const PROJECT_ID = /^\/api\/projects\/([a-z0-9-]+)$/;  // CS3-N22: PUT/DELETE 双胞胎正则单源
 
 function bad(res, code, message) {
   json(res, code, { error: message });
@@ -336,7 +338,7 @@ function realRouter({ store, bus, caps, wal }) {
       if (body.activate === true) setPrefs({ currentWs: created.id }, wal);
       return json(res, 201, created);
     }
-    const projMatch = path.match(/^\/api\/projects\/([a-z0-9-]+)$/);
+    const projMatch = path.match(PROJECT_ID);
     if (projMatch && method === 'PUT') {
       const pid = projMatch[1];
       const body = await readJson(req);
@@ -348,7 +350,7 @@ function realRouter({ store, bus, caps, wal }) {
       }
       return json(res, 200, getProject(pid));
     }
-    const projDelMatch = path.match(/^\/api\/projects\/([a-z0-9-]+)$/);
+    const projDelMatch = path.match(PROJECT_ID);
     if (projDelMatch && method === 'DELETE') {
       // F58: projects were immortal — no delete API, no UI entry; test
       // and abandoned projects accumulated forever.
@@ -375,81 +377,8 @@ function realRouter({ store, bus, caps, wal }) {
         await applyLlmPrefs();
       }
       if (String(body.group) === 'recon-source') {
-        // sync MCP config file + mount toggle (zero-pollution: no key ⇒
-        // server disabled, recon never sees the tools)
-        const root = CONFIG.dataDir;
-        const keys = getPrefs().reconApiKeys ?? {};
-
-        // ── F14: 数据源文件只含有凭据的源(零污染)──无凭据的残留记录
-        // (如清空密码后的 smtp)不应进任何注入文件。
-        const hasCred = cfg => Boolean(cfg && (cfg.key || cfg.token || cfg.secret
-          || cfg.id || cfg.user || cfg.password));
-
-        // ── c2 免杀云查 keys(只写已通过 validate 的源;失败即不落盘)──
-        // 本次保存的源若属 c2 消费且 r.mounted(或无 secret),同步;其余 c2 源保持现状
-        const c2Out = {};
-        for (const [sid, cfg] of Object.entries(keys)) {
-          if (sid === 'brute' || sid === 'smtp') continue;
-          const def = RECON_SOURCES_INTERNAL[sid];
-          const forC2 = def && (def.agents ?? ['recon']).includes('c2');
-          if (forC2 && hasCred(cfg)) c2Out[sid] = cfg;
-        }
-        await mkdir(path_mod.join(root, 'tools/c2'), { recursive: true });
-        await writeFile(path_mod.join(root, 'tools/c2/api-keys.json'), JSON.stringify(c2Out, null, 1), 'utf8');
-
-        // ── nday 情报源 keys(已验证才落盘)──
-        const ndayOut = {};
-        for (const [sid, cfg] of Object.entries(keys)) {
-          if (sid === 'brute' || sid === 'smtp') continue;
-          const def = RECON_SOURCES_INTERNAL[sid];
-          const forNday = def && (def.agents ?? ['recon']).includes('nday');
-          if (forNday && hasCred(cfg)) ndayOut[sid] = cfg;
-        }
-        await mkdir(path_mod.join(root, 'tools/nday'), { recursive: true });
-        await writeFile(path_mod.join(root, 'tools/nday/api-keys.json'), JSON.stringify(ndayOut, null, 1), 'utf8');
-
-        // ── phish SMTP(仅 smtp 源且已验证)──
-        const smtpCfg = keys.smtp ?? {};
-        const smtpHasSecret = smtpCfg.user || smtpCfg.password;
-        await mkdir(path_mod.join(root, 'tools/phish'), { recursive: true });
-        await writeFile(path_mod.join(root, 'tools/phish/smtp.json'),
-          JSON.stringify(smtpHasSecret ? { host: smtpCfg.host, port: Number(smtpCfg.port) || 587,
-            user: smtpCfg.user, pass: smtpCfg.password } : {}, null, 1), 'utf8');
-
-        // 最小权限: recon server 的配置文件只收 recon 组源——此前全量
-        // 落盘使 c2 组 key(virustotal/hybridanalysis)混入(server 虽按注
-        // 册表忽略, 但 key 材料不应越组落盘)。
-        const withCreds = {};
-        for (const [sid, cfg] of Object.entries(keys)) {
-          if (sid === 'brute' || !hasCred(cfg)) continue;
-          const def = RECON_SOURCES_INTERNAL[sid];
-          if (def && !(def.agents ?? ['recon']).includes('recon')) continue;
-          withCreds[sid] = cfg;
-        }
-        await writeFile(path_mod.join(root, 'recon-datasources.json'), JSON.stringify(withCreds), 'utf8');
-        const list = await loadMcpConfig();
-        const rest = list.filter(s => s.name !== 'recon-datasources'
-          && s.name !== 'nday-intel');
-        if (enabledReconSources().length) {
-          rest.push({
-            name: 'recon-datasources', transport: 'stdio', agents: ['recon'],
-            enabled: true,
-            command: ['node', path_mod.join(root, 'mcp-recon-datasources.mjs')],
-            env: {}, where: 'host',
-          });
-        }
-        // nday 情报 MCP:NVD key 验证落盘⇄挂载(镜像 recon-datasources 闸门;
-        // 裸 API 不给智能体——key 读取/限流/格式化都在工具内)。
-        if (ndayOut.nvd?.key) {
-          rest.push({
-            name: 'nday-intel', transport: 'stdio', agents: ['nday'],
-            enabled: true,
-            command: ['node', path_mod.join(root, 'mcp-nday-intel.mjs')],
-            env: {}, where: 'host',
-          });
-        }
-        await saveMcpConfig(rest);
-        await applyMcpAndMounts();
+        // CS3-#10: 凭据→注入文件同步抽离 src/keyfiles.mjs(路由层职责)
+        await syncSourceKeyFiles();
       }
       return json(res, 200, r);
     }
@@ -748,7 +677,7 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readJson(req);
       const instruction = String(body.instruction || '').slice(0, 8000);
       // F17: 只允许可派发键——report 是服务 agent(writer 唤醒制),config 三兄弟非 stage
-      const agents = (body.agents || []).filter(k => SPAWNABLE_KEYS.includes(k));
+      const agents = (body.agents || []).filter(k => SPAWNABLE_KEYS.includes(k));  // CS3-N22: 与 resume 同语义过滤
       if (!instruction || agents.length === 0) {
         return bad(res, 400, 'instruction 与 agents 必填(仅可派生 agent)');
       }
@@ -854,55 +783,10 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, { results, checkedAt: new Date().toISOString() });
     }
 
-    // ---------- phish campaign 漏斗(GoPhish 面板数据) ----------
+    // ---------- phish campaign 漏斗(GoPhish 面板数据; CS3-#10 抽离
+    // src/phish-funnel.mjs) ----------
     if (path === '/api/phish/campaigns' && method === 'GET') {
-      const dbFiles = [];
-      const trackDir = '/var/lib/spectre/tools/phish';
-      if (existsSync(trackDir)) {
-        for (const fn of readdirSync(trackDir)) {
-          if (fn.endsWith('.json')) dbFiles.push(fn.replace('.json', ''));
-        }
-      }
-      const campaigns = [];
-      for (const name of dbFiles) {
-        try {
-          const parsed = JSON.parse(readFileSync(`${trackDir}/${name}.json`, 'utf8'));
-          // R15-F1: 同目录双用途(smtp.json 凭据配置)被 *.json 通配收
-          // 录——按'有无 events 数组'判别, 非 campaign 的 json 自免疫。
-          if (!parsed || !Array.isArray(parsed.events)) continue;
-          const ev = parsed.events;
-          const byUid = {};
-          for (const e of ev) {
-            byUid[e.uid] ??= { open: 0, click: 0, submit: 0, session: 0, sent: 0 };
-            if (e.kind === 'open') byUid[e.uid].open++;
-            if (e.kind === 'click') byUid[e.uid].click++;
-            if (e.kind === 'submit') byUid[e.uid].submit++;
-            if (e.kind === 'session-captured') byUid[e.uid].session++;
-            if (e.kind === 'sent') byUid[e.uid].sent++;  // R15-F5
-          }
-          // R15-F5: 分母=有 sent 事件的 uid(发送数)——此前分母=已互动
-          // uid, 打开率结构性虚高(实测 100%)。存量旧库无 sent 时回退
-          // 互动分母以免面板清空。
-          const sentTargets = Object.values(byUid).filter(v => v.sent > 0).length;
-          const targets = sentTargets || Object.keys(byUid).length;
-          const opens = Object.values(byUid).filter(v => v.open > 0).length;
-          const clicks = Object.values(byUid).filter(v => v.click > 0).length;
-          const submits = Object.values(byUid).filter(v => v.submit > 0).length;
-          const sessions = Object.values(byUid).filter(v => v.session > 0).length;
-          campaigns.push({
-            name, events: ev.length, targets,
-            funnel: { opens, clicks, submits, sessions },
-            rates: {
-              open: targets ? Math.round(opens * 100 / targets) : 0,
-              click: targets ? Math.round(clicks * 100 / targets) : 0,
-              submit: targets ? Math.round(submits * 100 / targets) : 0,
-              session: targets ? Math.round(sessions * 100 / targets) : 0,
-            },
-            timeline: ev.slice(-50).map(e => ({ ts: e.ts, kind: e.kind, uid: e.uid })),
-          });
-        } catch { /* skip corrupt */ }
-      }
-      return json(res, 200, { campaigns });
+      return json(res, 200, phishCampaignFunnel());
     }
 
     return bad(res, 404, '资源不存在');

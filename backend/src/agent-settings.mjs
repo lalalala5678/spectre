@@ -297,7 +297,7 @@ export function settingsSchema() {
             id, label: sv.label, defaultBase: sv.defaultBase, tier: sv.tier, why: sv.why,
             fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
               id: `${id}.${fid}`, label: flabel,
-              type: fid === 'key' || fid === 'secret' || fid === 'token' || fid === 'password' ? 'password' : 'text',
+              type: fieldTypeOf(fid),
             })),
           })),
       },
@@ -310,7 +310,7 @@ export function settingsSchema() {
             id, label: sv.label, defaultBase: sv.defaultBase ?? '', tier: sv.tier, why: sv.why,
             fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
               id: `${id}.${fid}`, label: flabel,
-              type: fid === 'password' || fid === 'key' || fid === 'token' ? 'password' : 'text',
+              type: fieldTypeOf(fid),
             })),
           })),
       },
@@ -340,7 +340,7 @@ export function settingsSchema() {
             id, label: sv.label, defaultBase: sv.defaultBase, tier: sv.tier, why: sv.why,
             fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
               id: `${id}.${fid}`, label: flabel,
-              type: fid === 'key' || fid === 'secret' || fid === 'token' ? 'password' : 'text',
+              type: fieldTypeOf(fid),
             })),
           })),
       },
@@ -354,7 +354,7 @@ export function settingsSchema() {
           id, label: s.label, defaultBase: s.defaultBase, tier: s.tier, why: s.why,
           fields: Object.entries(s.fields).map(([fid, flabel]) => ({
             id: `${id}.${fid}`, label: flabel,
-            type: fid === 'key' || fid === 'secret' || fid === 'token' ? 'password' : 'text',
+            type: fieldTypeOf(fid),
           })),
         })),
       },
@@ -362,11 +362,19 @@ export function settingsSchema() {
   };
 }
 
+
+/**
+ * 凭据类字段名判定(CS3-N14: 四处逐字谓词漂移收敛——c2 组含 password
+ * 而 nday/recon 组漏, 'password' 字段在彼组会渲染为明文 text)。
+ */
+const CRED_FIELD = new Set(['key', 'secret', 'token', 'password']);
+const fieldTypeOf = fid => (CRED_FIELD.has(fid) ? 'password' : 'text');
+
 export function getSettings() {
   const p = getPrefs();
   const bp = p.bruteParams ?? {};
   const reconSources = { ...p.reconApiKeys };
-  // weakced brute params ride in reconSources under the pseudo-source id
+  // weakcred brute params ride in reconSources under the pseudo-source id(CS3-N14 拼写)
   reconSources.brute = bp;
   return {
     common: p.commonSettings ?? null,

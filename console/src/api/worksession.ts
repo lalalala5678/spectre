@@ -146,11 +146,6 @@ export async function setLastSession(wsId: string, agentKey: string,
     json: { agentKey, sessionId } });
 }
 
-export async function getLastSession(wsId: string,
-  agentKey: string): Promise<string | null> {
-  const all = await listWorkSessions();
-  return all.find(p => p.id === wsId)?.lastSessions?.[agentKey] ?? null;
-}
 
 /** F58: delete a project (server-side, WAL tombstone). */
 export async function deleteWorkSession(id: string): Promise<void> {

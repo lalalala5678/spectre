@@ -106,7 +106,7 @@ export function Topbar() {
     return () => { stopped = true; off(); };
   }, []);
 
-  // F69: 防抖搜索(会话树 + 总线条目; 结果缓存 30s)
+  // F69: 防抖搜索(会话树 + 总线条目)
   useEffect(() => {
     const query = q.trim();
     if (query.length < 2) { setSessHits([]); setBusHits([]); setOpen(false); return; }  // R32D30-E2: <2 字时复位下拉, 否则残留'无结果'提示自相矛盾
@@ -189,7 +189,7 @@ export function Topbar() {
               <button key={s.id} onClick={() => {
                 // R32D29-N2: 走 pendingOpen 通道——URL hash 双赋值方案
                 // 里旧页消费 effect 会抢在路由提交前洗掉 ?s=(≈50% 丢)。
-                const key = s.agentKey === 'autopwn' ? 'autopwn' : s.agentKey;
+                const key = s.agentKey;  // CS3-N20: 恒等三元删除
                 setOpen(false);
                 setPendingOpen(key, s.id);
                 go(key);

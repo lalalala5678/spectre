@@ -29,7 +29,7 @@ export function makeWorld() {
     model: { id: 'test', api: 'oc' }, streamFn: idleStream,
     caps: {}, wal: nullWal,
   });
-  const makeCaps = rec => ({
+  const makeCaps = _rec => ({
     followUp: () => {},
     emitBus: e => bus.emit(e),
     listBus: () => bus.list(),
@@ -58,7 +58,7 @@ export let pass = 0;
 export let fail = 0;
 export const ck = (name, ok, detail = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}: ${name}${ok ? '' : ' -> ' + String(detail).slice(0, 120)}`);
-  ok ? pass++ : fail++;
+  if (ok) pass++; else fail++;  // CS3: no-unused-expressions
 };
 export const finish = () => {
   console.log(`${pass}/${pass + fail}`);

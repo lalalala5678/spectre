@@ -168,7 +168,7 @@ export async function buildPi() {
   // User-facing settings override env (settings.mjs): baseUrl/apiKey/
   // model/maxTokens/contextWindow — every save passed a live probe, so
   // values arriving here were connectivity-verified at save time.
-    const eff = effectiveCommon();
+  const eff = effectiveCommon();
   const models = createModels();
   models.setProvider(createProvider({
     id: PROVIDER_ID,
@@ -222,7 +222,7 @@ export async function buildPi() {
  *  object — existing + new sessions pick up changes without a restart.
  *  baseUrl/auth are re-read per call; model identity fields mutate here. */
 export async function applyLlmPrefs() {
-    const eff = effectiveCommon();
+  const eff = effectiveCommon();
   if (liveModel) {
     liveModel.id = eff.model;
     liveModel.name = eff.model;
@@ -313,7 +313,7 @@ export function clipMarked(value, max, note = '') {
   return `${text.slice(0, max)}[已截断:原文 ${text.length} 字符${pointer}]`;
 }
 
-;/** pi tool-protocol envelope: plain-text success (CS1-R12 单源)。 */
+/** pi tool-protocol envelope: plain-text success (CS1-R12 单源)。 */
 export const sayText = t => ({ content: [{ type: 'text', text: t }] });
 
 /** pi tool-protocol envelope: plain-text error with isError (CS1-R12)。 */
@@ -956,7 +956,7 @@ export const BRUTE_PROMPT = [
   '',
   '# 线四:端口→服务→协议爆破',
   '自主:nmap -sV 拓扑端口(-p- 或 top1000 按需)→识别服务→选协议引擎:',
-  'hydra -L 用户表 -P 密码表 <service>://ip(ssh/mysql/ftp/telnet/smb	rdp/',
+  'hydra -L 用户表 -P 密码表 <service>://ip(ssh/mysql/ftp/telnet/smb  rdp/',
   'mongodb/postgres/mssql/smtp/pop3/imap/vnc/snmp -P community表 mqtt/redis)',
   '免爆破优先检查:Redis unauth(redis-cli ping)、ES 9200/_cluster/health、',
   'MongoDB unauth、Docker 2375/version、etcd 2379、Nacos 8848(nacos/nacos',

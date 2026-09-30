@@ -9,10 +9,9 @@ import os
 import threading
 import time
 
-import os
 DATA_DIR = os.environ.get("SPECTRE_DATA_DIR", "/var/lib/spectre")
 STORE = DATA_DIR + "/gateway-sessions.json"
-_DEBOUNKE = 0.5
+_DEBOUNCE = 0.5  # CS3-N15: 拼写对齐 docstring
 
 
 class SessionPersistence:
@@ -59,7 +58,7 @@ class SessionPersistence:
             if not self._dirty:
                 return
             now = time.time()
-            if not force and now - self._last_write < _DEBOUNKE:
+            if not force and now - self._last_write < _DEBOUNCE:
                 return
             self._dirty = False
             self._last_write = now

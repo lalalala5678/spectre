@@ -151,7 +151,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
     if ([...shells.values()].some(x => x.name === nm && x.status === 'active'
         && !(x.expiresAt && x.expiresAt <= nowIso)))
       return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
-        // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
+    // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
     const tr = String(transportRef || '');
     if (transport === 'web' && !tr.includes('{CMD}'))
       return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK)' };
@@ -309,7 +309,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
       sh.user = (user || '').trim() || null;
       sh.os = rest.join(' ').trim() || null;
       sh.host = sh.os ? String(sh.os).split(' ')[1] : null;
-    persistShells();  // R6-F2
+      persistShells();  // R6-F2
     }
     return sh;
   }

@@ -6,7 +6,8 @@
  * append-only channel as sessions and bus. Projects are tiny.
  *
  * Project record: { id, label, createdAt, lastSessions: {agentKey: sessionId} }
- * Prefs record:   { currentWs, ui: { rightRatio, stackRatios } }
+ * Prefs record:   { currentWs, ui: { rightRatio, stackRatios },
+ *                   commonSettings, reconApiKeys, bruteParams }
  */
 
 let projects = new Map();   // id → project
@@ -101,9 +102,6 @@ export function setLastSession(id, agentKey, sessionId, wal) {
   wal?.append({ t: 'proj', d: p });
 }
 
-export function getLastSession(id, agentKey) {
-  return projects.get(id)?.lastSessions?.[agentKey] ?? null;
-}
 
 // ------------------------------ prefs ------------------------------
 

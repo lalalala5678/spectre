@@ -146,7 +146,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
             self._drain()  # R4-2
             return self._redirect(config.PREFIX + "/login")
 
-        if rel in ("", "/"):
+        # CS3-N17: rel 已在上方 or "/" 归一, "" 臂不可达
+        if rel == "/":
             rel = "/index.html"
         return self._serve_static(rel)
 
@@ -272,7 +273,7 @@ def serve():
     import os
     from http.server import ThreadingHTTPServer
 
-    loopback = ("127.0.0.1", "localhost")
+    loopback = ("127.0.0.1", "localhost", "::1")  # CS3-N16 对齐 config.py 判定
     if config.BIND_HOST not in loopback and config.TRUST_PROXY:
         print("[gateway] 警告: 公网绑定且信任 XFF——直连者可自旋 X-Forwarded-For "
               "绕过锁定; 建议仅绑定环回由反代暴露, 或设 GATEWAY_TRUST_PROXY=0", flush=True)

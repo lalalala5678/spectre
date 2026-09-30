@@ -18,19 +18,8 @@ const STAGE_ROUTES: RouteKey[] = [
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
 ];
 
-const AGENT_OF_ROUTE: Record<string, string> = {
-  autopwn: 'autopwn',
-  recon: 'recon',
-  nday: 'nday',
-  weakcred: 'weakcred',
-  api: 'api',
-  exploit: 'exploit',
-  phish: 'phish',
-  c2: 'c2',
-  persistence: 'persistence',
-  postex: 'postex',
-  report: 'report',
-};
+// CS3-N20: route→agent 恒等映射删除——agent id 即 route key
+const AGENT_OF_ROUTE = (route: string): string => route;
 
 import { setPendingOpen } from './api/openSessionChannel';
 
@@ -99,7 +88,7 @@ export default function App() {
         <Topbar />
         <main className="min-h-0 flex-1 overflow-hidden bg-void-950">
           {STAGE_ROUTES.includes(route) ? (
-            <AgentWorkspacePage key={route} agent={getAgent(AGENT_OF_ROUTE[route])} />
+            <AgentWorkspacePage key={route} agent={getAgent(AGENT_OF_ROUTE(route))} />
           ) : ['skills', 'mcp', 'cli'].includes(route) ? (
             // CS1-R9: 三配置页同构外壳收敛(页面组件查表)
             <div className="h-full overflow-hidden p-4">

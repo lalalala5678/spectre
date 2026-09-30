@@ -3,7 +3,7 @@
  *
  * 差异化行为不在此层: 专属系统提示词在 pi.mjs, 每会话工具面与技能
  * 挂载在 sessions.mjs(_buildAgent)。本表是 agentKey 的权威单源,
- * 增删 agent 从这里开始(路由校验/前端花名册派生自 /api/agents)。
+ * 增删 agent 从这里开始; /api/agents 端点由此派生(console 花名册为 agentRegistry.ts 静态表, 增删需双侧同步——CS3-N9)。
  */
 
 export const AGENTS = Object.freeze([

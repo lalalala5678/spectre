@@ -33,7 +33,7 @@ const errText = (e: unknown) => String(e instanceof Error ? e.message : e);
 
 /** 单个 Agent 工作台页（资产测绘 / 漏洞挖掘 / … 共用骨架） */
 export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
-  const liveKey = agent.id === 'autopwn' ? 'autopwn' : agent.id;
+  const liveKey = agent.id;  // CS3-N20: 恒等三元删除
   const [tab, setTab] = useState<'session' | 'bus' | 'config' | 'history'>('session');
   const [workSession, setWorkSession] = useState<WorkSession | null>(null);
   const [projects, setProjects] = useState<WorkSession[]>([]);

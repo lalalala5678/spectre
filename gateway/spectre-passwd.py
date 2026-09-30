@@ -94,8 +94,9 @@ def main():
         print("用法: spectre-passwd add|del <user>", file=sys.stderr)
         sys.exit(2)
     user = argv[1]
-    if ":" in user or not user.strip():
-        sys.exit("用户名不允许含冒号/空白")
+    # CS3-N18: 消息与校验对齐——此前只拒冒号/全空, 'jo hn' 被接受
+    if ":" in user or not user.strip() or any(ch.isspace() for ch in user):
+        sys.exit("用户名不允许含冒号或空白字符")
     lines = read_lines()
     rest = [line for line in lines if line.split(":", 1)[0] != user]
     if cmd == "del":

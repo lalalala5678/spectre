@@ -27,7 +27,7 @@ export async function startAutopwn({ engagementId, instruction, agents,
   // The orchestrator never schedules itself.
   const targets = [...new Set(agents)].filter((key) => key !== 'autopwn');  // R7-F5: 去重
   if (targets.length === 0) {
-    throw Object.assign(new Error('no stage agents selected'), { statusCode: 400 });
+    throw Object.assign(new Error('未选择任何 stage agent'), { statusCode: 400 });
   }
   const client = await temporalClient();
   const handle = await client.workflow.start('autoPwnWorkflow', {

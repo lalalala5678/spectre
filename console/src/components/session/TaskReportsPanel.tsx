@@ -1,8 +1,8 @@
-import { ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
+import { PanelEntryMeta } from './PanelEntryMeta';
 import { StatusBadge } from './VulnPanel';
 
 /**
@@ -35,7 +35,6 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
           : <p className="py-3 text-center text-[11px] text-zinc-700">本项目暂无任务报告</p>
         )}
         {events.map(event => {
-          const a = event.author;
           // F56: render the CURRENT version (current = latest revision) —
           // reading the original's fields left the list showing the stale
           // title/status after a revision landed.
@@ -52,21 +51,8 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
                   cur.void ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
                   {cur.title ?? cur.summary}
                 </span>
-                {cur.void && (
-                  <span className="shrink-0 rounded-sm border border-void-600 px-1 py-0.5 font-mono text-[8.5px] text-zinc-600">已作废</span>
-                )}
-                {event.revisedCount > 0 && (
-                  <span className="shrink-0 rounded-sm border border-sky-800 bg-sky-950/40 px-1 py-0.5 font-mono text-[8.5px] tracking-widest text-sky-300">
-                    ⟳{event.revisedCount}
-                  </span>
-                )}
-                <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
+                <PanelEntryMeta event={event} voidable />
               </div>
-              {a && (
-                <p className="truncate pl-1 text-[10px] leading-tight text-zinc-600">
-                  {a.name}（{a.typeLabel}{a.parent ? ` · 父:${a.parent.name}` : ''} · L{a.depth}）
-                </p>
-              )}
             </button>
           );
         })}

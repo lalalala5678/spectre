@@ -71,8 +71,12 @@ export function emitRevision(bus, { target, fields, reason,
       ? `${fields.status !== undefined ? fields.status
           : (base.status ?? target.status ?? '')} · ${fields.title ?? base.title}`
       : (fields.title ?? base.summary),
-    severity: fields.severity !== undefined ? fields.severity : base.severity,
-    status: fields.status !== undefined ? fields.status : base.status,
+    // CS3-N21: 入口归一小写(枚举小写规范)——此前 VulnPanel 被迫维护
+    // 大小写双胞胎样式表。
+    severity: fields.severity !== undefined
+      ? String(fields.severity).toLowerCase() : base.severity,
+    status: fields.status !== undefined
+      ? String(fields.status).toLowerCase() : base.status,
     detail: fields.text ?? base.detail,
     void: fields.void !== undefined ? Boolean(fields.void)
       : Boolean(base.void),

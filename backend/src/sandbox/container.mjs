@@ -10,7 +10,7 @@ import { createHash } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
-import { HOST, ensureWorkspace } from './exec-env.mjs';
+import { HOST } from './exec-env.mjs';
 
 const REGISTRY_PATH = path.join(HOST.workspace, '..', 'sandbox-config.json');
 
@@ -47,6 +47,12 @@ async function runInSandbox(cfg, script, o = {}) {
   return run('docker', ['exec', cfg.container, ...inner.split(' ').filter(Boolean),
     'bash', '-lc', script], hostTimeout + 10);
 }
+
+
+/** apt 命令行解析(N13: 四处逐字/变体正则收敛; 组1=前缀 组2=flags 组3=包段). */
+const APT_INSTALL_RE = /(apt(?:-get)?\s+install\s+)((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/;
+const APT_ACT_RE = /apt(?:-get)?\s+(?:install|remove)\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/;
+const PKG_WORD_RE = /^[\w.+:~-]+$/;
 
 /** Parse package names out of an apt install command line (CS1-R3). */
 export function parseAptPackages(cmd) {
@@ -295,7 +301,7 @@ export function rewriteAptLineWithout(line, pkg) {
   // Token-level removal INSIDE the package segment only — a rebuild
   // from captured pieces once amputated a `2>` redirect (round-5:
   // replayed row became `jq&1`, backgrounded apt + dpkg lock races).
-  const m = String(line).match(/(apt(?:-get)?\s+install\s+)((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
+  const m = String(line).match(APT_INSTALL_RE);
   if (!m) return null;
   const seg = m[3];
   const cleaned = seg.replace(new RegExp(`(^|\\s)${pkg.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}(?=\\s|$)`), ' ');  // R24-F5: 转义
@@ -419,7 +425,7 @@ export async function uninstallCliTool(name) {
     // a naive whitespace split once fed `export`, `&&`, env assignments
     // to apt-get as package names (round-3 review).
     const pkgs = [...new Set(aptLines.flatMap(l => {
-      const m = l.match(/apt(?:-get)?\s+(?:install|remove)\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
+      const m = l.match(APT_ACT_RE);
       return m ? m[2].trim().split(/\s+/)
         // strict package-name shape: redirects (2>/dev/null), env
         // assignments and shell tokens can never look like this
@@ -473,8 +479,8 @@ export async function uninstallCliTool(name) {
   if (!aborted) {
     const rewrites = [];
     for (const line of aptLines) {
-      const m = String(line).match(/apt(?:-get)?\s+install\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
-      const pkgs2 = m ? m[2].trim().split(/\s+/).filter(w => /^[\w.+:~-]+$/.test(w)) : [];
+      const m = String(line).match(APT_INSTALL_RE);
+      const pkgs2 = m ? m[3].trim().split(/\s+/).filter(w => PKG_WORD_RE.test(w)) : [];
       if (pkgs2.length > 1 && pkgs2.includes(name)) {
         const rw = rewriteAptLineWithout(line, name);
         if (rw && /\binstall\b/.test(rw)) rewrites.push(rw);
@@ -520,12 +526,11 @@ export async function sharedLayerTools() {
   } catch { /* absent */ }
   for (const line of await readInstallLog()) {
     if (!isAptInstallRow(line)) continue;
-    const m = String(line).match(/apt(?:-get)?\s+install\s+((?:-{1,2}[\w-]+\s+)*)([^;&|]*)/);
-    const pkgs = m ? m[2].trim().split(/\s+/)
-      .filter(w => /^[\w.+:~-]+$/.test(w)) : [];
+    const m = String(line).match(APT_INSTALL_RE);
+    const pkgs = m ? m[3].trim().split(/\s+/)
+      .filter(w => PKG_WORD_RE.test(w)) : [];
     for (const p of pkgs) push(p, 'apt', line.slice(0, 100));
   }
   return out;
 }
 
-export { ensureWorkspace };

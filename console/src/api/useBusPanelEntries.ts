@@ -10,7 +10,7 @@
 import { useEffect, useState } from 'react';
 import { api, foldEntries, subscribeBus, type ApiBusEvent, type FoldedEntry } from './client';
 
-export type { FoldedEntry };
+export type { FoldedEntry };  // CS3-N23: PanelEntryMeta 消费
 
 
 export function useBusPanelEntries(
