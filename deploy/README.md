@@ -79,6 +79,11 @@ python3 gateway/spectre-passwd.py list
 curl 集成: 登录 POST 字段为 `user`/`pw`——`curl -d 'user=admin&pw=...' http://<gw>:8081/spectre/login`。
 ```
 
+## 行为备注
+
+- API 裸建会话(无 workSessionId)不进项目历史列表——顶部全局搜索按标题/ID 可找回; UI 建会自动归组
+- 登录失败锁定为网关内存态(5 次/15 分钟, 重启即清); 登录成败同为 303, CLI 集成读 Location 的 `?e=` 参数(`e=cred`/`e=lock`)区分
+
 ## CLI 验证备注
 
 `/api/bus/events` 为 SSE 长连接(空闲仅心跳)——CLI 探测用 `curl -N --max-time 3`, 裸 curl 会挂起属预期。
