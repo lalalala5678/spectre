@@ -53,7 +53,7 @@ function extractTitle(raw) {
   // 全局搜索按完整串找不到)。词边界截断, 超长才回退硬切, 上限 60。
   if (title.length <= 60) return title;
   const hard = title.slice(0, 60);
-  const cut = hard.match(/^[\s\S]*[\s]/);
+  const cut = hard.match(/^[\s\S]*[\s-]/);  // 空格或连字符(NDAY-R32D28 类 token 的自然边界)
   return (cut && cut[0].trim().length >= 20) ? cut[0].trim() : hard;
 }
 

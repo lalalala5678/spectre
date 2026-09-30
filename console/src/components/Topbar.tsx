@@ -14,6 +14,7 @@ interface BusEvt { seq: number; ts?: string; type: string | null; title: string 
  * 逻辑)。实现: ≥2 字符防抖搜索会话(/sessions/tree 轻投影)+总线条目
  * (intel/vulnerability/task-report 的 title/summary, CVE 正则加权)。 */
 const SEARCHABLE = new Set(['intel', 'intel-note', 'vulnerability', 'task-report']);
+import { setPendingOpen } from '../api/openSessionChannel';
 
 /** F70: 通知铃铛此前是纯装饰(硬编码红点+无逻辑)。实装:
  * - 漏洞发布(vulnerability)与新失败报告(task-report failed)推送为通知
@@ -161,6 +162,11 @@ export function Topbar() {
           placeholder="搜索会话 / 资产 / 发现 / CVE…"
           className="w-full rounded-sm border border-void-600 bg-void-800 py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-void-500"
         />
+        {open && sessHits.length === 0 && busHits.length === 0 && (
+          <div className="absolute left-1/2 top-full z-40 mt-2 w-[560px] -translate-x-1/2 rounded-md border border-void-700 bg-void-900/95 p-3 text-center text-[11px] text-zinc-500 shadow-lg">
+            无结果——输入 ≥2 字搜索会话与总线条目
+          </div>
+        )}
         {open && (sessHits.length > 0 || busHits.length > 0) && (
           <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-sm border border-void-600 bg-void-900 p-1 shadow-lg">
             {sessHits.length > 0 && (
@@ -171,13 +177,12 @@ export function Topbar() {
             )}
             {sessHits.map(s => (
               <button key={s.id} onClick={() => {
-                // R26: 深链直达——#<agent>?s=<id> 由工作区 boot 消费
-                // (裸会话/跨项目/记忆竞态三场景统一; 替换 25 轮的旁路
-                // setLastSession 方案——彼方案 go() 先行必开错会话)。
+                // R32D29-N2: 走 pendingOpen 通道——URL hash 双赋值方案
+                // 里旧页消费 effect 会抢在路由提交前洗掉 ?s=(≈50% 丢)。
                 const key = s.agentKey === 'autopwn' ? 'autopwn' : s.agentKey;
                 setOpen(false);
-                window.location.hash = `#${key}`;
-                window.location.hash = `#${key}?s=${encodeURIComponent(s.id)}`;
+                setPendingOpen(key, s.id);
+                go(key);
               }}
                 className="block w-full truncate rounded-sm px-2 py-1 text-left text-[11.5px] text-zinc-300 hover:bg-void-800">
                 <span className="font-mono text-[9.5px] text-zinc-600">{s.agentKey}</span>

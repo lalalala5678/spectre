@@ -21,6 +21,7 @@ import {
   deleteWorkSession, ensureWorkSession, listWorkSessions, newWorkSession, switchWorkSession,
   setLastSession, putPrefsSync, getPrefs, cnNumber, type WorkSession,
 } from '../api/worksession';
+import { takePendingOpen, OPEN_SESSION_EVENT } from '../api/openSessionChannel';
 
 // Right column: proportional width (vw), never a fixed pixel band — adapts
 // to any screen. The user preference is a RATIO, so a width dragged on one
@@ -41,19 +42,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const uiPrefsRef = useRef<{ rightRatio?: number } | null>(null);
   // Boot: resolve the active project from the SERVER (prefs+registry);
   // the browser knows nothing. null → full-workspace loading skeleton.
-  useEffect(() => {
-    let cancelled = false;
-    Promise.all([ensureWorkSession(), getPrefs()]).then(async ([ws, prefs]) => {
-      if (cancelled) return;
-      uiPrefsRef.current = prefs.ui ?? {};
-      const saved = Number(prefs.ui?.rightRatio);
-      if (saved > 0.02 && saved < 0.98) setRightRatio(saved);  // R13-F2
-      setWorkSession(ws);
-      setUiReady(true);
-      setProjects(await listWorkSessions());
-    }).catch(err => setWsError(errText(err)));
-    return () => { cancelled = true; };
-  }, []);
+  // R32D29-N4: 此前这里有两份逐字重复的 boot effect(ensureWorkSession
+  // 双跑), 已合并为一份。
   const [uiReady, setUiReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
@@ -77,27 +67,34 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const readDeepLink = () =>
     new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('s');
   const [deepLink, setDeepLink] = useState<string | null>(readDeepLink);
-  useEffect(() => {
-    const onHash = () => setDeepLink(readDeepLink());
-    window.addEventListener('hashchange', onHash);
-    return () => window.removeEventListener('hashchange', onHash);
-  }, []);
+
   // R26(二十七轮修订): 深链消费走 drill 通道——setDrillSession(id)
   // 本就是"渲染任意会话转录"的既有机制(EntryDetail onOpenSession 同路)。
   // ref 镜像: boot 的乐观清场据此保留深链(N1 时序竞争修复)。
   const deepLinkRef = useRef<string | null>(null);
+  // R32D29-N2: 应用内点击走 pendingOpen 通道(不走 hash——旧页消费
+  // effect 会抢在路由提交前洗掉 ?s=, fiber 实锤 ≈50% 丢目标); 冷
+  // 加载/URL 直达仍走 ?s=(仅挂载时一次性读)。ref 只在此写入, 由
+  // boot 首次运行末尾清零(R28-N1 pending 模型)。
+  const consumePending = useCallback(() => {
+    const id = takePendingOpen(liveKey);
+    if (!id) return;
+    deepLinkRef.current = id;
+    setDrillSession(id);
+  }, [liveKey]);
   useEffect(() => {
-    if (!deepLink) return;
-    // R28-N1 根治(pending 一次性消费模型): ref 只在此写入, 不在渲染体
-    // 镜像——镜像会在消费后的重渲染里把它清回 null, 与 boot 重跑竞态
-    // (二十八轮审计实锤: 冷加载/跨 agent 路径非确定性丢深链)。ref 由
-    // boot 首次运行末尾清零; state 保留不影响 deps 语义(hash 已被
-    // replaceState 清洗, 重挂载读不到旧参)。
-    deepLinkRef.current = deepLink;
-    setDrillSession(deepLink);
-    const base = window.location.hash.split('?')[0].replace('#', '');
-    history.replaceState(null, '', `${window.location.pathname}#${base}`);
-  }, [deepLink]);
+    if (deepLink) {
+      deepLinkRef.current = deepLink;
+      setDrillSession(deepLink);
+      const base = window.location.hash.split('?')[0].replace('#', '');
+      history.replaceState(null, '', `${window.location.pathname}#${base}`);
+      setDeepLink(null);  // 重入以挂接下方通道监听
+    } else {
+      consumePending();
+    }
+    window.addEventListener(OPEN_SESSION_EVENT, consumePending);
+    return () => window.removeEventListener(OPEN_SESSION_EVENT, consumePending);
+  }, [deepLink, consumePending]);
   const [entryView, setEntryView] = useState<ApiBusEvent | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
