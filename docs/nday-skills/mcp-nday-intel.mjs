@@ -16,11 +16,13 @@
 import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
 
+// R32D35-F2: 数据根走 SPECTRE_DATA_DIR(同 F1; where:'host' 时无
+// /opt/tools 挂载, 此前回落生产路径读到生产 NVD key)。
+import { join } from 'node:path';
 const cfg = (() => {
-  for (const p of ('/opt/tools/nday/api-keys.json',
-                   '/var/lib/spectre/tools/nday/api-keys.json')) {
-    try { return JSON.parse(readFileSync(p, 'utf8')); } catch { /* next */ }
-  }
+  const p = join(process.env.SPECTRE_DATA_DIR ?? '/var/lib/spectre',
+    'tools/nday/api-keys.json');
+  try { return JSON.parse(readFileSync(p, 'utf8')); } catch { /* none */ }
   return {};
 })();
 const NVD_KEY = cfg?.nvd?.key || process.env.NVD_API_KEY || '';

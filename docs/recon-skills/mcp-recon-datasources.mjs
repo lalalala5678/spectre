@@ -15,7 +15,12 @@
 import readline from 'node:readline';
 import { readFileSync } from 'node:fs';
 
-const CFG_PATH = '/var/lib/spectre/recon-datasources.json';
+// R32D35-F1: 数据根走 SPECTRE_DATA_DIR(env 由 runtime 注入, 见
+// sandbox/mcp.mjs 注入面)——硬编码曾使隔离实例读到生产凭据、新机配置
+// 永不挂载。keyfiles.mjs 写入同源路径。
+import { join } from 'node:path';
+const CFG_PATH = join(process.env.SPECTRE_DATA_DIR ?? '/var/lib/spectre',
+  'recon-datasources.json');
 let cfg = {};
 try { cfg = JSON.parse(readFileSync(CFG_PATH, 'utf8')); } catch { /* none configured */ }
 

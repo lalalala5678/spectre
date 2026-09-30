@@ -163,7 +163,8 @@ function realRouter({ store, bus, caps, wal }) {
         .filter(s => !q
           || (s.rawTitle ?? '').toLowerCase().includes(q)
           || (s.title ?? '').toLowerCase().includes(q)
-          || s.id.toLowerCase().includes(q))
+          || s.id.toLowerCase().includes(q)
+          || s.agentKey.toLowerCase().includes(q))  // R32D35-E2
         .map(s => ({
         id: s.id, agentKey: s.agentKey, title: s.title,
         rawTitle: s.rawTitle ?? null,  // R32D31-E1: 搜索面用未截断值

@@ -267,7 +267,10 @@ class GatewayHandler(BaseHTTPRequestHandler):
         try:
             proxy.proxy(self, rel)
         except proxy.ProxyError as error:
-            self._send(error.status, str(error).encode())
+            # R32D35-E1: 错误体此前是英文 OSError 原文('[Errno 111]
+            # Connection refused')直达前端——中文化包装。
+            self._send(error.status,
+                       f"后端 runtime 不可达({error})".encode())
 
 
 def serve():

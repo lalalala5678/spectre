@@ -43,7 +43,7 @@ cd ../console && npm i && npm run build
 #    共享机/生产机测试: 加 SPECTRE_AUTH_DIR=<隔离目录> GATEWAY_LOG_DIR=<隔离目录> 前缀
 cd ../gateway
 # 建号与网关必须同一 SPECTRE_AUTH_DIR(env 前缀不穿透 &&——export 后两段共用)
-export SPECTRE_AUTH_DIR=/var/lib/spectre/auth
+export SPECTRE_AUTH_DIR=/tmp/spectre-auth        # R32D35-E3: 与隔离指引一致(缺省= /etc/spectre-auth)
 python3 spectre-passwd.py add admin           # 交互输密码
 export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
 export SPECTRE_DATA_DIR=/tmp/spectre-data      # 与后端①同目录即可(网关只写会话文件)

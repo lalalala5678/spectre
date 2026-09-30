@@ -328,7 +328,9 @@ def main():
     p.add_argument('--subject', required=False)
     p.add_argument('--html', help='HTML 模板')
     p.add_argument('--track-url', default='https://t.local')
-    p.add_argument('--track-db', default='/var/lib/spectre/tools/phish/track.json',
+    import os as _os
+    _data = _os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre')
+    p.add_argument('--track-db', default=f'{_data}/tools/phish/track.json',
                     help='发送事件落库(漏斗分母, R15-F5)')
     p.add_argument('--attach', action='append')
     p.add_argument('--rate', default='5/min')

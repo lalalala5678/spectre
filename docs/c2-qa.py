@@ -66,7 +66,7 @@ def eng_yara(p):
 def _load_api_keys():
     """读设置面板写入的已验证 keys(仅验证通过的才落盘)"""
     for kp in ('/opt/tools/c2/api-keys.json',
-               '/var/lib/spectre/tools/c2/api-keys.json'):
+               f"{__import__('os').environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre')}/tools/c2/api-keys.json"):
         try:
             return json.load(open(kp))
         except Exception:

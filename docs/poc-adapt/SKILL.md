@@ -13,7 +13,7 @@ RCE 只 echo 标记/id/whoami;文件读取只读证明性文件;DB 只 SELECT;�
 ## 1. 有 nuclei 模板(定向单点)
 
 ```bash
-nuclei -t /var/lib/spectre/tools/fingerprints/plugins-0x727/<vendor>/<product>/CVE-*.yaml \
+nuclei -t /opt/tools/fingerprints/plugins-0x727/<vendor>/<product>/CVE-*.yaml \
   -u https://<目标> -nc -silent -timeout 10
 # 禁止 -tags cve 全库跑(那是扫描器干他);模板 matcher 读一遍理解它测什么
 ```

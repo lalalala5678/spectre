@@ -124,7 +124,8 @@ export async function api<T>(
   }
   if (!res.ok) {
     const body = await res.json().catch(() => ({}));
-    throw Object.assign(new Error(body.error ?? `HTTP ${res.status}`), {
+    // R32D35-E1: 非 JSON 错误体的回退文案中文化(此前 'HTTP 502')
+    throw Object.assign(new Error(body.error ?? `请求失败(HTTP ${res.status})`), {
       status: res.status,
     });
   }

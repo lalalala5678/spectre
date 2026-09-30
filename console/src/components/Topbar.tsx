@@ -125,7 +125,9 @@ export function Topbar() {
         // R32D32-R6: 服务端已按 q 过滤, 此处保留兜底匹配(兼容未带 q
         // 的旧后端/代理缓存)
         const allSess = tree.filter(s =>
-          (s.rawTitle ?? s.title ?? '').toLowerCase().includes(lower) || s.id.includes(lower),
+          (s.rawTitle ?? s.title ?? '').toLowerCase().includes(lower)
+          || s.id.includes(lower)
+          || s.agentKey.toLowerCase().includes(lower),  // R32D35-E2: 匹配面对齐渲染面
         );
         setSessTotal(allSess.length);
         setSessHits(allSess.slice(0, 5));
