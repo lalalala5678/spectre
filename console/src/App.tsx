@@ -33,7 +33,8 @@ const AGENT_OF_ROUTE: Record<string, string> = {
 
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
-    const h = window.location.hash.replace('#', '') as RouteKey;
+    // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
+    const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
     const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
     return valid.includes(h) ? h : 'autopwn';
   });
@@ -64,7 +65,7 @@ export default function App() {
   // on later hash changes (manual URL edits, history navigation).
   useEffect(() => {
     const onHash = () => {
-      const h = window.location.hash.replace('#', '') as RouteKey;
+      const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
       const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
       setRoute(valid.includes(h) ? h : 'autopwn');
     };

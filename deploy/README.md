@@ -64,7 +64,7 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtim
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
 # 四脚本统一数据根(不要设默认值兜底——留空让脚本守卫拦截生产误写;
 # 真要装生产才显式 export SPECTRE_DATA_DIR=/var/lib/spectre)
-export SPECTRE_DATA_DIR=/tmp/spectre-sandbox-data
+export SPECTRE_DATA_DIR=/tmp/spectre-data   # 与步骤 1/3 同根(runtime 挂载/网关会话/技能播种读同一棵树)
 bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据根(先行: 交付容器内引导)
 # 容器名按数据根哈希精确派生(共享机勿盲打缺省名——隔离实例是
 # spectre-sbx-<sha256(数据根)前8位>, 缺省数据根才是 spectre-sandbox)
@@ -72,7 +72,7 @@ SBX="spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8)"
 docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
   || { echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2; exit 1; }
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
-SPECTRE_DATA_DIR=/tmp/spectre-sandbox-data PORT=18090 INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 三变量与 runtime 同源
+SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 三变量与 runtime 同源
 
 # 7) 数据源凭据
 #    控制台「Agent 配置」页填入(验证通过才落盘, 未配置不注入);
@@ -113,6 +113,8 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 ## API 契约
 
 - `POST /api/sessions`: 必填 `agentKey`(14 键之一: autopwn/recon/nday/weakcred/api/exploit/phish/c2/persistence/postex/report/skill-config/mcp-config/cli-config); 可选 `workSessionId`(项目归组)
+- `POST /api/sessions/:id/messages`: 必填 `text`(202 异步——回执走 SSE `event: session`); `source=agent` 伪装注入需内部令牌
+- `GET /api/sessions/:id`: 会话摘要(消息内联在会话对象中——`GET .../messages` 端点不存在, 非对称属设计)
 - 全部 `/api/*`(除 health): 头 `X-Internal-Token`
 
 ## 行为备注

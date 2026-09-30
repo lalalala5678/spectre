@@ -72,6 +72,26 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);
+  // R26(二十六轮): 全局搜索深链 #<agent>?s=<id>——Topbar 点击直达目标
+  // 会话(裸会话/跨项目/同项目记忆竞态三场景统一由此打开)。
+  const readDeepLink = () =>
+    new URLSearchParams(window.location.hash.split('?')[1] ?? '').get('s');
+  const [deepLink, setDeepLink] = useState<string | null>(readDeepLink);
+  useEffect(() => {
+    const onHash = () => setDeepLink(readDeepLink());
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
+  // R26(二十六轮修订): 深链消费走 drill 通道——setDrillSession(id)
+  // 本就是"渲染任意会话转录"的既有机制(EntryDetail onOpenSession 同路);
+  // 不碰 boot 选择逻辑, 裸会话/跨项目/记忆竞态三场景统一直达。
+  useEffect(() => {
+    if (!deepLink) return;
+    setDrillSession(deepLink);
+    const base = window.location.hash.split('?')[0].replace('#', '');
+    history.replaceState(null, '', `${window.location.pathname}#${base}`);
+    setDeepLink(null);
+  }, [deepLink]);
   const [entryView, setEntryView] = useState<ApiBusEvent | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
   const [projectName, setProjectName] = useState('');
