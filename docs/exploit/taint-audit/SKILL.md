@@ -39,7 +39,7 @@ git log tagA..tagB 找含 fix/安全/cve 关键词的 commit→diff 反推漏洞
   CFR 反编译→高危面预扫(JeecgBoot 3.5.3 内嵌 jimureport 1.5.9≠仓库版本陷阱)
 - jmreport 族高发面:/jmreport/queryFieldBySql(SSTI≤1.6.0)/loadTableData(任意
   SQL)/testConnection(任意 JDBC,firewall 默认 null)/upload(黑名单 jsp/php/html
-  contains 方向漏杀 jsx/svg;签名密钥 DEFAULT_SECRET=<demo-default-secret>
+  contains 方向漏杀 jsx/svg;签名密钥 DEFAULT_SECRET=<demo应用默认密钥>
   硬编码可伪造);三层鉴权模型:宿主 anon×签名拦截器(safeMode=false 时恒过)×
   token 拦截器(无自定义 verifyToken 恒 true)
 - RuoYi 族状态:createTable SQLi≤4.7.9(4.8.0 补 sleep/union/like//**/\u000B);

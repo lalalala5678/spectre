@@ -11,14 +11,15 @@ def hit(tag):
     with open(HITS, 'a') as f:
         f.write(f"{tag} {time.strftime('%H:%M:%S')}\n")
 
+# 凭据从环境读(brutebench.env, 不入库)——up.sh 启动前 source 并 export
 CREDS = {
-    'plain':  {'user': 'ops',      'pw': 'bench-env-value'},
-    'md5':    {'user': 'manager',  'pw': 'bench-env-value', 'salt': 's1Lt9x'},
-    'aes':    {'user': 'admin',    'pw': 'bench-env-value', 'key': b'0123456789abcdef', 'iv': b'abcdef9876543210'},
-    'jwt':    {'user': 'service',  'pw': 'bench-env-value'},
-    'api':    {'user': 'report',   'pw': 'bench-env-value'},
+    'plain':  {'user': 'ops',      'pw': os.environ['BENCH_WEB_PLAIN_PW']},
+    'md5':    {'user': 'manager',  'pw': os.environ['BENCH_WEB_MD5_PW'], 'salt': 's1Lt9x'},
+    'aes':    {'user': 'admin',    'pw': os.environ['BENCH_WEB_AES_PW'], 'key': b'0123456789abcdef', 'iv': b'abcdef9876543210'},
+    'jwt':    {'user': 'service',  'pw': os.environ['BENCH_WEB_JWT_PW']},
+    'api':    {'user': 'report',   'pw': os.environ['BENCH_WEB_API_PW']},
 }
-JWT_SECRET = 'bench-env-value'  # rockyou 前排
+JWT_SECRET = os.environ['BENCH_JWT_SECRET']  # 刻意弱值见 brutebench.env
 
 # ---------- 18080 明文 ----------
 app1 = Flask('plain')

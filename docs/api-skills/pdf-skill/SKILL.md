@@ -212,7 +212,7 @@ qpdf input.pdf --pages . 6-10 -- pages6-10.pdf
 qpdf input.pdf output.pdf --rotate=+90:1  # Rotate page 1 by 90 degrees
 
 # Remove password
-qpdf --password=<pdf-pass> --decrypt encrypted.pdf decrypted.pdf
+qpdf --password=<PDF密码> --decrypt encrypted.pdf decrypted.pdf
 ```
 
 ### pdftk (if available)
@@ -286,7 +286,7 @@ for page in reader.pages:
     writer.add_page(page)
 
 # Add password
-writer.encrypt("<pdf-user-pass>", "<pdf-owner-pass>")
+writer.encrypt("<用户密码>", "<所有者密码>")
 
 with open("encrypted.pdf", "wb") as output:
     writer.write(output)
