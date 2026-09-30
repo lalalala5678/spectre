@@ -10,7 +10,7 @@ interface SandboxStatus {
   driver: 'local' | 'docker';
   container: string;
   image: string;
-  dockerAvailable?: boolean;
+  driverIsDocker?: boolean;
 }
 
 /** CLI 工具页 — 共享工具层：安装一次，全部 agent（全部项目）可用。

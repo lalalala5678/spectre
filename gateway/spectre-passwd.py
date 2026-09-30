@@ -90,7 +90,11 @@ def main():
         return
     if len(rest) != len(lines):
         print(f"[spectre-passwd] 注意: 用户 {user} 已存在, 本次将覆盖其密码")
-    pw = os.environ.get("PASS") or getpass.getpass(f"为 {user} 设置密码: ")
+    pw = os.environ.get("PASS")
+    if not pw:
+        if not sys.stdin.isatty():
+            sys.exit("[spectre-passwd] 非 tty 且未设 PASS 环境变量 — PASS='<密码>' python3 spectre-passwd.py add <user>")
+        pw = getpass.getpass(f"为 {user} 设置密码: ")
     if len(pw) < 8:
         sys.exit("密码至少 8 位")
     write_lines(rest + [f"{user}:{hash_pw(pw)}"])

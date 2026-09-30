@@ -73,15 +73,26 @@ export async function newWorkSession(name: string): Promise<WorkSession> {
  * uploaded verbatim (ids preserved so existing sessions stay grouped),
  * then every spectre.* storage key is wiped — the browser keeps nothing.
  */
-export async function ensureWorkSession(): Promise<WorkSession> {
-  await migrateLegacyStorage();
-  const [prefs, all] = await Promise.all([getPrefs(), listWorkSessions()]);
-  if (prefs.currentWs) {
-    const found = all.find(p => p.id === prefs.currentWs);
-    if (found) return found;
-  }
-  if (all.length > 0) return all[all.length - 1];
-  return newWorkSession('');
+// F1(十五轮): 本体也 memo——R14-F2 只 memo 了 migration; 全新用户无
+// legacy 键时迁移是空操作, AgentWorkspacePage 两处 boot 并发调用仍
+// 同时看到空表→各自 POST /projects 产出双「未命名项目」。并发者
+// await 同一 ensure promise, 落后者复用首建结果。
+let ensuring: Promise<WorkSession> | null = null;
+export function ensureWorkSession(): Promise<WorkSession> {
+  return ensuring ??= (async () => {
+    try {
+      await migrateLegacyStorage();
+      const [prefs, all] = await Promise.all([getPrefs(), listWorkSessions()]);
+      if (prefs.currentWs) {
+        const found = all.find(p => p.id === prefs.currentWs);
+        if (found) return found;
+      }
+      if (all.length > 0) return all[all.length - 1];
+      return await newWorkSession('');
+    } finally {
+      ensuring = null;  // 失败后允许重试(不缓存错误态)
+    }
+  })();
 }
 
 // R14-F2: memoized promise——migrated 布尔在 await 前置位, 并发
