@@ -93,7 +93,7 @@ export function Sidebar({
 
       {/* 底部：开源项目标识 */}
       <div className="border-t border-void-700 px-3.5 py-2.5">
-        <div className="font-mono text-[10px] text-zinc-600">v0.4.0 · AGPL-3.0</div>
+        <div className="font-mono text-[10px] text-zinc-600">v0.4.0 · MIT</div>
       </div>
     </aside>
   );
