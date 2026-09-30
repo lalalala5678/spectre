@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
-"""spectre-passwd — 网关账号管理 CLI(部署审计 R32: 此前新用户无任何
-官方建号路径, 网关对 passwd 缺失直接 FATAL)。
+"""spectre-passwd — 网关账号管理 CLI。
 
 用法:
   spectre-passwd add <user>              # 交互输入密码(或 PASS 环境变量)

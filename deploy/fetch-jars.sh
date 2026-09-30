@@ -1,33 +1,38 @@
 #!/bin/bash
-# 第三方 jar 依赖装载(15M libs + 25M generators 不入 git, 首次部署下载)
+# 第三方 jar 依赖装载(~40MB 不入 git, 首次部署下载)
 # 目标: /opt/tools/c2/libs 与 /opt/tools/c2/generators(挂载到容器同路径)
-set -e
-LIBS=/opt/tools/c2/libs
-GEN=/opt/tools/c2/generators
+# 任何一项失败都会在结尾汇总报错并以非零退出(不静默吞)。
+LIBS=${LIBS_DIR:-/opt/tools/c2/libs}
+GEN=${GEN_DIR:-/opt/tools/c2/generators}
 mkdir -p "$LIBS" "$GEN"
-cd "$LIBS"
-
+FAILED=()
+fetch() { # fetch <目录> <完整URL> <文件名>
+  local dir=$1 url=$2 name=$3
+  [ -f "$dir/$name" ] && return 0
+  if curl -fsSL --retry 2 -o "$dir/$name" "$url"; then
+    echo "  ✓ $name"
+  else
+    rm -f "$dir/$name"; echo "  ✗ $name ← $url"; FAILED+=("$name")
+  fi
+}
 MVN=https://repo1.maven.org/maven2
-fetch() { [ -f "$(basename $2)" ] || curl -fsSL -o "$(basename $2)" "$1/$2"; }
-
-# Tomcat 9(javax)/10.1(jakarta) 嵌入式桩
-fetch $MVN/org/apache/tomcat/embed/tomcat-embed-core/9.0.106 tomcat-embed-core-9.0.106.jar
-fetch $MVN/org/apache/tomcat/embed/tomcat-embed-core/10.1.39 tomcat-embed-core-10.1.39.jar
-fetch $MVN/org/apache/tomcat/tomcat-annotations-api/6.0.53 annotations-api-6.0.53.jar
-fetch $MVN/jakarta/annotation/jakarta.annotation-api/2.1.1 jakarta.annotation-api-2.1.1.jar
+cd "$LIBS"
+# Tomcat 9(javax)/10.1(jakarta) 嵌入式桩 + 注解 API
+fetch . $MVN/org/apache/tomcat/embed/tomcat-embed-core/9.0.106/tomcat-embed-core-9.0.106.jar tomcat-embed-core-9.0.106.jar
+fetch . $MVN/org/apache/tomcat/embed/tomcat-embed-core/10.1.39/tomcat-embed-core-10.1.39.jar tomcat-embed-core-10.1.39.jar
+fetch . $MVN/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1.jar jakarta.annotation-api-2.1.1.jar
 # 字节码变换(ASM 9.x)
-fetch $MVN/org/ow2/asm/asm/9.7 asm-9.7.jar
-fetch $MVN/org/ow2/asm/asm-commons/9.7 asm-commons-9.7.jar
-# Spring 编译桩(按 javastubs/patchsrc 声明的版本补齐; 显式坐标, 失败即报)
-mkdir -p spring && cd spring
-fetch $MVN/org/springframework/spring-core/5.3.39   spring-core-5.3.39.jar
-fetch $MVN/org/springframework/spring-web/5.3.39    spring-web-5.3.39.jar
-fetch $MVN/org/springframework/spring-context/5.3.39 spring-context-5.3.39.jar
-fetch $MVN/org/springframework/spring-beans/5.3.39  spring-beans-5.3.39.jar
-cd "$GEN"
-# jMG 真实载荷生成器(上游 pen4uin/java-memshell-generator)
-JMG=jmg-cli-1.0.9.jar
-[ -f "$JMG" ] || curl -fsSL -o "$JMG" \
-  https://github.com/pen4uin/java-memshell-generator/releases/download/v1.0.9/jmg-cli-1.0.9.jar
-sha256sum "$JMG" | grep -qi 31186f1 || echo "[警告] jmg jar 指纹不符, 校验后使用"
+fetch . $MVN/org/ow2/asm/asm/9.7/asm-9.7.jar asm-9.7.jar
+fetch . $MVN/org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar asm-commons-9.7.jar
+# Spring 编译桩(按 javastubs/patchsrc 声明的版本补齐; 显式坐标, 失败汇总)
+mkdir -p spring
+fetch spring $MVN/org/springframework/spring-core/5.3.39/spring-core-5.3.39.jar spring-core-5.3.39.jar
+fetch spring $MVN/org/springframework/spring-web/5.3.39/spring-web-5.3.39.jar spring-web-5.3.39.jar
+fetch spring $MVN/org/springframework/spring-context/5.3.39/spring-context-5.3.39.jar spring-context-5.3.39.jar
+fetch spring $MVN/org/springframework/spring-beans/5.3.39/spring-beans-5.3.39.jar spring-beans-5.3.39.jar
+# jMG 真实载荷生成器(上游 pen4uin/java-memshell-generator, tag v1.0.9_250101)
+fetch "$GEN" https://github.com/pen4uin/java-memshell-generator/releases/download/v1.0.9_250101/jmg-cli-1.0.9_250101.jar jmg-cli-1.0.9_250101.jar
+if [ ${#FAILED[@]} -gt 0 ]; then
+  echo "[fetch-jars] ✗ 失败 ${#FAILED[@]} 项: ${FAILED[*]}"; exit 1
+fi
 echo "[fetch-jars] 完成: $LIBS + $GEN"

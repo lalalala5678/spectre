@@ -117,7 +117,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
                 audit("logout", ip=self.client_ip())
             clear = (
                 f"{config.COOKIE_NAME}=; Path={config.PREFIX}; Max-Age=0; "
-                "HttpOnly; SameSite=Strict; Secure"
+                "HttpOnly; SameSite=Strict" + ("; Secure" if config.COOKIE_SECURE else "")
             )
             return self._redirect(
                 config.PREFIX + "/login", headers={"Set-Cookie": clear},
@@ -240,7 +240,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         cookie = (
             f"{config.COOKIE_NAME}={token}; Path={config.PREFIX}; "
             f"Max-Age={config.SESSION_ABSOLUTE_SECS}; "
-            "HttpOnly; SameSite=Strict; Secure"
+            "HttpOnly; SameSite=Strict" + ("; Secure" if config.COOKIE_SECURE else "")
         )
         return self._redirect(
             config.PREFIX + "/", headers={"Set-Cookie": cookie},

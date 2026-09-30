@@ -45,7 +45,7 @@ class Security:
         self._lock = threading.Lock()
         self._sessions = {}   # sha256(token) -> {user, ip, ua, login_ts, last_ts}
         self._failtrack = {}  # ip -> {n, window_start, locked_until}
-        # F72: memory-only sessions logged everyone out on every deploy
+        # memory-only sessions logged everyone out on every deploy
         # (spectre-console restart IS the gateway restart). Load the
         # compact sha256-keyed sidecar; write-behind keeps it current.
         from .session_store import SessionPersistence

@@ -16,7 +16,7 @@
 |---|---|---|---|
 | agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `LLM_API_KEY` |
 | console | `console/` (vite build) | — | — |
-| gateway | `gateway/server.py` | 8081 | `GATEWAY_PORT` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` |
+| gateway | `gateway/server.py` | 8081 | `GATEWAY_PORT` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) |
 | worker | Temporal activities | — | 同 runtime |
 | oob-collector | `deploy/oob-collector.py` | 19999 | — |
 | private-qa | `deploy/systemd/spectre-private-qa.service` | 8899 | — |
@@ -34,14 +34,17 @@ npm i && node agent-runtime.mjs      # PORT/SPECTRE_DATA_DIR 可环境变量覆�
 # 2) 前端(Node ≥ 20.19)
 cd ../console && npm i && npm run build
 
-# 3) 网关(纯 stdlib, 无需 pip)
+# 3) 网关(纯 stdlib, 无需 pip; Python ≥ 3.7)
 cd ../gateway
 python3 spectre-passwd.py add admin          # 创建首个登录账号(交互输密码)
-GATEWAY_DIST_DIR=../console/dist python3 server.py
+export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
+python3 server.py                             # dist 默认 ../console/dist
 
 # 4) 登录验证
-#    浏览器打开 http://<host>:8081/spectre/ → admin 登录
-#    Caddy/TLS 对外暴露时参考 deploy/Caddyfile
+#    本机: http://127.0.0.1:8081/spectre/ → admin 登录
+#    远程纯 HTTP: cookie 带 Secure 位会静默无法登录——要么 GATEWAY_INSECURE_COOKIE=1(仅测试),
+#    要么经 TLS(Caddy 样例见 deploy/Caddyfile; 网关默认只绑 127.0.0.1, 远程需 GATEWAY_BIND_HOST 或隧道)
+#    注意: 前端 npm i 与 npm run build 需同一 Node ≥ 20.19(混版本装出的原生依赖会损坏)
 
 # 5) systemd(可选, 路径经环境文件驱动)
 sudo mkdir -p /etc/spectre && sudo cp deploy/spectre.env.example /etc/spectre/spectre.env

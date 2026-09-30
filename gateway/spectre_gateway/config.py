@@ -11,7 +11,7 @@ BIND_HOST = os.environ.get("GATEWAY_BIND_HOST", "127.0.0.1")
 BIND_PORT = int(os.environ.get("GATEWAY_PORT", "8081"))
 
 #: Static SPA built by console/ (`npm run build`).
-DIST_DIR = os.environ.get("GATEWAY_DIST_DIR", "./console/dist")
+DIST_DIR = os.environ.get("GATEWAY_DIST_DIR", "../console/dist")
 
 #: Credentials and audit locations.
 AUTH_DIR = os.environ.get("SPECTRE_AUTH_DIR", "/etc/spectre-auth")
@@ -25,7 +25,9 @@ RUNTIME_PORT = int(os.environ.get("RUNTIME_PORT", "8090"))
 #: Internal token the runtime enforces on every /api route.
 RUNTIME_TOKEN = os.environ.get("INTERNAL_TOKEN", "")
 
-#: Session cookie and lifetime.
+#: Session cookie and lifetime。纯 HTTP 非 localhost 部署(测试)可置
+#: GATEWAY_INSECURE_COOKIE=1 关闭 Secure 位; 生产必须走 TLS。
+COOKIE_SECURE = os.environ.get("GATEWAY_INSECURE_COOKIE", "") != "1"
 COOKIE_NAME = "spectre_sess"
 SESSION_IDLE_SECS = 3600
 SESSION_ABSOLUTE_SECS = 12 * 3600
