@@ -276,7 +276,9 @@ def serve():
     except OSError as e:
         print(f"[gateway] 日志目录不可用({config.LOG_DIR}): {e} — 审计日志将只写 stdout", flush=True)
     if not os.path.isfile(config.PASSWD_FILE):
-        raise SystemExit(f"FATAL: {config.PASSWD_FILE} missing — 先运行 python3 spectre-passwd.py add <user> 创建账号")
+        raise SystemExit(
+            f"FATAL: {config.PASSWD_FILE} missing — 先运行 python3 spectre-passwd.py add <user> 创建账号"
+            f"(注意: 建号与网关须同一 SPECTRE_AUTH_DIR, 两边不一致即此错)")
     # F9(部署审计四轮): 空 INTERNAL_TOKEN 此前静默启动, 登录后所有 API 401
     if not config.RUNTIME_TOKEN:
         raise SystemExit(

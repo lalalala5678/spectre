@@ -42,7 +42,7 @@ cd ../console && npm i && npm run build
 # 3) 网关(纯 stdlib, 无需 pip; Python ≥ 3.7)
 #    共享机/生产机测试: 加 SPECTRE_AUTH_DIR=<隔离目录> GATEWAY_LOG_DIR=<隔离目录> 前缀
 cd ../gateway
-python3 spectre-passwd.py add admin          # 创建首个登录账号(交互输密码)
+SPECTRE_AUTH_DIR=<与网关同值> python3 spectre-passwd.py add admin   # 建号(交互输密码); 与网关同 AUTH_DIR
 export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
 export SPECTRE_DATA_DIR=/tmp/spectre-data      # 与后端①同目录即可(网关只写会话文件)
 python3 server.py                             # dist 默认 ../console/dist

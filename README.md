@@ -42,9 +42,10 @@ SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # 测试隔离数据
 cd ../console && npm i && npm run build
 
 # ③ 网关(纯 stdlib)——INTERNAL_TOKEN 必须=① 中 .env 的值, 否则 API 反代全 401
-cd ../gateway && python3 spectre-passwd.py add admin && \
+cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
+  python3 spectre-passwd.py add admin && \
   INTERNAL_TOKEN=<同①> SPECTRE_DATA_DIR=/tmp/spectre-data \
-  SPECTRE_AUTH_DIR=/tmp/spectre-auth GATEWAY_LOG_DIR=/tmp/spectre-logs python3 server.py
+  GATEWAY_LOG_DIR=/tmp/spectre-logs python3 server.py   # 建号与网关同 AUTH_DIR
 ```
 
 打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。

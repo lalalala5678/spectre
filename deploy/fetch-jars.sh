@@ -1,5 +1,5 @@
 #!/bin/bash
-# 第三方 jar 依赖装载(~~25MB 不入 git, 首次部署下载)
+# 第三方 jar 依赖装载(~25MB 不入 git, 首次部署下载)
 # 目标: $SPECTRE_DATA_DIR/tools/c2/{libs,generators}(挂载进容器为 /opt/tools/c2/*)
 # 任何一项失败都会在结尾汇总报错并以非零退出(不静默吞)。
 ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}

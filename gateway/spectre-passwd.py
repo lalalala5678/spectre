@@ -6,6 +6,8 @@
   spectre-passwd del <user>
   spectre-passwd list
 环境: SPECTRE_AUTH_DIR(默认 /etc/spectre-auth)
+防线: 缺省生产凭据文件已有内容时——tty 交互确认; 非 tty 必须显式
+      SPECTRE_ALLOW_DEFAULT_AUTH=1 放行(管道/脚本误写生产防线)。
 """
 import os
 import sys
@@ -20,12 +22,9 @@ SCRYPT_N, SCRYPT_R, SCRYPT_P = 2 ** 15, 8, 1
 
 def hash_pw(pw: str) -> str:
     salt = secrets.token_bytes(16)
-    try:
-        import hashlib
-        h = hashlib.scrypt(pw.encode(), salt=salt, n=SCRYPT_N, r=SCRYPT_R,
-                           p=SCRYPT_P, dklen=32, maxmem=128 * 1024 * 1024)
-    except ImportError:
-        sys.exit("需要 Python 3.7+")
+    h = __import__("hashlib").scrypt(pw.encode(), salt=salt, n=SCRYPT_N,
+                                     r=SCRYPT_R, p=SCRYPT_P, dklen=32,
+                                     maxmem=128 * 1024 * 1024)
     return f"scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${base64.b64encode(salt).decode()}${base64.b64encode(h).decode()}"
 
 
@@ -37,24 +36,33 @@ def read_lines():
 
 
 def _write_guard():
-    # D3(部署审计十轮): 非 root 对系统路径的 PermissionError 此前裸栈
+    # D3(十轮): 非 root 对系统路径 PermissionError 裸栈→友好指引
     try:
         os.makedirs(AUTH_DIR, mode=0o750, exist_ok=True)
-        probe = os.path.join(AUTH_DIR, '.probe')
-        with open(probe, 'w') as f:
-            f.write('x')
+        probe = os.path.join(AUTH_DIR, ".probe")
+        with open(probe, "w") as f:
+            f.write("x")
         os.unlink(probe)
     except PermissionError:
-        import sys
         sys.exit(f"[spectre-passwd] 无权写入 {AUTH_DIR} — 用 sudo, 或设 SPECTRE_AUTH_DIR 指向可写目录")
 
+
 def write_lines(lines):
-    if os.path.exists(PASSWD) and not os.environ.get('SPECTRE_AUTH_DIR'):
-        # D1(部署审计十轮): 缺省 /etc/spectre-auth 已有凭据(可能是既有装机
-        # 生产账号)——追加/覆盖前提示确认; 隔离目录不受限。
-        import sys as _sys
-        print(f"[spectre-passwd] 注意: 正在修改缺省凭据文件 {PASSWD}(既有装机账号将受影响); 测试请设 SPECTRE_AUTH_DIR 隔离", file=_sys.stderr)
-    os.makedirs(AUTH_DIR, mode=0o750, exist_ok=True)
+    if os.path.exists(PASSWD) and not os.environ.get("SPECTRE_AUTH_DIR"):
+        # D1+F2(十/十六轮): 缺省生产凭据已有内容——防误写双闸。
+        print(f"[spectre-passwd] 注意: 即将修改缺省凭据文件 {PASSWD}(既有装机账号将受影响)", file=sys.stderr)
+        if os.environ.get("SPECTRE_ALLOW_DEFAULT_AUTH") != "1":
+            if not sys.stdin.isatty():
+                print("[spectre-passwd] 拒绝: 非 tty 修改缺省生产凭据——设 SPECTRE_ALLOW_DEFAULT_AUTH=1 显式放行, 或 SPECTRE_AUTH_DIR 隔离", file=sys.stderr)
+                sys.exit(1)
+            try:
+                ans = input("[spectre-passwd] 确认继续? [y/N] ").strip().lower()
+            except EOFError:
+                ans = ""
+            if ans != "y":
+                print("[spectre-passwd] 已取消(SPECTRE_AUTH_DIR 隔离 / SPECTRE_ALLOW_DEFAULT_AUTH=1 跳过)", file=sys.stderr)
+                sys.exit(1)
+    _write_guard()
     existed = os.path.exists(PASSWD)
     with open(PASSWD, "w", encoding="utf-8") as f:
         f.write("\n".join(lines) + ("\n" if lines else ""))
@@ -79,7 +87,6 @@ def main():
     user = argv[1]
     if ":" in user or not user.strip():
         sys.exit("用户名不允许含冒号/空白")
-    _write_guard()
     lines = read_lines()
     rest = [l for l in lines if l.split(":", 1)[0] != user]
     if cmd == "del":
