@@ -78,7 +78,7 @@ def handle(c, addr):
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(('0.0.0.0', 19999)); s.listen(16)
+s.bind(('0.0.0.0', int(os.environ.get('OOB_PORT', '19999')))); s.listen(16)
 print(f'[oob] listening :19999 (quota={QUOTA_BYTES//(1024*1024)}MB, rate={RATE_PER_IP}/min/ip)', flush=True)
 while True:
     c, addr = s.accept()

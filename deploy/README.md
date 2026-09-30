@@ -12,6 +12,8 @@
 > Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。|
 | Docker | 仅沙箱 driver 需要 |
 
+> npm 故障排障: 安装若以 \`npm error Exit handler never called!\` 崩溃, 先 \`npm config get registry\` 检查是否指向不可达镜像; 切换 \`--registry=https://registry.npmjs.org\` 并**删除半装的 node_modules 后重装**。
+
 ## 组件清单
 
 | 组件 | 入口 | 默认端口 | 环境变量 |
@@ -76,6 +78,10 @@ python3 gateway/spectre-passwd.py del <user>
 python3 gateway/spectre-passwd.py list
 curl 集成: 登录 POST 字段为 `user`/`pw`——`curl -d 'user=admin&pw=...' http://<gw>:8081/spectre/login`。
 ```
+
+## CLI 验证备注
+
+\`/api/bus/events\` 为 SSE 长连接(空闲仅心跳)——CLI 探测用 \`curl -N --max-time 3\`, 裸 curl 会挂起属预期。
 
 ## 数据目录
 

@@ -34,7 +34,7 @@
 git clone https://github.com/lalalala5678/spectre && cd spectre
 
 # ① 后端(Node ≥ 22.19)——先编辑 .env 填 INTERNAL_TOKEN(自定随机串)与 LLM_API_KEY
-cd backend && cp .env.example .env && $EDITOR .env
+cd backend && cp .env.example .env && ${EDITOR:-vi} .env
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && \
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # 测试隔离数据目录(生产缺省 /var/lib/spectre)
 
