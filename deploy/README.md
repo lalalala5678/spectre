@@ -6,8 +6,8 @@
 
 | 组件 | 要求 |
 |---|---|
-| Node | **前端 ≥ 20.19**（构建链 vite/rolldown 硬性）；后端 ≥ 18 即可 |
-| Python | ≥ 3.6（网关零第三方依赖，纯 stdlib） |
+| Node | **≥ 20.19**（全仓统一：构建链硬性 + 依赖声明的运行时下限） |
+| Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
 | Docker | 仅沙箱 driver 需要 |
 
 ## 组件清单
@@ -16,7 +16,7 @@
 |---|---|---|---|
 | agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `LLM_API_KEY` |
 | console | `console/` (vite build) | — | — |
-| gateway | `gateway/server.py` | 8081 | `GATEWAY_PORT` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) |
+| gateway | `gateway/server.py` | 8081 | `GATEWAY_PORT` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
 | worker | Temporal activities | — | 同 runtime |
 | oob-collector | `deploy/oob-collector.py` | 19999 | — |
 | private-qa | `deploy/systemd/spectre-private-qa.service` | 8899 | — |
@@ -38,6 +38,8 @@ cd ../console && npm i && npm run build
 cd ../gateway
 python3 spectre-passwd.py add admin          # 创建首个登录账号(交互输密码)
 export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
+export SPECTRE_DATA_DIR=/tmp/spectre-data      # 测试隔离! 生产缺省 /var/lib/spectre——
+                                               # 多实例共用会互相覆写会话文件
 python3 server.py                             # dist 默认 ../console/dist
 
 # 4) 登录验证

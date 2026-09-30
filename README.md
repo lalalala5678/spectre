@@ -32,9 +32,10 @@
 
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
-cd backend && cp .env.example .env && npm i && node agent-runtime.mjs   # Node ≥ 18
+cd backend && cp .env.example .env && npm i && node agent-runtime.mjs   # Node ≥ 20.19
 cd ../console && npm i && npm run build                                 # Node ≥ 20.19
-cd ../gateway && python3 spectre-passwd.py add admin && python3 server.py   # 纯 stdlib
+cd ../gateway && python3 spectre-passwd.py add admin && \
+  SPECTRE_DATA_DIR=/tmp/spectre-data python3 server.py   # 纯 stdlib; 测试数据目录隔离
 ```
 
 完整部署(systemd/沙箱/私架面杀/凭据边界)见 [deploy/README.md](deploy/README.md)。

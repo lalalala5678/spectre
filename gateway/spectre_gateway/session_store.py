@@ -63,9 +63,14 @@ class SessionPersistence:
             self._last_write = now
             payload = json.dumps(sessions)
             tmp = self._path + ".tmp"
-            os.makedirs(os.path.dirname(self._path), exist_ok=True)
-            with open(tmp, "w", encoding="utf-8") as f:
-                f.write(payload)
-                f.flush()
-                os.fsync(f.fileno())
-            os.replace(tmp, self._path)
+            try:
+                os.makedirs(os.path.dirname(self._path), exist_ok=True)
+                with open(tmp, "w", encoding="utf-8") as f:
+                    f.write(payload)
+                    f.flush()
+                    os.fsync(f.fileno())
+                os.replace(tmp, self._path)
+            except OSError as e:
+                # 只读/无权限目录优雅降级——此前裸异常炸请求线程
+                print(f"[gateway] 会话落盘失败(只读/权限): {e}", flush=True)
+                self._dirty = True

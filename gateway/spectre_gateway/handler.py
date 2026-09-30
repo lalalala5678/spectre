@@ -15,6 +15,9 @@ class GatewayHandler(BaseHTTPRequestHandler):
     security: Security = None  # set at startup
     server_version = "spectre-gw"
     sys_version = ""
+    def version_string(self):
+        return self.server_version  # 消灭默认拼接的尾随空格
+    sys_version = ""
     protocol_version = "HTTP/1.1"
 
     def log_message(self, fmt, *args):
@@ -23,6 +26,8 @@ class GatewayHandler(BaseHTTPRequestHandler):
     # ---------- helpers ----------
 
     def client_ip(self):
+        if not config.TRUST_PROXY:
+            return self.client_address[0]
         forwarded = self.headers.get("X-Forwarded-For", "")
         if forwarded:
             # last hop = the trusted proxy appended real client IP;
@@ -261,7 +266,10 @@ def serve():
     import os
     from http.server import ThreadingHTTPServer
 
-    os.makedirs(config.LOG_DIR, exist_ok=True)
+    try:
+        os.makedirs(config.LOG_DIR, exist_ok=True)
+    except OSError as e:
+        print(f"[gateway] 日志目录不可用({config.LOG_DIR}): {e} — 审计日志将只写 stdout", flush=True)
     if not os.path.isfile(config.PASSWD_FILE):
         raise SystemExit(f"FATAL: {config.PASSWD_FILE} missing")
 

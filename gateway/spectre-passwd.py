@@ -26,7 +26,7 @@ def hash_pw(pw: str) -> str:
         h = hashlib.scrypt(pw.encode(), salt=salt, n=SCRYPT_N, r=SCRYPT_R,
                            p=SCRYPT_P, dklen=32, maxmem=128 * 1024 * 1024)
     except ImportError:
-        sys.exit("需要 Python 3.6+(hashlib.scrypt)")
+        sys.exit("需要 Python 3.7+")
     return f"scrypt${SCRYPT_N}${SCRYPT_R}${SCRYPT_P}${base64.b64encode(salt).decode()}${base64.b64encode(h).decode()}"
 
 

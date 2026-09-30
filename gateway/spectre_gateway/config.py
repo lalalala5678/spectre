@@ -22,7 +22,11 @@ LOG_FILE = os.path.join(LOG_DIR, "auth.log")
 #: Upstream agent runtime for /spectre/api/*.
 RUNTIME_HOST = os.environ.get("RUNTIME_HOST", "127.0.0.1")
 RUNTIME_PORT = int(os.environ.get("RUNTIME_PORT", "8090"))
-#: Internal token the runtime enforces on every /api route.
+#: 是否信任 X-Forwarded-For(经 Caddy/Nginx 反代时保持开; 网关直接暴露
+#: 公网时置 0——否则直连者可自旋 XFF 绕过登录失败锁定, 锁定退化为
+#: socket 地址)。
+TRUST_PROXY = os.environ.get("GATEWAY_TRUST_PROXY", "1") != "0"
+#: Internal token the runtime enforces on /api/* (except /api/health).
 RUNTIME_TOKEN = os.environ.get("INTERNAL_TOKEN", "")
 
 #: Session cookie and lifetime。纯 HTTP 非 localhost 部署(测试)可置

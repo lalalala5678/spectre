@@ -8,3 +8,4 @@ __pycache__/
 .DS_Store
 mrrobot.ova
 brutebench.env
+__pycache__/
