@@ -19,7 +19,14 @@ import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
 import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
-import { loadMcpConfig, saveMcpConfig, mutateMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
+import { loadMcpConfig, saveMcpConfig, mutateMcpConfig, testMcpServer, closeMcpConnection } from './sandbox/mcp.mjs';
+import { getSettings, saveSetting, enabledReconSources, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { applyLlmPrefs } from './pi.mjs';
+import { writeFile, mkdir } from 'node:fs/promises';
+import { rebuildMounts } from './sandbox/mount.mjs';
+import { HOST } from './sandbox/exec-env.mjs';
+import { sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
+import { existsSync, readFileSync, readdirSync } from 'node:fs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
 
@@ -357,26 +364,19 @@ function realRouter({ store, bus, caps, wal }) {
     // Values live in prefs (WAL-durable); saves are per-field, only after a
     // live probe (network fields) or range check (numeric fields).
     if (path === '/api/agent-settings' && method === 'GET') {
-      const { getSettings } = await import('./agent-settings.mjs');
       return json(res, 200, getSettings());
     }
     if (path === '/api/agent-settings/save' && method === 'POST') {
       const body = await readJson(req);
-      const { saveSetting, enabledReconSources } = await import('./agent-settings.mjs');
       const r = await saveSetting(body, wal);
       if (!r.ok) return bad(res, 400, r.error);
       if (String(body.group) === 'common') {
         // hot-apply LLM prefs (same process as the session store)
-        const { applyLlmPrefs } = await import('./pi.mjs');
         await applyLlmPrefs();
       }
       if (String(body.group) === 'recon-source') {
         // sync MCP config file + mount toggle (zero-pollution: no key ⇒
         // server disabled, recon never sees the tools)
-        const { writeFile, mkdir } = await import('node:fs/promises');
-        const { getPrefs } = await import('./projects.mjs');
-        const { CONFIG } = await import('./config.mjs');
-        const { join } = await import('node:path');
         const root = CONFIG.dataDir;
         const keys = getPrefs().reconApiKeys ?? {};
 
@@ -387,7 +387,6 @@ function realRouter({ store, bus, caps, wal }) {
 
         // ── c2 免杀云查 keys(只写已通过 validate 的源;失败即不落盘)──
         // 本次保存的源若属 c2 消费且 r.mounted(或无 secret),同步;其余 c2 源保持现状
-        const { RECON_SOURCES_INTERNAL } = await import('./agent-settings.mjs');
         const c2Out = {};
         for (const [sid, cfg] of Object.entries(keys)) {
           if (sid === 'brute' || sid === 'smtp') continue;
@@ -395,8 +394,8 @@ function realRouter({ store, bus, caps, wal }) {
           const forC2 = def && (def.agents ?? ['recon']).includes('c2');
           if (forC2 && hasCred(cfg)) c2Out[sid] = cfg;
         }
-        await mkdir(join(root, 'tools/c2'), { recursive: true });
-        await writeFile(join(root, 'tools/c2/api-keys.json'), JSON.stringify(c2Out, null, 1), 'utf8');
+        await mkdir(path_mod.join(root, 'tools/c2'), { recursive: true });
+        await writeFile(path_mod.join(root, 'tools/c2/api-keys.json'), JSON.stringify(c2Out, null, 1), 'utf8');
 
         // ── nday 情报源 keys(已验证才落盘)──
         const ndayOut = {};
@@ -406,14 +405,14 @@ function realRouter({ store, bus, caps, wal }) {
           const forNday = def && (def.agents ?? ['recon']).includes('nday');
           if (forNday && hasCred(cfg)) ndayOut[sid] = cfg;
         }
-        await mkdir(join(root, 'tools/nday'), { recursive: true });
-        await writeFile(join(root, 'tools/nday/api-keys.json'), JSON.stringify(ndayOut, null, 1), 'utf8');
+        await mkdir(path_mod.join(root, 'tools/nday'), { recursive: true });
+        await writeFile(path_mod.join(root, 'tools/nday/api-keys.json'), JSON.stringify(ndayOut, null, 1), 'utf8');
 
         // ── phish SMTP(仅 smtp 源且已验证)──
         const smtpCfg = keys.smtp ?? {};
         const smtpHasSecret = smtpCfg.user || smtpCfg.password;
-        await mkdir(join(root, 'tools/phish'), { recursive: true });
-        await writeFile(join(root, 'tools/phish/smtp.json'),
+        await mkdir(path_mod.join(root, 'tools/phish'), { recursive: true });
+        await writeFile(path_mod.join(root, 'tools/phish/smtp.json'),
           JSON.stringify(smtpHasSecret ? { host: smtpCfg.host, port: Number(smtpCfg.port) || 587,
             user: smtpCfg.user, pass: smtpCfg.password } : {}, null, 1), 'utf8');
 
@@ -427,7 +426,7 @@ function realRouter({ store, bus, caps, wal }) {
           if (def && !(def.agents ?? ['recon']).includes('recon')) continue;
           withCreds[sid] = cfg;
         }
-        await writeFile(join(root, 'recon-datasources.json'), JSON.stringify(withCreds), 'utf8');
+        await writeFile(path_mod.join(root, 'recon-datasources.json'), JSON.stringify(withCreds), 'utf8');
         const list = await loadMcpConfig();
         const rest = list.filter(s => s.name !== 'recon-datasources'
           && s.name !== 'nday-intel');
@@ -435,7 +434,7 @@ function realRouter({ store, bus, caps, wal }) {
           rest.push({
             name: 'recon-datasources', transport: 'stdio', agents: ['recon'],
             enabled: true,
-            command: ['node', join(root, 'mcp-recon-datasources.mjs')],
+            command: ['node', path_mod.join(root, 'mcp-recon-datasources.mjs')],
             env: {}, where: 'host',
           });
         }
@@ -445,12 +444,11 @@ function realRouter({ store, bus, caps, wal }) {
           rest.push({
             name: 'nday-intel', transport: 'stdio', agents: ['nday'],
             enabled: true,
-            command: ['node', join(root, 'mcp-nday-intel.mjs')],
+            command: ['node', path_mod.join(root, 'mcp-nday-intel.mjs')],
             env: {}, where: 'host',
           });
         }
         await saveMcpConfig(rest);
-        const { rebuildMounts } = await import('./sandbox/mount.mjs');
         await rebuildMounts(AGENT_KEYS);
       }
       return json(res, 200, r);
@@ -466,8 +464,6 @@ function realRouter({ store, bus, caps, wal }) {
       const { fields, file } = parseMultipart(body,
         req.headers['content-type'] ?? '');
       if (!file) return bad(res, 400, 'file 字段必填(multipart)');
-      const { mkdir, writeFile } = await import('node:fs/promises');
-      const { HOST } = await import('./sandbox/exec-env.mjs');
       const safeName = file.filename.slice(0, 120) || `upload-${Date.now()}`;
       await mkdir(HOST.uploads, { recursive: true });
       const target = path_mod.join(HOST.uploads, safeName);
@@ -494,7 +490,6 @@ function realRouter({ store, bus, caps, wal }) {
         image: body.image ? String(body.image).slice(0, 200) : undefined,
       });
       const ensured = await ensureSandbox();
-      const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 200, { ...cfg, ensured });
     }
@@ -512,7 +507,6 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/sandbox/skills/rebuild' && method === 'POST') {
       // P1-B(五审): skills-seed 播种后挂载缓存不刷新——"新会话生效"
       // 承诺此前为假(需重启或碰巧触发技能 CRUD)。
-      const { rebuildMounts } = await import('./sandbox/mount.mjs');
       const r2 = await rebuildMounts(AGENT_KEYS);
       store.rebuildSessionAgents();
       return json(res, 200, r2);
@@ -536,20 +530,17 @@ function realRouter({ store, bus, caps, wal }) {
         description: String(body.description ?? '').slice(0, 200),
         content: String(body.content).slice(0, 50000),
       });
-      const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 201, { filePath });
     }
     if (path === '/api/sandbox/skills' && method === 'DELETE') {
-      const url2 = new URL(req.url, 'http://x');
-      const agentKey = url2.searchParams.get('agentKey');
-      const name = url2.searchParams.get('name');
+      const agentKey = url.searchParams.get('agentKey');
+      const name = url.searchParams.get('name');
       if (!agentKey || !name) return bad(res, 400, 'agentKey、name 必填');
       if (!isAgentKey(agentKey) || !/^[\w-]+$/.test(name)) {
         return bad(res, 400, 'agentKey 或 name 非法');
       }
       await deleteSkill(agentKey, name);
-      const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 200, { deleted: true });
     }
@@ -604,35 +595,27 @@ function realRouter({ store, bus, caps, wal }) {
       // R5-F2: 同名更新必须失效旧连接——POST 此前从不关闭, 新
       // command/env 永不生效, 旧 stdio 子进程滞留到重启(与 DELETE
       // 路径'removed or CHANGED 都不得存活'的注释矛盾)。
-      const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
       closeMcpConnection(entry.name);
       // R22-F2: 互斥读改写
       const next = await mutateMcpConfig(list =>
         [...list.filter(s => s.name !== entry.name), entry]);
-      const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 201, next.find(s => s.name === entry.name));
     }
     if (path === '/api/sandbox/mcp' && method === 'DELETE') {
-      const url2 = new URL(req.url, 'http://x');
-      const name = url2.searchParams.get('name');
+      const name = url.searchParams.get('name');
       await mutateMcpConfig(list =>
         list.filter(s => s.name !== name));
-      const { closeMcpConnection } = await import('./sandbox/mcp.mjs');
       closeMcpConnection(name);
-      const { rebuildMounts } = await import('./sandbox/mount.mjs');
       await rebuildMounts(AGENT_KEYS);
       return json(res, 200, { deleted: true });
     }
     if (path === '/api/sandbox/cli/installed' && method === 'GET') {
-      const { sharedLayerTools } = await import('./sandbox/container.mjs');
       return json(res, 200, await sharedLayerTools());
     }
     if (path === '/api/sandbox/cli' && method === 'DELETE') {
-      const url2 = new URL(req.url, 'http://x');
-      const name = url2.searchParams.get('name');
+      const name = url.searchParams.get('name');
       if (!name) return bad(res, 400, 'name 必填');
-      const { uninstallCliTool } = await import('./sandbox/container.mjs');
       const r = await uninstallCliTool(name);
       return json(res, 200, r);
     }
@@ -850,8 +833,6 @@ function realRouter({ store, bus, caps, wal }) {
 
     // ---------- 数据源可用性复查(挂载门:不可用 ⇒ 前端可见+不注入) ----------
     if (path === '/api/agent-settings/verify' && method === 'GET') {
-      const { getPrefs } = await import('./projects.mjs');
-      const { RECON_SOURCES_INTERNAL } = await import('./agent-settings.mjs');
       const keys = getPrefs().reconApiKeys ?? {};
       const results = [];
       for (const [sid, cfg] of Object.entries(keys)) {
@@ -877,7 +858,6 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/phish/campaigns' && method === 'GET') {
       const dbFiles = [];
       const trackDir = '/var/lib/spectre/tools/phish';
-      const { readdirSync, readFileSync, existsSync } = await import('node:fs');
       if (existsSync(trackDir)) {
         for (const fn of readdirSync(trackDir)) {
           if (fn.endsWith('.json')) dbFiles.push(fn.replace('.json', ''));

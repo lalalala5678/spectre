@@ -9,6 +9,12 @@ from . import config, pages, proxy, static_files
 from .security import Security, audit
 
 
+def _rel_with_query(split):
+    """Runtime-relative path incl. query (CS1-R14: 四方法逐字收敛)."""
+    rel = split.path[len(config.PREFIX):]
+    return rel + (('?' + split.query) if split.query else '')
+
+
 class GatewayHandler(BaseHTTPRequestHandler):
     """One shared Security instance is injected by `serve()`."""
 
@@ -170,8 +176,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         # keep the QUERY STRING — DELETE/PUT endpoints address resources
         # by query params (?agentKey=&name= / ?name=); dropping it once
         # turned every such call into a 400 (button E2E caught it).
-        rel = path[len(config.PREFIX):] + (
-            ('?' + split.query) if split.query else '')
+        rel = _rel_with_query(split)
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
@@ -188,8 +193,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         # keep the QUERY STRING — DELETE/PUT endpoints address resources
         # by query params (?agentKey=&name= / ?name=); dropping it once
         # turned every such call into a 400 (button E2E caught it).
-        rel = path[len(config.PREFIX):] + (
-            ('?' + split.query) if split.query else '')
+        rel = _rel_with_query(split)
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
@@ -203,8 +207,7 @@ class GatewayHandler(BaseHTTPRequestHandler):
         path = split.path
         if not path.startswith(config.PREFIX):
             return self._send(404, b"not found")
-        rel = path[len(config.PREFIX):] + (
-            ('?' + split.query) if split.query else '')
+        rel = _rel_with_query(split)
 
         if rel.split('?')[0].startswith("/api/"):
             if not self._session():

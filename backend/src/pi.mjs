@@ -315,7 +315,15 @@ export function clipMarked(value, max, note = '') {
   return `${text.slice(0, max)}[已截断:原文 ${text.length} 字符${pointer}]`;
 }
 
-function textOf(content) {
+;/** pi tool-protocol envelope: plain-text success (CS1-R12 单源)。 */
+export const sayText = t => ({ content: [{ type: 'text', text: t }] });
+
+/** pi tool-protocol envelope: plain-text error with isError (CS1-R12)。 */
+export const sayError = t => ({ content: [{ type: 'text', text: t }], isError: true });
+
+/** Flat text of a pi message content (string or content blocks).
+ * R4: 全仓唯一实现——agent-runtime 的三处逐字闭包已改为复用。 */
+export function textOf(content) {
   if (typeof content === 'string') {
     return content;
   }

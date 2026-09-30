@@ -876,22 +876,34 @@ function entryLabel(e) {
   return e.type ?? '?';
 }
 
+
 /**
- * @param {object} record  engagement child session record
- * @param {object} caps    { signalEngagement, emitBus, followUp }
+ * buildPublishIntelTool (CS1-R15/C2/D2): engagement child 与 direct 两处
+ * ~30 行逐字双胞胎抽共享工厂(AGENTS.md ≥20 行规则; spawn_agent 已树
+ * 先例)。差异仅: 总线 to/origin、DM 通知、描述详略。
+ * @param {object} record   session record
+ * @param {object} caps     { emitBus, followUp?, authorOf? }
+ * @param {{to: 'orchestrator'|'user', origin: 'engagement'|'direct',
+ *          dm: boolean, verbose: boolean}} mode
  */
-export function buildChildTools(record, caps) {
-  const publishIntel = {
+function buildPublishIntelTool(record, caps, mode) {
+  const dm = mode.dm;
+  return {
     name: 'publish_intel',
     label: '发布情报',
     description:
-      '[creates event] Publish an INTEL NOTE — any information that might help ' +
-      'the task: observed behavior, credentials/leaks worth trying, ' +
-      'interesting endpoints, environment details, partial leads, ' +
-      'attack-surface hypotheses. Low bar by design: if it could plausibly ' +
-      'help ANY agent in this project, publish it. Confirmed real-harm ' +
-      'submittable vulnerabilities go to publish_vulnerability, NOT here. ' +
-      'Visible to every agent (query_intel kind=intel) and the 情报 panel.',
+      '[creates event] ' + (mode.verbose
+        ? 'Publish an INTEL NOTE — any information that might help '
+        + 'the task: observed behavior, credentials/leaks worth trying, '
+        + 'interesting endpoints, environment details, partial leads, '
+        + 'attack-surface hypotheses. Low bar by design: if it could plausibly '
+        + 'help ANY agent in this project, publish it. Confirmed real-harm '
+        + 'submittable vulnerabilities go to publish_vulnerability, NOT here. '
+        + 'Visible to every agent (query_intel kind=intel) and the 情报 panel.'
+        : 'Record an INTEL NOTE from this conversation into the '
+        + '情报 panel — any information that might help the task (leads, '
+        + 'observations, environment details, hypotheses). Confirmed submittable '
+        + 'vulnerabilities go to publish_vulnerability instead.'),
     executionMode: 'sequential',
     parameters: Type.Object({
       title: Type.String({ description: 'One-line intel title' }),
@@ -902,24 +914,26 @@ export function buildChildTools(record, caps) {
     execute: async (_id, params) => {
       const engagement = record.engagementId ? `autopwn-${record.engagementId}` : null;
       caps.emitBus({
-        channel: 'dm', from: record.agentKey, to: 'orchestrator',
+        channel: 'dm', from: record.agentKey, to: mode.to,
         type: 'intel-note',
         title: params.title,
         summary: params.title,
         detail: params.text,
-        origin: 'engagement',
+        origin: mode.origin,
         author: caps.authorOf?.(record) ?? null,
         workSessionId: record.workSessionId ?? null,
-        engagement,
+        ...(engagement ? { engagement } : {}),
       });
-      const dmTarget = record.orchestratorSessionId ?? record.parentSessionId;
-      if (dmTarget) {
-        await caps.followUp(
-          dmTarget,
-          `[DM from ${record.agentKey}] [情报] ${params.title}\n` +
-          `${params.text}\n` +
-          '(如其他智能体需要知情,用 relay_to_agents 转发;否则继续等待产出)',
-        );
+      if (dm) {
+        const dmTarget = record.orchestratorSessionId ?? record.parentSessionId;
+        if (dmTarget) {
+          await caps.followUp(
+            dmTarget,
+            `[DM from ${record.agentKey}] [情报] ${params.title}\n` +
+            `${params.text}\n` +
+            '(如其他智能体需要知情,用 relay_to_agents 转发;否则继续等待产出)',
+          );
+        }
       }
       return {
         content: [{
@@ -929,6 +943,15 @@ export function buildChildTools(record, caps) {
       };
     },
   };
+}
+
+/**
+ * @param {object} record  engagement child session record
+ * @param {object} caps    { signalEngagement, emitBus, followUp }
+ */
+export function buildChildTools(record, caps) {
+  const publishIntel = buildPublishIntelTool(record, caps,
+    { to: 'orchestrator', origin: 'engagement', dm: true, verbose: true });
   const spawnAgent = buildSpawnAgentTool(record, caps);
 
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
@@ -990,35 +1013,8 @@ export function buildDirectTools(record, caps) {
   };
 
 
-  const publishIntel = {
-    name: 'publish_intel',
-    label: '发布情报',
-    description:
-      '[creates event] Record an INTEL NOTE from this conversation into the ' +
-      '情报 panel — any information that might help the task (leads, ' +
-      'observations, environment details, hypotheses). Confirmed submittable ' +
-      'vulnerabilities go to publish_vulnerability instead.',
-    executionMode: 'sequential',
-    parameters: Type.Object({
-      title: Type.String({ description: 'One-line intel title' }),
-      text: Type.String({ description: 'Intel content (markdown)' }),
-    }),
-    execute: async (_id, params) => {
-      caps.emitBus({
-        channel: 'dm', from: record.agentKey, to: 'user',
-        type: 'intel-note',
-        title: params.title,
-        summary: params.title,
-        detail: params.text,
-        origin: 'direct',
-        author: caps.authorOf?.(record) ?? null,
-        workSessionId: record.workSessionId ?? null,
-      });
-      return {
-        content: [{ type: 'text', text: `情报已入库: ${params.title}` }],
-      };
-    },
-  };
+  const publishIntel = buildPublishIntelTool(record, caps,
+    { to: 'user', origin: 'direct', dm: false, verbose: false });
 
   if (record.agentKey === 'report') {
     // R31: report(writer)原 early-return 无 tooling 实例——撰写引用/

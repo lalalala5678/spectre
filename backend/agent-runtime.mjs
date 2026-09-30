@@ -24,6 +24,7 @@ import { emitRevision } from './src/revision.mjs';
 import { buildPi } from './src/pi.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
+import { textOf } from './src/pi.mjs';
 import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
 import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
@@ -125,6 +126,35 @@ const shellScope = () => {
 
 const shellRegistry = createShellRegistry({ bus: { emit: (entry) => bus.emit({ type: 'shell-event', ...entry }) }, wal, listScope: shellScope });
 
+/**
+ * CS1-R5: reportWriter/revisionWriter/wakeAgent 三连的机械骨架——
+ * 派生会话 create(+溯源/修订目标) → system prompt → 300s 事件等待。
+ * 业务判定(事件扫描/回执文案)留在各调用方。
+ * @returns {{session: object, timeout: boolean}}
+ */
+async function runDetachedAgent(o) {
+  const s = store.create(o.agentKey, {
+    workSessionId: o.ws,
+    name: o.name,
+    description: o.description,
+  });
+  // Frozen requester provenance — rides on the writer's published
+  // events (discoverer attribution); revisionTarget gates reviseEntry.
+  if (o.requester) s.requester = o.requester;
+  if (o.revisionTarget !== undefined) s.revisionTarget = o.revisionTarget;
+  store.prompt(s, o.prompt, 'system');
+  await store.awaitCompletion(s, 300_000);
+  // R15-F2: 超时兜底触发时会话仍在跑——不得伪造判定回执。
+  return { session: s, timeout: s.busy };
+}
+
+/** Last non-empty assistant reply of a session (CS1-R5 ×3 收敛). */
+function lastReply(s) {
+  const last = [...s.agent.state.messages].reverse()
+    .find(m => m.role === 'assistant' && textOf(m).trim());
+  return last ? textOf(last) : '';
+}
+
 const caps = {
   shells: shellRegistry,
   dispatch: (input) => startAutopwn(input),
@@ -147,10 +177,7 @@ const caps = {
     // 用户直连会话含内)。null===null 时旧会话互通。
     if ((record.workSessionId ?? null) !== (callerWs ?? null)) return null;
     return record.agent.state.messages.slice(-last)
-      .map(m => ({ role: m.role, text: typeof m.content === 'string'
-        ? m.content
-        : (m.content?.filter?.(c => c.type === 'text')
-          ?.map(c => c.text)?.join('') || '') }));
+      .map(m => ({ role: m.role, text: textOf(m) || '' }));
   },
   /** Provenance snapshot for intel events (delegates to SessionStore). */
   authorOf: (record) => store.authorOf(record),
@@ -203,18 +230,17 @@ const caps = {
    * timeout — agent_end always fires, error paths included). Verdict:
    * the writer's published vulnerability event, or its decline reason.
    */
+
   reportWriter: async (requesterRecord, hint) => {
     const requesterAuthor = store.authorOf(requesterRecord);
-    const writer = store.create('report', {
-      workSessionId: requesterRecord.workSessionId ?? null,
+    const baseSeq = bus.list().at(-1)?.seq ?? 0;
+    const { session: writer, timeout } = await runDetachedAgent({
+      agentKey: 'report',
+      ws: requesterRecord.workSessionId ?? null,
       name: `报告:${String(hint).slice(0, 20)}`,
       description: `漏洞线索:${String(hint).slice(0, 60)}`,
-    });
-    // Frozen requester provenance — rides on the writer's published
-    // vulnerability events (discoverer attribution).
-    writer.requester = { sessionId: requesterRecord.id, author: requesterAuthor };
-    const baseSeq = bus.list().at(-1)?.seq ?? 0;
-    store.prompt(writer,
+      requester: { sessionId: requesterRecord.id, author: requesterAuthor },
+      prompt:
       `【漏洞报告撰写】你是报告撰写专职 agent。发现者 ${requesterAuthor.name}` +
       `(${requesterAuthor.typeLabel})在会话 ${requesterRecord.id} 中上报了漏洞线索:\n` +
       `「${hint}」\n\n` +
@@ -225,11 +251,9 @@ const caps = {
       `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity,` +
       `正文包含发现过程、证据链、危害分析与复现要点,并注明发现者 ${requesterAuthor.name};\n` +
       `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
-      `5) 用 submit_task_report 提交任务报告收尾。`, 'system');
-    await store.awaitCompletion(writer, 300_000);
-    // R15-F2: 超时兜底触发时 writer 仍在跑——此前落入 declined 分支
-    // 伪造'驳回'回执, 慢运行稍后落账即回执与账本矛盾。
-    if (writer.busy) {
+      `5) 用 submit_task_report 提交任务报告收尾。`,
+    });
+    if (timeout) {
       return { ok: false, timeout: true,
         text: `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
           `可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查是否落账` };
@@ -247,13 +271,7 @@ const caps = {
       };
     }
     // Declined / failed: relay the writer's final reasoning back.
-    const msgs = writer.agent.state.messages;
-    const textOf = m => typeof m.content === 'string' ? m.content
-      : (m.content?.filter?.(c => c.type === 'text')
-        ?.map(c => c.text)?.join('') ?? '');
-    const last = [...msgs].reverse()
-      .find(m => m.role === 'assistant' && textOf(m).trim());
-    const reply = last ? textOf(last) : '';
+    const reply = lastReply(writer);
     return {
       ok: false,
       text: `报告agent未将此线索立为漏洞。其判定说明:\n` +
@@ -269,26 +287,20 @@ const caps = {
    *  no quota — same detach rules as the report writer), ask it to
    *  confirm its own toolface state, await its reply, return it. */
   wakeAgent: async (requesterRecord, agentKey, question) => {
-    const target = store.create(agentKey, {
-      workSessionId: requesterRecord.workSessionId ?? null,
+    const { session: target } = await runDetachedAgent({
+      agentKey,
+      ws: requesterRecord.workSessionId ?? null,
       name: `唤醒验证:${agentKey}`,
       description: `配置验证:${String(question).slice(0, 60)}`,
-    });
-    store.prompt(target,
+      prompt:
       `【配置验证】配置智能体 ${requesterRecord.agentKey} 刚完成了工具配置变更,需要你从自己的工具面确认状态。\n` +
       `问题:${question}\n\n` +
       `要求:只做验证本身——检查你的技能索引/工具清单,必要时实际调用一次,` +
-      `把回执要点如实报告。不要展开其它任务。完成后一句话结论即可。`, 'system');
-    await store.awaitCompletion(target, 300_000);
-    const msgs = target.agent.state.messages;
-    const textOf = m => typeof m.content === 'string' ? m.content
-      : (m.content?.filter?.(c => c.type === 'text')
-        ?.map(c => c.text)?.join('') ?? '');
-    const last = [...msgs].reverse()
-      .find(m => m.role === 'assistant' && textOf(m).trim());
-    const reply = last ? textOf(last) : '(无输出)';
+      `把回执要点如实报告。不要展开其它任务。完成后一句话结论即可。`,
+    });
+    const reply = lastReply(target) || '(无输出)';
     return {
-      ok: Boolean(last),
+      ok: Boolean(reply !== '(无输出)'),
       text: `${agentKey} 的验证答复:\n${reply.slice(0, 1200)}\n` +
         `(验证会话 ${target.id},read_session 可复盘)`,
     };
@@ -340,14 +352,14 @@ const caps = {
     const chain = bus.list().filter(e => e.revises === target.seq);
     const current = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
     const requesterAuthor = store.authorOf(requesterRecord);
-    const writer = store.create('report', {
-      workSessionId: requesterRecord.workSessionId ?? null,
+    const { session: writer, timeout } = await runDetachedAgent({
+      agentKey: 'report',
+      ws: requesterRecord.workSessionId ?? null,
       name: `修订:${String(target.title ?? '').slice(0, 20)}`,
       description: `漏洞修订申请:${reason.slice(0, 60)}`,
-    });
-    writer.requester = { sessionId: requesterRecord.id, author: requesterAuthor };
-    writer.revisionTarget = target.seq;
-    store.prompt(writer,
+      requester: { sessionId: requesterRecord.id, author: requesterAuthor },
+      revisionTarget: target.seq,
+      prompt:
       `【漏洞修订审核 · seq=${target.seq}】你是报告撰写专职 agent。` +
       `${requesterAuthor.name}(${requesterAuthor.typeLabel})申请修订漏洞:\n` +
       `『${target.title}』(severity=${target.severity ?? '?'},现行版内容如下)\n` +
@@ -358,9 +370,9 @@ const caps = {
       `2) 判定正确性:要求的内容是否准确、不会引入错误;\n` +
       `3) 两关都过 → 调用 revise_entry(seq=${target.seq}, reason=..., title/severity/text 按核定结果)落账修订;\n` +
       `   任一关不过 → 不落账,在最终回复中明确说明驳回理由(将回执给申请者);\n` +
-      `4) 提交任务报告收尾。`, 'system');
-    await store.awaitCompletion(writer, 300_000);
-    if (writer.busy) {  // R15-F2: 同 reportWriter——超时非判定
+      `4) 提交任务报告收尾。`,
+    });
+    if (timeout) {  // R15-F2: 同 reportWriter——超时非判定
       return { ok: false, timeout: true,
         text: `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
           `可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查修订` };
@@ -380,15 +392,10 @@ const caps = {
         details: { sessionId: writer.id, revises: target.seq, n: landed.revision.n },
       };
     }
-    const textOf = m => typeof m.content === 'string' ? m.content
-      : (m.content?.filter?.(c => c.type === 'text')
-        ?.map(c => c.text)?.join('') ?? '');
-    const last = [...writer.agent.state.messages].reverse()
-      .find(m => m.role === 'assistant' && textOf(m).trim());
     return {
       ok: false,
       text: `撰写agent驳回了该修订申请。其说明:\n` +
-        `${((last && textOf(last)) || '(无输出)').slice(0, 600)}\n` +
+        `${(lastReply(writer) || '(无输出)').slice(0, 600)}\n` +
         `(审核对话 ${writer.id})`,
       details: { sessionId: writer.id, declined: true },
     };

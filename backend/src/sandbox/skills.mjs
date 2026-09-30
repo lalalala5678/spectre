@@ -54,14 +54,23 @@ export function skillsFor(agentKey) {
   return mounted.get(agentKey) ?? [];
 }
 
-/** Persist a skill (create/overwrite) in an agent's directory. */
-export async function saveSkill(agentKey, { name, description, content }) {
-  // R22-F1: name 遍历守卫下沉到唯一入口——routes 侧有此校验(注释
-  // 自证 crafted name 曾达 rm -rf), 工具面(configure_skill/delete_skill,
-  // LLM 可控输入)漏防; ../../.. 即逃逸 HOST.skills。
+/**
+ * Skill-name traversal guard (CS1-R16: save/delete 两处同款收敛)。
+ * R22-F1: crafted name 曾达 rm -rf——../../.. 即逃逸 HOST.skills。
+ * @param {string} name
+ */
+function assertSkillName(name) {
   if (!/^[\w-]+$/.test(String(name)) || String(name).length > 60) {
     throw new Error(`name 非法: [a-zA-Z0-9_-]{1,60}(收到 ${JSON.stringify(String(name).slice(0, 40))})`);
   }
+}
+
+/** Persist a skill (create/overwrite) in an agent's directory. */
+export async function saveSkill(agentKey, { name, description, content }) {
+  // R22-F1: name 遍历守卫(assertSkillName 唯一入口)——routes 侧有此
+  // 校验(注释自证 crafted name 曾达 rm -rf), 工具面(configure_skill/
+  // delete_skill, LLM 可控输入)漏防; ../../.. 即逃逸 HOST.skills。
+  assertSkillName(name);
   const dir = `${HOST.skills}/${agentKey}/${name}`;
   const { mkdir, writeFile } = await import('node:fs/promises');
   await mkdir(dir, { recursive: true });
@@ -78,9 +87,7 @@ export async function saveSkill(agentKey, { name, description, content }) {
 /** Remove a skill directory. */
 export async function deleteSkill(agentKey, name) {
   // R22-F1: 同 saveSkill——删除面是 rm -rf recursive+force。
-  if (!/^[\w-]+$/.test(String(name)) || String(name).length > 60) {
-    throw new Error(`name 非法: [a-zA-Z0-9_-]{1,60}`);
-  }
+  assertSkillName(name);
   const { rm } = await import('node:fs/promises');
   await rm(`${HOST.skills}/${agentKey}/${name}`,
     { recursive: true, force: true });

@@ -59,6 +59,28 @@ loadShells();
 
 const MAX_OUT = 64 * 1024;
 
+/** transportRef "user:pass@host[:port]" — CS1-R6: 三处逐字正则收敛。 */
+const SSH_REF_RE = /^(.+?):(.*?)@([^:]+)(?::(\d+))?$/;
+/** Second-resolution UTC timestamp — CS1-R6: 两处逐字收敛。 */
+const isoNow = () => new Date().toISOString().slice(0, 19) + 'Z';
+
+/**
+ * Normalize child-process output into the bounded exec result shape
+ * (CS1-R7: ssh/local 两分支逐字后处理收敛)。timeout/截断注记由
+ * `timeoutNote` 区分远端/容器措辞。
+ */
+function boundedExecResult(err, so, se, timeoutNote) {
+  const stdout = String(so ?? '');
+  let stderr = String(se ?? '');
+  const code = err ? (err.code ?? 1) : 0;
+  if (code === 124 || code === 137) stderr += `\n${timeoutNote}`;
+  if (err?.killed) stderr += '\n[timeout]';
+  if (err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
+    stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
+  }
+  return { stdout, stderr, code };
+}
+
 export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
   const audit = (kind, data) => {
     try { bus?.emit?.('shell-event', { kind, at: new Date().toISOString(), ...data }); } catch { /* bus optional */ }
@@ -68,7 +90,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
     // Server-side authorization: exercise window + target binding.
     const sc = listScope?.() ?? null;
     if (!sc) return { ok: false, error: 'scope 不可读:授权门配置缺失' };
-    const now = new Date().toISOString().slice(0, 19) + 'Z';
+    const now = isoNow();
     const inWindow = sc.window && sc.window.start <= now && now <= sc.window.end;
     const inTargets = Array.isArray(sc.targets) && sc.targets.includes(shell.target);
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
@@ -112,7 +134,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
         return new URL(urlPart).hostname;
       }
       if (shell.transport === 'ssh') {
-        const m = /^(.+?):(.*?)@([^:]+)(?::(\d+))?$/.exec(tr);
+        const m = SSH_REF_RE.exec(tr);
         return m ? m[3] : null;
       }
     } catch { return null; }
@@ -125,7 +147,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
     const nm = String(name || '').trim();
     if (!nm) return { error: 'name 必填(建议格式 目标-面-权限,如 dc8-web-www)' };
     // R6-F3: 过期通道不占名(事实终态, gate 已拒执行)
-    const nowIso = new Date().toISOString().slice(0, 19) + 'Z';
+    const nowIso = isoNow();
     if ([...shells.values()].some(x => x.name === nm && x.status === 'active'
         && !(x.expiresAt && x.expiresAt <= nowIso)))
       return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
@@ -133,7 +155,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
     const tr = String(transportRef || '');
     if (transport === 'web' && !tr.includes('{CMD}'))
       return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK)' };
-    if (transport === 'ssh' && !/^(.+?):(.*?)@([^:]+)(?::(\d+))?$/.test(tr))
+    if (transport === 'ssh' && !SSH_REF_RE.test(tr))
       return { error: 'ssh transportRef 需 user:pass@host[:port]' };
     if (transport === 'local' && !tr)
       return { error: 'local transportRef 需 容器名[:用户] (如 pxlab:www-data)' };
@@ -187,7 +209,7 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
     try {
       if (sh.transport === 'ssh') {
         // transportRef: "user:pass@host:port" — VM range channel (post-creds).
-        const m = /^(.+?):(.*?)@([^:]+)(?::(\d+))?$/.exec(sh.transportRef || '');
+        const m = SSH_REF_RE.exec(sh.transportRef || '');
         if (!m) return { ok: false, error: 'ssh transportRef 需 user:pass@host[:port]' };
         const [, u, pw, h, port] = m;
         const r = await new Promise((resolve) => {
@@ -198,12 +220,8 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
             { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? ''), code: err ? (err.code ?? 1) : 0 }));
         });
-        stdout = r.so; stderr = r.se; code = r.code;
-        if (code === 124 || code === 137) stderr += '\n[timeout: 远端进程已被 timeout(1) 终止]';
-        if (r.err?.killed) stderr += '\n[timeout]';
-        if (r.err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
-          stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
-        }
+        ({ stdout, stderr, code } = boundedExecResult(
+          r.err, r.so, r.se, '[timeout: 远端进程已被 timeout(1) 终止]'));
       } else if (sh.transport === 'web') {
         // transportRef: full URL template with {CMD} placeholder, e.g.
         //   http://h/p.php?c={CMD}        (GET; CMD urlencoded)
@@ -264,13 +282,8 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
           execFile('docker', argv, { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
         });
-        stdout = res.so; stderr = res.se;
-        code = res.err ? (res.err.code ?? 1) : 0;
-        if (code === 124 || code === 137) { stderr += '\n[timeout: 容器内进程已被 timeout(1) 终止]'; }
-        if (res.err && res.err.killed) stderr += '\n[timeout]';
-        if (res.err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
-          stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
-        }
+        ({ stdout, stderr, code } = boundedExecResult(
+          res.err, res.so, res.se, '[timeout: 容器内进程已被 timeout(1) 终止]'));
       } else {
         return { ok: false, error: `transport ${sh.transport} 未接入(真实植入通道后续挂)` };
       }

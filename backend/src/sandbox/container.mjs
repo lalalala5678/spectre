@@ -29,6 +29,30 @@ let cfg = {
   image: 'debian:bookworm-slim',
 };
 
+
+/**
+ * Run a bash script through the configured driver (CS1-R2: 此前 7 处
+ * docker/local 三元逐字重复)。docker 形态外层再包 timeout(R24-F1:
+ * attached exec 不转发信号——只杀宿主客户端则容器内进程存活)。
+ * @param {{driver: 'local'|'docker', container?: string}} cfg
+ * @param {string} script
+ * @param {{timeoutSec?: number, hostTimeoutSec?: number}} [o]
+ */
+async function runInSandbox(cfg, script, o = {}) {
+  const hostTimeout = o.hostTimeoutSec ?? 900;
+  if (cfg.driver !== 'docker') {
+    return run('bash', ['-lc', script], hostTimeout);
+  }
+  const inner = o.noInnerTimeout ? '' : 'timeout -k 2 900 ';
+  return run('docker', ['exec', cfg.container, ...inner.split(' ').filter(Boolean),
+    'bash', '-lc', script], hostTimeout + 10);
+}
+
+/** Parse package names out of an apt install command line (CS1-R3). */
+export function parseAptPackages(cmd) {
+  return String(cmd).split(/\s+/).filter(t => /^[a-z0-9][a-z0-9.+-]*$/i.test(t) && !t.startsWith('-'));
+}
+
 async function dockerAvailable() {
   return new Promise(resolve => {
     const p = spawn('docker', ['version', '--format', '{{.Server.Version}}'],
@@ -168,9 +192,7 @@ export async function replayInstallLog() {
     if (!cmd) continue;
     // R24-F1: 容器内 timeout 包装(R5-F5 契约——attached exec 不转发
     // 信号, 只杀宿主客户端则容器内安装存活且账本不记)。
-    const res = cfg.driver === 'docker'
-      ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', cmd], 910)
-      : await run('bash', ['-lc', cmd], 900);
+    const res = await runInSandbox(cfg, cmd);
     n += res.code === 0 ? 1 : 0;
   }
   return { replayed: n, total: n };
@@ -224,9 +246,7 @@ async function bootstrapToolchain() {
     return { bootstrapped: true, skipped: true };
   }
   const script = bootstrapScript();
-  const res = cfg.driver === 'docker'
-    ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', script], 910)  // R24-F1
-    : await run('bash', ['-lc', script], 900);
+  const res = await runInSandbox(cfg, script);
   // R24-3: 输出单行化——此前多行 apt 输出与状态粘连不可读
   // R26: 固定文案——此前取尾行, apt/pip 的 WARNING/Writing 行语义拧巴
   console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}(基础包 nodejs/python3/git/build-essential)${res.code === 0 ? '' : `: ${String(res.out).slice(-160)}`}`);
@@ -251,9 +271,7 @@ async function bootstrapToolchain() {
  *  driver; on host for local). Installs persist via the mounts. */
 export async function installCli(command) {
   const safeCmd = String(command).slice(0, 4000);
-  const res = cfg.driver === 'docker'
-    ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', safeCmd], 910)  // R24-F1
-    : await run('bash', ['-lc', safeCmd], 900);
+  const res = await runInSandbox(cfg, safeCmd);
   if (res.code === 0) await appendInstallLog(safeCmd);
   return { exitCode: res.code, output: res.out.slice(-4000), ok: res.code === 0 };
 }
@@ -262,9 +280,7 @@ export async function installCli(command) {
 export async function listInstalledTools() {
   const probe = 'for d in /usr/local/bin /usr/bin /opt/tools/bin; do '
     + '[ -d "$d" ] && ls "$d"; done | sort -u | head -400';
-  const res = cfg.driver === 'docker'
-    ? await run('docker', ['exec', cfg.container, 'bash', '-lc', probe], 60)
-    : await run('bash', ['-lc', probe], 60);
+  const res = await runInSandbox(cfg, probe, { hostTimeoutSec: 60, noInnerTimeout: true });
   return res.code === 0 ? res.out.split('\n').filter(Boolean) : [];
 }
 
@@ -421,17 +437,13 @@ export async function uninstallCliTool(name) {
       const siblings = pkgs.filter(p => p !== name);
       const targets = pkgs.includes(name) ? [name] : pkgs;
       const rmCmd = `apt-get remove -y --purge ${targets.join(' ')}`;
-      const res = cfg.driver === 'docker'
-        ? await run('docker', ['exec', cfg.container, 'bash', '-lc', rmCmd], 120)
-        : await run('bash', ['-lc', rmCmd], 120);
+      const res = await runInSandbox(cfg, rmCmd, { hostTimeoutSec: 120, noInnerTimeout: true });
       // P0: exit 0 is NOT proof — dpkg -l must show no 'ii' rows for
       // the packages before this counts as removed.
       let verified = res.code === 0;
       if (verified) {
         const chkCmd = `dpkg -l ${targets.join(' ')} 2>/dev/null | grep -c '^ii' || true`;
-        const chk = cfg.driver === 'docker'
-          ? await run('docker', ['exec', cfg.container, 'bash', '-lc', chkCmd], 60)
-          : await run('bash', ['-lc', chkCmd], 60);
+        const chk = await runInSandbox(cfg, chkCmd, { hostTimeoutSec: 60, noInnerTimeout: true });
         verified = String(chk.out ?? '').trim() === '0';
       }
       const noteTail = (siblings.length
@@ -442,9 +454,7 @@ export async function uninstallCliTool(name) {
         // symlink owned by another package (toilet's figlet) — the
         // receipt must not read as failure, nor stay silent (round-5)
         const altCmd = `command -v ${name} || true`;
-        const alt = cfg.driver === 'docker'
-          ? await run('docker', ['exec', cfg.container, 'bash', '-lc', altCmd], 30)
-          : await run('bash', ['-lc', altCmd], 30);
+        const alt = await runInSandbox(cfg, altCmd, { hostTimeoutSec: 30, noInnerTimeout: true });
         const altNote = String(alt.out ?? '').trim()
           ? `(注:command -v ${name} 仍命中——dpkg 层已移除,命令可能来自 alternatives/系统其它包提供)` : '';
         aptRemoved.push(rmCmd + noteTail + altNote);

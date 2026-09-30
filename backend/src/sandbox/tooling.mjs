@@ -17,6 +17,8 @@ import { loadMcpConfig, testMcpServer, closeMcpConnection, mutateMcpConfig } fro
 import { listInstalledTools, sandboxConfig, uninstallCliTool, readInstallLog } from './container.mjs';
 import { AGENT_KEYS } from '../agents.mjs';
 import { getPrefs } from '../projects.mjs';
+// CS1-R12: 信封单源 pi.mjs(errText 曾与 okText 逐字同——双胞胎漂移过)
+import { sayText as okText, sayError as errText } from '../pi.mjs';
 
 // ------------------------------------------------------------- helpers
 
@@ -24,11 +26,6 @@ async function rebuildMounts() {
   const { rebuildMounts: rb } = await import('./mount.mjs');
   await rb(AGENT_KEYS);
 }
-
-const okText = t => ({ content: [{ type: 'text', text: t }] });
-// CS1-C3②: errText 此前与 okText 逐字相同(两个名字一个实现)——错误
-// 回执必须是 isError 信封(MCP 规范), 否则调用方无法区分成败。
-const errText = t => ({ content: [{ type: 'text', text: t }], isError: true });
 
 // ------------------------------------------------- vertical discovery
 

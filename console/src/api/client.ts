@@ -250,11 +250,14 @@ export function subscribeSse(
  * originals carrying `current` + `revisedCount`; standalone revisions
  * are folded away.
  */
-export function foldEntries(events: ApiBusEvent[]): Array<ApiBusEvent & {
+/** 修订折叠后的总线条目(现行版 current + 修订计数)。 */
+export type FoldedEntry = ApiBusEvent & {
   current: ApiBusEvent;
   revisedCount: number;
   orphaned?: boolean;
-}> {
+};
+
+export function foldEntries(events: ApiBusEvent[]): FoldedEntry[] {
   const byOriginal = new Map<number, ApiBusEvent>();
   const counts = new Map<number, number>();
   const known = new Set(events.filter(e => !e.revises).map(e => e.seq));

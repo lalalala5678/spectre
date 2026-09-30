@@ -1,10 +1,8 @@
-import { useEffect, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
-import { api, foldEntries, subscribeBus, type ApiBusEvent } from '../../api/client';
-
-type FoldedEntry = ApiBusEvent & { current: ApiBusEvent; revisedCount: number };
+import type { ApiBusEvent } from '../../api/client';
+import { useBusPanelEntries } from '../../api/useBusPanelEntries';
 import { StatusBadge } from './VulnPanel';
 
 /**
@@ -17,53 +15,11 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
   workSessionId?: string;
   onOpen: (event: ApiBusEvent) => void;
 }) {
-  const [events, setEvents] = useState<FoldedEntry[]>([]);
-  // Distinguish LOADING (project switched, fetch in flight) from EMPTY
-  // (project loaded, nothing published) — stale content must never
-  // linger after a project switch, and '暂无' must never flash first.
-  const [loaded, setLoaded] = useState(false);
-
-  useEffect(() => {
-    let stopped = false;
-    const cursor = { v: 0 };
-    setEvents([]);
-    setLoaded(false);
-    const accept = (e: ApiBusEvent) =>
-      e.type === 'task-report' && e.workSessionId === workSessionId;
-    (async () => {
-      try {
-        const all = await api<ApiBusEvent[]>('/bus'
-          + (workSessionId ? `?ws=${workSessionId}` : ''));
-        if (stopped) return;
-        setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
-        setLoaded(true);
-        cursor.v = all.at(-1)?.seq ?? 0;
-      } catch { /* SSE reconnect will heal */ }
-    })();
-    const off = subscribeBus((name, raw) => {
-      if (name !== 'bus') return;
-      const e = raw as ApiBusEvent;
-      if (e.seq <= cursor.v) return;
-      cursor.v = e.seq;
-      if (e.revises) {
-        // revision landed — refetch to fold the new current version
-        void (async () => {
-          try {
-            const all = await api<ApiBusEvent[]>('/bus'
-          + (workSessionId ? `?ws=${workSessionId}` : ''));
-            if (stopped) return;  // R20-F2: 项目切换竞态——旧在途 refetch 不得覆盖新项目清场
-            setEvents(foldEntries(all.filter(accept)).slice(-20).reverse());
-            setLoaded(true);
-          } catch { /* next event heals */ }
-        })();
-        return;
-      }
-      if (!accept(e)) return;
-      setEvents(prev => prev.some(x => x.seq === e.seq)
-        ? prev : [{ ...e, current: e, revisedCount: 0 } as FoldedEntry, ...prev].slice(0, 20));
-    });
-    return () => { stopped = true; off(); };
-  }, [workSessionId]);
+  // R3-1 对齐: 先折后滤(同 Vuln/Intel——TR 的 accept 不看 origin, 行为
+  // 等效但顺序统一, 修订不再依赖巧合)。
+  const accept = (e: ApiBusEvent) =>
+    e.type === 'task-report' && e.workSessionId === workSessionId;
+  const { events, loaded } = useBusPanelEntries(accept, { ws: workSessionId });
 
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">
