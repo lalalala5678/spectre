@@ -8,7 +8,7 @@
 |---|---|
 | Node | **≥ 22.19**（全仓统一：@earendil-works/* 依赖链 engines 下限） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
-| Docker | 沙箱 driver 需要——**装了 Docker 的机器上 runtime 启动即自动建沙箱容器并 apt 装工具链(数百 MB 网络/磁盘)**; 设 `SPECTRE_SANDBOX_DRIVER=local` 可免 Docker 冒烟(工具链降级为宿主机直跑) |
+| Docker | 沙箱 driver 需要——**装了 Docker 的机器上 runtime 启动即自动建沙箱容器+挂载(不装工具链——bootstrap 需手动执行)**; 设 `SPECTRE_SANDBOX_DRIVER=local` 可免 Docker 冒烟(工具链降级为宿主机直跑) |
 
 > Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。
 
@@ -64,7 +64,10 @@ sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtim
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
 export SPECTRE_DATA_DIR=${SPECTRE_DATA_DIR:-/var/lib/spectre}   # 四脚本统一数据根
 bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据根(先行: 交付容器内引导)
-docker exec spectre-sandbox bash /opt/tools/bootstrap-sandbox.sh   # 容器内! 宿主机直跑会装系统包
+# 容器名按数据根派生: 缺省 spectre-sandbox; 隔离 SPECTRE_DATA_DIR 时为
+# spectre-sbx-<sha256(数据根)前8位>(docker ps 查实际名, 共享机勿盲打缺省名!)
+docker exec $(docker ps --format '{{.Names}}' | grep -E 'spectre-sandbox|spectre-sbx-' | head -1) \
+  bash /opt/tools/bootstrap-sandbox.sh   # 容器内! 宿主机直跑会装系统包
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
 bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_DIR/skills
 
@@ -109,6 +112,10 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 - POST /api/sessions 的 title 字段被忽略——标题由 summarizer 在首轮对话后自动生成(设计)
 - 登录后 UI 会在最近工作会话自动创建 AutoPwn 会话(编排器常驻入口)
 - 登录失败锁定为网关内存态(5 次/15 分钟, 重启即清); 登录成败同为 303, CLI 集成读 Location 的 `?e=` 参数(`e=cred`/`e=lock`)区分
+
+## API 认证
+
+runtime 全部 `/api/*`(除 `/api/health`)要求头 `X-Internal-Token: <INTERNAL_TOKEN 值>`(网关自动注入; 直连时自带; Bearer 不支持)。
 
 ## CLI 验证备注
 
