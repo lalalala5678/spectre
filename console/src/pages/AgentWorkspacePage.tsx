@@ -82,15 +82,18 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);
   }, []);
-  // R26(二十六轮修订): 深链消费走 drill 通道——setDrillSession(id)
-  // 本就是"渲染任意会话转录"的既有机制(EntryDetail onOpenSession 同路);
-  // 不碰 boot 选择逻辑, 裸会话/跨项目/记忆竞态三场景统一直达。
+  // R26(二十七轮修订): 深链消费走 drill 通道——setDrillSession(id)
+  // 本就是"渲染任意会话转录"的既有机制(EntryDetail onOpenSession 同路)。
+  // ref 镜像: boot 的乐观清场据此保留深链(N1 时序竞争修复)。
+  const deepLinkRef = useRef<string | null>(null);
+  deepLinkRef.current = deepLink;
   useEffect(() => {
     if (!deepLink) return;
     setDrillSession(deepLink);
     const base = window.location.hash.split('?')[0].replace('#', '');
     history.replaceState(null, '', `${window.location.pathname}#${base}`);
     setDeepLink(null);
+    deepLinkRef.current = null;
   }, [deepLink]);
   const [entryView, setEntryView] = useState<ApiBusEvent | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
@@ -116,7 +119,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // Optimistic clear (project-switch perceived latency): the OLD
     // project's transcript used to linger until this async finished —
     // clear the stage synchronously so the skeleton shows immediately.
-    setDrillSession(null);
+    // R27-N1: 深链在场时不得清——boot 的乐观清场此前把刚消费的
+    // setDrillSession(id) 同步覆写(跨 agent 新挂载路径深链必丢)。
+    setDrillSession(deepLinkRef.current);
     setWsError('');
     setEntryView(null);
     setMySessions([]);
@@ -144,6 +149,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         void setLastSession(ws.id, liveKey, latest); // heal stale
         setMySessions(mine);
         setSessionId(latest);
+      } else if (deepLinkRef.current) {
+        // R27-N2: 深链在场(正在拉目标)——跳过新建, 杜绝每次点击
+        // 遗留 0-msg 空会话污染
+        setMySessions([]);
+        setSessionId(null);
       } else {
         const created = await api<ApiSessionSummary>('/sessions', {
           method: 'POST',
