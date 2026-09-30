@@ -9,7 +9,8 @@ import os
 import threading
 import time
 
-STORE = "/var/lib/spectre/gateway-sessions.json"
+import os
+STORE = os.environ.get("SPECTRE_DATA_DIR", "/var/lib/spectre") + "/gateway-sessions.json"
 _DEBOUNKE = 0.5
 
 

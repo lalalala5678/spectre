@@ -4,7 +4,8 @@ After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-ExecStart=/opt/temporal server start-dev --ip 127.0.0.1 --port 7233 --ui-ip 127.0.0.1 --ui-port 7234 --db-filename /var/lib/temporal-dev/spectre.db
+EnvironmentFile=/etc/spectre/spectre.env
+ExecStart=/bin/sh -c 'exec /opt/temporal server start-dev --ip 127.0.0.1 --port 7233 --ui-ip 127.0.0.1 --ui-port 7234 --db-filename /var/lib/temporal-dev/spectre.db'
 Restart=always
 RestartSec=2
 StateDirectory=temporal-dev

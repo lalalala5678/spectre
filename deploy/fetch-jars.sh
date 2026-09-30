@@ -18,12 +18,12 @@ fetch $MVN/jakarta/annotation/jakarta.annotation-api/2.1.1 jakarta.annotation-ap
 # 字节码变换(ASM 9.x)
 fetch $MVN/org/ow2/asm/asm/9.7 asm-9.7.jar
 fetch $MVN/org/ow2/asm/asm-commons/9.7 asm-commons-9.7.jar
-# Spring 编译桩(按 javastubs/patchsrc 声明的版本补齐)
+# Spring 编译桩(按 javastubs/patchsrc 声明的版本补齐; 显式坐标, 失败即报)
 mkdir -p spring && cd spring
-for a in spring-core/spring-core/5.3.39 spring-web/spring-web/5.3.39 \
-         spring-context/spring-context/5.3.39 spring-beans/spring-beans/5.3.39; do
-  fetch $MVN/org/springframework/$a "$(echo $a | tr '/' '-' | sed 's/-[0-9.]*$/-&/;s/^.*-\([0-9][0-9.]*\)$/x/;s/x//').jar" 2>/dev/null || true
-done
+fetch $MVN/org/springframework/spring-core/5.3.39   spring-core-5.3.39.jar
+fetch $MVN/org/springframework/spring-web/5.3.39    spring-web-5.3.39.jar
+fetch $MVN/org/springframework/spring-context/5.3.39 spring-context-5.3.39.jar
+fetch $MVN/org/springframework/spring-beans/5.3.39  spring-beans-5.3.39.jar
 cd "$GEN"
 # jMG 真实载荷生成器(上游 pen4uin/java-memshell-generator)
 JMG=jmg-cli-1.0.9.jar

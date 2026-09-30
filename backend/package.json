@@ -3,7 +3,7 @@
   "version": "0.1.0",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test tests/"
   },
   "keywords": [],
   "author": "",
@@ -17,5 +17,8 @@
     "@temporalio/client": "^1.14.2",
     "@temporalio/worker": "^1.14.2",
     "@temporalio/workflow": "^1.14.2"
+  },
+  "engines": {
+    "node": ">=18"
   }
 }

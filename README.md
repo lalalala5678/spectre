@@ -27,17 +27,15 @@
 ## 快速开始
 
 ```bash
-# 后端(需要 Node 22)
-cd backend && npm i && node agent-runtime.mjs
-
-# 前端
-cd console && npm i && npm run build
-
-# 基础设施(可选): temporal-dev / oob-collector / 网关
-# 详见 deploy/
+git clone https://github.com/lalalala5678/spectre && cd spectre
+cd backend && cp .env.example .env && npm i && node agent-runtime.mjs   # Node ≥ 18
+cd ../console && npm i && npm run build                                 # Node ≥ 20.19
+cd ../gateway && python3 spectre-passwd.py add admin && python3 server.py   # 纯 stdlib
 ```
 
-模型与数据源凭据在设置页配置（验证通过才落盘，未配置的源不注入智能体工具面）。
+完整部署(systemd/沙箱/私架面杀/凭据边界)见 [deploy/README.md](deploy/README.md)。
+
+数据源凭据在设置页配置（验证通过才落盘，未配置的源不注入智能体工具面）；LLM 凭据经 `backend/.env` 启动装载。
 
 ## 文档
 

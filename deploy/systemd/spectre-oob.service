@@ -4,7 +4,8 @@ After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-ExecStart=/usr/bin/python3 /root/spectre/deploy/oob-collector.py
+EnvironmentFile=/etc/spectre/spectre.env
+ExecStart=/bin/sh -c 'exec /usr/bin/python3 ${SPECTRE_REPO}/deploy/oob-collector.py'
 Restart=always
 RestartSec=2
 # R18-F2: 唯一公网监听单元此前零沙箱(root 裸奔)——镜像 console 基线。

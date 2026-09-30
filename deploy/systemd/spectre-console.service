@@ -4,9 +4,8 @@ After=network.target
 StartLimitIntervalSec=0
 
 [Service]
-EnvironmentFile=/root/spectre/backend/.env
-WorkingDirectory=/root/spectre/gateway
-ExecStart=/usr/bin/python3 /root/spectre/gateway/server.py
+EnvironmentFile=/etc/spectre/spectre.env
+ExecStart=/bin/sh -c 'cd ${SPECTRE_REPO}/gateway && exec /usr/bin/python3 ${SPECTRE_REPO}/gateway/server.py'
 Restart=always
 RestartSec=2
 User=root
@@ -14,7 +13,7 @@ User=root
 # sandbox
 NoNewPrivileges=true
 ProtectSystem=strict
-ReadWritePaths=/var/log/spectre-console /var/lib/spectre
+ReadWritePaths=/var/lib/spectre /var/log/spectre-console
 ProtectHome=read-only
 PrivateTmp=true
 ProtectKernelTunables=true

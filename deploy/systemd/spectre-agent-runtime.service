@@ -5,8 +5,8 @@ StartLimitIntervalSec=0
 Wants=temporal-dev.service
 
 [Service]
-WorkingDirectory=/root/spectre/backend
-ExecStart=/opt/node22/bin/node agent-runtime.mjs
+EnvironmentFile=/etc/spectre/spectre.env
+ExecStart=/bin/sh -c 'cd ${SPECTRE_REPO}/backend && exec ${NODE_BIN} agent-runtime.mjs'
 Restart=always
 RestartSec=2
 NoNewPrivileges=true

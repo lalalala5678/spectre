@@ -29,5 +29,8 @@
     "typescript": "~6.0.2",
     "vite": "^8.2.2"
   },
-  "license": "MIT"
+  "license": "MIT",
+  "engines": {
+    "node": ">=20.19"
+  }
 }
