@@ -3,6 +3,16 @@
 # 用法: tools-sync.sh [目标根](默认 /var/lib/spectre)
 set -e
 DST="${1:-${SPECTRE_DATA_DIR:-/var/lib/spectre}}"
+# R13-1(十三轮): 生产缺省路径守卫——与 skills-seed NEW-B 同款(该脚本
+# 上轮已实测漏 env 直写生产; 十三轮再次真实触发)。
+if [ -z "$SPECTRE_DATA_DIR" ] && [ -z "$1" ] && [ "$DST" = "/var/lib/spectre" ]; then
+  if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
+    echo "[tools-sync] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $DST" >&2
+    echo "[tools-sync] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
+    exit 1
+  fi
+  echo "[tools-sync] 警告: SPECTRE_ALLOW_DEFAULT_DATA=1 —— 写入生产路径 $DST" >&2
+fi
 mkdir -p "$DST/tools/bin" "$DST/tools/c2"
 cp -v tools/bin/*.py "$DST/tools/bin/"
 for d in basetypes basetypes-jakarta javastubs yara-rules mock; do
