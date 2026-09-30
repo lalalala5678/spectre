@@ -159,7 +159,11 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/sessions' && method === 'POST') {
       const body = await readJson(req);
+      // R12-1(十二轮): requireFields 失败时已发送 400, 再 bad() 双发
+      // headers → ERR_HTTP_HEADERS_SENT 裸栈(缺 agentKey 即触发); 对齐
+      // :649 的 if(...){ return; } 模式。
       if (!requireFields(res, body, ['agentKey']) || !isAgentKey(body.agentKey)) {
+        if (res.headersSent) return;
         return bad(res, 400, 'unknown agentKey');
       }
       // Engagement metadata marks AutoPwn children — internal only, a

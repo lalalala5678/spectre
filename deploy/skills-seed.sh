@@ -28,7 +28,9 @@ echo "[skills-seed] $n 个技能 → $DST/skills/ (见下方挂载刷新; 平台
 # 播种后刷新运行时挂载缓存(需 runtime 在跑 + INTERNAL_TOKEN + 同 PORT)
 # NEW-C(十一轮): curl 补 -f 消除 401 假成功; PORT 与 runtime 启动同源。
 RT_PORT="${PORT:-8090}"
-if [ -n "${INTERNAL_TOKEN:-}" ] && curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:${RT_PORT}/api/health"; then
+if [ -z "${INTERNAL_TOKEN:-}" ]; then
+  echo "提示: 未设 INTERNAL_TOKEN——跳过挂载刷新; 下次启动自动装载(如需即时刷新, 导出 backend/.env 的 INTERNAL_TOKEN)"
+elif curl -sf -o /dev/null --max-time 3 "http://127.0.0.1:${RT_PORT}/api/health"; then
   if curl -sf -X POST -H "X-Internal-Token: ${INTERNAL_TOKEN}" \
       "http://127.0.0.1:${RT_PORT}/api/sandbox/skills/rebuild" >/dev/null; then
     echo "[skills-seed] 挂载缓存已刷新(PORT=$RT_PORT)"
@@ -36,5 +38,5 @@ if [ -n "${INTERNAL_TOKEN:-}" ] && curl -sf -o /dev/null --max-time 3 "http://12
     echo "[skills-seed] 刷新失败: runtime 在 :$RT_PORT 但 token 无效或路由拒绝" >&2
   fi
 else
-  echo "提示: runtime 未运行(探测 :$RT_PORT, 与后端同 PORT env)——下次启动自动装载"
+  echo "提示: :$RT_PORT 未探测到 runtime(与后端同 PORT env)——下次启动自动装载"
 fi
