@@ -31,6 +31,8 @@ const AGENT_OF_ROUTE: Record<string, string> = {
   report: 'report',
 };
 
+import { setPendingOpen } from './api/openSessionChannel';
+
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
@@ -65,8 +67,17 @@ export default function App() {
   // on later hash changes (manual URL edits, history navigation).
   useEffect(() => {
     const onHash = () => {
-      const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
+      const raw = window.location.hash.replace('#', '');
+      // R32D30-E3: 应用已开时地址栏粘贴 #agent?s=id 此前只切路由不
+      // drill(?s= 仅挂载时读一次)。这里把参数转发到 pendingOpen 通道
+      // ——与搜索点击同一消费路径, 并 replaceState 清洗地址栏。
+      const s = new URLSearchParams(raw.split('?')[1] ?? '').get('s');
+      const h = raw.split('?')[0] as RouteKey;
       const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
+      if (s && valid.includes(h)) {
+        setPendingOpen(h, s);
+        history.replaceState(null, '', `${window.location.pathname}#${h}`);
+      }
       setRoute(valid.includes(h) ? h : 'autopwn');
     };
     window.addEventListener('hashchange', onHash);

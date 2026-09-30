@@ -108,7 +108,7 @@ export function Topbar() {
   // F69: 防抖搜索(会话树 + 总线条目; 结果缓存 30s)
   useEffect(() => {
     const query = q.trim();
-    if (query.length < 2) { setSessHits([]); setBusHits([]); return; }
+    if (query.length < 2) { setSessHits([]); setBusHits([]); setOpen(false); return; }  // R32D30-E2: <2 字时复位下拉, 否则残留'无结果'提示自相矛盾
     let cancelled = false;
     const t = setTimeout(async () => {
       try {

@@ -54,7 +54,10 @@ function extractTitle(raw) {
   if (title.length <= 60) return title;
   const hard = title.slice(0, 60);
   const cut = hard.match(/^[\s\S]*[\s-]/);  // 空格或连字符(NDAY-R32D28 类 token 的自然边界)
-  return (cut && cut[0].trim().length >= 20) ? cut[0].trim() : hard;
+  // R32D30-E1: 剥离悬挂尾部分隔符——保留 '- ' 尾巴会让跨切点查询
+  // ('OGSL-CVE' 对被截成 '...OGSL-' 的标题)检索丢会话。
+  const trimmed = cut ? cut[0].trim().replace(/[\s-]+$/, '') : '';
+  return trimmed.length >= 20 ? trimmed : hard;
 }
 
 /** pi transcript slice as flat text, newest last, bounded by chars. */
