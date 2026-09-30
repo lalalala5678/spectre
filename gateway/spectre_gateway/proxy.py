@@ -12,7 +12,7 @@ from . import config
 class ProxyError(Exception):
     """Upstream connection failure."""
 
-    def __init__(self, status=502, message="backend unavailable"):
+    def __init__(self, status=502, message="后端 runtime 不可达"):
         super().__init__(message)
         self.status = status
 
@@ -68,9 +68,10 @@ def proxy(handler, api_path):
         handler.wfile.write(b"0\r\n\r\n")
     except (BrokenPipeError, ConnectionResetError, TimeoutError):
         pass  # client went away mid-stream (normal for SSE)
-    except ValueError:
-        # R32D32-R1: upstream died mid-chunk (runtime restart) leaves a
-        # torn chunk header — http.client raises on int('') parse. The
+    except (ValueError, http.client.IncompleteRead, ConnectionError):
+        # R32D32-R1/R32D33-N3: upstream died mid-chunk (runtime restart)
+        # surfaces as a torn chunk header (int('') ValueError), a short
+        # chunk body (IncompleteRead) or a reset (ConnectionError). The
         # stream is unrecoverable; end the chunked body cleanly so the
         # browser reconnects its SSE instead of spraying tracebacks.
         try:

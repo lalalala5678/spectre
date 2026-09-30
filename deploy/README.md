@@ -47,6 +47,8 @@ export SPECTRE_AUTH_DIR=/var/lib/spectre/auth
 python3 spectre-passwd.py add admin           # 交互输密码
 export INTERNAL_TOKEN=<与 backend/.env 同值>   # 网关反代 API 的令牌
 export SPECTRE_DATA_DIR=/tmp/spectre-data      # 与后端①同目录即可(网关只写会话文件)
+# 换端口部署: GATEWAY_PORT=18081 RUNTIME_PORT=18090(指向你①的 PORT)——
+# 缺省 8081/8090
 python3 server.py                             # dist 默认 ../console/dist
 
 # 4) 登录验证
@@ -120,7 +122,7 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 
 ## 行为备注
 
-- API 裸建会话(无 workSessionId)不进项目历史列表——顶部全局搜索按标题/ID 可找回, 点击结果直接打开该会话(任何项目/任何 agent 的会话均可); UI 建会自动归组
+- API 裸建会话(无 workSessionId)不进项目历史列表——顶部全局搜索按标题/ID 可找回(注: 无 LLM 标题的会话检索面=首条用户消息前 40 字摘录, 更长关键词可能不命中), 点击结果直接打开该会话(任何项目/任何 agent 的会话均可); UI 建会自动归组
 - POST /api/sessions 的 title 字段被忽略——标题由 summarizer 在首轮对话后自动生成(设计)
 - 登录后 UI 会在最近工作会话自动创建 AutoPwn 会话(编排器常驻入口); 切换项目时在 autopwn 页在位则建 AutoPwn 锚点、在其它 agent 页则建该 agent 锚点(agent 页 bootstrap 机制); 首次浏览某 agent 页会在当前项目为该 agent 建一个 0-msg 会话(下次进入直接恢复)——均为锚点行为, 非泄漏
 - 首次打开 Skill 管理/MCP Server/CLI 工具页会各自静默创建对应配置智能体会话(按需惰性单例, 复访不增殖)
