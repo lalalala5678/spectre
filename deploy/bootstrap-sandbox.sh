@@ -13,8 +13,8 @@ mkdir -p /opt/tools/c2/clamav-db
 chown -R "$(id -u clamav 2>/dev/null || echo 103):$(id -g clamav 2>/dev/null || echo 106)" /opt/tools/c2/clamav-db
 if [ ! -L /var/lib/clamav ]; then
   rm -f /var/lib/clamav/clamav-db
-  mv /var/lib/clamav/* /opt/tools/c2/clamav-db/ 2>/dev/null || true
-  rmdir /var/lib/clamav 2>/dev/null || true
+  mv /var/lib/clamav/* /opt/tools/c2/clamav-db/ || echo "[bootstrap] 库搬迁部分失败(已有库? 继续)"
+  rmdir /var/lib/clamav 2>/dev/null
   ln -sn /opt/tools/c2/clamav-db /var/lib/clamav
 fi
 freshclam || echo "[bootstrap] freshclam 失败(离线?)——已有库可继续"

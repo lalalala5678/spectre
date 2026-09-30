@@ -1,4 +1,9 @@
----\nname: source-acquire\ndescription: 源码获取(阶段一)\n---\n\n# 源码获取(阶段一)
+---
+name: source-acquire
+description: 源码获取(阶段一)
+---
+
+# 源码获取(阶段一)
 [read-only 下载] 版本精确对齐是审计有效性的前提。
 
 ## 获取路径(按命中率)

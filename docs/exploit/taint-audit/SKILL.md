@@ -1,4 +1,9 @@
----\nname: taint-audit\ndescription: 污点链审计(阶段三·核心)\n---\n\n# 污点链审计(阶段三·核心)
+---
+name: taint-audit
+description: 污点链审计(阶段三·核心)
+---
+
+# 污点链审计(阶段三·核心)
 [read-only] source→传播→sink 全链证明,过滤绕过是主战场。
 
 ## 双引擎

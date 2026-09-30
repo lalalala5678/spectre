@@ -6,6 +6,7 @@
  * intentional feature).
  */
 import { spawn } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
@@ -15,10 +16,16 @@ const REGISTRY_PATH = path.join(HOST.workspace, '..', 'sandbox-config.json');
 
 // ------------------------------------------------------------- registry
 
+// P0-B(五审): 容器名按数据目录命名空间化——隔离实例(SPECTRE_DATA_DIR
+// 非默认)此前静默接管生产容器 spectre-sandbox(命令执行落生产挂载)。
+// 默认数据目录保持原名, 现役容器/私架单元引用零影响。
+const dataDir = process.env.SPECTRE_DATA_DIR ?? '/var/lib/spectre';
+const containerName = dataDir === '/var/lib/spectre' ? 'spectre-sandbox'
+  : `spectre-sbx-${createHash('sha256').update(dataDir).digest('hex').slice(0, 8)}`;
 let cfg = {
   driver: process.env.SPECTRE_SANDBOX_DRIVER
     ?? (await dockerAvailable() ? 'docker' : 'local'),
-  container: 'spectre-sandbox',
+  container: process.env.SPECTRE_SANDBOX_CONTAINER ?? containerName,
   image: 'debian:bookworm-slim',
 };
 

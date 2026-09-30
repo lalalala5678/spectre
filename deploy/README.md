@@ -8,6 +8,8 @@
 |---|---|
 | Node | **≥ 22.19**（全仓统一：@earendil-works/* 依赖链 engines 下限） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
+
+> Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。|
 | Docker | 仅沙箱 driver 需要 |
 
 ## 组件清单

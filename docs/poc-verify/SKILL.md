@@ -1,4 +1,9 @@
----\nname: poc-verify\ndescription: PoC 与验证(阶段四)\n---\n\n# PoC 与验证(阶段四)
+---
+name: poc-verify
+description: PoC 与验证(阶段四)
+---
+
+# PoC 与验证(阶段四)
 [轻探测] 白盒结论黑盒落地——KAT 铁律沿用(出口实测才算数)。
 
 ## PoC 构造模板

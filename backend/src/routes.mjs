@@ -488,6 +488,14 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, await listInstalledTools());
     }
     // skills CRUD + per-agent mounts
+    if (path === '/api/sandbox/skills/rebuild' && method === 'POST') {
+      // P1-B(五审): skills-seed 播种后挂载缓存不刷新——"新会话生效"
+      // 承诺此前为假(需重启或碰巧触发技能 CRUD)。
+      const { rebuildMounts } = await import('./sandbox/mount.mjs');
+      const r2 = await rebuildMounts(AGENT_KEYS);
+      store.rebuildSessionAgents();
+      return json(res, 200, r2);
+    }
     if (path === '/api/sandbox/skills' && method === 'GET') {
       return json(res, 200, await listSkillsTree(AGENT_KEYS));
     }

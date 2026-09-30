@@ -19,7 +19,7 @@
  */
 import { randomUUID } from 'node:crypto';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
-import { dirname as pdirname } from 'node:path';
+import { dirname as pdirname, join as pathJoin } from 'node:path';
 import { execFile } from 'node:child_process';
 
 
@@ -35,7 +35,10 @@ function parseFormBody(tpl) {
 
 /** shells by id — persisted to disk on every mutation; replayed on boot. */
 const shells = new Map();
-const SHELL_SNAPSHOT = '/var/lib/spectre/tools/c2/shells.json';
+// P0-A(五审): 跟随数据目录——此前硬编码生产路径, 隔离实例写穿到
+// /var/lib/spectre/tools/c2/shells.json(跨实例状态互渗, 实测发生)。
+const SHELL_SNAPSHOT = pathJoin(
+  process.env.SPECTRE_DATA_DIR ?? '/var/lib/spectre', 'tools/c2/shells.json');
 
 function persistShells() {
   try {
