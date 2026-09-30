@@ -228,7 +228,9 @@ async function bootstrapToolchain() {
     ? await run('docker', ['exec', cfg.container, 'timeout', '-k', '2', '900', 'bash', '-lc', script], 910)  // R24-F1
     : await run('bash', ['-lc', script], 900);
   // R24-3: 输出单行化——此前多行 apt 输出与状态粘连不可读
-  const bootLog = String(res.out).split('\n').filter(Boolean).slice(-1)[0] ?? '';
+  // R25: 尾行常是 apt 的 WARNING 行——过滤后取真实语义行
+  const bootLines = String(res.out).split('\n').filter(l => l.trim() && !/^WARNING/i.test(l.trim()));
+  const bootLog = bootLines.slice(-1)[0] ?? '';
   console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}${bootLog ? `: ${bootLog.slice(0, 120)}` : ''}`);
   if (res.code === 0) {
     // write the identity marker + ledger the apt toolchain so a rebuild

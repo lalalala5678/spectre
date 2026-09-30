@@ -2,12 +2,13 @@ import { useEffect, useRef, useState } from 'react';
 import { Activity, Bell, LogOut, Search } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
+import { setLastSession, switchWorkSession } from '../api/worksession';
 
 /** F60: /api/health 前端零消费——模型名/会话总量/总线事件总量后端有、
  * 用户无从得知。状态栏 30s 轮询展示(ok 掉线变红)。 */
 interface HealthInfo { ok: boolean; model: string; sessions: number; bus: number; }
 
-interface TreeSess { id: string; agentKey: string; title: string | null; busy?: boolean }
+interface TreeSess { id: string; agentKey: string; title: string | null; busy?: boolean; workSessionId?: string | null }
 interface BusEvt { seq: number; ts?: string; type: string | null; title: string | null; summary: string | null; severity?: string | null; status?: string | null; revises?: number | null }
 
 /** F69: 顶栏搜索此前是空壳(placeholder 承诺"会话/资产/发现/CVE"但无任何
@@ -167,7 +168,22 @@ export function Topbar() {
               <div className="mb-1 px-2 py-0.5 text-[9px] uppercase tracking-widest text-zinc-600">会话</div>
             )}
             {sessHits.map(s => (
-              <button key={s.id} onClick={() => go(s.agentKey === 'autopwn' ? 'autopwn' : s.agentKey)}
+              <button key={s.id} onClick={() => {
+                // N-A(二十五轮): 此前只跳 agent 页新建空会话——搜到的会话
+                // 无入口打开, 文档"可找回"承诺未兑现。改为记忆为目标
+                // agent 的 lastSession(工作区 boot 恢复它)再跳转。
+                const key = s.agentKey === 'autopwn' ? 'autopwn' : s.agentKey;
+                void (async () => {
+                  try {
+                    if (s.workSessionId) {
+                      // 跨项目命中: 先切换项目, 再记忆为该 agent 的恢复目标
+                      await switchWorkSession(s.workSessionId);
+                      await setLastSession(s.workSessionId, key, s.id);
+                    }
+                  } catch { /* 记忆失败仍跳转 */ }
+                })();
+                go(key);
+              }}
                 className="block w-full truncate rounded-sm px-2 py-1 text-left text-[11.5px] text-zinc-300 hover:bg-void-800">
                 <span className="font-mono text-[9.5px] text-zinc-600">{s.agentKey}</span>
                 {' '}{s.title ?? s.id}
