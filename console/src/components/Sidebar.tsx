@@ -49,7 +49,7 @@ export function Sidebar({
         <SpectreMark />
         <div>
           <div className="text-[13px] font-semibold tracking-widest text-zinc-100">SPECTRE</div>
-          <div className="mt-px text-[10px] text-zinc-600">blackbox · agent console</div>
+          <div className="mt-px text-[10px] text-zinc-600">SPECTRE · agent console</div>
         </div>
       </div>
 

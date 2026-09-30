@@ -49,7 +49,7 @@ function extractTitle(raw) {
   if (!m || m[1] === undefined) return null;
   const title = (m[1] ?? '').replace(/[\r\n]+/g, ' ').trim();
   if (!title || /^(none|null|无)$/i.test(title)) return null;
-  return title.slice(0, 60);
+  return title.slice(0, 32);  // N-c: 长指令观感(UI 投影回退线 40)
 }
 
 /** pi transcript slice as flat text, newest last, bounded by chars. */

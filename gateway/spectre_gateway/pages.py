@@ -43,7 +43,7 @@ _TEMPLATE = """<!doctype html>
 <body>
   <form class="card" method="POST" action="__ACTION__" autocomplete="off">
     <h1>SPECTRE</h1>
-    <div class="sub">BLACKBOX · AGENT CONSOLE — RESTRICTED</div>
+    <div class="sub">SPECTRE · AGENT CONSOLE — RESTRICTED</div>
     <label for="user">Operator</label>
     <input id="user" name="user" type="text" required autofocus autocomplete="username">
     <label for="pw">Passphrase</label>
