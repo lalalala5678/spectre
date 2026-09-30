@@ -66,8 +66,10 @@ export SPECTRE_DATA_DIR=${SPECTRE_DATA_DIR:-/var/lib/spectre}   # 四脚本统�
 bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据根(先行: 交付容器内引导)
 # 容器名按数据根派生: 缺省 spectre-sandbox; 隔离 SPECTRE_DATA_DIR 时为
 # spectre-sbx-<sha256(数据根)前8位>(docker ps 查实际名, 共享机勿盲打缺省名!)
-docker exec $(docker ps --format '{{.Names}}' | grep -E 'spectre-sandbox|spectre-sbx-' | head -1) \
-  bash /opt/tools/bootstrap-sandbox.sh   # 容器内! 宿主机直跑会装系统包
+# 容器名按数据根哈希精确派生(隔离实例 spectre-sbx-<sha256 前8位>)
+docker exec spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8) \
+  bash /opt/tools/bootstrap-sandbox.sh 2>/dev/null \
+  || docker exec spectre-sandbox bash /opt/tools/bootstrap-sandbox.sh   # 缺省数据根回落
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
 bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_DIR/skills
 
@@ -79,9 +81,10 @@ bash deploy/skills-seed.sh            # 55 个方法论技能 → $SPECTRE_DATA_
 ## 账号管理
 
 ```bash
-python3 gateway/spectre-passwd.py add <user>   # PASS=环境变量可非交互
-python3 gateway/spectre-passwd.py del <user>
-python3 gateway/spectre-passwd.py list
+# 共享机: 所有命令加 SPECTRE_AUTH_DIR=<隔离目录> 前缀(list 也会读缺省生产文件)
+SPECTRE_AUTH_DIR=<隔离目录> python3 gateway/spectre-passwd.py add <user>   # PASS=环境变量可非交互
+SPECTRE_AUTH_DIR=<隔离目录> python3 gateway/spectre-passwd.py del <user>
+SPECTRE_AUTH_DIR=<隔离目录> python3 gateway/spectre-passwd.py list
 curl 集成: 登录 POST 字段为 `user`/`pw`——`curl -d 'user=admin&pw=...' http://<gw>:8081/spectre/login`。
 ```
 

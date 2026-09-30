@@ -43,7 +43,7 @@ SPECTRE_DATA_DIR=/tmp/spectre-data npm i && \
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # 测试隔离数据目录(生产缺省 /var/lib/spectre)
 
 # ② 前端(Node ≥ 22.19; 与 ① 同一 Node 版本)
-cd ../console && npm i && npm run build
+cd ../console && npm i && npm run build  # npm 崩溃(Exit handler/ENOTFOUND)→ deploy/README 排障节
 
 # ③ 网关(纯 stdlib)——INTERNAL_TOKEN 必须=① 中 .env 的值, 否则 API 反代全 401
 cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
