@@ -32,11 +32,18 @@ MANIFEST="${LIBS%/*}/.sha256"  # R32D69-F3: 置 c2 根+条目相对路径——c
 # 不再静默全量重下 ~51MB; 迁移后旧清单删除。
 OLD_MANIFEST="$LIBS/.sha256"
 if [ -f "$OLD_MANIFEST" ] && [ ! -f "$MANIFEST" ]; then
+  # CS49-F2: 真实旧清单=裸文件名(git 全史三代写入口径同)——spring-*
+  # 入 libs/spring/, jmg-* 入 generators/, 其余入 libs/。此前 awk 假设
+  # ./x|spring/x 前缀从未存在, 迁移后 15 条错 10 条(-c 10 FAILED)。
   awk '{
     p = $2
-    sub(/^\.\//, "", p)
-    if (p ~ /^generators\//) ; else p = "libs/" p
-    print $1 "  " p
+    if (p ~ /^\.\//) sub(/^\.\//, "", p)
+    if (p ~ /^generators\//) out = p
+    else if (p ~ /^spring\//) out = "libs/" p
+    else if (p ~ /^jmg-/) out = "generators/" p
+    else if (p ~ /^spring-/) out = "libs/spring/" p
+    else out = "libs/" p
+    print $1 "  " out
   }' "$OLD_MANIFEST" > "$MANIFEST" && rm -f "$OLD_MANIFEST"
 fi
 fetch() { # fetch <目录> <完整URL> <文件名>

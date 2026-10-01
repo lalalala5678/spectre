@@ -327,7 +327,7 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readJson(req);
       // migration batch: {projects: [...]} registers legacy browser-side
       // entries (keeps ids so existing sessions stay grouped; CS47-N6:
-      // 同 id 域校验, 域外静默跳过)
+      // 同 id 域校验, 域外项 skipped 明细随响应披露)
       if (Array.isArray(body.projects)) {
         // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
         // 却永远无法成为 currentWs)。R32D70: 域外项拒绝明细随响应披露。
@@ -339,7 +339,11 @@ function realRouter({ store, bus, caps, wal }) {
             skipped.push(String(p.id));
           }
         }
-        return json(res, 201, skipped.length ? { projects: listProjects(), skipped, note: '域外 id 未注册([a-zA-Z0-9_-]{1,64})' } : listProjects());
+        // CS49-F6: 响应形状恒定(机器消费免 Array.isArray 分叉)。
+        const projects = listProjects();
+        return json(res, 201, skipped.length
+          ? { projects, skipped, note: '域外 id 未注册([a-zA-Z0-9_-]{1,64})' }
+          : { projects });
       }
       const created = createProject(String(body.label ?? ''), wal);
       // R32D31-N1: 此前无条件 setPrefs(currentWs)——API/CLI 建项目会
@@ -443,7 +447,12 @@ function maskPrefs(raw) {
         return bad(res, 400, 'currentWs 须为项目 id 字符串([a-zA-Z0-9_-]{1,64})或 null');
       }
       // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。
-      // CS48-5: 形状违规统一 400(setPrefs 同步 throw 此前冒泡 500)。
+      // CS48-5: 形状违规统一 400(setPrefs 同步 throw 此前冒泡 500);
+      // CS49-F5: null 体先短痛拒(守卫 body_ 兜空后 setPrefs(null) 曾
+      // 泄漏引擎原文 TypeError)。
+      if (body === null || body === undefined) {
+        return bad(res, 400, '请求体须为 JSON 对象');
+      }
       try {
         return json(res, 200, maskPrefs(setPrefs(body, wal)));
       } catch (e) {
