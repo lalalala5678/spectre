@@ -326,7 +326,8 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/projects' && method === 'POST') {
       const body = await readJson(req);
       // migration batch: {projects: [...]} registers legacy browser-side
-      // entries verbatim (keeps ids so existing sessions stay grouped)
+      // entries (keeps ids so existing sessions stay grouped; CS47-N6:
+      // 同 id 域校验, 域外静默跳过)
       if (Array.isArray(body.projects)) {
         for (const p of body.projects) {
           // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
@@ -439,7 +440,12 @@ function maskPrefs(raw) {
         return bad(res, 400, 'currentWs 须为项目 id 字符串([a-zA-Z0-9_-]{1,64})或 null');
       }
       // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。
-      return json(res, 200, maskPrefs(setPrefs(body, wal)));
+      // CS48-5: 形状违规统一 400(setPrefs 同步 throw 此前冒泡 500)。
+      try {
+        return json(res, 200, maskPrefs(setPrefs(body, wal)));
+      } catch (e) {
+        return bad(res, 400, e instanceof Error ? e.message : String(e));
+      }
     }
 
     // ---------- uploads (files land in the sandbox /opt/uploads) ----------

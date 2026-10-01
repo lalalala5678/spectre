@@ -71,7 +71,7 @@ export async function newWorkSession(name: string): Promise<WorkSession> {
  * Resolve the active project at boot: current pref → its project →
  * latest project → (none yet) create the first unnamed one. Also runs
  * the ONE-TIME migration: legacy browser-side registry entries are
- * uploaded verbatim (ids preserved so existing sessions stay grouped),
+ * uploaded with same-domain id validation (CS47-N6)
  * then every spectre.* storage key is wiped — the browser keeps nothing.
  */
 // F1(十五轮): 本体也 memo——R14-F2 只 memo 了 migration; 全新用户无

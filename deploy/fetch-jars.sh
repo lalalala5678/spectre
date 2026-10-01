@@ -27,6 +27,18 @@ FAILED=()
 # R32D59 观测项: sha256 清单——首跑落账, 重跑校验(防篡改/半下载静默
 # 留存; HTTP 200 不等于内容完整)。清单恒在 libs 根, 增量维护。
 MANIFEST="${LIBS%/*}/.sha256"  # R32D69-F3: 置 c2 根+条目相对路径——cd c2 根 sha256sum -c 可用
+# CS48-4: 升级迁移——旧清单(libs/.sha256, 条目 ./x|spring/x|generators/x)
+# 一次性转译为 c2 根相对制(libs/x|libs/spring/x|generators/x), 存量部署
+# 不再静默全量重下 ~51MB; 迁移后旧清单删除。
+OLD_MANIFEST="$LIBS/.sha256"
+if [ -f "$OLD_MANIFEST" ] && [ ! -f "$MANIFEST" ]; then
+  awk '{
+    p = $2
+    sub(/^\.\//, "", p)
+    if (p ~ /^generators\//) ; else p = "libs/" p
+    print $1 "  " p
+  }' "$OLD_MANIFEST" > "$MANIFEST" && rm -f "$OLD_MANIFEST"
+fi
 fetch() { # fetch <目录> <完整URL> <文件名>
   local dir=$1 url=$2 name=$3
   # R32D69-F3: 清单条目=相对 c2 根路径(cd c2 根 sha256sum -c 可用)。
@@ -38,7 +50,7 @@ fetch() { # fetch <目录> <完整URL> <文件名>
     *)  rel="libs/$dir/$name" ;;
   esac
   # R32D59 观测项/CS37: sha256 清单(awk 精确匹配文件名列, 免正则元字符错配);
-  # 清单恒在 libs 根(GEN/spring jar 同账)。
+  # 清单恒在 c2 根(GEN/spring jar 同账, 相对路径)。
   if [ -f "$dir/$name" ] && [ -f "$MANIFEST" ]; then
     want=$(awk -v n="$rel" '$2==n{print $1}' "$MANIFEST")
     if [ -n "$want" ]; then

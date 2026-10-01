@@ -8,3 +8,4 @@ __pycache__/
 .DS_Store
 mrrobot.ova
 brutebench.env
+data/  # R32D69-F4/CS48-1: 数据根选在仓库内时的隔离目录
