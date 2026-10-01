@@ -155,11 +155,16 @@ test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移�
   const arch = readFileSync(join(ROOT, 'docs', 'ARCHITECTURE.md'), 'utf8');
   const line = arch.split('\n').find(l => l.includes('行数软指引'));
   assert.ok(line, 'ARCHITECTURE.md 行数软指引行缺失');
+  // CS18-F1: 恰好一次——includes 子串断言对「新旧两套数字并存」失明
+  // (批次 AB 编辑事故实证), 全行提取后逐项精确比对。
+  const listed = [...line.matchAll(/([\w·-]+)\((\d+)\)/g)].map(m => `${m[1]}(${m[2]})`);
   for (const [name, rel] of rows) {
     const content = readFileSync(join(ROOT, rel), 'utf8');
     // 与 wc -l 同口径(结尾换行不另计一行)
     const actual = content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
-    assert.ok(line.includes(`${name}(${actual})`),
-      `行数表漂移: ${name} 实际 ${actual} 行, 表内为「${line.slice(0, 120)}」——改文件须同步 docs/ARCHITECTURE.md:105`);
+    assert.equal(listed.filter(x => x.startsWith(`${name}(`)).length, 1,
+      `行数表 ${name} 出现多次/缺失: ${listed.join(',')}`);
+    assert.ok(listed.includes(`${name}(${actual})`),
+      `行数表漂移: ${name} 实际 ${actual} 行, 表内为「${listed.join(',')}」——改文件须同步 docs/ARCHITECTURE.md:105`);
   }
 });

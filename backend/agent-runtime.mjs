@@ -16,7 +16,6 @@ import http from 'node:http';
 import { CONFIG } from './src/config.mjs';
 import { Bus } from './src/bus.mjs';
 import { createShellRegistry } from './src/shells.mjs';
-import { readFileSync } from 'node:fs';
 import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
 import { entryKind as entryKindOf } from './src/tools.mjs';
@@ -33,7 +32,7 @@ import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
 import { projectsFromWal, listProjects, getPrefs, tombstonesAll } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
-import fs from 'node:fs';
+import fs, { readFileSync } from 'node:fs';  // CS18-F6: 合并同模块双 import
 
 // N7(部署审计五轮, P0): 数据目录实例锁——boot compaction 原先发生在
 // 端口 bind 之前, 多实例共用数据目录时"先原子重写 WAL 再 EADDRINUSE

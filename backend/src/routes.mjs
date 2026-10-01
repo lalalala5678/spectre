@@ -22,7 +22,7 @@ import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import { syncSourceKeyFiles } from './keyfiles.mjs';
 import { phishCampaignFunnel } from './phish-funnel.mjs';
 import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
-import { getSettings, saveSetting, effectiveCommon, hasSourceCredential, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { getSettings, saveSetting, hasSourceCredential, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
@@ -129,7 +129,8 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/health') {
       return json(res, 200, {
         ok: true,
-        model: effectiveCommon().model || '(未配置)',
+        // CS18-F4: model 字段已删(R32D44 顶栏去模型字样后全仓零消费;
+        // 模型多态下单一模型名不再代表平台, 配置见设置页)。
         sessions: store.list().length,
         bus: bus.list().length,
       });
@@ -362,7 +363,8 @@ function realRouter({ store, bus, caps, wal }) {
     }
 
     // ---------- agent settings (user-facing config bar) ----------
-        // live probe (network fields) or range check (numeric fields).
+    // 保存协议: common/recon 组逐字段(带探测/范围校验), agent-llm/common
+    // llm 四字段原子提交(见 agent-settings.mjs 文件头)。
     if (path === '/api/agent-settings' && method === 'GET') {
       return json(res, 200, getSettings());
     }

@@ -8,7 +8,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { CONFIG } from './config.mjs';
 import { getPrefs } from './projects.mjs';
-import { RECON_SOURCES_INTERNAL, enabledReconSources } from './agent-settings.mjs';
+import { RECON_SOURCES_INTERNAL, enabledReconSources, hasSourceCredential } from './agent-settings.mjs';
 import { loadMcpConfig, saveMcpConfig } from './sandbox/mcp.mjs';
 import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import path_mod from 'node:path';
@@ -16,8 +16,7 @@ import path_mod from 'node:path';
 /** F14: 数据源文件只含有凭据的源(零污染)——无凭据残留不进任何注入文件。
  * CS17-4: 谓词收敛到 agent-settings.hasSourceCredential 单源(此前本处
  * 多认 id/user——censys id-only 也会进注入文件)。 */
-import { hasSourceCredential } from './agent-settings.mjs';
-const hasCred = (cfg, sid) => hasSourceCredential(cfg, sid);
+const hasCred = hasSourceCredential;  // CS18-F5: 消透传包装
 
 /** 按消费组过滤(keys → {sid: cfg}), skip 为排除的伪源。 */
 function byGroup(keys, agents, skip) {

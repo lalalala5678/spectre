@@ -38,7 +38,7 @@
 git clone https://github.com/lalalala5678/spectre && cd spectre
 
 # ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串)
-#    LLM 不走 env: 登录控制台后在「设置」页配置(见下 ⑦)
+#    LLM 不走 env: 登录控制台后在「设置」页配置(见下方「配置大模型」)
 cd backend && cp .env.example .env && ${EDITOR:-vi} .env
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test && \
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # npm 崩溃→deploy/README 排障节   # 测试隔离数据目录(生产缺省 /var/lib/spectre)
@@ -57,9 +57,12 @@ cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
 打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。
 
 > 前台网关占住这个终端——后续 deploy/ 脚本(skills-seed/fetch-jars 等)
-> 开**新终端**执行, 并先 `cd` 回仓库根(步骤 0-4 的路径都在各自目录内)。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
+> 开**新终端**执行, 并先 `cd` 回仓库根(deploy/README.md 步骤 0-4 的
+> 命令路径都在各自子目录内)。
 
-⑦ **配置大模型**（登录后, 平台统一接管）: 「设置」页 → 通用配置 → 接口格式
+远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
+
+**配置大模型**（登录后, 平台统一接管）: 「设置」页 → 通用配置 → 接口格式
 （OpenAI 兼容/Anthropic/Gemini）+ Base URL + API Key + 模型名, 每字段保存前
 做真实连通探测。默认供应商之上可对单个 agent 覆盖（如默认 GLM、报告 agent
 换 DeepSeek）——设置页「单 Agent 大模型覆盖」区或各 agent 页「配置」页签内
