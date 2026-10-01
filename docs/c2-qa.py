@@ -64,9 +64,15 @@ def eng_yara(p):
     return {'engine': 'yara', 'detected': False, 'signature': ''}
 
 def _load_api_keys():
-    """读设置面板写入的已验证 keys(仅验证通过的才落盘)"""
+    """读设置面板写入的已验证 keys(仅验证通过的才落盘)。
+
+    双运行位(R32D36): 容器内 /opt/tools 是数据根 bind 挂载(优先);
+    宿主侧回落 SPECTRE_DATA_DIR。"""
+    def _in_container():
+        return os.path.exists('/opt/tools/bootstrap-sandbox.sh')
     for kp in ('/opt/tools/c2/api-keys.json',
-               f"{__import__('os').environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre')}/tools/c2/api-keys.json"):
+               (f"{os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre')}/tools/c2/api-keys.json"
+                if not _in_container() else '/nonexistent')):
         try:
             return json.load(open(kp))
         except Exception:

@@ -2,7 +2,7 @@
 /**
  * mcp-nday-intel — NDay Agent 情报 MCP(stdio)
  *
- * Config: /opt/tools/nday/api-keys.json 形如 {"nvd":{"key":"..."}}
+ * Config: $SPECTRE_DATA_DIR/tools/nday/api-keys.json 形如 {"nvd":{"key":"..."}}(R32D36 同步代码实况)
  * (设置面板「NDay Agent」组验证后落盘;env NVD_API_KEY 兜底)。
  * 无 key 也可跑(NVD 免费层 5req/30s,进程内限流器兜住);
  * 有 key 限流自动升 50req/30s。

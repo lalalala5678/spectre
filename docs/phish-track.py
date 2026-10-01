@@ -9,14 +9,26 @@ import sys, os, json, time, hashlib, base64, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-DB_FILE = '/opt/tools/phish/track.json'  # 映射宿主 tools/phish/(campaigns API 可读)
-import os as _os; _os.makedirs('/opt/tools/phish', exist_ok=True)
+# R32D36: 双运行位判定——容器内(/opt/tools 是数据根 bind 挂载, 以
+# bootstrap 标记识别)用 /opt/tools/phish; 宿主侧走 SPECTRE_DATA_DIR
+# (phish-send 写入端同源)。两位于宿主数据根指向同一文件。
+import os as _os
+def _in_container():
+    return _os.path.exists('/opt/tools/bootstrap-sandbox.sh')
+def _phish_dir():
+    if _in_container():
+        return '/opt/tools/phish'
+    env = _os.environ.get('SPECTRE_DATA_DIR')
+    return f'{env}/tools/phish' if env else '/var/lib/spectre/tools/phish'
+DB_FILE = f'{_phish_dir()}/track.json'  # campaigns API 可读(phish-funnel 同目录)
+_os.makedirs(_phish_dir(), exist_ok=True)
 
 import time as _time
 def scope_gate_full():
     """完整授权门(同 c2-qa): targets+window 双校验,exit 75"""
     import json as _json
-    SCOPE = '/opt/tools/c2/scope.json'
+    SCOPE = ('/opt/tools/c2/scope.json' if _in_container()
+             else f"{_os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre')}/tools/c2/scope.json")  # R32D36
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
     try:

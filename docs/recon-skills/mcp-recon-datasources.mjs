@@ -6,7 +6,7 @@
  * secrets are configured (user's zero-pollution rule: an unconfigured
  * source must not appear in the agent's toolface at all).
  *
- * Config file: /var/lib/spectre/recon-datasources.json — written by the
+ * Config file: $SPECTRE_DATA_DIR/recon-datasources.json — written by the
  * settings save path (backend/src/settings.mjs writes it on every
  * recon-source save; validators run BEFORE the file is updated).
  *

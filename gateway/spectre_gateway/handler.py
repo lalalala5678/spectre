@@ -52,6 +52,15 @@ class GatewayHandler(BaseHTTPRequestHandler):
 
     def _send(self, status, body=b"", ctype="text/html; charset=utf-8",
               headers=None, csp=config.CSP_APP):
+        # R32D36: 客户端早断(POST-404 后弃连等)时 wfile 写抛
+        # BrokenPipeError——response 已不可达, 静默断连即可, 不刷栈。
+        try:
+            self._send_inner(status, body, ctype, headers, csp)
+        except (BrokenPipeError, ConnectionResetError):
+            self.close_connection = True
+
+    def _send_inner(self, status, body=b"", ctype="text/html; charset=utf-8",
+                    headers=None, csp=config.CSP_APP):
         self.send_response(status)
         self.send_header("Content-Type", ctype)
         self.send_header("Content-Length", str(len(body)))
