@@ -363,8 +363,8 @@ function realRouter({ store, bus, caps, wal }) {
     }
 
     // ---------- agent settings (user-facing config bar) ----------
-    // 保存协议: common/recon 组逐字段(带探测/范围校验), agent-llm/common
-    // llm 四字段原子提交(见 agent-settings.mjs 文件头)。
+    // 保存协议: 大多数字段逐字段(带探测/范围校验); LLM 连通两类
+    // (common.llm 默认供应商/agent-llm 覆盖)为四字段原子提交。
     if (path === '/api/agent-settings' && method === 'GET') {
       return json(res, 200, getSettings());
     }

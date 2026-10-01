@@ -158,6 +158,14 @@ test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移�
   // CS18-F1: 恰好一次——includes 子串断言对「新旧两套数字并存」失明
   // (批次 AB 编辑事故实证), 全行提取后逐项精确比对。
   const listed = [...line.matchAll(/([\w·-]+)\((\d+)\)/g)].map(m => `${m[1]}(${m[2]})`);
+  // CS19-5: 反向——表内多出未知 name(N) 记号(改文件后留旧名/手滑)
+  // 也须红, 与技能双胞胎锁的双向集合相等同款(CS11-7 先例)。
+  const known = new Set(rows.map(([name]) => name));
+  for (const entry of listed) {
+    const entryName = entry.slice(0, entry.lastIndexOf('('));
+    assert.ok(known.has(entryName),
+      `行数表出现未知条目 ${entry}(不在受锁七文件内)——清理 docs/ARCHITECTURE.md:105`);
+  }
   for (const [name, rel] of rows) {
     const content = readFileSync(join(ROOT, rel), 'utf8');
     // 与 wc -l 同口径(结尾换行不另计一行)

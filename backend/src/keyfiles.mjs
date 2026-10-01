@@ -49,7 +49,7 @@ export async function syncSourceKeyFiles() {
 
   // phish SMTP(仅 smtp 源且已验证)
   const smtpCfg = keys.smtp ?? {};
-  const smtpHasSecret = smtpCfg.user || smtpCfg.password;
+  const smtpHasSecret = hasCred(smtpCfg, 'smtp');  // CS19-7: 单源谓词
   await mkdir(path_mod.join(root, 'tools/phish'), { recursive: true });
   await writeFile(path_mod.join(root, 'tools/phish/smtp.json'),
     JSON.stringify(smtpHasSecret ? { host: smtpCfg.host,

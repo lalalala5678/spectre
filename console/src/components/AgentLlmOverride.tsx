@@ -7,10 +7,18 @@ import { cn } from '../utils/cn';
  * 用完整生效配置做真实连通探测, 失败零落盘。
  * - mode='override'(默认): agent 覆盖——留空字段=清除该项回默认。
  * - mode='default': 默认供应商——三项必填(格式默认 openai)。 */
-export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override' }: {
+export interface LlmFormatMeta { id: string; label: string; hint: string; }
+
+export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', formats }: {
   agentId: string; ov?: Record<string, string>; onSaved: () => void;
   mode?: 'override' | 'default';
+  formats?: LlmFormatMeta[];  // CS19-4: schema.llmFormats 单源下发
 }) {
+  const fmts = formats ?? [
+    { id: 'openai', label: 'OpenAI 兼容', hint: 'GLM/DeepSeek/Kimi/Qwen/OpenAI 及绝大多数代理网关' },
+    { id: 'anthropic', label: 'Anthropic', hint: 'Claude 系;key 头 x-api-key + anthropic-version' },
+    { id: 'gemini', label: 'Gemini', hint: 'Gemini 系;key 走 x-goog-api-key 请求头' },
+  ];
   const isDefault = mode === 'default';
   const [draft, setDraft] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
   const [orig, setOrig] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
@@ -57,9 +65,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override' }: {
           {isDefault
             ? <option value="">openai(默认)</option>
             : <option value="">(继承默认)</option>}
-          <option value="openai">OpenAI 兼容</option>
-          <option value="anthropic">Anthropic</option>
-          <option value="gemini">Gemini</option>
+          {fmts.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
       ) : (
         <input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
@@ -84,13 +90,11 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override' }: {
       </div>
       <div className="space-y-1.5">
         {field('format', '接口格式', '')}
-        {/* R32D45-N3: 三线制 per-format hint 此前后端死元数据——这里
-            按选中格式显示适配说明。 */}
+        {/* R32D45-N3/CS19-4: 适配说明按选中格式从 schema 下发的
+            单源数据渲染。 */}
         <p className="pl-[94px] font-mono text-[9.5px] text-zinc-600">
-          {draft.format === 'anthropic' ? 'Claude 系; key 头 x-api-key + anthropic-version'
-            : draft.format === 'gemini' ? 'Gemini 系; key 走 x-goog-api-key 请求头'
-            : draft.format === '' && !isDefault ? '继承默认供应商的格式'
-            : 'GLM/DeepSeek/Kimi/Qwen/OpenAI 及绝大多数代理网关'}
+          {draft.format === '' && !isDefault ? '继承默认供应商的格式'
+            : (fmts.find(f => f.id === (draft.format || 'openai'))?.hint ?? '')}
         </p>
         {field('baseUrl', 'Base URL', isDefault ? 'https://open.bigmodel.cn/api/paas/v4' : '留空=用默认')}
         {field('apiKey', 'API Key', isDefault ? '' : '留空=用默认', 'password')}

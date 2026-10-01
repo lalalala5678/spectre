@@ -599,10 +599,11 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
     sources: { id: string; label: string; fields: { id: string; label: string }[] }[] }[]>([]);
   const [reconSources, setReconSources] = useState<Record<string, Record<string, string>>>({});
   const [agentLlm, setAgentLlm] = useState<Record<string, Record<string, string>>>({});
+  const [llmFormats, setLlmFormats] = useState<{ id: string; label: string; hint: string }[]>([]);
   const [mcps, setMcps] = useState<{ name: string; transport: string; enabled?: boolean;
     url?: string; command?: string; agents?: string[] }[] | null>(null);
 
-  const reloadLlm = () => api<{ common: typeof common; agentLlm: Record<string, Record<string, string>> }>('/agent-settings')
+  const reloadLlm = () => api<{ common: Record<string, Record<string, string | number>> | null; agentLlm: Record<string, Record<string, string>> }>('/agent-settings')
     .then(d => { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); })
     .catch(() => {});
 
@@ -611,8 +612,8 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
     api<{ common: Record<string, Record<string, string | number>> | null;
       agentLlm: Record<string, Record<string, string>>;
       reconSources: Record<string, Record<string, string>>;
-      schema: { agents: typeof schemaAgents } }>('/agent-settings')
-      .then(d => { if (!cancelled) { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); setReconSources(d.reconSources ?? {}); setSchemaAgents(d.schema?.agents ?? []); } })
+      schema: { agents: typeof schemaAgents; llmFormats?: { id: string; label: string; hint: string }[] } }>('/agent-settings')
+      .then(d => { if (!cancelled) { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); setLlmFormats(d.schema?.llmFormats ?? []); setReconSources(d.reconSources ?? {}); setSchemaAgents(d.schema?.agents ?? []); } })
       .catch(() => { if (!cancelled) setCommon({}); });
     api<typeof mcps>('/sandbox/mcp')
       .then(list => { if (!cancelled) setMcps(list ?? []); })
@@ -632,7 +633,8 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
     model: ovLlm.model || baseLlm.model,
   };
   const comp = (common?.compaction ?? {}) as Record<string, string | number>;
-  const fmtLabel = { openai: 'OpenAI 兼容', anthropic: 'Anthropic', gemini: 'Gemini' }[String(llm.format || 'openai')] ?? String(llm.format || 'openai');
+  // CS19-4: 格式中文名从 schema 单源取(与编辑器选项同源)
+  const fmtLabel = llmFormats.find(f => f.id === String(llm.format || 'openai'))?.label ?? String(llm.format || 'openai');
   const mine = (mcps ?? []).filter(m => (m.agents ?? []).includes(agentId) && m.enabled !== false);
   const myGroup = schemaAgents.find(g => g.agentKey === agentId);
   const cfg = (v: string | number | undefined, d: string) => (v === undefined || v === '' ? d : String(v));
@@ -661,7 +663,7 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
               </div>
             ))}
           </div>
-          <AgentLlmOverride agentId={agentId} ov={agentLlm?.[agentId]} onSaved={reloadLlm} />
+          <AgentLlmOverride agentId={agentId} formats={llmFormats} ov={agentLlm?.[agentId]} onSaved={reloadLlm} />
         </div>
       </Panel>
 

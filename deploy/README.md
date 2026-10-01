@@ -34,7 +34,7 @@
 git clone https://github.com/lalalala5678/spectre /opt/spectre && cd /opt/spectre
 
 # 1) 后端(state.wal 属主——多实例共用数据目录会互相覆写, 测试务必隔离)
-cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN(LLM 登录后在设置页配置——平台化, 见 README ⑦)
+cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN(LLM 登录后在根 README「配置大模型」段指引下于设置页配置)
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # PORT 可覆盖; 生产缺省 /var/lib/spectre
 

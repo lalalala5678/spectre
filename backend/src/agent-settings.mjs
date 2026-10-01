@@ -6,11 +6,12 @@
  *             thinking effort, compaction window…)
  *  - AGENT  — per-agent specialties (this round: recon data-source APIs)
  *
- * Save protocol (user's iron rule): common/recon groups save per-field
- * with a live connectivity test (network fields) or range check (numeric
- * fields); the agent-llm group is ATOMIC (R32D44/CS16-P1): all four
- * fields in one request, probed as the merged effective config, failed
- * validation → error, nothing persisted.
+ * Save protocol (user's iron rule): most fields save per-field with a
+ * live connectivity test (network fields) or range check (numeric
+ * fields). LLM connectivity is ATOMIC instead (R32D45-N1/CS16-P1):
+ * the default vendor (common.llm) and per-agent overrides (agent-llm)
+ * both submit all four fields in one request, probed as the complete
+ * effective config — failed validation → error, nothing persisted.
  *
  * Values live in the prefs store (WAL-durable). NOT to be confused with
  * settings.mjs (spawn policy, pre-existing).
@@ -303,13 +304,14 @@ export const RECON_SOURCES_INTERNAL = RECON_SOURCES;
 /* ---------------- schema (UI renders from this) ---------------- */
 export function settingsSchema() {
   return {
+    // CS19-4: LLM 供应商四字段(格式/URL/Key/模型)走原子编辑器——选项
+    // 与适配说明从这里下发(前端不再硬编码三份副本)。
+    llmFormats: Object.entries(LLM_FORMATS).map(([id, f]) => ({
+      id, label: f.label, hint: f.hint,
+    })),
     common: {
       label: '通用配置(全部智能体生效)',
       fields: [
-        { id: 'llm.format', label: '接口格式', type: 'select', options: Object.keys(LLM_FORMATS), default: 'openai', hint: 'OpenAI 兼容=绝大多数厂商;Anthropic=Claude 系;Gemini=Google 系' },
-        { id: 'llm.baseUrl', label: 'API Base URL', type: 'text', required: true, placeholder: 'https://open.bigmodel.cn/api/paas/v4' },
-        { id: 'llm.apiKey', label: 'API Key', type: 'password', required: true },
-        { id: 'llm.model', label: '模型名称', type: 'text', required: true, placeholder: 'glm-4.7' },
         { id: 'llm.thinkingLevel', label: 'Thinking Effort', type: 'select', options: THINKING_LEVELS, default: 'low', hint: '按所选档位原样传给厂商,不维护厂商映射' },
         { id: 'llm.maxTokens', label: '最大输出 Tokens', type: 'number', check: num(256, 262144), default: 32768 },
         { id: 'llm.contextWindow', label: '上下文窗口 Tokens', type: 'number', check: num(8192, 4194304), default: 786432 },
@@ -451,17 +453,25 @@ export async function saveSetting({ group, field, value }, wal) {
       if (['format', 'baseUrl', 'apiKey', 'model'].some(k => typeof raw[k] !== 'string')) {
         return { ok: false, error: 'value 须为 { format, baseUrl, apiKey, model } 四字符串字段' };
       }
-      if (raw.format && !Object.keys(LLM_FORMATS).includes(raw.format)) {
+      // CS19-3: 与 agent-llm 原子路径同款 trim(粘贴带尾随空格的 URL
+      // 此前原样落盘)。
+      const v4 = {
+        format: raw.format.trim(),
+        baseUrl: raw.baseUrl.trim(),
+        apiKey: raw.apiKey.trim(),
+        model: raw.model.trim(),
+      };
+      if (v4.format && !Object.keys(LLM_FORMATS).includes(v4.format)) {
         return { ok: false, error: `格式必须是 ${Object.keys(LLM_FORMATS).join('/')}` };
       }
-      if (!raw.baseUrl || !raw.apiKey || !raw.model) {
+      if (!v4.baseUrl || !v4.apiKey || !v4.model) {
         return { ok: false, error: '默认供应商三项必填(Base URL/API Key/模型)' };
       }
-      const r = await llmProbe(raw.baseUrl, raw.apiKey, raw.model, raw.format || 'openai');
+      const r = await llmProbe(v4.baseUrl, v4.apiKey, v4.model, v4.format || 'openai');
       if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
       const fresh = { ...getPrefs().commonSettings };
-      fresh.llm = { ...fresh.llm, format: raw.format || 'openai',
-        baseUrl: raw.baseUrl, apiKey: raw.apiKey, model: raw.model };
+      fresh.llm = { ...fresh.llm, format: v4.format || 'openai',
+        baseUrl: v4.baseUrl, apiKey: v4.apiKey, model: v4.model };
       setPrefs({ commonSettings: fresh }, wal);
       return { ok: true };
     }
@@ -486,15 +496,6 @@ export async function saveSetting({ group, field, value }, wal) {
     }
     const [top, leaf] = field.split('.');
     const leafVal = def.type === 'number' ? Number(v) : v;
-    if (['llm.baseUrl', 'llm.apiKey', 'llm.model'].includes(field)) {
-      // F47: 空值=清除该项(跳过 probe——空串不是可测端点)。R32D44:
-      // env 回退已删, 三项齐才构成可运行配置(pi 层 fail-fast 兜底)。
-      const merged = { ...(getPrefs().commonSettings ?? {}).llm, [leaf]: leafVal };
-      if (merged.baseUrl && merged.apiKey && merged.model) {
-        const r = await llmProbe(merged.baseUrl, merged.apiKey, merged.model, merged.format);
-        if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
-      }
-    }
     // R10-F2: probe 是 20s 网络窗口——窗口后重读 prefs 只合并本叶子,
     // 并发保存的另一字段不被陈旧快照覆盖。
     const fresh = { ...getPrefs().commonSettings };
