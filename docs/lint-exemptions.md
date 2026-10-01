@@ -79,5 +79,5 @@ TypeError), 即"修而即坏"——无引擎缺失环境的活体验证。
 
 BS(d49aa02)提交信息列"F11 颜色注释如实"但该 hunk 实际未落盘
 (编辑脚本 replace 目标串与现场文本不符, 未断言即静默跳过)——第六轮
-对账失实实例。F11 已在 BU 批次补落(IntelNotesPanel Emerald→Teal)。
+对账失实实例。F11 已在 BV 批次补落(IntelNotesPanel Emerald→Teal)。
 教训并入既有三条款: 无断言的 replace 不得视为已修。

@@ -110,6 +110,12 @@ export function getPrefs() {
 }
 
 export function setPrefs(patch, wal) {
+  // CS46-F6b: 嵌套形状守卫——stackRatios 须普通对象(字符串仍会被
+  // spread 成字符索引键; 顶层守卫在 routes 只看 ui 一层)。
+  if (patch.ui && Object.prototype.hasOwnProperty.call(patch.ui, 'stackRatios')
+    && (typeof patch.ui.stackRatios !== 'object' || patch.ui.stackRatios === null)) {
+    throw new Error('ui.stackRatios 须为普通对象');
+  }
   const ui = { ...prefs.ui, ...patch.ui };
   // R13-F4: stackRatios 按 key 合并——ui 级浅合并此前使单 key patch
   // 整体替换 stackRatios(auto 页拖动抹掉 stage 页已存比例, 违

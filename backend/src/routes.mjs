@@ -427,8 +427,11 @@ function maskPrefs(raw) {
       if ('ui' in body_ && (typeof body_.ui !== 'object' || body_.ui === null || Array.isArray(body_.ui))) {
         return bad(res, 400, 'ui 须为普通对象(键值对)——非对象值会被展开成字符索引');
       }
-      if ('currentWs' in body_ && !(body_.currentWs === null || /^ws-[a-z0-9][a-z0-9-]*$/i.test(String(body_.currentWs)))) {
-        return bad(res, 400, 'currentWs 须为 ws- 前缀项目 id 字符串或 null');
+      // CS46-F1: currentWs 与 workSessionId 同 id 域([\w-]{1,64}——此前
+      // ws- 前缀正则误伤 API 建的非前缀项目, console 选中即 400 静默吞)。
+      if ('currentWs' in body_ && !(body_.currentWs === null
+        || (/^[\w-]+$/.test(String(body_.currentWs)) && String(body_.currentWs).length <= 64))) {
+        return bad(res, 400, 'currentWs 须为项目 id 字符串([a-zA-Z0-9_-]{1,64})或 null');
       }
       // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。
       return json(res, 200, maskPrefs(setPrefs(body, wal)));
@@ -475,7 +478,8 @@ function maskPrefs(raw) {
       if (!cmd) return bad(res, 400, 'command 必填');
       // R32D68-OBS1: local 驱动=宿主执行——宿主包管理器命令须显式
       // opt-in(与启动 bootstrap 的 SPECTRE_ALLOW_HOST_BOOTSTRAP 同哲学)。
-      const hostPkg = /\b(apt|apt-get|pip3?|snap)\b/.test(cmd);
+      // CS46-F3: 覆盖面扩至常见宿主包管理器/远程脚本执行器。
+      const hostPkg = /\b(apt(?:-get)?|pip3?|pipx|snap|apk|yum|dnf|brew|gem|cargo|conda|uv|npm|npx|curl|wget)\b/.test(cmd);
       if (hostPkg && sandboxConfig().driver !== 'docker'
         && process.env.SPECTRE_ALLOW_HOST_BOOTSTRAP !== '1') {
         return bad(res, 400, 'local 驱动下该命令将变更宿主机——设 SPECTRE_ALLOW_HOST_BOOTSTRAP=1 显式确认(或用 docker 驱动)');

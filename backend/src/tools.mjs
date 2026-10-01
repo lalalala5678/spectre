@@ -116,6 +116,9 @@ export function buildIntelTools(record, caps) {
         status: e.current.status ?? e.status,
         detail: e.current.detail ?? e.detail,
         summary: e.current.summary ?? e.summary,
+        // CS46-F2: 修订版 summary 顶替时截断标志同步顶替——否则原始条
+        // 目的 summaryClipped 错标修订版(跨 500 界时'取全文/不可恢复'双向失真)。
+        summaryClipped: e.current.summary ? Boolean(e.current.summaryClipped) : e.summaryClipped,
         void: Boolean(e.current.void),
         orphaned: Boolean(e.orphaned),
         revisedCount: e.revisedCount,

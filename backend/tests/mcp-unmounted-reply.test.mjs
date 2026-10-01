@@ -9,39 +9,42 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
-import { mkdtempSync, rmSync } from 'node:fs';
-import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-function mcpCall(procPath, name) {
-  return new Promise((resolve, reject) => {
-    // CS45-N5: 数据根钉临时目录(gate-matrix 先例)——环境机装了 ipinfo
-    // 凭据时桥会真挂载并外发请求, 断言失败+网络副作用双坏。
-    const dir = mkdtempSync(join(tmpdir(), 'mcp-lock-'));
-    const child = spawn('node', [procPath], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      env: { ...process.env, SPECTRE_DATA_DIR: dir },
+async function mcpCall(procPath, name) {
+  // CS45-N5/CS46-F5: 数据根钉临时目录(gate-matrix 先例)且清理挂全
+  // 分支(此前仅成功路径 rmSync——超时/child error 泄漏 mcp-lock-*)。
+  const { mkdtempSync, rmSync } = await import('node:fs');
+  const { tmpdir } = await import('node:os');
+  const dir = mkdtempSync(join(tmpdir(), 'mcp-lock-'));
+  try {
+    return await new Promise((resolve, reject) => {
+      const child = spawn('node', [procPath], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        env: { ...process.env, SPECTRE_DATA_DIR: dir },
+      });
+      let out = '', err = '';
+      child.stdout.on('data', d => { out += d; });
+      child.stderr.on('data', d => { err += d; });
+      child.on('error', reject);
+      const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('MCP 桥 8s 无回执')); }, 8000);
+      child.stdout.on('data', () => {
+        if (out.includes('\n')) {
+          clearTimeout(timer);
+          child.kill('SIGKILL');
+          resolve({ out, err });
+        }
+      });
+      child.stdin.write(JSON.stringify({
+        jsonrpc: '2.0', id: 1, method: 'tools/call',
+        params: { name, arguments: { query: 'x' } },
+      }) + '\n');
     });
-    let out = '', err = '';
-    child.stdout.on('data', d => { out += d; });
-    child.stderr.on('data', d => { err += d; });
-    child.on('error', reject);
-    const timer = setTimeout(() => { child.kill('SIGKILL'); reject(new Error('MCP 桥 8s 无回执')); }, 8000);
-    child.stdout.on('data', () => {
-      if (out.includes('\n')) {
-        clearTimeout(timer);
-        child.kill('SIGKILL');
-        rmSync(dir, { recursive: true, force: true });
-        resolve({ out, err });
-      }
-    });
-    child.stdin.write(JSON.stringify({
-      jsonrpc: '2.0', id: 1, method: 'tools/call',
-      params: { name, arguments: { query: 'x' } },
-    }) + '\n');
-  });
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
 }
 
 test('mcp-recon-datasources: 未挂载工具 → isError 回执且不崩(CS44-F1 锁)', async () => {
