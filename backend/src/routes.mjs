@@ -363,26 +363,30 @@ function realRouter({ store, bus, caps, wal }) {
       if (!deleteProject(pid, wal)) return bad(res, 404, '项目不存在');
       return json(res, 200, { deleted: true, id: pid });
     }
+
+/** CS44-R32D67-B: prefs 凭据掩码视图(GET/PUT 回显共用; 掩码哨兵
+ * 写面在 agent-settings save 路径, 本端点只读)。 */
+function maskPrefs(raw) {
+        const masked = {
+          ...raw,
+          commonSettings: raw.commonSettings ? {
+            ...raw.commonSettings,
+            llm: raw.commonSettings.llm ? { ...raw.commonSettings.llm,
+              apiKey: raw.commonSettings.llm.apiKey ? maskSecret(raw.commonSettings.llm.apiKey) : raw.commonSettings.llm.apiKey } : raw.commonSettings.llm,
+            webSearch: raw.commonSettings.webSearch ? { ...raw.commonSettings.webSearch,
+              apiKey: raw.commonSettings.webSearch.apiKey ? maskSecret(raw.commonSettings.webSearch.apiKey) : raw.commonSettings.webSearch.apiKey } : raw.commonSettings.webSearch,
+          } : raw.commonSettings,
+          agentLlm: Object.fromEntries(Object.entries(raw.agentLlm ?? {}).map(([k, v]) =>
+            [k, v?.apiKey ? { ...v, apiKey: maskSecret(v.apiKey) } : v])),
+          reconApiKeys: Object.fromEntries(Object.entries(raw.reconApiKeys ?? {}).map(([src, o]) =>
+            [src, Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
+              [fk, isSecretLeaf(src, fk) ? maskSecret(fv) : fv]))])),
+        };
+  return masked;
+}
+
     if (path === '/api/prefs' && method === 'GET') {
-      // R32D66-NEW2: 凭据叶掩码回显(llm/webSearch/agentLlm/reconApiKeys——
-      // 掩码哨兵写面在 agent-settings save 路径, 本端点只读)。
-      const raw = getPrefs();
-      const masked = {
-        ...raw,
-        commonSettings: raw.commonSettings ? {
-          ...raw.commonSettings,
-          llm: raw.commonSettings.llm ? { ...raw.commonSettings.llm,
-            apiKey: raw.commonSettings.llm.apiKey ? maskSecret(raw.commonSettings.llm.apiKey) : raw.commonSettings.llm.apiKey } : raw.commonSettings.llm,
-          webSearch: raw.commonSettings.webSearch ? { ...raw.commonSettings.webSearch,
-            apiKey: raw.commonSettings.webSearch.apiKey ? maskSecret(raw.commonSettings.webSearch.apiKey) : raw.commonSettings.webSearch.apiKey } : raw.commonSettings.webSearch,
-        } : raw.commonSettings,
-        agentLlm: Object.fromEntries(Object.entries(raw.agentLlm ?? {}).map(([k, v]) =>
-          [k, v?.apiKey ? { ...v, apiKey: maskSecret(v.apiKey) } : v])),
-        reconApiKeys: Object.fromEntries(Object.entries(raw.reconApiKeys ?? {}).map(([src, o]) =>
-          [src, Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
-            [fk, isSecretLeaf(src, fk) ? maskSecret(fv) : fv]))])),
-      };
-      return json(res, 200, masked);
+      return json(res, 200, maskPrefs(getPrefs()));
     }
 
     // ---------- agent settings (user-facing config bar) ----------
@@ -413,11 +417,13 @@ function realRouter({ store, bus, caps, wal }) {
       // 探测」只在 /api/agent-settings/save 通道成立(此前经本端点可绕
       // 过探测直落坏配置且不热更)。
       const body_ = body ?? {};
-      if ((body_.commonSettings && (body_.commonSettings.llm || body_.commonSettings.webSearch))
-        || body_.agentLlm || body_.reconApiKeys) {
-        return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(保存前真实连通探测+热更)');
+      // R32D67-A: 三凭据子树键整体拒(含 null/空对象/异形——此前 truthy
+      // 判断使 {commonSettings:{}} 200 且静默清空 llm)。
+      if ('commonSettings' in body_ || 'agentLlm' in body_ || 'reconApiKeys' in body_) {
+        return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(保存前真实连通探测+热更)——/api/prefs 不接受 commonSettings/agentLlm/reconApiKeys 键');
       }
-      return json(res, 200, setPrefs(body, wal));
+      // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。
+      return json(res, 200, maskPrefs(setPrefs(body, wal)));
     }
 
     // ---------- uploads (files land in the sandbox /opt/uploads) ----------

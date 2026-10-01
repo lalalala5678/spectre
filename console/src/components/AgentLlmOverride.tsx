@@ -45,6 +45,10 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
     } catch (e) {
       setState('err'); setMsg(e instanceof Error ? e.message : String(e)); return;
     }
+    // R32D67-C: 表单回写 trim 后值(落盘已 trim——此前显示/持久分叉)。
+    const saved = { format: (draft.format || 'openai').trim(), baseUrl: draft.baseUrl.trim(),
+      apiKey: draft.apiKey, model: draft.model.trim() };
+    setDraft(saved); setOrig(saved);
     setState('ok'); setMsg('已保存(通过连通探测)'); onSaved();
     setTimeout(() => setState('idle'), 2500);
   };

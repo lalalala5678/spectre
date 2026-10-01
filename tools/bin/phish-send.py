@@ -321,15 +321,18 @@ def main():
         _rd, _ra = _pa(args.reply_to)
         if _ra:
             args.reply_to = _ra
-    # NEW-2: send 模式必填前置(此前逐目标打 'NoneType is not iterable')
-    if args.mode == 'send' and not getattr(args, 'from_addr', None):
-        print('缺少 --from <email@domain>(可选 --from-name "Display")', file=sys.stderr)
-        return 2
-    # NEW-3: --html 文件存在性友好报错(此前裸 FileNotFoundError 栈)
-    if getattr(args, 'html', None) and args.mode in ('send', 'dryrun') \
-            and not os.path.isfile(args.html):
-        print(f'--html 文件不存在: {args.html}', file=sys.stderr)
-        return 2
+    # R32D67-D: 门序契约——EDUSRC(76)/scope(75) 先于用法(2); send/
+    # dryrun 的必填前置(--from/--html)原在此前, 现移到 gate() 之后。
+    gate()
+    if args.mode in ('send', 'dryrun'):
+        # NEW-2: send 模式必填前置(此前逐目标打 'NoneType is not iterable')
+        if args.mode == 'send' and not getattr(args, 'from_addr', None):
+            print('缺少 --from <email@domain>(可选 --from-name "Display")', file=sys.stderr)
+            return 2
+        # NEW-3: --html 文件存在性友好报错(此前裸 FileNotFoundError 栈)
+        if getattr(args, 'html', None) and not os.path.isfile(args.html):
+            print(f'--html 文件不存在: {args.html}', file=sys.stderr)
+            return 2
 
     # DKIM 密钥生成模式
     if args.mode == 'genkey':
