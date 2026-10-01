@@ -332,7 +332,7 @@ def cmd_run(args):
                         cp2 = os.path.join(vo2, c)
                         # CS55-F5: 子失败透传(此前裸 run 丢弃)。
                         _rm = subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
-                                       capture_output=True, text=True)
+                                             capture_output=True, text=True)  # CS56-N3: 对齐开括号
                         if _rm.returncode != 0:
                             print(f'c2-variant gen 失败 rc={_rm.returncode}: {(_rm.stderr or _rm.stdout).strip()[:160]}', file=sys.stderr)
                             return 1
@@ -406,7 +406,7 @@ def cmd_run(args):
             # real-lane:字节码变换族(cp-ldc-split)
             # CS55-F5: 子失败透传(此前裸 run 丢弃)。
             _rb = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'split',
-                            '--class', cur, '--out', vo], capture_output=True, text=True)
+                                  '--class', cur, '--out', vo], capture_output=True, text=True)  # CS56-N3
             if _rb.returncode != 0:
                 print(f'c2-bytecode split 失败 rc={_rb.returncode}: {(_rb.stderr or _rb.stdout).strip()[:160]}', file=sys.stderr)
                 return 1

@@ -361,7 +361,8 @@ def cmd_gen(args):
     # R32D60-NEW4: --src 不存在→干净 rc=2(此前裸栈 rc=1)。
     if not os.path.isfile(a['--src']):
         print(f"用法错误: --src 文件不存在或不是常规文件: {a['--src']}", file=sys.stderr); return 2
-    src = open(a['--src']).read()
+    # R32D75-F4: 非 UTF-8 源容错读取(此前 UnicodeDecodeError 裸栈)。
+    src = open(a['--src'], errors='replace').read()
     srcpath = a['--src']
     outdir = a.get('--out', '/tmp/c2-variants')
     rounds = int(a.get('--rounds', '3'))

@@ -235,12 +235,10 @@ if __name__ == '__main__':
     if any(x in sys.argv[1:] for x in ('-h', '--help')):
         print(__doc__); sys.exit(0)
     edusrc_gate()
-    # R32D42-P1: 子命令归一——serve 以外(含 -h/--help)一律用法输出;
-    # 帮助 rc=0, 未知/缺失 rc=2(此前 --help 在白名单被放行后无分支
-    # 可走, 静默 rc=0)。
+    # R32D42-P1/CS56-N1: 子命令归一——-h 已由上方门块处理(rc=0);
+    # 未知/缺失子命令一律用法 rc=2。
     if len(sys.argv) < 2 or sys.argv[1] not in ('serve',):
-        print(__doc__)
-        sys.exit(0 if sys.argv[1:] and sys.argv[1] in ('-h', '--help') else 2)
+        print(__doc__); sys.exit(2)
     if sys.argv[1] == 'serve':
         listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8080'
         target = '--target' in sys.argv and sys.argv[sys.argv.index('--target') + 1] or 'https://login.microsoft.com'
