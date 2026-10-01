@@ -148,3 +148,19 @@ test('variant selftest 缺目录干净 rc=2(CS41-A1 锁)', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('c2-qa run/scan 缺文件干净 rc=2(CS52-F1 锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-qa-'));
+  mkdirSync(join(dir, 'tools', 'c2'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'c2', 'scope.json'),
+    JSON.stringify({ exercise: 'qa', targets: ['a.local'], window: { start: '2026-01-01T00:00:00Z', end: '2027-01-01T00:00:00Z' } }));
+  try {
+    for (const sub of ['scan', 'run']) {
+      const r = runTool('c2-qa.py', [sub, '--payload', '/nonexistent/x.bin'], dir, false);
+      assert.equal(r.status, 2, `c2-qa ${sub} 缺文件应 rc=2, 实得 ${r.status}`);
+      assert.ok(!r.stderr.includes('Traceback'), '不得裸栈');
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

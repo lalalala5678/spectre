@@ -1,7 +1,8 @@
 /**
- * prefs-http (CS50-N4): PUT /api/prefs HTTP 面机锁——守卫路径(null 体/
- * 未知键/凭据子树/ui 非对象/currentWs 域外)与 F5/F6 新行为真起 runtime
- * 验证(prefs-guard 只锁纯函数面, 自述"HTTP 面锁待补"三批次)。
+ * prefs-http (CS50-N4): PUT /api/prefs HTTP 面机锁——守卫路径(非对象
+ * 体五态: null/数组/字符串/数字/布尔, 未知键/凭据子树/ui 非对象/
+ * currentWs 域外)与形状违规统一 400 真起 runtime 验证; 纯函数面在
+ * prefs-guard.test.mjs。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -25,7 +26,7 @@ function onceUp(port, _tries = 40) {
   });
 }
 
-test('PUT /api/prefs 守卫路径 HTTP 面(null/未知键/凭据/ui 形状/currentWs)', { timeout: 30000 }, async () => {
+test('PUT /api/prefs 守卫路径 HTTP 面(五态体/未知键/凭据/ui/currentWs)', { timeout: 30000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'prefs-http-'));
   writeFileSync(join(dir, '.env'), 'INTERNAL_TOKEN=phttp\n');
   const port = 19950 + (process.pid % 49);  // CS51-5: 避开 runtime-url-guard 19500-19899

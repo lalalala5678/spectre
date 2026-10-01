@@ -238,10 +238,9 @@ def cmd_scan(args):
         return 2
     a = a0
     p = a['--payload']
-    # R32D72-N1: 文件缺干净 rc=2(此前 FileNotFoundError 裸栈——门序表
-    # '用法(2)'契约)。
+    # R32D72-N1/CS52-F7: 文件缺/非常规干净 rc=2(族模板文案)。
     if not os.path.isfile(p):
-        print(f'用法错误: --payload 文件不存在: {p}', file=sys.stderr); return 2
+        print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     engines = a.get('--engines', 'auto').split(',')
     res = scan_all(p, engines)
     sha = sha256f(p)
@@ -275,6 +274,9 @@ def cmd_run(args):
         return 2
     a = a0
     p = a['--payload']
+    # CS52-F1: run 子命令同守卫(N1 只修了 scan——缺文件裸栈)。
+    if not os.path.isfile(p):
+        print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     engines = a.get('--engines', 'auto').split(',')
     maxr = int(a.get('--max-rounds', '8'))
     fams = a.get('--families', 'mask,decomp,id,struct')  # v3:伪装令 mask 先行+签名驱动,弃 enc/code 演示桩
