@@ -557,7 +557,7 @@ export const RECON_PROMPT = [
   '1. 资产总表:所有域名、IP、对应关系准确;域名↔IP↔端口↔服务↔指纹全链对齐。',
   '2. 指纹铁律(用户目标):只要对面是开源项目,就要直接定位是哪个开源项目',
   '   (+版本,能给则给)——尽一切可能。统一入口 fp-scan 四层指纹库',
-  '   (httpx 内置 wappalyzer/webappanalyzer 7613/whatweb/nuclei 4447',
+  '   (httpx 内置 wappalyzer/webappanalyzer 扩展/whatweb/nuclei 双指纹库',
   '   国产+CVE 模板,--deep 对存疑资产),识别路径与判定规则见 host-profile',
   '   技能;四层全穷尽仍识别不出,才能写"指纹源不足"+原因证据,且前置',
   '   设备必须已被识别。禁止"待识别"。实测能力:Ghost:6.64/Flarum/若依',

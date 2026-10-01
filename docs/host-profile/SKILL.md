@@ -18,9 +18,9 @@ description: 需要对确认主机做端口/服务/OS 指纹并识别部署的�
 ```bash
 # 默认层(轻,每资产 2-5 请求):httpx 内置 wappalyzer + webappanalyzer(7613)
 #   + whatweb(版本最强,默认前 120 资产);自动 follow 重定向拿登录页 title
-fp-scan -l assets.txt            # 输出 fp-scan 中间文件(mktemp 私有) TSV
-# deep 层(对存疑/高价值资产):追加 nuclei 4447 指纹模板
-#   (PD technologies 917 + 0x727 国产 3530:若依/致远/通达/蓝凌/大华...)
+fp-scan -l assets.txt -o out.tsv # 输出 TSV(-o 显式; 中间文件为 mktemp 私有, 结束即清)
+# deep 层(对存疑/高价值资产):追加 nuclei 指纹模板(数量以 fetch-fingerprints 实际交付为准;
+#   PD technologies + 0x727 国产库:若依/致远/通达/蓝凌/大华...)
 fp-scan -l suspects.txt --deep   # 请求数↑,仅限存疑资产
 ```
 输出列:asset|status|title|server|apps(带版本)|favicon mmh3|source(命中库)。

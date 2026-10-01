@@ -120,7 +120,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     if (!sc) return { ok: false, error: 'scope 不可读:授权门配置缺失' };
     const now = isoNow();
     const inWindow = sc.window && sc.window.start <= now && now <= sc.window.end;
-    // R32D50-F8/CS27-7: targets 语义=模块级 targetMatches(见上方注释)。
+    // R32D50-F8/CS27-7: targets 语义=模块级 targetMatches(详见其 doc 注释)。
     const inTargets = Array.isArray(sc.targets)
       && sc.targets.some(t => targetMatches(t, shell.target));
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };

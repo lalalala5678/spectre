@@ -99,6 +99,10 @@ def pwsh_check(p):
     return True, 'ps runtime OK: ' + r.stdout.strip()[:40]
 
 def php_check(p):
+    # CS32: php 引擎缺失干净 SKIP(此前裸 FileNotFoundError)——容器位内置。
+    if not shutil.which('php'):
+        print('[c2-functest] php 不在 PATH——L1/L2 跳过(容器位内置; 宿主自装)', file=sys.stderr)
+        return True, 'php SKIP(php 未装)'
     r = subprocess.run(['php', '-l', p], capture_output=True, text=True)
     if r.returncode != 0:
         return False, 'php syntax: ' + r.stdout.strip()[:80]

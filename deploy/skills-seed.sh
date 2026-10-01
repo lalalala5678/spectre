@@ -7,7 +7,7 @@ DST="${1:-${SPECTRE_DATA_DIR:-/var/lib/spectre}}"
 # 九轮 F-C 同类防护此前唯独漏了本脚本(十一轮审计真实触发覆写)。
 if [ "$(realpath -m "$DST")" = "/var/lib/spectre" ]; then  # R32D55-N2(真修): 按解析后目标判
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
-    echo "[skills-seed] 拒绝: 目标为生产缺省路径 $DST(解析为 $(realpath -m "$DST"))" >&2
+    echo "[skills-seed] 拒绝: 目标为生产缺省路径 $DST(解析为 $(realpath -m "$DST"))——设 SPECTRE_DATA_DIR=<隔离目录> 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
     echo "[skills-seed] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1 确认写入生产" >&2
     exit 1
   fi

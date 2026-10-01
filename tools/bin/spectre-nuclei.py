@@ -35,6 +35,11 @@ for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt
 # ============================================================
 
 def load_template(path):
+    # CS32-F8: 文件缺失/非 yaml 给可行动错误(此前 FileNotFoundError/ScannerError 裸栈)。
+    if not os.path.isfile(path):
+        raise SystemExit(f'模板文件不存在: {path}')
+    if not path.endswith(('.yaml', '.yml')):
+        raise SystemExit(f'模板须为 .yaml/.yml: {path}')
     with open(path) as f:
         return yaml.safe_load(f)
 

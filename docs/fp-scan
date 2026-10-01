@@ -86,7 +86,7 @@ whatweb -q --no-errors --input-file ${FPTMP}.ww 2>/dev/null \
   > ${FPTMP}.l3.txt || true
 
 if [ "$DEEP" = "1" ]; then
-  echo "[fp-scan] layer4(deep): nuclei fingerprint templates(4447)..."
+  echo "[fp-scan] layer4(deep): nuclei fingerprint templates(以 fetch-fingerprints 实际交付为准)..."
   nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" -t "$NT_DIR/plugins-0x727" \
     -severity info,low,medium,high,critical -tags tech,fingerprint,panel \
     -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json 2>/dev/null || true
@@ -136,7 +136,6 @@ for line in open(os.environ['FPTMP']+'.l3.txt'):
             if not re.match(r'^[A-Za-z][\w .:/-]{1,40}$', fld): continue
             apps[a].add((fld, 'whatweb'))
 
-import os
 seen_now = set(meta) | set(apps)
 if os.path.exists(os.environ['FPTMP']+'.l4.json'):
     for line in open(os.environ['FPTMP']+'.l4.json'):

@@ -90,6 +90,11 @@ def core_guard(body, ext):
     if 'SPECTRE-MARK' not in body:
         return False, 'marker-missing'
     if ext == 'php':
+        # CS32-F1: php 缺失干净 SKIP(此前 FileNotFoundError 裸栈)。
+        import shutil
+        if not shutil.which('php'):
+            print('[c2-variant] php 不在 PATH——语法校验跳过(容器位内置; 宿主自装)', file=sys.stderr)
+            return True, 'php-syntax SKIP(php 未装)'
         with tempfile.NamedTemporaryFile('w', suffix='.php', delete=False) as t:
             t.write(body); tmp = t.name
         try:
@@ -476,7 +481,7 @@ def cmd_selftest(args):
                            capture_output=True, text=True)
         cands = sorted(x for x in os.listdir(out) if x.startswith('variant_')) if os.path.isdir(out) else []
         if not cands:
-            print(f'SELFTEST FAIL {f}: no guarded candidate: {g.stdout.strip()[:100]}')
+            print(f'SELFTEST FAIL {f}: no guarded candidate: {(g.stdout + g.stderr).strip()[:160]}')
             fails += 1; continue
         vp = os.path.join(out, cands[0])
         resid = yara_string_hits(vp)

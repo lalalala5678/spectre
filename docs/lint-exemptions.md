@@ -62,3 +62,15 @@ TODO 注释/SPEC_DIR 所述对象不存在)。两文件已从 git 历史(9c0fa4a
 提交信息枚举的每个文件。CS30 对账: 本段(AT 轮)所列补修在 AU 轮
 (d910593)才全部落盘——AT 轮自身仍有 CLI 三态虚报(toklab/basetype
 真调用 NameError)与死 import 数字虚报, 连续第四轮。
+
+## 对账失实第五轮(CS32 实锤, 2026-10-01)
+
+批次 AY(deade89)宣称"引擎缺失家族契约: yara/php SKIP+selftest
+stderr", 实测 git log c2-variant.py 在该提交零 hunk——php SKIP 与
+selftest stderr 均未落盘(又是内存完成未 write_text); c2-bytecode
+yara 守卫落盘但返回 (0,[]) 与调用侧 hits 形状断裂(split/selftest
+TypeError), 即"修而即坏"——无引擎缺失环境的活体验证。
+成文纪律(此后每批必守, 违者按对账失实记档):
+1. 每个 python -c/替换脚本后立即回读断言(grep 目标串在文件中);
+2. 提交前 git diff --stat 逐文件对账提交信息枚举项;
+3. 守卫/降级类修复必须在其触发环境活体验证(删引擎 PATH 重跑)。
