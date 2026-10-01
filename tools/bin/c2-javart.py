@@ -79,6 +79,7 @@ def run_harness(mode, name, marker, cp_extra, lane='javax'):
 
 def main():
     args = sys.argv[1:]
+    # R32D42-P1/P2: --help/奇数参不再裸栈
     if not args or args[0] in ('-h', '--help'):
         print(__doc__); return 0 if args else 2
     if len(args) % 2:
