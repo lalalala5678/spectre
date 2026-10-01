@@ -13,7 +13,7 @@
  * official read tool resolves skill file paths inside the same env the
  * bash tool runs in. For the local driver the host path IS the path.
  */
-import { mkdir, writeFile, rm, readdir } from 'node:fs/promises';
+import { mkdir, writeFile, rm, readdir, readFile } from 'node:fs/promises';
 import { loadSkills } from '@earendil-works/pi-agent-core';
 
 import { HOST, CONTAINER, containerPathToHost, makeExecutionEnv }
@@ -79,6 +79,17 @@ export async function saveSkill(agentKey, { name, description, content }) {
 }
 
 /** Remove a skill directory. */
+/** R32D44-feature: 读技能正文(控制台 agent 配置面板点开技能看内容)。
+ * agentKey/name 已在 routes 层白名单校验(isAgentKey + [\w-]+), 此处
+ * 只处理存在性; 不存在返回 null(404 语义)。 */
+export async function readSkillContent(agentKey, name) {
+  try {
+    return await readFile(`${HOST.skills}/${agentKey}/${name}/SKILL.md`, 'utf8');
+  } catch {
+    return null;
+  }
+}
+
 export async function deleteSkill(agentKey, name) {
   // R22-F1: 同 saveSkill——删除面是 rm -rf recursive+force。
   assertSkillName(name);

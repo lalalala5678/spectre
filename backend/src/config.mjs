@@ -53,9 +53,8 @@ export const CONFIG = Object.freeze({
   port: Number(process.env.PORT || 8090),
   host: '127.0.0.1',
 
-  llmBaseUrl: required('LLM_BASE_URL'),
-  llmApiKey: required('LLM_API_KEY'),
-  llmModel: required('LLM_MODEL'),
+  // R32D44-llm: LLM 直连 env(LLM_BASE_URL/KEY/MODEL)已删——统一平台
+  // 设置页配置(默认供应商+单 agent 覆盖), 见 agent-settings.mjs。
 
   internalToken: required('INTERNAL_TOKEN'),
   temporalAddress: process.env.TEMPORAL_ADDRESS || '127.0.0.1:7233',

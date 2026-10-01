@@ -217,16 +217,18 @@ export function Topbar() {
 
       <div className="font-mono text-[11px] text-zinc-600">{fmt(now)} 本地</div>
 
-      {/* F60: 运行时状态(模型·会话·事件) */}
+      {/* F60: 运行时状态(会话·事件)。R32D44: 模型名字样移除——供应商
+          已平台化(默认+单 agent 覆盖), 单一模型名不再能代表全平台,
+          且避免绑定观感; 模型信息在设置页与各 agent 配置页签可见。 */}
       <div
         title={health
-          ? `模型 ${health.model} · 会话 ${health.sessions} · 总线事件 ${health.bus}`
+          ? `会话 ${health.sessions} · 总线事件 ${health.bus}`
           : 'runtime 不可达'}
         className="flex items-center gap-1.5 font-mono text-[10.5px] text-zinc-500"
       >
         <Activity className={health ? 'h-3 w-3 text-emerald-500' : 'h-3 w-3 text-red-500'} />
         {health
-          ? <span>{health.model} · {health.sessions} 会话 · {health.bus} 事件</span>
+          ? <span>{health.sessions} 会话 · {health.bus} 事件</span>
           : <span className="text-red-400">runtime 不可达</span>}
       </div>
 

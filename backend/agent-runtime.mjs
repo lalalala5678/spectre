@@ -21,7 +21,8 @@ import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
 import { entryKind as entryKindOf } from './src/tools.mjs';
 import { emitRevision } from './src/revision.mjs';
-import { buildPi, textOf } from './src/pi.mjs';
+import { buildPi, textOf, applyLlmPrefs } from './src/pi.mjs';
+import { effectiveCommon, migrateLegacyLlmEnv } from './src/agent-settings.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
 import { rebuildMounts } from './src/sandbox/mount.mjs';
@@ -81,7 +82,7 @@ if (!takeLock()) {
 }
 process.on('exit', () => { try { fs.unlinkSync(lockPath); } catch { /* best-effort: 锁文件已不存在 */ } });
 
-const { model, streamFn } = await buildPi();
+const { model, streamFn, modelForAgent } = await buildPi();
 const wal = new Wal(path.join(CONFIG.dataDir, 'state.wal'));
 wal.open();
 
@@ -110,6 +111,14 @@ for (const e of entries) {
 }
 // project registry + prefs (server-side, browser stores nothing)
 projectsFromWal(entries);
+// R32D44-llm: 旧 .env LLM_* 一次性导入平台配置(此后 env 通道失效)。
+// 必须在 WAL replay 之后——此前放在 wal.open 后读到的是模块初值,
+// 每次开机都重复迁移(幂等但 WAL 每靴多一条); 且 buildPi 先于本处,
+// 导入后立即热更 live model 身份字段(否则首请求打向空 baseUrl)。
+if (migrateLegacyLlmEnv(wal)) {
+  console.log('[agent-runtime] 已将 .env 的 LLM_* 一次性导入平台配置(以后请在「设置」页管理)');
+  await applyLlmPrefs();
+}
 spawnSettingsFromWal(entries);  // F68: spawn policy WAL replay
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
@@ -403,7 +412,7 @@ const caps = {
   },
 };
 
-const store = new SessionStore({ model, streamFn, caps, wal,
+const store = new SessionStore({ model, streamFn, modelForAgent, caps, wal,
   summarizer: new Summarizer({ model, streamFn }) });
 const spawnPolicy = makeSpawnPolicy(store);
 store.rehydrate([...replay.records.values()]);
@@ -465,5 +474,5 @@ const server = http.createServer(async (req, res) => {
 
 server.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`[agent-runtime] http://${CONFIG.host}:${CONFIG.port}`);
-  console.log(`[agent-runtime] model=${CONFIG.llmModel} temporal=${CONFIG.temporalAddress}`);
+  console.log(`[agent-runtime] model=${effectiveCommon().model || '(未配置——设置页配)'} temporal=${CONFIG.temporalAddress}`);
 });

@@ -10,7 +10,7 @@
 
 ```
 ┌─ console (React) ─── 网关(Python) ── agent-runtime (Node, :8090)
-│                                        ├─ 14 会话智能体(pi-agent-core, LLM 由 .env 配置——任意 OpenAI 兼容厂商)
+│                                        ├─ 14 会话智能体(pi-agent-core, LLM 平台配置——默认供应商+单 agent 覆盖, 三种线制)
 │                                        ├─ MCP stdio 服务器群(recon/nday 情报源)
 │                                        └─ 沙箱(docker driver, CLI/skills 挂载)
 ├─ worker (Temporal activities) ── temporal-dev
@@ -37,8 +37,8 @@
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
 
-# ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串)+ LLM 三行(BASE_URL/API_KEY/MODEL)
-#    任意 OpenAI 兼容厂商均可(示例为智谱 GLM, 换 DeepSeek/OpenAI/vLLM 只改这三行)
+# ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串)
+#    LLM 不走 env: 登录控制台后在「设置」页配置(见下 ⑦)
 cd backend && cp .env.example .env && ${EDITOR:-vi} .env
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test && \
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # npm 崩溃→deploy/README 排障节   # 测试隔离数据目录(生产缺省 /var/lib/spectre)
@@ -56,13 +56,19 @@ cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
 
 打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
 
+⑦ **配置大模型**（登录后, 平台统一接管）: 「设置」页 → 通用配置 → 接口格式
+（OpenAI 兼容/Anthropic/Gemini）+ Base URL + API Key + 模型名, 每字段保存前
+做真实连通探测。默认供应商之上可对单个 agent 覆盖（如默认 GLM、报告 agent
+换 DeepSeek）——设置页「单 Agent 大模型覆盖」区或各 agent 页「配置」页签内
+均可修改。旧装机 .env 的 `LLM_*` 首次启动会一次性导入, 之后 env 通道失效。
+
 > Node 22.x(低于 22.19)安装时 npm 会打印 EBADENGINE 警告——依赖链的版本声明比实际需求严格, 22.x 实测可运行, 警告可忽略。
 
 共享机多实例: 所有服务统一加 `PORT/GATEWAY_PORT/SPECTRE_DATA_DIR/SPECTRE_AUTH_DIR/TEMPORAL_ADDRESS` 隔离前缀(worker 默认连 7233 生产队列)。
 
 完整部署(systemd/沙箱/私架面杀/凭据边界)见 [deploy/README.md](deploy/README.md)。
 
-数据源凭据在设置页配置（验证通过才落盘，未配置的源不注入智能体工具面）；LLM 凭据经 `backend/.env` 启动装载。
+数据源凭据与大模型接入均在设置页配置（保存前真实连通校验；LLM 支持默认供应商+单 agent 覆盖， 接口格式 OpenAI 兼容/Anthropic/Gemini 三选）。
 
 ## 文档
 

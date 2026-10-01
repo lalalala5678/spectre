@@ -1,18 +1,30 @@
 /**
  * pi agent construction.
  *
- * 分层: 本模块只提供 LLM 接入与消息基建——buildPi() 从 CONFIG 接线
- * OpenAI 兼容 provider(换厂商=改 .env), textOf/normalizeMessage 是
+ * 分层: 本模块只提供 LLM 接入与消息基建——buildPi() 按平台配置
+ * (设置页统一接管, R32D44: .env 直连通道已删)接线三种线制
+ * (openai 兼容/anthropic/gemini)+默认供应商与单 agent 覆盖,
+ * textOf/normalizeMessage 是
  * 全仓消息形状工具。各 agent 的差异化(12+ 专属业务提示词
  * RECON/NDAY/BRUTE/API/VULNHUNT/C2/PERSIST/POSTEX/PHISH+配置三)在
  * 本模块 prompt 常量区; 每会话的工具面组装在 sessions.mjs。
  */
 
 import { createModels, createProvider } from '@earendil-works/pi-ai';
-import { effectiveCommon } from './agent-settings.mjs';
+import { effectiveCommon, effectiveLlmFor, LLM_FORMATS } from './agent-settings.mjs';
 import * as openaiCompletions from '@earendil-works/pi-ai/api/openai-completions';
+import * as anthropicMessages from '@earendil-works/pi-ai/api/anthropic-messages';
+import * as googleGenerativeAi from '@earendil-works/pi-ai/api/google-generative-ai';
 
 import { CONFIG } from './config.mjs';
+import { AGENTS } from './agents.mjs';
+
+/* R32D44-llm: 三线制注册表(格式 → pi-ai 实现)。 */
+const WIRE_IMPLS = {
+  'openai-completions': openaiCompletions,
+  'anthropic-messages': anthropicMessages,
+  'google-generative-ai': googleGenerativeAi,
+};
 
 /**
  * L2c backpressure: a 429 (e.g. Zhipu code 1302) means the ACCOUNT is
@@ -125,11 +137,12 @@ export const STAGE_PROMPT = [
  * format), hence the thinkingFormat compat flags below.
  */
 function modelCatalog(eff = {}) {
+  const wire = (LLM_FORMATS[eff.format] ?? LLM_FORMATS.openai).api;
   return [{
-    id: eff.model ?? CONFIG.llmModel,
-    name: eff.model ?? CONFIG.llmModel,
-    api: 'openai-completions',
-    baseUrl: eff.baseUrl ?? CONFIG.llmBaseUrl,
+    id: eff.model || 'unconfigured',
+    name: eff.model || 'unconfigured',
+    api: wire,
+    baseUrl: eff.baseUrl || '',
     provider: PROVIDER_ID,
     reasoning: true,
     input: ['text'],
@@ -157,50 +170,82 @@ function modelCatalog(eff = {}) {
   }];
 }
 
-let liveModel = null;
 
-/**
- * @returns {Promise<{ models: import('@earendil-works/pi-ai').MutableModels,
- *                     model: object,
- *                     streamFn: Function }}>}
- */
-export async function buildPi() {
-  // User-facing settings override env (settings.mjs): baseUrl/apiKey/
-  // model/maxTokens/contextWindow — every save passed a live probe, so
-  // values arriving here were connectivity-verified at save time.
-  const eff = effectiveCommon();
-  const models = createModels();
-  models.setProvider(createProvider({
-    id: PROVIDER_ID,
-    // read prefs at CALL time so a settings save applies without rebuild
+/** R32D44-llm: 三线制 api 注册表(每个 provider 都全量注册, 模型条目的
+ * api 字段选择线制——切格式=改配置, 不改代码)。 */
+function wireApiRegistry() {
+  return Object.fromEntries(Object.entries(WIRE_IMPLS).map(([name, impl]) => ([name, {
+    stream: impl.stream, streamSimple: impl.streamSimple,
+  }])));
+}
+
+/** R32D44-llm: 每 agent 一个 provider + 一个默认 provider。auth 在调用
+ * 时读当前 prefs(设置页保存即生效, 无需重启); 单 agent 覆盖与默认
+ * 供应商各走各的 provider, 互不串扰。scope='default'|agentKey。 */
+const liveModels = new Map();  // scope → live model object
+
+function providerFor(scope) {
+  const resolve = scope === 'default'
+    ? () => effectiveCommon()
+    : () => effectiveLlmFor(scope);
+  return createProvider({
+    id: scope === 'default' ? PROVIDER_ID : `spectre-${scope}`,
     auth: {
       apiKey: {
         name: 'spectre-llm',
         resolve: async () => {
-          const key = effectiveCommon().apiKey;
-          return key
-            ? { auth: { apiKey: key }, source: 'settings' }
-            : { auth: { apiKey: process.env.LLM_API_KEY }, source: 'LLM_API_KEY' };
+          const eff = resolve();
+          // R32D44: env 回退已删——未配置即显式失败, 不静默走旧通道。
+          if (!eff.apiKey) {
+            throw new Error(scope === 'default'
+              ? '未配置大模型——请在平台「设置」页配置默认供应商(Base URL/API Key/模型)'
+              : `agent ${scope} 的 LLM 覆盖不完整——请在设置页补齐或清除覆盖`);
+          }
+          return { auth: { apiKey: eff.apiKey }, source: 'platform-settings' };
         },
       },
     },
-    models: modelCatalog(eff),
-    api: {
-      'openai-completions': {
-        stream: openaiCompletions.stream,
-        streamSimple: openaiCompletions.streamSimple,
-      },
-    },
-  }));
-  const model = models.getModel(PROVIDER_ID, eff.model);
-  if (!model) {
-    throw new Error(`model not found: ${PROVIDER_ID}/${eff.model}`);
+    models: modelCatalog(resolve()),
+    api: wireApiRegistry(),
+  });
+}
+
+/**
+ * @returns {Promise<{ models: import('@earendil-works/pi-ai').MutableModels,
+ *                     model: object,
+ *                     modelForAgent: (agentKey: string) => object,
+ *                     streamFn: Function }}>}
+ */
+export async function buildPi() {
+  // 平台配置(设置页)统一接管: baseUrl/apiKey/model/format/maxTokens/
+  // contextWindow——每字段保存都过了真实连通探测。默认 + 每 agent
+  // 各一个 provider, scope→live model 注册表供 applyLlmPrefs 热更。
+  const models = createModels();
+  const scopes = ['default', ...AGENTS.map(a => a.key)];
+  for (const scope of scopes) {
+    models.setProvider(providerFor(scope));
+    const eff = scope === 'default' ? effectiveCommon() : effectiveLlmFor(scope);
+    const m = models.getModel(scope === 'default' ? PROVIDER_ID : `spectre-${scope}`, eff.model || 'unconfigured');
+    if (m) { m.__scope = scope; liveModels.set(scope, m); }
   }
+  const model = liveModels.get('default');
+  if (!model) {
+    throw new Error('default LLM provider model 未构建');
+  }
+  /** agent → 该 agent 的 live model(覆盖未配=默认 model 同一对象) */
+  const modelForAgent = (agentKey) => liveModels.get(agentKey) ?? model;
   // L1 resilience: pi's retryProviderRequest defaults maxRetries to 0 —
   // every call dies on the first 429/5xx. Inject retries + timeout for
   // ALL consumers (sessions, summarizer, tools) through one wrapper;
   // caller options (signal, maxTokens, …) pass through untouched.
   const streamFn = async (modelArg, ctx, opts = {}) => {
+    // R32D44: fail-fast——未配齐(Base URL/Key/模型)的调用给可行动
+    // 错误, 不让 fetch 打向 'undefined/chat/completions' 产出噪声栈。
+    const scope = modelArg?.__scope ?? 'default';
+    const effNow = scope === 'default' ? effectiveCommon() : effectiveLlmFor(scope);
+    if (!effNow.baseUrl || !effNow.apiKey || !effNow.model) {
+      throw new Error('未配置大模型——请在平台「设置」页配置(Base URL/API Key/模型)');
+    }
     const waited = await waitForGate();
     if (waited) {
       // Stagger releases ONLY after a cooldown: a herd of queued calls
@@ -214,26 +259,30 @@ export async function buildPi() {
       timeoutMs: CONFIG.llmTimeoutMs,
     });
   };
-  liveModel = model;
-  return { models, model, streamFn };
+  return { models, model, modelForAgent, streamFn };
 }
 
 /** Settings save (same process) re-applies LLM prefs onto the LIVE model
  *  object — existing + new sessions pick up changes without a restart.
  *  baseUrl/auth are re-read per call; model identity fields mutate here. */
 export async function applyLlmPrefs() {
-  const eff = effectiveCommon();
-  if (liveModel) {
-    liveModel.id = eff.model;
-    liveModel.name = eff.model;
+  // R32D44: 全 scope 热更——默认+每 agent 覆盖各自 live model 都按
+  // 当前 prefs 刷新身份字段(baseUrl/auth 调用时读; id/name/api 变更
+  // 使切模型/切线制对既有会话即时生效)。
+  for (const [scope, m] of liveModels) {
+    const eff = scope === 'default' ? effectiveCommon() : effectiveLlmFor(scope);
+    if (!m) continue;
+    m.id = eff.model || 'unconfigured';
+    m.name = eff.model || 'unconfigured';
     // R21-F2: baseUrl 此前烘死在构建期——注释承诺每调用重读, 改
-    // baseUrl 不重启永不生效。openai-completions 每请求现读
-    // model.baseUrl, liveModel 与 summarizer/sessions 共享引用。
-    liveModel.baseUrl = eff.baseUrl;
-    liveModel.contextWindow = eff.contextWindow;
-    liveModel.maxTokens = Math.min(eff.maxTokens, eff.contextWindow);
+    // baseUrl 不重启永不生效。各线制每请求现读 model.baseUrl,
+    // live model 与 summarizer/sessions 共享引用。
+    m.baseUrl = eff.baseUrl;
+    m.api = (LLM_FORMATS[eff.format] ?? LLM_FORMATS.openai).api;
+    m.contextWindow = eff.contextWindow;
+    m.maxTokens = Math.min(eff.maxTokens, eff.contextWindow);
   }
-  return eff;
+  return effectiveCommon();
 }
 
 /** Unwrap tool-result content blocks into plain display text. */

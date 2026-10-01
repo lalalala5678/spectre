@@ -15,7 +15,7 @@
  */
 import { getPrefs, setPrefs } from './projects.mjs';
 import { probeSearchProvider } from './sandbox/tooling-probe.mjs';
-import { CONFIG } from './config.mjs';
+import { AGENTS } from './agents.mjs';
 
 /** pi canonical thinking levels — passed to the vendor AS-IS. No vendor
  * mapping is maintained here (user decision: 映射交给用户/厂商,不搭中间站). */
@@ -46,12 +46,49 @@ async function probe(url, init = {}, { timeoutMs = 15000, okCheck } = {}) {
   }
 }
 
-async function llmProbe(baseUrl, apiKey, model) {
-  return probe(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
-    body: JSON.stringify({ model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 4, stream: false }),
-  }, { timeoutMs: 20000 });
+/* R32D44-llm: 平台统一 LLM 接入的三种线制(用户令: 格式下拉选择)。
+ * 探测按线制走各自握手——探测通过才允许落盘(与既有保存协议一致)。 */
+export const LLM_FORMATS = {
+  openai: {
+    label: 'OpenAI 兼容(/chat/completions)',
+    hint: 'GLM/DeepSeek/Kimi/Qwen/OpenAI 及绝大多数代理网关',
+    api: 'openai-completions',
+    probe: (baseUrl, apiKey, model) => probe(`${baseUrl.replace(/\/$/, '')}/chat/completions`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${apiKey}` },
+      body: JSON.stringify({ model, messages: [{ role: 'user', content: 'ping' }], max_tokens: 4, stream: false }),
+    }, { timeoutMs: 20000 }),
+  },
+  anthropic: {
+    label: 'Anthropic(/v1/messages)',
+    hint: 'Claude 系;key 头 x-api-key + anthropic-version',
+    api: 'anthropic-messages',
+    probe: (baseUrl, apiKey, model) => probe(`${baseUrl.replace(/\/$/, '')}/v1/messages`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json', 'x-api-key': apiKey,
+        'anthropic-version': '2023-06-01',
+      },
+      body: JSON.stringify({ model, max_tokens: 4, messages: [{ role: 'user', content: 'ping' }] }),
+    }, { timeoutMs: 20000 }),
+  },
+  gemini: {
+    label: 'Google Gemini(:generateContent)',
+    hint: 'Gemini 系;key 走查询参数',
+    api: 'google-generative-ai',
+    probe: (baseUrl, apiKey, model) => probe(
+      `${baseUrl.replace(/\/$/, '')}/v1beta/models/${encodeURIComponent(model)}:generateContent`,
+      {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': apiKey },
+        body: JSON.stringify({ contents: [{ parts: [{ text: 'ping' }] }] }),
+      }, { timeoutMs: 20000 }),
+  },
+};
+
+async function llmProbe(baseUrl, apiKey, model, format = 'openai') {
+  const f = LLM_FORMATS[format] ?? LLM_FORMATS.openai;
+  return f.probe(baseUrl, apiKey, model);
 }
 
 /* -------- data-source validators (official default base URLs) --------
@@ -267,9 +304,10 @@ export function settingsSchema() {
     common: {
       label: '通用配置(全部智能体生效)',
       fields: [
-        { id: 'llm.baseUrl', label: 'API Base URL', type: 'text', required: true, placeholder: CONFIG.llmBaseUrl },
+        { id: 'llm.format', label: '接口格式', type: 'select', options: Object.keys(LLM_FORMATS), default: 'openai', hint: 'OpenAI 兼容=绝大多数厂商;Anthropic=Claude 系;Gemini=Google 系' },
+        { id: 'llm.baseUrl', label: 'API Base URL', type: 'text', required: true, placeholder: 'https://open.bigmodel.cn/api/paas/v4' },
         { id: 'llm.apiKey', label: 'API Key', type: 'password', required: true },
-        { id: 'llm.model', label: '模型名称', type: 'text', required: true, placeholder: CONFIG.llmModel },
+        { id: 'llm.model', label: '模型名称', type: 'text', required: true, placeholder: 'glm-4.7' },
         { id: 'llm.thinkingLevel', label: 'Thinking Effort', type: 'select', options: THINKING_LEVELS, hint: '按所选档位原样传给厂商,不维护厂商映射' },
         { id: 'llm.maxTokens', label: '最大输出 Tokens', type: 'number', check: num(256, 262144), default: 32768 },
         { id: 'llm.contextWindow', label: '上下文窗口 Tokens', type: 'number', check: num(8192, 4194304), default: 786432 },
@@ -359,6 +397,18 @@ export function settingsSchema() {
         })),
       },
     ],
+    // R32D44-llm: 每 agent 的 LLM 覆盖(默认供应商之上按 agent 换厂商/
+    // 模型——例: 默认 GLM, 报告 agent 改 DeepSeek)。字段留空=继承默认。
+    agentLlm: AGENTS.map(a => ({
+      agentKey: a.key, label: `${a.name} · ${a.role}`,
+      hint: '留空=继承默认大模型供应商;填写后此 agent 单独走该供应商(保存前真实连通校验)。',
+      fields: [
+        { id: 'format', label: '接口格式', type: 'select', options: ['', ...Object.keys(LLM_FORMATS)], hint: '空=继承默认' },
+        { id: 'baseUrl', label: 'API Base URL', type: 'text' },
+        { id: 'apiKey', label: 'API Key', type: 'password' },
+        { id: 'model', label: '模型名称', type: 'text' },
+      ],
+    })),
   };
 }
 
@@ -378,6 +428,7 @@ export function getSettings() {
   reconSources.brute = bp;
   return {
     common: p.commonSettings ?? null,
+    agentLlm: p.agentLlm ?? {},
     reconSources,
     schema: settingsSchema(),
   };
@@ -410,20 +461,58 @@ export async function saveSetting({ group, field, value }, wal) {
     const [top, leaf] = field.split('.');
     const leafVal = def.type === 'number' ? Number(v) : v;
     if (['llm.baseUrl', 'llm.apiKey', 'llm.model'].includes(field)) {
-      // F47: 空值=清除该项回退 env 默认(跳过 probe——空串不是可测端点)
-      const merged = { ...defaultsFromEnv(), ...(getPrefs().commonSettings ?? {}).llm,
-        [leaf]: leafVal };
-      for (const k of ['baseUrl', 'apiKey', 'model']) {
-        if (!merged[k]) merged[k] = defaultsFromEnv()[k];
+      // F47: 空值=清除该项(跳过 probe——空串不是可测端点)。R32D44:
+      // env 回退已删, 三项齐才构成可运行配置(pi 层 fail-fast 兜底)。
+      const merged = { ...(getPrefs().commonSettings ?? {}).llm, [leaf]: leafVal };
+      if (merged.baseUrl && merged.apiKey && merged.model) {
+        const r = await llmProbe(merged.baseUrl, merged.apiKey, merged.model, merged.format);
+        if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
       }
-      const r = await llmProbe(merged.baseUrl, merged.apiKey, merged.model);
-      if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
     }
     // R10-F2: probe 是 20s 网络窗口——窗口后重读 prefs 只合并本叶子,
     // 并发保存的另一字段不被陈旧快照覆盖。
     const fresh = { ...getPrefs().commonSettings };
     fresh[top] = { ...fresh[top], [leaf]: leafVal };
     setPrefs({ commonSettings: fresh }, wal);
+    return { ok: true };
+  }
+
+  if (group === 'agent-llm') {
+    // R32D44-llm: 单 agent LLM 覆盖。空值=删覆盖(继承默认, 免探测);
+    // 非空=以"覆盖后生效配置"整体探测(格式/URL/key/模型 四字段合并)。
+    const [agentKey, leaf] = field.split('.');
+    const group2 = schema.agentLlm.find(g => g.agentKey === agentKey);
+    if (!group2 || !['format', 'baseUrl', 'apiKey', 'model'].includes(leaf)) {
+      return { ok: false, error: '未知配置项' };
+    }
+    const v = clean(value);
+    if (leaf === 'format' && v && !Object.keys(LLM_FORMATS).includes(v)) {
+      return { ok: false, error: `格式必须是 ${Object.keys(LLM_FORMATS).join('/')}` };
+    }
+    const cur = { ...(getPrefs().agentLlm ?? {})[agentKey] };
+    if (v === '' || v == null) delete cur[leaf];
+    else cur[leaf] = v;
+    if (v !== '' && v != null) {
+      // 探测必须用「覆盖后」的生效配置(cur=旧覆盖+本次新值)——此前误用
+      // effectiveLlmFor(旧 prefs), 坏 key 借真 key 的探测通过后落盘
+      // (浏览器负向实测抓出)。
+      const base = effectiveCommon();
+      const eff = {
+        format: cur.format || base.format,
+        baseUrl: cur.baseUrl || base.baseUrl,
+        apiKey: cur.apiKey || base.apiKey,
+        model: cur.model || base.model,
+      };
+      if (!eff.baseUrl || !eff.apiKey || !eff.model) {
+        return { ok: false, error: '默认供应商尚未配齐(Base URL/Key/模型)——先在通用配置配好默认, 再做单 agent 覆盖' };
+      }
+      const r = await llmProbe(eff.baseUrl, eff.apiKey, eff.model, eff.format);
+      if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+    }
+    const freshAll = { ...getPrefs().agentLlm };
+    if (Object.keys(cur).length === 0) delete freshAll[agentKey];
+    else freshAll[agentKey] = cur;
+    setPrefs({ agentLlm: freshAll }, wal);
     return { ok: true };
   }
 
@@ -479,17 +568,40 @@ export async function saveSetting({ group, field, value }, wal) {
   return { ok: false, error: '未知分组' };
 }
 
-function defaultsFromEnv() {
-  return { baseUrl: CONFIG.llmBaseUrl, apiKey: CONFIG.llmApiKey, model: CONFIG.llmModel };
-}
+/* R32D44-llm: .env 直连 LLM 的旧通道已删(用户令: 统一平台配置防双源
+ * 污染)——未配置即未配置, 由 pi 层 fail-fast 明示, 不再静默回退 env。 */
 
+/** R32D44-llm: 一次性迁移——旧装机 .env 里的 LLM_* 在首次启动时导入
+ * 平台配置(prefs), 此后 env 完全失效(纯单源)。幂等: prefs 已有三元组
+ * 或 env 无值即跳过; 迁移动作留痕在 prefs.commonSettings.llm.migratedFromEnv。 */
+export function migrateLegacyLlmEnv(wal) {
+  const cur = (getPrefs().commonSettings ?? {}).llm ?? {};
+  const env = {
+    baseUrl: process.env.LLM_BASE_URL || '',
+    apiKey: process.env.LLM_API_KEY || '',
+    model: process.env.LLM_MODEL || '',
+  };
+  const haveAll = cur.baseUrl && cur.apiKey && cur.model;
+  const envAny = env.baseUrl || env.apiKey || env.model;
+  if (haveAll || !envAny || cur.migratedFromEnv) return false;
+  const merged = {
+    ...cur,
+    baseUrl: cur.baseUrl || env.baseUrl,
+    apiKey: cur.apiKey || env.apiKey,
+    model: cur.model || env.model,
+    migratedFromEnv: true,
+  };
+  const fresh = { ...getPrefs().commonSettings, llm: merged };
+  setPrefs({ commonSettings: fresh }, wal);
+  return true;
+}
 export function effectiveCommon() {
   const cur = getPrefs().commonSettings ?? {};
-  const env = defaultsFromEnv();
   return {
-    baseUrl: cur.llm?.baseUrl || env.baseUrl,
-    apiKey: cur.llm?.apiKey || env.apiKey,
-    model: cur.llm?.model || env.model,
+    format: cur.llm?.format || 'openai',
+    baseUrl: cur.llm?.baseUrl || '',
+    apiKey: cur.llm?.apiKey || '',
+    model: cur.llm?.model || '',
     thinkingLevel: cur.llm?.thinkingLevel || 'low',
     maxTokens: Number(cur.llm?.maxTokens) || 32768,
     contextWindow: Number(cur.llm?.contextWindow) || 786432,
@@ -498,6 +610,19 @@ export function effectiveCommon() {
       reserveTokens: Number(cur.compaction?.reserveTokens) || 16384,
       keepRecentTokens: Number(cur.compaction?.keepRecentTokens) || 20000,
     },
+  };
+}
+
+/** R32D44-llm: 某 agent 的生效 LLM 配置=默认之上按字段覆盖。 */
+export function effectiveLlmFor(agentKey) {
+  const base = effectiveCommon();
+  const ov = (getPrefs().agentLlm ?? {})[agentKey] ?? {};
+  return {
+    ...base,
+    format: ov.format || base.format,
+    baseUrl: ov.baseUrl || base.baseUrl,
+    apiKey: ov.apiKey || base.apiKey,
+    model: ov.model || base.model,
   };
 }
 

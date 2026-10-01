@@ -77,7 +77,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   │   ├── _base/                 #   共享底座(SYSTEM.md/tools/skills)
 │   │   ├── recon/                 #   每智能体:SYSTEM.md + tools.mjs + skills/
 │   │   └── …/
-│   ├── .env                       # 密钥(600):LLM_*/INTERNAL_TOKEN
+│   ├── .env                       # 密钥(600):INTERNAL_TOKEN(LLM 已平台化——设置页配置)
 │   └── package.json
 │
 ├── deploy/                        # 运维物料

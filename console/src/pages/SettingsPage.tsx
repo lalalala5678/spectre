@@ -25,10 +25,12 @@ interface SourceDef {
 }
 interface SettingsPayload {
   common: Record<string, Record<string, string | number>> | null;
+  agentLlm: Record<string, Record<string, string>>;
   reconSources: Record<string, Record<string, string>>;
   schema: {
     common: { label: string; fields: FieldDef[] };
     agents: { agentKey: string; label: string; hint?: string; sources: SourceDef[] }[];
+    agentLlm: { agentKey: string; label: string; hint?: string; fields: FieldDef[] }[];
   };
 }
 
@@ -201,6 +203,11 @@ export function SettingsPage() {
     await api('/agent-settings/save', { method: 'POST', json: { group, field: `${srcId}.${leaf}`, value: v } });
     await reload();
   };
+  // R32D44-llm: 单 agent 供应商覆盖(留空保存=删覆盖回默认)
+  const saveAgentLlm = (agentKey: string) => (leaf: string) => async (v: string) => {
+    await api('/agent-settings/save', { method: 'POST', json: { group: 'agent-llm', field: `${agentKey}.${leaf}`, value: v } });
+    await reload();
+  };
 
   if (err) return <div className="p-6 text-red-400">设置加载失败:{err}</div>;
   if (!data) return <div className="animate-pulse p-6 text-zinc-500">加载中…</div>;
@@ -252,6 +259,38 @@ export function SettingsPage() {
             const [top, leaf] = f.id.split('.');
             const bucket = top === 'llm' ? llm : comp;
             return <FieldRow key={f.id} def={f} value={bucket[leaf]} onSave={saveCommon(f.id)} />;
+          })}
+        </div>
+      </section>
+
+      {/* ---------- R32D44: 单 Agent 大模型供应商覆盖 ---------- */}
+      <section className="mb-8 overflow-hidden rounded border border-void-700 bg-void-900/30">
+        <div className="flex items-center gap-2 border-b border-void-700 bg-gradient-to-r from-void-800/60 to-transparent px-4 py-3">
+          <span className="text-[12.5px] font-medium text-zinc-200">单 Agent 大模型覆盖</span>
+          <span className="text-[10.5px] text-zinc-500">默认供应商之上按 agent 换厂商/模型(例: 默认 GLM, 报告 agent 用 DeepSeek)</span>
+        </div>
+        <p className="border-b border-void-800/70 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">
+          四字段全留空=完全继承默认;填任一项并保存会用「覆盖后的生效配置」做真实连通探测, 通过才落盘。清除某项=保存空值。
+        </p>
+        <div className="divide-y divide-void-800/70">
+          {(data.schema.agentLlm ?? []).map((g) => {
+            const ov = data.agentLlm?.[g.agentKey] ?? {};
+            const overridden = Boolean(ov.baseUrl || ov.apiKey || ov.model || ov.format);
+            return (
+              <div key={g.agentKey} className="px-4 py-2.5">
+                <div className="mb-1.5 flex items-center gap-2">
+                  <span className="text-[11.5px] font-medium text-zinc-300">{g.label}</span>
+                  {overridden
+                    ? <span className="rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9.5px] text-orange-300">已覆盖</span>
+                    : <span className="rounded-sm bg-void-800 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-600">用默认</span>}
+                </div>
+                <div className="grid grid-cols-1 gap-x-4 gap-y-1 md:grid-cols-2">
+                  {g.fields.map((f) => (
+                    <FieldRow key={f.id} def={f} value={ov[f.id]} onSave={saveAgentLlm(g.agentKey)(f.id)} />
+                  ))}
+                </div>
+              </div>
+            );
           })}
         </div>
       </section>

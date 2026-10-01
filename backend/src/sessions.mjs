@@ -72,12 +72,16 @@ export class SessionStore {
    * the composition root so this store never imports Temporal or the bus.
    * summarizer: title/brief generator (same model, policy-bounded).
    */
-  constructor({ model, streamFn, caps = {}, summarizer = null, wal = null }) {
+  constructor({ model, streamFn, caps = {}, summarizer = null, wal = null,
+    modelForAgent = null }) {
     this.model = model;
     this.streamFn = streamFn;
     this.caps = caps;
     this.summarizer = summarizer;
     this.wal = wal;
+    // R32D44-llm: agent → 专属 live model(单 agent 供应商覆盖; 未覆盖
+    // agent 与默认同一对象)。
+    this.modelForAgent = modelForAgent;
     this.sessions = new Map();
   }
 
@@ -235,7 +239,7 @@ export class SessionStore {
           `${tools.map(t => `- ${t.name}`).join('\n')}` +
           (skillIndexBlock ? `\n\n${skillIndexBlock}` : '') +
           (record.agentKey === 'weakcred' ? `\n\n# 当前爆破参数(用户配置,实时生效)\n${JSON.stringify(effectiveBruteParams())}` : ''),
-        model: this.model,
+        model: this.modelForAgent?.(record.agentKey) ?? this.model,
         tools,
         // Thinking effort is user-configurable (settings bar); pi levels
         // pass through the model's thinkingLevelMap(如 GLM 的 tier 映射) or raw to vendor.
@@ -477,7 +481,7 @@ export class SessionStore {
     // one summarizer call through the SAME streamFn/model
     const transcript = head.map(m => `${m.role}: ${typeof m.content === 'string'
       ? m.content : JSON.stringify(m.content ?? '')}`).join('\n').slice(0, 240_000);
-    const r = await this.streamFn(this.model, { system: 'You are a session summarizer. Summarize the conversation so far: participants, decisions, tool findings, pending work. Be dense and factual; the summary replaces the history.', messages: [{ role: 'user', content: transcript }] }, { maxTokens: 4096 });
+    const r = await this.streamFn(this.modelForAgent?.(record.agentKey) ?? this.model, { system: 'You are a session summarizer. Summarize the conversation so far: participants, decisions, tool findings, pending work. Be dense and factual; the summary replaces the history.', messages: [{ role: 'user', content: transcript }] }, { maxTokens: 4096 });
     if (r.stopReason !== 'stop' && r.stopReason !== 'length') return;
     const summaryText = (r.content ?? []).filter(c => c.type === 'text').map(c => c.text).join('');
     if (!summaryText) return;

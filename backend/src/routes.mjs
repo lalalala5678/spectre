@@ -17,12 +17,12 @@ import { injectionOriginOf } from './sessions.mjs';
 import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools, sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
-import { saveSkill, deleteSkill, listSkillsTree } from './sandbox/skills.mjs';
+import { saveSkill, deleteSkill, listSkillsTree, readSkillContent } from './sandbox/skills.mjs';
 import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import { syncSourceKeyFiles } from './keyfiles.mjs';
 import { phishCampaignFunnel } from './phish-funnel.mjs';
 import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
-import { getSettings, saveSetting, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { getSettings, saveSetting, effectiveCommon, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
@@ -129,7 +129,7 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/health') {
       return json(res, 200, {
         ok: true,
-        model: CONFIG.llmModel,
+        model: effectiveCommon().model || '(未配置)',
         sessions: store.list().length,
         bus: bus.list().length,
       });
@@ -371,8 +371,10 @@ function realRouter({ store, bus, caps, wal }) {
       const body = await readJson(req);
       const r = await saveSetting(body, wal);
       if (!r.ok) return bad(res, 400, r.error);
-      if (String(body.group) === 'common') {
-        // hot-apply LLM prefs (same process as the session store)
+      if (String(body.group) === 'common' || String(body.group) === 'agent-llm') {
+        // hot-apply LLM prefs (same process as the session store).
+        // R32D44: agent-llm 组也热更——覆盖保存后 live model 的
+        // baseUrl/model/api 不刷新, 请求打向默认 OpenAI 端点(实测抓出)。
         await applyLlmPrefs();
       }
       if (String(body.group) === 'recon-source') {
@@ -441,6 +443,19 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/sandbox/skills' && method === 'GET') {
       return json(res, 200, await listSkillsTree(AGENT_KEYS));
+    }
+    // R32D44-feature: 技能正文读取(agent 配置面板点开技能看内容)。
+    // 校验与 skills CRUD 同款(agentKey 白名单 + name 纯标识符)。
+    if (path === '/api/sandbox/skills/content' && method === 'GET') {
+      const agentKey = url.searchParams.get('agentKey');
+      const name = url.searchParams.get('name');
+      if (!agentKey || !name) return bad(res, 400, 'agentKey、name 必填');
+      if (!isAgentKey(agentKey) || !/^[\w-]+$/.test(name)) {
+        return bad(res, 400, 'agentKey 或 name 非法(name: [a-zA-Z0-9_-]+)');
+      }
+      const content = await readSkillContent(agentKey, name);
+      if (content === null) return bad(res, 404, '技能不存在');
+      return json(res, 200, { agentKey, name, content });
     }
     if (path === '/api/sandbox/skills' && method === 'POST') {
       const body = await readJson(req);

@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2 } from 'lucide-react';
+  ArrowRightLeft, ChevronDown, ChevronRight, CornerUpLeft, Cpu, History, Play, Plus, ShieldCheck, Trash2 } from 'lucide-react';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Dot } from '../components/ui/Badge';
@@ -544,15 +544,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
           {tab === 'bus' && isAuto && <BusView workSessionId={workSession.id} />}
           {tab === 'config' && (
-            <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-              {isAuto && <SpawnLimitSettings />}
-              {/* F24: 原「运行时配置」为无保存逻辑的假表单(模型假选项/输入框
-                  不落地)——真实配置在「Agent 配置」页(LLM 连通校验+逐字段保存)。
-                  能力挂载原为 mock 假技能名,改真实技能目录(只读展示)。 */}
-              <Panel title="本 Agent 技能(真实挂载,只读)">
-                <RealSkillsPanel agentKey={agent.id} />
-              </Panel>
-            </div>
+            <AgentConfigTab agentId={agent.id} isAuto={isAuto} />
           )}
 
           {tab === 'history' && (
@@ -590,10 +582,221 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   );
 }
 
+
+/** R32D44-llm: agent 配置页签内的供应商覆盖编辑器(与设置页同一保存
+ * 协议: 逐字段保存+真实连通探测; 留空保存=清除该项回默认)。 */
+function AgentLlmOverride({ agentId, ov, onSaved }: {
+  agentId: string; ov?: Record<string, string>; onSaved: () => void;
+}) {
+  const [draft, setDraft] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
+  const [orig, setOrig] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
+  const [state, setState] = useState<'idle' | 'saving' | 'ok' | 'err'>('idle');
+  const [msg, setMsg] = useState('');
+  useEffect(() => {
+    const v = { format: ov?.format ?? '', baseUrl: ov?.baseUrl ?? '', apiKey: ov?.apiKey ?? '', model: ov?.model ?? '' };
+    setDraft(v); setOrig(v); setState('idle'); setMsg('');
+  }, [agentId, ov?.format, ov?.baseUrl, ov?.apiKey, ov?.model]);
+  const dirty = JSON.stringify(draft) !== JSON.stringify(orig);
+
+  const save = async () => {
+    if (!dirty || state === 'saving') return;
+    setState('saving'); setMsg('');
+    // 只提交变化了的字段(未动字段不触发探测)
+    for (const k of ['format', 'baseUrl', 'apiKey', 'model'] as const) {
+      if (draft[k] === orig[k]) continue;
+      try {
+        await api('/agent-settings/save', { method: 'POST',
+          json: { group: 'agent-llm', field: `${agentId}.${k}`, value: draft[k] } });
+      } catch (e) {
+        setState('err'); setMsg(e instanceof Error ? e.message : String(e)); return;
+      }
+    }
+    setState('ok'); setMsg('已保存(通过连通探测)'); onSaved();
+    setTimeout(() => setState('idle'), 2500);
+  };
+
+  const overridden = Boolean(orig.baseUrl || orig.apiKey || orig.model || orig.format);
+  // 字段行渲染(非组件——oxlint react/static-components)
+  const field = (k: 'format' | 'baseUrl' | 'apiKey' | 'model', label: string, ph: string, type = 'text') => (
+    <label key={k} className="flex items-center gap-2">
+      <span className="w-[86px] shrink-0 text-[10.5px] text-zinc-500">{label}</span>
+      {k === 'format' ? (
+        <select value={draft.format} onChange={e => setDraft(d => ({ ...d, format: e.target.value }))}
+          className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2 py-1 font-mono text-[11px] text-zinc-200 outline-none focus:border-orange-700">
+          <option value="">(继承默认)</option>
+          <option value="openai">OpenAI 兼容</option>
+          <option value="anthropic">Anthropic</option>
+          <option value="gemini">Gemini</option>
+        </select>
+      ) : (
+        <input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
+          className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2 py-1 font-mono text-[11px] text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-orange-700" />
+      )}
+    </label>
+  );
+
+  return (
+    <div className="rounded-sm border border-void-700 bg-void-900/60 p-2.5">
+      <div className="mb-2 flex items-center justify-between gap-2">
+        <span className="text-[11px] font-medium text-zinc-300">
+          本 agent 覆盖
+          {overridden && <span className="ml-1.5 rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9px] text-orange-300">已覆盖</span>}
+          {!overridden && <span className="ml-1.5 font-mono text-[9.5px] text-zinc-600">当前=默认供应商</span>}
+        </span>
+        <button onClick={() => void save()} disabled={!dirty || state === 'saving'}
+          className={cn('flex items-center gap-1 rounded-sm border px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40',
+            dirty ? 'border-orange-600 bg-orange-600/20 text-orange-300 hover:bg-orange-600/30' : 'border-void-600 text-zinc-500')}>
+          {state === 'saving' ? '探测中…' : state === 'ok' ? '✓ 已保存' : '保存并探测'}
+        </button>
+      </div>
+      <div className="space-y-1.5">
+        {field('format', '接口格式', '')}
+        {field('baseUrl', 'Base URL', '留空=用默认')}
+        {field('apiKey', 'API Key', '留空=用默认', 'password')}
+        {field('model', '模型名称', '留空=用默认')}
+      </div>
+      <p className={cn('mt-1.5 truncate font-mono text-[10px]', state === 'err' ? 'text-red-400' : 'text-zinc-600')} title={msg}>
+        {state === 'err' ? msg : '保存会用覆盖后的完整配置做真实连通探测; 清除=保存空值回默认'}
+      </p>
+    </div>
+  );
+}
+
+/**
+ * R32D44-feature: agent 配置页签——点开某 agent 后在此看它的完整配置面:
+ * 生效运行配置(上下文窗口/模型/思考档位等, 来自全局通用配置)、挂载的
+ * MCP、挂载的技能(点击直接展开正文)、专属数据源(apikey 配置态)。
+ * 编辑入口仍统一在「设置」页(#settings)——此处为只读+跳转, 不做第二
+ * 编辑面(单一数据源, 避免双写漂移)。
+ * 布局: 自适应宽度——面板 grid 随断点 1/2 列回流, 无固定像素宽; 技能
+ * 正文 pre-wrap 满行折行。
+ */
+function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean }) {
+  const [common, setCommon] = useState<Record<string, Record<string, string | number>> | null>(null);
+  const [schemaAgents, setSchemaAgents] = useState<{ agentKey: string; label: string; hint: string;
+    sources: { id: string; label: string; fields: { id: string; label: string }[] }[] }[]>([]);
+  const [reconSources, setReconSources] = useState<Record<string, Record<string, string>>>({});
+  const [agentLlm, setAgentLlm] = useState<Record<string, Record<string, string>>>({});
+  const [mcps, setMcps] = useState<{ name: string; transport: string; enabled?: boolean;
+    url?: string; command?: string; agents?: string[] }[] | null>(null);
+
+  const reloadLlm = () => api<{ common: typeof common; agentLlm: Record<string, Record<string, string>> }>('/agent-settings')
+    .then(d => { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); })
+    .catch(() => {});
+
+  useEffect(() => {
+    let cancelled = false;
+    api<{ common: Record<string, Record<string, string | number>> | null;
+      agentLlm: Record<string, Record<string, string>>;
+      reconSources: Record<string, Record<string, string>>;
+      schema: { agents: typeof schemaAgents } }>('/agent-settings')
+      .then(d => { if (!cancelled) { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); setReconSources(d.reconSources ?? {}); setSchemaAgents(d.schema?.agents ?? []); } })
+      .catch(() => { if (!cancelled) setCommon({}); });
+    api<typeof mcps>('/sandbox/mcp')
+      .then(list => { if (!cancelled) setMcps(list ?? []); })
+      .catch(() => { if (!cancelled) setMcps([]); });
+    return () => { cancelled = true; };
+  }, []);
+
+  const llm = (common?.llm ?? {}) as Record<string, string | number>;
+  const comp = (common?.compaction ?? {}) as Record<string, string | number>;
+  const fmtLabel = { openai: 'OpenAI 兼容', anthropic: 'Anthropic', gemini: 'Gemini' }[String(agentLlm?.[agentId]?.format || llm.format || 'openai')] ?? String(llm.format || 'openai');
+  const mine = (mcps ?? []).filter(m => (m.agents ?? []).includes(agentId) && m.enabled !== false);
+  const myGroup = schemaAgents.find(g => g.agentKey === agentId);
+  const cfg = (v: string | number | undefined, d: string) => (v === undefined || v === '' ? d : String(v));
+
+  return (
+    <div className="grid w-full min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-2">
+      {isAuto && <SpawnLimitSettings />}
+
+      {/* 生效运行配置 + 本 agent 供应商覆盖(R32D44: 可直接改) */}
+      <Panel title="大模型(生效配置 + 本 agent 覆盖)">
+        <div className="space-y-2">
+          <div className="space-y-1.5">
+            {[
+              ['格式', cfg(fmtLabel, 'OpenAI 兼容')],
+              ['Base URL', cfg(llm.baseUrl, '(未配置)')],
+              ['模型', cfg(llm.model, '(未配置)')],
+              ['Thinking Effort', cfg(llm.thinkingLevel, '(未设置)')],
+              ['最大输出 Tokens', cfg(llm.maxTokens, '32768')],
+              ['上下文窗口 Tokens', cfg(llm.contextWindow, '786432')],
+              ['上下文压缩', cfg(comp.enabled, '开启')],
+              ['API Key', llm.apiKey ? '已配置' : '(未配置)'],
+            ].map(([k, v]) => (
+              <div key={k} className="flex items-center justify-between gap-3 rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
+                <span className="shrink-0 text-[11px] text-zinc-500">{k}</span>
+                <span className="min-w-0 truncate font-mono text-[11.5px] text-zinc-300" title={v}>{v}</span>
+              </div>
+            ))}
+          </div>
+          <AgentLlmOverride agentId={agentId} ov={agentLlm?.[agentId]} onSaved={reloadLlm} />
+        </div>
+      </Panel>
+
+      {/* 挂载的 MCP */}
+      <Panel title={`挂载的 MCP(${mine.length})`}>
+        {mcps === null ? <div className="text-[11.5px] text-zinc-500">载入中…</div>
+          : mine.length === 0 ? <div className="text-[11.5px] text-zinc-500">该 agent 暂无挂载的 MCP 服务器。</div>
+          : <div className="space-y-1.5">
+            {mine.map(m => (
+              <div key={m.name} className="rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="min-w-0 truncate font-mono text-[11.5px] text-zinc-300">{m.name}</span>
+                  <Dot tone="cyan" />
+                </div>
+                <div className="mt-0.5 truncate font-mono text-[10px] text-zinc-600" title={m.url ?? m.command}>
+                  {m.transport === 'stdio' ? (Array.isArray(m.command) ? m.command.join(' ') : String(m.command ?? 'stdio')) : (m.url ?? m.transport ?? '')}
+                </div>
+              </div>
+            ))}
+            <a href="#mcp" className="block pt-1 text-[10.5px] text-orange-400/80 underline-offset-2 hover:underline">
+              在「MCP Server」页管理挂载 →
+            </a>
+          </div>}
+      </Panel>
+
+      {/* 挂载的技能(点击直接看正文) */}
+      <Panel title="挂载的技能(点击查看内容)" className="min-w-0">
+        <RealSkillsPanel agentKey={agentId} expandable />
+      </Panel>
+
+      {/* 专属数据源 / 参数(编辑在设置页) */}
+      <Panel title="专属配置(数据源 / 参数)">
+        {!myGroup ? <div className="text-[11.5px] text-zinc-500">该 agent 无专属数据源配置组(仅用全局通用配置)。</div>
+          : <div className="space-y-1.5">
+            {myGroup.sources.map(src => {
+              const vals = reconSources[src.id] ?? {};
+              const has = src.fields.some(f => vals[f.id.split('.')[1]]);
+              return (
+                <div key={src.id} className="flex items-center justify-between gap-3 rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
+                  <div className="min-w-0">
+                    <div className="truncate text-[11.5px] text-zinc-300">{src.label}</div>
+                    <div className="truncate font-mono text-[9.5px] text-zinc-600">{src.fields.map(f => f.label).join(' / ')}</div>
+                  </div>
+                  {has ? <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] text-emerald-400"><ShieldCheck className="h-3 w-3" />已配置</span>
+                    : <span className="shrink-0 font-mono text-[10px] text-zinc-600">未配置</span>}
+                </div>
+              );
+            })}
+            <div className="pt-1 text-[10.5px] text-zinc-600">{myGroup.hint}</div>
+            <a href="#settings" className="block text-[10.5px] text-orange-400/80 underline-offset-2 hover:underline">
+              在「设置」页配置(保存前真实连通校验) →
+            </a>
+          </div>}
+      </Panel>
+    </div>
+  );
+}
+
 /** F24: 真实技能只读面板(原 mock 假技能名列表) */
-function RealSkillsPanel({ agentKey }: { agentKey: string }) {
+function RealSkillsPanel({ agentKey, expandable = false }: { agentKey: string; expandable?: boolean }) {
   const [names, setNames] = useState<string[] | null>(null);
   const [err, setErr] = useState('');
+  // R32D44-feature: 点击技能直接看正文(展开态缓存, 再点收起)
+  const [open, setOpen] = useState<string | null>(null);
+  const [content, setContent] = useState<Record<string, string>>({});
+  const [loading, setLoading] = useState('');
+
   useEffect(() => {
     api<{ agentKey: string; name: string }[]>('/sandbox/skills')
       .then(tree => {
@@ -601,15 +804,49 @@ function RealSkillsPanel({ agentKey }: { agentKey: string }) {
       })
       .catch(e => setErr(e instanceof Error ? e.message : String(e)));
   }, [agentKey]);
+
+  const toggle = async (n: string) => {
+    if (open === n) { setOpen(null); return; }
+    setOpen(n);
+    if (content[n] === undefined) {
+      setLoading(n);
+      try {
+        const r = await api<{ content: string }>(`/sandbox/skills/content?agentKey=${encodeURIComponent(agentKey)}&name=${encodeURIComponent(n)}`);
+        setContent(c => ({ ...c, [n]: r.content }));
+      } catch (e) {
+        setContent(c => ({ ...c, [n]: `加载失败: ${e instanceof Error ? e.message : String(e)}` }));
+      } finally {
+        setLoading('');
+      }
+    }
+  };
+
   if (err) return <div className="text-[11.5px] text-red-400">加载失败:{err}</div>;
   if (!names) return <div className="text-[11.5px] text-zinc-500">载入中…</div>;
   if (!names.length) return <div className="text-[11.5px] text-zinc-500">该 agent 暂无挂载技能。</div>;
   return (
     <div className="space-y-1.5">
       {names.map(n => (
-        <div key={n} className="flex items-center justify-between rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
-          <span className="font-mono text-[11.5px] text-zinc-300">#{n}</span>
-          <Dot tone="cyan" />
+        <div key={n} className="min-w-0 rounded-sm border border-void-700 bg-void-900">
+          <button
+            onClick={expandable ? () => void toggle(n) : undefined}
+            className={cn('flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left', expandable && 'hover:bg-void-800/60')}
+          >
+            <span className="flex min-w-0 items-center gap-1.5">
+              {expandable && (open === n
+                ? <ChevronDown className="h-3 w-3 shrink-0 text-zinc-600" />
+                : <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />)}
+              <span className="truncate font-mono text-[11.5px] text-zinc-300">#{n}</span>
+            </span>
+            <Dot tone="cyan" />
+          </button>
+          {expandable && open === n && (
+            <div className="border-t border-void-700 px-2.5 py-2">
+              {loading === n && content[n] === undefined
+                ? <div className="text-[11px] text-zinc-500">载入中…</div>
+                : <pre className="max-h-80 w-full min-w-0 overflow-auto whitespace-pre-wrap break-words rounded-sm bg-void-950 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-400">{content[n]}</pre>}
+            </div>
+          )}
         </div>
       ))}
     </div>

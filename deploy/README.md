@@ -20,7 +20,7 @@
 
 | 组件 | 入口 | 默认端口 | 环境变量 |
 |---|---|---|---|
-| agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `LLM_API_KEY` `SPECTRE_SANDBOX_DRIVER` |
+| agent-runtime | `backend/agent-runtime.mjs` | 8090 | `PORT` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN` `SPECTRE_SANDBOX_DRIVER` |
 | console | `console/` (vite build) | — | — |
 | gateway | `gateway/server.py` | 8081 | `GATEWAY_BIND_HOST` `GATEWAY_PORT` `RUNTIME_HOST` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
 | worker | Temporal activities | — | 同 runtime |
