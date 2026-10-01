@@ -601,7 +601,9 @@ export async function saveSetting({ group, field, value }, wal) {
     // 触发双字段整体验证)。
     const hasSecret = hasSourceCredential(cur, srcId);
     if (!hasSecret) {
-      const all0 = { ...getPrefs().reconApiKeys, [srcId]: cur };
+      const all0 = { ...getPrefs().reconApiKeys };
+      if (Object.keys(cur).length === 0) delete all0[srcId];  // R32D48: 源级空对象不留
+      else all0[srcId] = cur;
       setPrefs({ reconApiKeys: all0 }, wal);
       return { ok: true, mounted: false };
     }
@@ -610,7 +612,8 @@ export async function saveSetting({ group, field, value }, wal) {
     // R10-F2: validate(~15s 网络窗口)后重读——并发保存的兄弟字段不被
     // 陈旧快照覆盖(丢更新)。
     const freshAll = { ...getPrefs().reconApiKeys };
-    freshAll[srcId] = cur;  // CS22-F2: 探测过的 cur(空键已删)
+    if (Object.keys(cur).length === 0) delete freshAll[srcId];  // R32D48: 源级空对象不留
+    else freshAll[srcId] = cur;  // CS22-F2: 探测过的 cur(空键已删)
     setPrefs({ reconApiKeys: freshAll }, wal);
     return { ok: true, mounted: true };
   }

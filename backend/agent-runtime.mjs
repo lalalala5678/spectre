@@ -115,10 +115,15 @@ projectsFromWal(entries);
 // 必须在 WAL replay 之后——此前放在 wal.open 后读到的是模块初值,
 // 每次开机都重复迁移(幂等但 WAL 每靴多一条); 且 buildPi 先于本处,
 // 导入后立即热更 live model 身份字段(否则首请求打向空 baseUrl)。
-if (migrateLegacyLlmEnv(wal)) {
+const migratedLlm = migrateLegacyLlmEnv(wal);
+if (migratedLlm) {
   console.log('[agent-runtime] 已将 .env 的 LLM_* 一次性导入平台配置(以后请在「设置」页管理)');
-  await applyLlmPrefs();
 }
+// R32D48-P0: 无条件热更——buildPi(上文)先于 WAL replay 以空 prefs 建
+// live model, 迁移后任何重启不再走迁移分支, live model 的 baseUrl 停留
+// 构建期空值→OpenAI SDK 默认 api.openai.com(平台密钥外发第三方,
+// 抓包实证)。此前仅设置页保存触发过热更, 掩盖了纯重启路径。
+await applyLlmPrefs();
 spawnSettingsFromWal(entries);  // F68: spawn policy WAL replay
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
