@@ -6,10 +6,12 @@ cd "$(dirname "$0")/.."
 DST="${1:-${SPECTRE_DATA_DIR:-/var/lib/spectre}}"
 # R13-1(十三轮): 生产缺省路径守卫——与 skills-seed NEW-B 同款(该脚本
 # 上轮已实测漏 env 直写生产; 十三轮再次真实触发)。
-if [ -z "$SPECTRE_DATA_DIR" ] && [ -z "$1" ] && [ "$DST" = "/var/lib/spectre" ]; then
+# R32D55-N2(真修): 按解析后的目标判——env 已设但尾斜杠变体指向生产
+# 此前 -z 短路放行(realpath 检查根本不执行, 实测绕过)。
+DST_N=$(realpath -m "$DST")
+if [ "$DST_N" = "/var/lib/spectre" ]; then
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
-    echo "[tools-sync] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $DST" >&2
-    echo "[tools-sync] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
+    echo "[tools-sync] 拒绝: 目标为生产缺省路径 $DST(解析为 $DST_N)——设 SPECTRE_DATA_DIR=<隔离目录> 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
     exit 1
   fi
   echo "[tools-sync] 警告: SPECTRE_ALLOW_DEFAULT_DATA=1 —— 写入生产路径 $DST" >&2
@@ -18,7 +20,7 @@ mkdir -p "$DST/tools/bin" "$DST/tools/c2"
 cp -v tools/bin/*.py "$DST/tools/bin/"
 # CS9-N5: fp-scan 统一指纹入口(pi.mjs 提示词引用)——bash 本体随 bin 交付
 cp -v docs/fp-scan "$DST/tools/bin/fp-scan"; chmod +x "$DST/tools/bin/fp-scan"
-for d in basetypes basetypes-jakarta javastubs javastubs-jakarta javastubs-rx javart jsshim yara-rules mock; do  # R32D54: jsshim(JS 桩)入仓  # CS26-4: jakarta/rx 桩入仓交付  # CS25: javart(RTHarness 源+类)入交付面
+for d in basetypes basetypes-jakarta javastubs javastubs-jakarta javastubs-rx javart jsshim dicts yara-rules mock; do  # R32D55: dicts 入仓; fingerprints 走 fetch-fingerprints.sh(45MB)  # R32D54: jsshim(JS 桩)入仓  # CS26-4: jakarta/rx 桩入仓交付  # CS25: javart(RTHarness 源+类)入交付面
   [ -d "tools/c2/$d" ] && cp -r "tools/c2/$d" "$DST/tools/c2/"
 done
 cp -v tools/c2/private-qa-server.py tools/c2/mcp-echo.mjs "$DST/tools/c2/"

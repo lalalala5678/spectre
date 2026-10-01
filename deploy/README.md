@@ -79,6 +79,7 @@ SBX="spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8)"
 docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
   || { echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2; exit 1; }
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
+bash deploy/fetch-fingerprints.sh   # 指纹库 nt-technologies+plugins-0x727(~45MB, R32D55-N1 供给面)
 SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 三变量与 runtime 同源
 
 # 7) 数据源凭据

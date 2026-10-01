@@ -21,7 +21,19 @@ else
 fi
 CFF=$FP_DIR/webappanalyzer.json
 NT_DIR=$FP_DIR/../fingerprints
+# R32D55-N1: 供给守卫——缺件给可行动错误(此前 FileNotFoundError 裸栈)。
+if [ ! -f "$CFF" ]; then
+  echo "[fp-scan] 缺字典 $CFF——tools-sync 应已交付(tools/dicts/); 若无, 检查克隆完整性" >&2; exit 2
+fi
+if [ ! -d "$NT_DIR/nt-technologies" ]; then
+  echo "[fp-scan] 缺指纹库 $NT_DIR/nt-technologies——运行 bash deploy/fetch-fingerprints.sh(约 45MB, 网络下载)" >&2; exit 2
+fi
+for eng in httpx whatweb; do
+  command -v "$eng" >/dev/null 2>&1 || echo "[fp-scan][warn] 引擎 $eng 不在 PATH——对应层将跳过" >&2
+done
 OUT=out.tsv; LIST=""; DEEP=0; MAX=120
+FPTMP=$(mktemp -u /tmp/fp-scan.XXXXXX)  # R32D55-N4: 共享 /tmp/.fps.* 多实例碰撞→mktemp
+trap "rm -f ${FPTMP}*" EXIT
 # R32D54: -h/--help 契约(家族统一; 此前未知 flag 静默吞)。
 if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,12p' "$0"; exit 0; fi
 while [ $# -gt 0 ]; do case "$1" in
@@ -32,22 +44,22 @@ while [ $# -gt 0 ]; do case "$1" in
 esac; done
 
 # F28: 清理陈旧临时文件——此前残留的 l1/l2/l4 会被下一会话当新鲜结果合并(跨会话污染)
-rm -f /tmp/.fps.l1.json /tmp/.fps.l2.json /tmp/.fps.l3.txt /tmp/.fps.l4.json /tmp/.fps.out /tmp/.fps.in /tmp/.fps.ww
-if [ -n "$LIST" ]; then cp "$LIST" /tmp/.fps.in; else cat > /tmp/.fps.in; fi
-[ -s /tmp/.fps.in ] || { echo "fp-scan: empty input" >&2; exit 1; }
+rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
+if [ -n "$LIST" ]; then cp "$LIST" ${FPTMP}.in; else cat > ${FPTMP}.in; fi
+[ -s ${FPTMP}.in ] || { echo "fp-scan: empty input" >&2; exit 1; }
 
 echo "[fp-scan] layer1: httpx builtin wappalyzer..."
-cat /tmp/.fps.in | httpx -silent -title -tech-detect -status-code \
-  -web-server -content-type -favicon -follow-redirects -threads 15 -timeout 8 -json -o /tmp/.fps.l1.json >/dev/null 2>&1
+cat ${FPTMP}.in | httpx -silent -title -tech-detect -status-code \
+  -web-server -content-type -favicon -follow-redirects -threads 15 -timeout 8 -json -o ${FPTMP}.l1.json >/dev/null 2>&1
 
 # F28: PD httpx -cff 只认 "technologies" 键;旧版 webappanalyzer.json 用 "apps"
-# → 层2 静默零输出。首次遇到自动转换缓存到 /tmp/.fps.cff.json。
+# → 层2 静默零输出。首次遇到自动转换缓存到 ${FPTMP}.cff.json。
 CFF_OK="$CFF"
 if [ -f "$CFF" ] && ! grep -q '"technologies"' <(head -c 4096 "$CFF"); then
-  if [ ! -s /tmp/.fps.cff.json ]; then
-    python3 -c "import json,sys; d=json.load(open('$CFF')); json.dump({'technologies': d.get('apps', d.get('technologies', {}))}, open('/tmp/.fps.cff.json','w'))" 2>/dev/null || true
+  if [ ! -s ${FPTMP}.cff.json ]; then
+    python3 -c "import json,sys; d=json.load(open('$CFF')); json.dump({'technologies': d.get('apps', d.get('technologies', {}))}, open('${FPTMP}.cff.json','w'))" 2>/dev/null || true
   fi
-  [ -s /tmp/.fps.cff.json ] && CFF_OK=/tmp/.fps.cff.json
+  [ -s ${FPTMP}.cff.json ] && CFF_OK=${FPTMP}.cff.json
 fi
 echo "[fp-scan] layer2: httpx + webappanalyzer(7613)..."
 # F28: cff 格式与 httpx v1.10 wappalyzer loader 不兼容(四种重组实测全拒)。
@@ -61,20 +73,20 @@ if [ -s "$CFF_OK" ]; then
     echo "[fp-scan] layer2: cff 不兼容 httpx wappalyzer loader,降级内置引擎(交叉验证)" >&2
   fi
 fi
-cat /tmp/.fps.in | httpx -silent -tech-detect -status-code \
-  $L2_CFF -threads 15 -timeout 8 -json -o /tmp/.fps.l2.json >/dev/null 2>&1
+cat ${FPTMP}.in | httpx -silent -tech-detect -status-code \
+  $L2_CFF -threads 15 -timeout 8 -json -o ${FPTMP}.l2.json >/dev/null 2>&1
 
 echo "[fp-scan] layer3: whatweb(up to $MAX, version-strong)..."
-head -$MAX /tmp/.fps.in > /tmp/.fps.ww
-whatweb -q --no-errors --input-file /tmp/.fps.ww 2>/dev/null \
+head -$MAX ${FPTMP}.in > ${FPTMP}.ww
+whatweb -q --no-errors --input-file ${FPTMP}.ww 2>/dev/null \
   | sed 's/\[200 OK\]\|\[301 Moved Permanently\]\|\[302 Found\]//g' \
-  > /tmp/.fps.l3.txt || true
+  > ${FPTMP}.l3.txt || true
 
 if [ "$DEEP" = "1" ]; then
   echo "[fp-scan] layer4(deep): nuclei fingerprint templates(4447)..."
-  nuclei -l /tmp/.fps.in -t "$NT_DIR/nt-technologies" -t "$NT_DIR/plugins-0x727" \
+  nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" -t "$NT_DIR/plugins-0x727" \
     -severity info,low,medium,high,critical -tags tech,fingerprint,panel \
-    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o /tmp/.fps.l4.json 2>/dev/null || true
+    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json 2>/dev/null || true
 fi
 
 python3 - <<'PYEOF'
@@ -87,7 +99,7 @@ def norm(u):
     u = u.strip()
     return re.sub(r'^https?://', '', u).rstrip('/')
 
-for line in open('/tmp/.fps.l1.json'):
+for line in open('${FPTMP}.l1.json'):
     try: d = json.loads(line)
     except: continue
     a = norm(d.get('url', d.get('host', '')))
@@ -101,7 +113,7 @@ for line in open('/tmp/.fps.l1.json'):
     fh = d.get('favicon') or d.get('favicon_hash')
     if fh: m['favicon'] = str(fh)
 
-for line in open('/tmp/.fps.l2.json'):
+for line in open('${FPTMP}.l2.json'):
     try: d = json.loads(line)
     except: continue
     a = norm(d.get('url', d.get('host', '')))
@@ -109,7 +121,7 @@ for line in open('/tmp/.fps.l2.json'):
         apps[a].add((str(t), 'webappanalyzer'))
 
 # whatweb: "host [HTTP] field1, field2[key=val], ..."
-for line in open('/tmp/.fps.l3.txt'):
+for line in open('${FPTMP}.l3.txt'):
     line = line.strip()
     if not line: continue
     parts = re.split(r'\]\s*', line.replace('[', '', 1)) if ']' in line else [line]
@@ -123,8 +135,8 @@ for line in open('/tmp/.fps.l3.txt'):
 
 import os
 seen_now = set(meta) | set(apps)
-if os.path.exists('/tmp/.fps.l4.json'):
-    for line in open('/tmp/.fps.l4.json'):
+if os.path.exists('${FPTMP}.l4.json'):
+    for line in open('${FPTMP}.l4.json'):
         try: d = json.loads(line)
         except: continue
         # F28: nuclei host 可能无端口/带 scheme——与 httpx 的 norm 键分裂,
@@ -146,7 +158,7 @@ if os.path.exists('/tmp/.fps.l4.json'):
             apps[target].add((f"{tid}", 'nuclei'))
 
 seen = set(meta) | set(apps)
-with open('/tmp/.fps.out', 'w') as f:
+with open('${FPTMP}.out', 'w') as f:
     f.write("asset\tstatus\ttitle\tserver\tapps\tfav\tsource\n")
     for a in sorted(seen):
         m = meta.get(a, {})
@@ -158,5 +170,5 @@ print(f"[fp-scan] done: {len(seen)} assets")
 PYEOF
 
 # F28: -o 生效——此前 OUT 变量解析了却从不写出
-cp /tmp/.fps.out "$OUT" && echo "[fp-scan] output -> $OUT"
+cp ${FPTMP}.out "$OUT" && echo "[fp-scan] output -> $OUT"
 

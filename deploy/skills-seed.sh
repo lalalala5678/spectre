@@ -5,7 +5,7 @@ set -e
 DST="${1:-${SPECTRE_DATA_DIR:-/var/lib/spectre}}"
 # NEW-B(十一轮): 未显式指定数据根而解析为生产缺省路径时拦截——六轮 G4/
 # 九轮 F-C 同类防护此前唯独漏了本脚本(十一轮审计真实触发覆写)。
-if [ -z "$SPECTRE_DATA_DIR" ] && [ -z "$1" ] && [ "$DST" = "/var/lib/spectre" ]; then
+if [ "$(realpath -m "$DST")" = "/var/lib/spectre" ]; then  # R32D55-N2(真修): 按解析后目标判
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
     echo "[skills-seed] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $DST" >&2
     echo "[skills-seed] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1 确认写入生产" >&2

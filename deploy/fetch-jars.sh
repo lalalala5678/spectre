@@ -7,11 +7,12 @@ ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
 # 最后缺位者(漏 env 直跑即静默写 ~25MB jar 进生产路径)。
 # CS3-N19: 守卫判实际写目标(LIBS/GEN 可覆盖 ROOT), 而非仅 ROOT
 # CS3-N19/CS4-M11: 守卫判全部实际写目标(LIBS 与 GEN 任一落在生产路径即拦)
-GUARD_LIBS=${LIBS_DIR:-$ROOT/tools/c2/libs}
-GUARD_GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
-if [ -z "$SPECTRE_DATA_DIR" ] \
-   && { [ "$GUARD_LIBS" = "/var/lib/spectre/tools/c2/libs" ] \
-     || [ "$GUARD_GEN" = "/var/lib/spectre/tools/c2/generators" ]; }; then
+# R32D55-N2: realpath 归一——尾斜杠/./ 变体此前绕过守卫写生产。
+GUARD_LIBS=$(realpath -m "${LIBS_DIR:-$ROOT/tools/c2/libs}")
+GUARD_GEN=$(realpath -m "${GEN_DIR:-$ROOT/tools/c2/generators}")
+# R32D55-N2(真修): 按解析后目标判(env 已设的尾斜杠变体此前绕过)。
+if [ "$GUARD_LIBS" = "/var/lib/spectre/tools/c2/libs" ] \
+   || [ "$GUARD_GEN" = "/var/lib/spectre/tools/c2/generators" ]; then
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
     echo "[fetch-jars] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $ROOT" >&2
     echo "[fetch-jars] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2

@@ -13,10 +13,14 @@ import sys, os, json, re, argparse, time
 try:
     import yaml
 except ImportError:
+    # R32D55-N3: 共享层在场但缺 yaml 也给可行动错误(此前裸栈)。
     _p = '/opt/tools/py'
     if os.path.isdir(_p):
         sys.path.insert(0, _p)
-        import yaml
+        try:
+            import yaml
+        except ImportError:
+            raise SystemExit('共享层 /opt/tools/py 缺 PyYAML——pip install --target /opt/tools/py pyyaml 或容器位运行')
     else:
         raise SystemExit('spectre-nuclei 需要 PyYAML——容器位内置; 宿主位 PYTHONPATH=/opt/tools/py 或 pip install pyyaml')
 import urllib.request, urllib.error
