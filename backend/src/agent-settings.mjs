@@ -579,16 +579,23 @@ export async function saveSetting({ group, field, value }, wal) {
     return { ok: true };
   }
   if (group === 'recon-source') {
-    // R32D46-NEW-5/CS20: 畸形 field 守卫——无点(leaf=undefined 垃圾)、
-    // 尾点(leaf='')、多点(a.b.c 静默截断落错字段)全拒。
+    // R32D46-NEW-5/CS20/R32D47-P3: 畸形 field 守卫——无点(leaf=undefined
+    // 垃圾)、尾点(leaf='')、多点(a.b.c 静默截断落错字段)全拒; 叶子须在
+    // 该源 schema 字段集内(secretX 之类未知名此前静默落盘)。
     if (!/^[^.\s]+\.[^.\s]+$/.test(field)) {
       return { ok: false, error: 'field 须为 <sourceId>.<leaf> 形状(单点两侧非空)' };
     }
     const [srcId, leaf] = field.split('.');
     const src = RECON_SOURCES[srcId];
     if (!src) return { ok: false, error: '未知数据源' };
+    if (!Object.keys(src.fields ?? {}).includes(leaf)) {
+      return { ok: false, error: `未知字段 ${leaf}(该源字段: ${Object.keys(src.fields ?? {}).join('/')})` };
+    }
     const leafVal = clean(value);
-    const cur = { ...getPrefs().reconApiKeys?.[srcId], [leaf]: leafVal };
+    // R32D47-P3: 空串=删键(此前残留 "a":"" 空串键, 状态不整洁)。
+    const prev = { ...getPrefs().reconApiKeys?.[srcId] };
+    const cur = leafVal === '' ? (() => { const c2 = { ...prev }; delete c2[leaf]; return c2; })()
+      : { ...prev, [leaf]: leafVal };
     // R10-F1: id 不算 secret——censys.id 参数化(同 cse.cx), 先存免探
     // 测落盘; 此前含 cur.id 使 censys 逐字段保存永久死锁(任一先存都
     // 触发双字段整体验证)。

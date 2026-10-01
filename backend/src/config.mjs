@@ -13,7 +13,9 @@ function loadEnvFile(path) {
   }
   for (const line of readFileSync(path, 'utf8').split('\n')) {
     const match = line.match(/^([A-Z_][A-Z0-9_]*)=(.*)$/);
-    if (match && !process.env[match[1]]) {
+    // R32D47-P3: 判据用 !== undefined——空串 env 此前被 !truthy 判为
+    // 未设, .env 值照样灌入(想用空串屏蔽 .env 行必须物理删行)。
+    if (match && process.env[match[1]] === undefined) {
       process.env[match[1]] = match[2];
     }
   }

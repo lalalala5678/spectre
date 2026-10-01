@@ -86,6 +86,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // 让下一次项目切换复用旧 drill 并抑制新项目锚点(跨项目残留)。
     if (!bootDoneRef.current) deepLinkRef.current = id;
     setDrillSession(id);
+    // R32D47-P2: URL 同步——搜索点击等 pendingOpen 通道此前剥掉 ?s=,
+    // 刷新恢复的是旧会话(URL/屏显脱钩的最后一个幸存通道)。
+    history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${id}`);
   }, [liveKey]);
   useEffect(() => {
     if (deepLink) {
@@ -281,7 +284,13 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // 有意最小 deps(见上注释); ws.id 变化由 bootstrapNonce 吸收
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workSession?.id, liveKey]);
-  const closeDrill = useCallback(() => setDrillSession(null), []);
+  const closeDrill = useCallback(() => {
+    setDrillSession(null);
+    // R32D47-P2: 返回主控会话时 ?s= 同步回当前主会话(与切换同口径)。
+    if (sessionId) {
+      history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${sessionId}`);
+    }
+  }, [liveKey, sessionId]);
   const onResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragW.current) return;
     const delta = dragW.current.startX - e.clientX;

@@ -230,7 +230,7 @@ export function SettingsPage() {
       <div className="mb-6 flex items-end justify-between">
         <div>
           <h1 className="flex items-center gap-2 text-[16px] font-medium text-zinc-100">
-            <Sparkles className="h-4 w-4 text-orange-400" />Agent 配置
+            <Sparkles className="h-4 w-4 text-orange-400" />设置
           </h1>
           <p className="mt-1 text-[11.5px] text-zinc-500">
             大多数字段独立保存(逐字段探测/范围校验,失败不落盘);大模型供应商为四字段整体保存+整体探测。
