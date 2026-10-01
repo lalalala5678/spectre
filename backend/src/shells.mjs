@@ -99,27 +99,28 @@ export function shellBusAdapter(bus) {
   };
 }
 
+/** CS26-2/CS27-1/7: scope targets 匹配器(模块级单源)——精确串 |
+ * '*.domain' 通配; 大小写不敏感(DNS 语义); 网段不参与 shell 匹配
+ * (shell.target 是主机名; scope-gate SKILL 'targets' 为 glob 清单)。
+ * gate 标签门与 exec 目的地校验共用; 导出供机锁直接断言。 */
+export function targetMatches(t, target) {
+  const tt = String(t).toLowerCase(), dt = String(target).toLowerCase();
+  return tt === dt || (tt.startsWith('*.') && dt.endsWith(tt.slice(1)));
+}
+
 export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 死参数删(仅 persistShells 快照持久化)
   const audit = (kind, data) => {
     try { bus?.emit?.('shell-event', { kind, at: new Date().toISOString(), ...data }); } catch { /* bus optional */ }
   };
 
-  /** CS26-2: scope targets 匹配器单源——精确串 | '*.domain' 通配;
- * 大小写不敏感(DNS 语义)。gate 标签门与 exec 目的地校验共用。 */
-function targetMatches(t, target) {
-  const tt = String(t).toLowerCase(), dt = String(target).toLowerCase();
-  return tt === dt || (tt.startsWith('*.') && dt.endsWith(tt.slice(1)));
-}
-
-function gate(shell) {
+  function gate(shell) {
     // Server-side authorization: exercise window + target binding.
     const sc = listScope?.() ?? null;
     if (!sc) return { ok: false, error: 'scope 不可读:授权门配置缺失' };
     const now = isoNow();
     const inWindow = sc.window && sc.window.start <= now && now <= sc.window.end;
-    // R32D50-F8/CS26-2: targets 语义与 scope 文档对齐(glob/清单)——
-    // 匹配器 targetMatches 提为模块级单源, gate 标签门与 exec 目的地
-    // 校验共用(支持 '*.domain' 通配+大小写不敏感)。
+    // R32D50-F8/CS27-7: targets 语义=模块级 targetMatches(见上; glob
+    // 通配清单, 网段不参与 shell 匹配)。
     const inTargets = Array.isArray(sc.targets)
       && sc.targets.some(t => targetMatches(t, shell.target));
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
@@ -134,7 +135,8 @@ function gate(shell) {
     // R6-F1: target 是自由文本标签, 与流量实际目的地零绑定——此前
     // 注册 target=授权名即可把 transportRef 指向任意内网地址(实测
     // 打穿 runtime 自身 /api/health)。推导 web/ssh 的目的地主机并
-    // 要求 ∈ targets(精确或点后缀子域); local=平台自有沙箱不校验。
+    // 要求 ∈ targets(targetMatches: 精确|'*.domain' 通配——裸目标不吃
+    // 点后缀子域, CS27-5 语义收窄披露); local=平台自有沙箱不校验。
     if (shell.transport === 'web' || shell.transport === 'ssh') {
       const dest = destinationHost(shell);
       if (dest) {
@@ -201,7 +203,7 @@ function gate(shell) {
   function list(f = {}) {
     let out = [...shells.values()];
     if (f.target) out = out.filter(x => x.target === f.target);
-    if (f.transport) out = out.filter(x => x.transport === String(f.transport).toLowerCase());  // CS26-8: 与 register 归一同口径
+    if (f.transport) out = out.filter(x => x.transport === String(f.transport).toLowerCase());  // CS26-8/CS27-6: 与 agent 入口(tools.mjs)归一同口径
     if (f.tag) out = out.filter(x => (x.tags ?? []).includes(f.tag));
     if (f.name) out = out.filter(x => String(x.name).toLowerCase().includes(String(f.name).toLowerCase()));
     if (f.status) out = out.filter(x => x.status === f.status);

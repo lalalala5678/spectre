@@ -7,7 +7,7 @@
   toklab brute --pairs p.txt --base school,campus,edu --rules year_suffix      # 语义生成(基词×年份×大小写,免手搓字典)
 captured.txt 每行: <body>\\t<sig>  (离线爆破,零在线请求)
 """
-import sys, json, base64, hashlib, hmac
+import sys  # CS28: 死 import 清理时误删(实际 main 消费 sys.exit)
 
 def b64d(s):
     s2 = s + '=' * (-len(s) % 4)
@@ -107,6 +107,10 @@ def cmd_brute(args):
     return 1
 
 def main():
+    # R32D53: -h rc=0(家族统一)。
+    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__)
+        return 0
     if len(sys.argv) < 3:
         print(__doc__)
         return 2

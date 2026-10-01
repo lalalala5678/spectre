@@ -110,7 +110,7 @@ def check_payload(path):
 
 def check_deep(raw, nrm, path):
     """二令十四项:面在=判据,面缺=N/A(留痕);判据不满足=FAIL(裸奔)。"""
-    import re as _re, os as _os, struct as _struct
+    import re as _re  # CS28: _os/_struct 死别名删
     out = {}
     def face(name):
         return bool(_re.search(DEEP_FACES[name], raw))
@@ -202,7 +202,7 @@ def check_delivery(d):
         out['items'].append(check_payload(p))
     bare = [i['file'] for i in out['items'] if i['verdict'] == 'REJECT']
     # ⑨ mtime 拟态核查:交付文件 mtime 偏离目录均值过大=裸奔
-    import time as _t, statistics as _st
+    import statistics as _st  # CS28: _t 死别名删
     files = [f for f in glob.glob(os.path.join(d, '*')) if os.path.isfile(f)]
     mt = [os.path.getmtime(f) for f in files]
     out['mtime'] = {'n': len(mt),

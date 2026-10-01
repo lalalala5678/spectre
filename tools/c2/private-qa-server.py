@@ -14,7 +14,7 @@
 配置: /opt/tools/c2/private-qa.json {"url":"http://127.0.0.1:8899/scan","token":"..."}
 (c2-qa.py 文件优先读它, env PRIVATE_QA_URL/TOKEN 兜底。)
 """
-import sys, os, json, glob, subprocess, tempfile, secrets
+
 from http.server import BaseHTTPRequestHandler
 
 CONTAINER = os.environ.get('SPECTRE_SANDBOX_CONTAINER', '')

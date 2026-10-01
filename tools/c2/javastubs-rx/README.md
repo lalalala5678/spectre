@@ -1,6 +1,6 @@
 # javastubs-rx
 
-reactor/WebFlux 最小桩(Flux/Mono/ServerWebExchange 等 20 类)。
+reactor/WebFlux 最小桩(Flux/Mono/ServerWebExchange 等, 0 个 .class=逻辑 13 类)。
 
 - 来源: 本地编译产物入库(上游源未随产线保留——CS27-3 记载为
   供给面债务); 与 `javastubs/`/`javastubs-jakarta/` 的 src+classes

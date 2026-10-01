@@ -60,34 +60,27 @@ console.log(JSON.stringify({ ok: Boolean(ev),
 });
 
 test('CS27-15: targetMatches 语义机锁(通配/裸目标子域/大小写)', () => {
+  // CS28-C2: targetMatches 已导出——直接 import 断言(去 eval 抠源码脆断)。
   const cases = [
     // [pattern, target, expected]
     ['*.foo.com', 'sub.foo.com', true],
     ['*.foo.com', 'foo.com', false],          // 通配不吃裸域
-    ['foo.com', 'sub.foo.com', false],        // CS27-5: 裸目标不再吃点后缀子域
+    ['foo.com', 'sub.foo.com', false],        // CS27-5: 裸目标不吃点后缀子域
     ['foo.com', 'FOO.com', true],             // 大小写不敏感
     ['*.FOO.com', 'sub.foo.com', true],
-    ['203.0.113.0/24', '203.0.113.5', false], // 网段不参与(如 SKILL 所述)
+    ['203.0.113.0/24', '203.0.113.5', false], // 网段不参与(targetMatches 无 CIDR 分支)
   ];
   const dir = mkdtempSync(join(tmpdir(), 'tm-'));
   try {
-    const src = [
+    const script = [
       `process.env.SPECTRE_DATA_DIR = ${JSON.stringify(dir)};`,
-      "const m = await import('./src/shells.mjs');",
-      "// targetMatches 未导出——经 registry 语义等价面验证不可行, 直接源断言",
-      "const fs = await import('node:fs');",
-      "const src = fs.readFileSync('./src/shells.mjs', 'utf8');",
-      "const mm = src.match(/function targetMatches\\(t, target\\) \\{[\\s\\S]*?\\n\\}/);",
-      "if (!mm) { console.log(JSON.stringify({ ok: false, err: 'no fn' })); process.exit(0); }",
+      `const { targetMatches } = await import('./src/shells.mjs');`,
       `const cases = ${JSON.stringify(cases)};`,
-      "const fn = new Function('t', 'target', mm[0].replace('function targetMatches(t, target) {', 'return (' + 'function (t, target) {') + ')');",
-      "// 还原函数体: 包一层 eval",
-      "const body = mm[0]; const f = eval('(' + body + ')');",
-      "const out = cases.map(([p2, t2, exp]) => { const got = f(p2, t2); return got === exp; });",
-      "console.log(JSON.stringify({ ok: out.every(Boolean), results: out }));",
+      'const out = cases.map(([p, t, exp]) => targetMatches(p, t) === exp);',
+      'console.log(JSON.stringify({ ok: out.every(Boolean), results: out }));',
     ].join('\n');
     const r = spawnSync(process.execPath, ['--input-type=module', '-'], {
-      input: src, encoding: 'utf8', timeout: 30000, cwd: BACKEND,
+      input: script, encoding: 'utf8', timeout: 30000, cwd: BACKEND,
     });
     if (r.status !== 0) throw new Error(`exit ${r.status}: ${r.stderr}`);
     const out = JSON.parse(r.stdout);

@@ -111,7 +111,7 @@ export async function ensureSandbox() {
       await fsp.mkdir(d, { recursive: true });
     }
     const boot = await bootstrapToolchain();
-    return { driver: 'local', ok: true, ...boot };
+    return { driver: 'local', ok: boot.bootstrapped !== false, ...boot };  // CS28/N4
   }
   for (const d of Object.values(HOST)) {
     await fsp.mkdir(d, { recursive: true });
@@ -127,7 +127,11 @@ export async function ensureSandbox() {
         return { driver: 'docker', ok: false, error: `start failed: ${start.out.slice(-200)}` };
       }
     }
-    return { driver: 'docker', ok: true, started: true };
+    // R32D53-N4: 存活容器也验 bootstrap marker——此前 exists 早退直接
+    // ok:true, 上次 bootstrap 失败(marker 未写)后重启永不重试(文档
+    // '重启即重试'不成立, 实测 0 行 bootstrap)。
+    const reBoot = await bootstrapToolchain();
+    return { driver: 'docker', ok: reBoot.bootstrapped !== false, started: true, ...reBoot };
   }
   const pull = await run('docker', ['pull', cfg.image], 600);
   if (pull.code !== 0) {
@@ -256,21 +260,19 @@ async function bootstrapToolchain() {
     // 失败仍返回 ok:true, 调用方(健康面)与文档承诺脱节。
     return { bootstrapped: false, error: `bootstrap exit ${res.code}: ${String(res.out).slice(-160)}` };
   }
-  {
-    // write the identity marker + ledger the apt toolchain so a rebuild
-    // can replay it even if the marker path itself is ever lost
-    // R24-2: marker 路径与读路径同源(base)——local 此前硬编码 /opt/tools
-    // (写穿隔离且与 markerHost 不匹配, 每次启动全量重跑 bootstrap)。
-    const writeBase = cfg.driver === 'docker' ? '/opt/tools' : HOST.tools;
-    const write = `printf '%s' ${identity} > ${writeBase}/.bootstrapped`;
-    if (cfg.driver === 'docker') {
-      await run('docker', ['exec', cfg.container, 'sh', '-c', write], 30);
-    } else {
-      await run('sh', ['-c', write], 30);
-    }
-    await appendInstallLog(`apt-get install -y nodejs npm python3 python3-pip git curl unzip jq build-essential`).catch(() => {});
+  // write the identity marker + ledger the apt toolchain so a rebuild
+  // can replay it even if the marker path itself is ever lost
+  // R24-2: marker 路径与读路径同源(base)——local 此前硬编码 /opt/tools
+  // (写穿隔离且与 markerHost 不匹配, 每次启动全量重跑 bootstrap)。
+  const writeBase = cfg.driver === 'docker' ? '/opt/tools' : HOST.tools;
+  const write = `printf '%s' ${identity} > ${writeBase}/.bootstrapped`;
+  if (cfg.driver === 'docker') {
+    await run('docker', ['exec', cfg.container, 'sh', '-c', write], 30);
+  } else {
+    await run('sh', ['-c', write], 30);
   }
-  return { bootstrapped: res.code === 0, output: res.out.slice(-500) };
+  await appendInstallLog('apt-get install -y nodejs npm python3 python3-pip git curl unzip jq build-essential').catch(() => {});
+  return { bootstrapped: true, output: res.out.slice(-500) };  // CS28-A3: 恒真条件删
 }
 
 /** Install shared CLI tooling (runs inside the sandbox for docker

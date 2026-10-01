@@ -497,6 +497,9 @@ def cmd_fingerprint(args):
     return 0
 
 def main():
+    # R32D53: -h rc=0(家族统一)。
+    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__); return 0
     if len(sys.argv) < 2:
         print(__doc__); return 2
     cmd, args = sys.argv[1], sys.argv[2:]

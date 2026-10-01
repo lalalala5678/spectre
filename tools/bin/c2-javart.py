@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""c2-javart — Java 运行时验证包装(双车道: Tomcat 9 javax / Tomcat 10.1 jakarta,\nRTHarness/RTHarnessJakarta 于 $C2/javart; CS27-11 双车道化表述)。
+"""c2-javart — Java 运行时验证包装(双车道: Tomcat 9 javax / Tomcat 10.1 jakarta,
+RTHarness/RTHarnessJakarta 于 $C2/javart; CS27-11 双车道化表述)。
 用法:
   c2-javart.py --src variant.java             # 源码 → 编译 → 模式探测 → RT
   c2-javart.py --class x.class --name fqcn    # real-lane:class 文件 → load/注册模式
@@ -131,7 +132,9 @@ def main():
             xc = extra_cp(logical)
             rc, line = run_harness(mode, name, marker, d + (':' + xc if xc else ''), lane_of(logical, a.get('--src') or ''))
         else:
-            cls = a['--class']
+            cls = a.get('--class')
+            if not cls:
+                print('[c2-javart] --class 模式需要 --class <file> 与 --name <fqcn>', file=sys.stderr); return 2
             outd = os.path.dirname(os.path.abspath(cls)) or '.'
             name = a.get('--name') or os.path.splitext(os.path.basename(cls))[0]
             logical = name  # class 模式由调用方给 fqcn/短名;load 用短名,cp 加目录

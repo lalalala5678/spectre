@@ -13,8 +13,10 @@
                manifest(sha256/jmg info);文本 decomp 不适用,需字节码变换族(未建,如实)
 纪律: 授权门(scope.json)+EDUSRC 隔离+审计,与 c2-qa 同源。
 """
-import sys, os, json, base64, re, subprocess, time, tempfile, hashlib
 
+
+
+import os, sys, json  # CS28: 死 import 清理误删 os(_data_root 消费)——恢复
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
