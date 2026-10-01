@@ -131,7 +131,9 @@ function SourceCard({ src, cfg, onSave, verify }: {
   const [open, setOpen] = useState(true);
   const isParams = src.id === 'brute';
   const paramCount = Object.values(cfg ?? {}).filter(v => String(v ?? '').length > 0).length;
-  const mounted = isParams ? paramCount > 0 : Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.id || cfg.password));
+  // R32D44-P2-5: id-only(censys 先存 id 免探测)不算已挂载——与后端
+  // enabledReconSources 同口径, 防绿点虚报。
+  const mounted = isParams ? paramCount > 0 : Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.password));
   const tier = TIER_STYLE[src.tier ?? 'P2'];
   const verifyState = verify;
   return (
@@ -218,7 +220,10 @@ export function SettingsPage() {
   const sources = reconAgent?.sources ?? [];
   const mountedCount = sources.filter((s) => {
     const c = data.reconSources[s.id];
-    return Boolean(c && (c.key || c.token || c.secret || c.id));
+    // R32D44-P2-5: 与后端 enabledReconSources 同口径——只认真实凭据
+    // 字段; 此前把 censys 的 id-only 也计入, UI 谎报'已挂载 MCP'
+    // (后端 verify configured:false, 实际未挂载)。
+    return Boolean(c && (c.key || c.token || c.secret));
   }).length;
   const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
   const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');

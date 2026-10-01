@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, ChevronDown, Loader2, User, X } from 'lucide-react';
+import { Bot, Check, ChevronDown, Loader2, User, X , TriangleAlert } from 'lucide-react';
 
 import {
   api,
@@ -625,6 +625,28 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
           <div className="text-[13px] text-zinc-300">
             <Markdown>{body}</Markdown>
           </div>
+        </div>
+      </div>
+    );
+  }
+
+  // R32D44-P1-2: LLM 失败回合可见化——后端把 fail-fast(未配置大模型)
+  // 与流异常放在 assistant.error/stopReason=error, 此前全仓无渲染点,
+  // 用户只看到空气泡+空闲。红色横幅给出可行动错误。
+  if (message.error) {
+    const errMsg = message.error;
+    return (
+      <div className="max-w-[92%]">
+        <div className="rounded-sm border border-red-900 bg-red-950/30 px-3 py-2">
+          <div className="mb-1 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-widest text-red-400/80">
+            <TriangleAlert className="h-3 w-3" /> 本轮失败
+          </div>
+          <div className="font-mono text-[12px] leading-relaxed text-red-300">{errMsg}</div>
+          {/未配置大模型|设置/.test(errMsg) && (
+            <a href="#settings" className="mt-1.5 inline-block text-[11px] text-orange-400/90 underline underline-offset-2">
+              去设置页配置大模型 →
+            </a>
+          )}
         </div>
       </div>
     );

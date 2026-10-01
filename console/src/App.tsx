@@ -83,14 +83,19 @@ export default function App() {
   const [wsId, setWsId] = useState<string | null>(null);
   // R13-F1: 依赖 [route]——项目切换只写服务端 prefs, App 层 wsId 此前
   // 是启动快照永不刷新, skills/mcp/cli 页持续作用于旧项目(跨项目错写)。
-  // R32D43-N1: 解析完成前先置 null——切项目后首次进配置页此前以旧
-  // wsId 即时挂载, ToolingChat check-then-create 在旧项目建幽灵会话
-  // (实测 50ms 双建)。置 null 走既有加载占位, 拦住 stale 首渲染。
+  // R32D44-P1-3: 路由变更的 wsId 清空必须在渲染期做——此前在 useEffect
+  // 里置 null, 但子组件(ToolingChat)的 effect 先于父 effect 同一 commit
+  // 执行, stale wsId 首渲染已触发 check-then-create(两轮审计 48/47ms
+  // 双建复现)。render-phase 调整 state 是 React 认可模式, 同步拦住。
+  const [lastRoute, setLastRoute] = useState(route);
+  if (route !== lastRoute) {
+    setLastRoute(route);
+    setWsId(null);
+  }
   // R32D43-N2: currentWs 悬空(不存在 id)校验——此前真值门直接放行,
   // 配置页 eager-create + ensureProject 把已删/坏 id 复活成幽灵项目。
   useEffect(() => {
     let cancelled = false;
-    setWsId(null);
     Promise.all([getPrefs(), listWorkSessions()]).then(([prefs, all]) => {
       if (cancelled) return;
       const cur = prefs.currentWs;

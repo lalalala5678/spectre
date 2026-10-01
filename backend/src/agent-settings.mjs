@@ -74,7 +74,7 @@ export const LLM_FORMATS = {
   },
   gemini: {
     label: 'Google Gemini(:generateContent)',
-    hint: 'Gemini 系;key 走查询参数',
+    hint: 'Gemini 系;key 走 x-goog-api-key 请求头',
     api: 'google-generative-ai',
     probe: (baseUrl, apiKey, model) => probe(
       `${baseUrl.replace(/\/$/, '')}/v1beta/models/${encodeURIComponent(model)}:generateContent`,

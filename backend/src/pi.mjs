@@ -136,14 +136,18 @@ export const STAGE_PROMPT = [
  * 某些厂商(如 GLM-4.6) emits `reasoning_content` before `content` (DeepSeek-style wire
  * format), hence the thinkingFormat compat flags below.
  */
-function modelCatalog(eff = {}) {
+function modelCatalog(eff = {}, providerId = PROVIDER_ID) {
   const wire = (LLM_FORMATS[eff.format] ?? LLM_FORMATS.openai).api;
   return [{
     id: eff.model || 'unconfigured',
     name: eff.model || 'unconfigured',
     api: wire,
     baseUrl: eff.baseUrl || '',
-    provider: PROVIDER_ID,
+    // R32D44-P0-1: provider 必须随 scope——此前硬编码默认 PROVIDER_ID,
+    // pi-ai requireProvider(model) 按 model.provider 找 auth resolver,
+    // 每 agent 覆盖的 key 在流式路径永远不可达(聊天出站全是默认 key,
+    // 探测用覆盖 key——两条路径不一致, mock 抓出)。
+    provider: providerId,
     reasoning: true,
     input: ['text'],
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
@@ -189,8 +193,9 @@ function providerFor(scope) {
   const resolve = scope === 'default'
     ? () => effectiveCommon()
     : () => effectiveLlmFor(scope);
+  const pid = scope === 'default' ? PROVIDER_ID : `spectre-${scope}`;
   return createProvider({
-    id: scope === 'default' ? PROVIDER_ID : `spectre-${scope}`,
+    id: pid,
     auth: {
       apiKey: {
         name: 'spectre-llm',
@@ -206,7 +211,7 @@ function providerFor(scope) {
         },
       },
     },
-    models: modelCatalog(resolve()),
+    models: modelCatalog(resolve(), pid),
     api: wireApiRegistry(),
   });
 }
