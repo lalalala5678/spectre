@@ -31,7 +31,7 @@ def scope_gate_full():
     """完整授权门: targets+exercise+window 三必填(SKILL 契约), exit 75。"""
     SCOPE = os.path.join(_data_root(), 'c2/scope.json')
     if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
+        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE})', file=sys.stderr); sys.exit(75)
     try:
         sc = json.load(open(SCOPE))
         now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())

@@ -206,8 +206,9 @@ def check_delivery(d):
     import statistics as _st  # CS28: _t 死别名删
     files = [f for f in glob.glob(os.path.join(d, '*')) if os.path.isfile(f)]
     mt = [os.path.getmtime(f) for f in files]
+    # R32D64-P2: 空集/单文件无判据→N/A(此前 <2 空洞 PASS 误导)。
     out['mtime'] = {'n': len(mt),
-                    'verdict': 'PASS' if (len(mt) < 2 or _st.pstdev(mt) < 3600) else 'FAIL',
+                    'verdict': ('N/A' if len(mt) < 2 else ('PASS' if _st.pstdev(mt) < 3600 else 'FAIL')),
                     'note': 'mtime 与目录均值偏差<1h'}
     # ⑭ 部署清单(二令第十四项,交付包必备):缺=裸奔面
     out['deploy_checklist'] = os.path.exists(os.path.join(d, 'deploy-checklist.yaml'))
@@ -232,6 +233,10 @@ def main():
         # CS41-A9: 缺参干净 rc=2(此前 KeyError 裸栈)。
         if '--delivery' not in a and '--payload' not in a:
             print('用法: c2-disguise.py check --payload <file> | --delivery <dir>', file=sys.stderr); return 2
+        # R32D64-P0: 文件/目录缺干净 rc=2(此前 check_payload 裸 open 裸栈)。
+        tgt = a['--delivery'] if '--delivery' in a else a['--payload']
+        if not os.path.exists(tgt):
+            print(f'用法错误: 路径不存在: {tgt}', file=sys.stderr); return 2
         res = check_delivery(a['--delivery']) if '--delivery' in a else check_payload(a['--payload'])
         print(json.dumps(res, ensure_ascii=False, indent=1))
         return 1 if res['verdict'] == 'REJECT' else 0

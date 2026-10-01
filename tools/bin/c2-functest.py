@@ -129,6 +129,11 @@ def main():
         if r.returncode != 0:
             lines = r.stdout.strip().splitlines() + r.stderr.strip().splitlines()
             line = next((l for l in lines if l.strip()), f'c2-javart exit {r.returncode}')
+            # R32D64-P2: 引擎缺失/未交付=环境供给问题→SKIP rc=0(与 php
+            # SKIP 同哲; 退码族约——其余引擎预检均 rc=2, 裸 FAIL 专指真回归)。
+            if '容器位内置' in line or '未交付' in line:
+                print(f'SKIP: {line} ({p})')
+                return 0
             print(f'FAIL: {line} ({p})')
             return 1
         lines = r.stdout.strip().splitlines()

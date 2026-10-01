@@ -103,10 +103,10 @@ test('门族矩阵: 坏 JSON scope 全族统一干净 75(CS37-F3 形态补位)',
         assert.ok(!r.stderr.includes('Traceback'), `${tool}: 不得裸栈`);
       }
     }
-    // CS37-F4: bind verify/expire 缺参 usage rc=2
+    // R32D64-P3: bind 门序统一(scope 先于用法)——坏 scope 下缺参也 75
     for (const sub of ['verify', 'expire']) {
       const r = runTool('c2-bind.py', [sub], badDir, false);
-      assert.equal(r.status, 2, `c2-bind ${sub} 缺参应 rc=2, 实得 ${r.status}`);
+      assert.equal(r.status, 75, `c2-bind ${sub} 坏scope+缺参应 75(门先), 实得 ${r.status}`);
     }
   } finally {
     rmSync(badDir, { recursive: true, force: true });

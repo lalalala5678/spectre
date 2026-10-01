@@ -8,6 +8,7 @@
   bind  : 目标必须在 /opt/tools/c2/scope.json targets 内;exp 默认=scope 窗口 end,
           --days N 可提前(不可晚于窗口 end);写入 <payload>.bind.json
           {sha256,target,exercise,exp,sig};sig=HMAC-SHA256(bind.key, sha|target|exercise|exp)
+  门序: 三子命令一致 scope 先于用法(bind 无 EDUSRC 门——目标绑定语义另行, 见 SKILL)。
   verify: OK=0;载荷被改(sha 不符)=79;目标不在当前 scope=78;过期=77;sig 不符=80;
          无/坏 sidecar=81;scope 缺/坏=75;缺参=2
   expire: exp 置为过去(立即自废)
@@ -69,6 +70,9 @@ def cmd_bind(args):
 
 def cmd_verify(args):
     a = dict(zip(args[::2], args[1::2]))
+    # R32D64-P3: 门序同 bind 子命令(scope 先于用法——此前同文件两种
+    # 顺序直觉分裂)。
+    sc = scope_gate_full()
     # CS37-F4: 缺参干净 usage rc=2(此前 KeyError 裸栈)。
     if '--payload' not in a:
         print('用法: c2-bind.py verify --payload <file> [--target t]', file=sys.stderr); return 2
@@ -86,12 +90,6 @@ def cmd_verify(args):
     # 等 KeyError 裸栈, 同函数 rec.get('sig','') 却防御(自相矛盾)。
     if not all(k in rec for k in ('sha256', 'target', 'exercise', 'exp')):
         print('VERIFY-FAIL: bad sidecar shape(缺 sha256/target/exercise/exp)', file=sys.stderr); return 81
-    try:
-        sc = json.load(open(SCOPE))
-    except FileNotFoundError:
-        print('SCOPE-REJECT: no scope file', file=sys.stderr); return 75
-    except Exception as e:
-        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); return 75
     sha = hashlib.sha256(open(p, 'rb').read()).hexdigest()
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if sha != rec['sha256']:
@@ -109,6 +107,8 @@ def cmd_verify(args):
 
 def cmd_expire(args):
     a = dict(zip(args[::2], args[1::2]))
+    # R32D64-P3: 门序同 bind/verify(scope 先于用法)。
+    scope_gate_full()
     # CS37-F4: 缺参干净 usage rc=2。
     if '--payload' not in a:
         print('用法: c2-bind.py expire --payload <file>', file=sys.stderr); return 2
