@@ -154,7 +154,7 @@ class TrackHandler(BaseHTTPRequestHandler):
 
 def serve(port):
     edusrc_gate()
-    scope_gate_full()  # F10: 完整授权门(targets+window)
+    scope_gate_full()  # F10: 完整授权门(targets+exercise+window 三必填, CS37-F5)
     print(f'[phish-track] listening :{port}', flush=True)
     HTTPServer(('0.0.0.0', port), TrackHandler).serve_forever()
 

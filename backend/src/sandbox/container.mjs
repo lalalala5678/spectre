@@ -228,7 +228,7 @@ function bootstrapScript() {
     // R32D58-F2(P1)/CS36-Z1(P0): 宿主 apt 守卫仅 local 驱动——docker 位
     // 在容器内执行(无宿主变异), 恢复无条件 bootstrap(README Docker 承诺);
     // 先例 bootstrap-sandbox.sh 的 [ ! -f /.dockerenv ] 前半即此语义。
-    ...(cfg.driver === 'local'
+    ...(cfg.driver !== 'docker'
       ? ['if [ "${SPECTRE_ALLOW_HOST_BOOTSTRAP:-0}" != "1" ]; then '
          + 'echo "[sandbox][local] 跳过宿主 apt(装基础包须显式 SPECTRE_ALLOW_HOST_BOOTSTRAP=1)" >&2; '
          + 'elif command -v apt-get >/dev/null 2>&1; then '
@@ -264,7 +264,7 @@ async function bootstrapToolchain() {
   const res = await runInSandbox(cfg, script);
   // R24-3: 输出单行化——此前多行 apt 输出与状态粘连不可读
   // R26: 固定文案——此前取尾行, apt/pip 的 WARNING/Writing 行语义拧巴
-  const noapt = cfg.driver === 'local' && process.env.SPECTRE_ALLOW_HOST_BOOTSTRAP !== '1';
+  const noapt = cfg.driver !== 'docker' && process.env.SPECTRE_ALLOW_HOST_BOOTSTRAP !== '1';
   console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}${noapt ? '(跳过宿主 apt——SPECTRE_ALLOW_HOST_BOOTSTRAP=1 可装)' : '(基础包 nodejs/python3/git/build-essential)'}${res.code === 0 ? '' : `: ${String(res.out).slice(-160)}`}`);
   if (res.code !== 0) {
     // R32D52-N4: 失败不写 marker(下次启动重试)且不谎报 ok——此前
@@ -279,7 +279,7 @@ async function bootstrapToolchain() {
   // 不匹配→重跑重判(env 后补 SPECTRE_ALLOW_HOST_BOOTSTRAP=1 即可生效),
   // 而非被无差别 marker 永久短路。
   const writeBase = cfg.driver === 'docker' ? '/opt/tools' : HOST.tools;
-  const mark = cfg.driver === 'local' && process.env.SPECTRE_ALLOW_HOST_BOOTSTRAP !== '1'
+  const mark = cfg.driver !== 'docker' && process.env.SPECTRE_ALLOW_HOST_BOOTSTRAP !== '1'
     ? identity + '-noapt' : identity;
   const write = `printf '%s' ${mark} > ${writeBase}/.bootstrapped`;
   if (cfg.driver === 'docker') {

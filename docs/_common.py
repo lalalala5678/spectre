@@ -79,6 +79,7 @@ def audit_log(path, target, action, sha='', note=''):
     bytecode 名义 4 列实 6-7 字段/phish-send 3 列无时间戳——统一五列
     ts\ttarget\taction\tsha\tnote)。"""
     os.makedirs(os.path.dirname(path), exist_ok=True)
+    note = str(note).replace('\t', ' | ')  # CS37-F6: note 单列, 内嵌 tab 破坏五列制式
     with open(path, 'a') as f:
         f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\t'
                 f'{target}\t{action}\t{sha}\t{note}\n')

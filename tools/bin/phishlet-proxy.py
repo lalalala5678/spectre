@@ -276,7 +276,7 @@ def make_handler(phishlet, db_file):
 
 def serve(listen, phishlet, db_file):
     edusrc_gate((phishlet.get('proxy_host', '') if isinstance(phishlet, dict) else '',))
-    scope_gate_full()  # F10: 完整授权门(targets+window)
+    scope_gate_full()  # F10: 完整授权门(targets+exercise+window 三必填, CS37-F5)
     host, _, port = listen.rpartition(':')
     handler = make_handler(phishlet, db_file)
     print(f'[phishlet-proxy] {phishlet["name"]}: {listen} → {phishlet["target_host"]}', flush=True)

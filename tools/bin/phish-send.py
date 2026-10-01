@@ -424,7 +424,7 @@ def main():
         # V5 修复: dryrun 也写审计日志(实测写了 PHISH-V2 ... 0/1)=审计污染,
         # 只对真实发送落账(CS36-Z4: 五列单源制式, 补时间戳)
         audit_log(os.path.join(_data_root(), 'c2/audit.log'), 'PHISH-V2', 'send',
-                  '', f'{(args.subject or "")[:50]}\t{sent}/{len(targets)}')
+                  '', f'{(args.subject or "")[:50]} {sent}/{len(targets)}')
     return 0 if failed == 0 else 1
 
 if __name__ == '__main__':

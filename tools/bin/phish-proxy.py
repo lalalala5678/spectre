@@ -215,7 +215,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
 def serve(listen, target, db_file=None, strip_csp=True):
     edusrc_gate((target,))
-    scope_gate_full()  # F10: 完整授权门(targets+window)
+    scope_gate_full()  # F10: 完整授权门(targets+exercise+window 三必填, CS37-F5)
     global DB_FILE
     if db_file:
         DB_FILE = db_file

@@ -25,7 +25,11 @@ def gate(payload=''):
         sys.exit(76)
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file'); sys.exit(75)
-    sc = json.load(open(SCOPE))
+    # CS37-F3: 坏 JSON 干净 75(此前裸栈 rc=1)。
+    try:
+        sc = json.load(open(SCOPE))
+    except Exception as e:
+        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); sys.exit(75)
     t = time.time()
     try:
         ok = (sc.get('targets') and

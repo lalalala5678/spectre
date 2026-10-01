@@ -28,10 +28,11 @@ FAILED=()
 MANIFEST="$LIBS/.sha256"
 fetch() { # fetch <目录> <完整URL> <文件名>
   local dir=$1 url=$2 name=$3
-  if [ -f "$dir/$name" ]; then
-    # 在场即校验清单(有账才查; 无账=存量免验)
-    if [ -f "$MANIFEST" ] && grep -q "  $name$" "$MANIFEST"; then
-      want=$(grep "  $name$" "$MANIFEST" | awk '{print $1}')
+  # R32D59 观测项/CS37: sha256 清单(awk 精确匹配文件名列, 免正则元字符错配);
+  # 清单恒在 libs 根(GEN/spring jar 同账)。
+  if [ -f "$dir/$name" ] && [ -f "$MANIFEST" ]; then
+    want=$(awk -v n="$name" '$2==n{print $1}' "$MANIFEST")
+    if [ -n "$want" ]; then
       got=$(sha256sum "$dir/$name" | awk '{print $1}')
       if [ "$want" != "$got" ]; then
         echo "  ✗ $name sha256 不符(清单 $want 实际 $got)——删除重取"; rm -f "$dir/$name"
@@ -41,8 +42,8 @@ fetch() { # fetch <目录> <完整URL> <文件名>
   fi
   if curl -fsSL --retry 2 -o "$dir/$name" "$url"; then
     got=$(sha256sum "$dir/$name" | awk '{print $1}')
-    if [ -f "$MANIFEST" ] && grep -q "  $name$" "$MANIFEST"; then
-      want=$(grep "  $name$" "$MANIFEST" | awk '{print $1}')
+    want=$(awk -v n="$name" '$2==n{print $1}' "$MANIFEST" 2>/dev/null)
+    if [ -n "$want" ]; then
       if [ "$want" != "$got" ]; then
         echo "  ✗ $name 新下载 sha256 与清单不符($want≠$got)"; rm -f "$dir/$name"; FAILED+=("$name"); return 1
       fi
@@ -54,6 +55,7 @@ fetch() { # fetch <目录> <完整URL> <文件名>
     rm -f "$dir/$name"; echo "  ✗ $name ← $url"; FAILED+=("$name")
   fi
 }
+
 MVN=https://repo1.maven.org/maven2
 cd "$LIBS"
 # Tomcat 9(javax)/10.1(jakarta) 嵌入式桩 + 注解 API

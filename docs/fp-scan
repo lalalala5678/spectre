@@ -9,7 +9,7 @@
 # 输出: TSV — asset | status | title | server | apps(带版本) | fav | source
 set -u
 # R32D54: -h/--help 契约(家族统一); R32D57-NEW8: 先于 env-warn。
-if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,12p' "$0"; exit 0; fi
+if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,9p' "$0"; exit 0; fi  # CS37-F8: 头注块止于第 9 行
 # F28-bis: 显式 PATH——裸 docker exec 下 /usr/bin/httpx 是 python-httpx 库 CLI,
 # 层1静默无产出。工具真身在 /opt/tools/bin(shared-tool 层)。
 export PATH="/opt/tools/bin:$PATH"
@@ -77,7 +77,8 @@ echo "[fp-scan] layer2: httpx + webappanalyzer(7613)..."
 # 绝不静默空转;扩展库兼容留待 httpx 升级。
 L2_CFF=""
 L2_SRC="webappanalyzer"
-if [ -s "$CFF_OK" ]; then
+# CS37 观测项: httpx 缺失时不做 cff 探测(此前误报'cff 不兼容')
+if [ -s "$CFF_OK" ] && command -v httpx >/dev/null 2>&1; then
   if echo "http://127.0.0.1:1" | timeout 10 httpx -silent -tech-detect -cff "$CFF_OK" -json >/dev/null 2>&1; then
     L2_CFF="-cff $CFF_OK"
   else

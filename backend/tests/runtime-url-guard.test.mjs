@@ -42,7 +42,7 @@ function rawReq(port, payload) {
 test('ESC 控制字符路径 → 400 且 runtime 存活(F1 P0 回归锁)', { timeout: 30000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'rt-guard-'));
   writeFileSync(join(dir, '.env'), 'INTERNAL_TOKEN=guard-test-token\n');
-  const port = 18000 + (process.pid % 500);
+  const port = 19500 + (process.pid % 400);  // CS37: 避开 18090/18081 审计段
   const child = spawn(process.execPath, ['agent-runtime.mjs'], {
     cwd: ROOT,
     env: { ...process.env, DATA_DIR: dir, PORT: String(port), INTERNAL_TOKEN: 'guard-test-token', SPECTRE_SANDBOX_ROOT: dir },

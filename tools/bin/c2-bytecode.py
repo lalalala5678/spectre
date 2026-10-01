@@ -15,7 +15,7 @@
 授权门/EDUSRC 隔离与 c2-qa 同源。
 """
 import sys, os, json, subprocess, tempfile, time, glob, re
-from _common import audit_log, _edusrc_hit, _data_root, sha256f
+from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f
 
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
@@ -29,17 +29,12 @@ DEFAULT_RULES = os.path.join(_C2, 'yara-rules')
 JMG_DIR = os.path.join(_C2, 'basetypes-jmg')
 
 def gate():
-    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发(getcwd 启发式废除)。
-    # CS34-F7/F12: 谓词收口 _common._edusrc_hit; 文案统一 C2 族全式。
-    # R32D58-F5: 门序族统一=edusrc 先(phish 族同制)。
+    # CS37-F2/F3: 收敛 _common 单源门——此前本地副本不查 exercise(SKILL
+    # 三必填契约分叉)且坏 JSON 裸栈 rc=1(单源门干净 75)。
     if _edusrc_hit():
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
-    if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT'); sys.exit(75)
-    sc = json.load(open(SCOPE))
-    now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
-        print('SCOPE-REJECT'); sys.exit(75)
+    return scope_gate_full()
+
 
     return sc
 

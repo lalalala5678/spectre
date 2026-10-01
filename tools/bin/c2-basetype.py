@@ -15,7 +15,7 @@
 """
 
 import sys, base64, hashlib, json, os, re, subprocess, time  # CS29/F-B: 恢复全活集(sys 起头族例)-F2 恢复全活集
-from _common import audit_log, _edusrc_hit, _data_root
+from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root
 
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
@@ -24,17 +24,12 @@ JMG_JAR = os.path.join(_C2, 'generators/jmg-cli-1.0.9.jar')
 DEFAULT_DIR = os.path.join(_C2, 'basetypes-jmg')
 
 def gate():
-    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发(getcwd 启发式废除)。
-    # CS34-F7/F12: 谓词收口 _common._edusrc_hit; 文案统一 C2 族全式。
-    # R32D58-F5: 门序族统一=edusrc 先(phish 族同制)。
+    # CS37-F2/F3: 收敛 _common 单源门——此前本地副本不查 exercise(SKILL
+    # 三必填契约分叉)且坏 JSON 裸栈 rc=1(单源门干净 75)。
     if _edusrc_hit():
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
-    if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT'); sys.exit(75)
-    sc = json.load(open(SCOPE))
-    now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
-        print('SCOPE-REJECT: empty targets or out of window'); sys.exit(75)
+    return scope_gate_full()
+
 
     return sc
 
@@ -94,7 +89,7 @@ def cmd_gen(args):
                'tool': a.get('--tool', 'Godzilla'), 'format': a.get('--format', 'BASE64'),
                'lane': 'real-lane(class-bytes)', 'info': info.strip().splitlines()[-3:]})
     json.dump(mf, open(mf_path, 'w'), indent=1)
-    audit_log(AUDIT, 'BASETYPE', 'gen', sha[:16], f'{name}\treal-lane')
+    audit_log(AUDIT, 'BASETYPE', 'gen', sha[:16], f'{name} real-lane')
     print(f'GEN-OK: {cp} ({len(raw)} bytes, sha={sha[:16]}) → manifest 注册,车道=real-lane(class-bytes)')
     print('注意: real-lane 不适用文本 decomp;QA 需字节码变换族(未建)。')
     return 0

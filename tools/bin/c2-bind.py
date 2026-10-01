@@ -46,6 +46,12 @@ def cmd_bind(args):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); return 75
     except Exception as e:
         print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); return 75
+    # CS37-F4: 结构坏(缺 window/targets)干净 75 对齐族语义(此前 KeyError
+    # 裸栈; {} 误走 BIND-REJECT 70——空 targets=未授权=75)。
+    if not (sc.get('targets') and sc.get('exercise') and sc.get('window', {}).get('start') and sc.get('window', {}).get('end')):
+        print('SCOPE-REJECT: empty targets/exercise or out of window', file=sys.stderr); return 75
+    if a.get('--days') and not a['--days'].lstrip('-').isdigit():
+        print('用法: --days 须为整数天数', file=sys.stderr); return 2
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')
     # CS30-F8: targets 语义与 SKILL/shells 对齐(精确|'*.domain' 通配——
     # 此前纯精确成员, 通配 scope 条目下具体主机结构性 BIND-REJECT 70)。
@@ -53,10 +59,10 @@ def cmd_bind(args):
         t, tg = str(t).lower(), str(tg).lower()
         return t == tg or (t.startswith('*.') and tg.endswith(t[1:]))
     if not any(_tm(t, target) for t in sc.get('targets', [])):
-        print(f'BIND-REJECT: target {target!r} not in scope targets'); return 70
+        print(f'BIND-REJECT: target {target!r} not in scope targets', file=sys.stderr); return 70
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc['window']['start'] <= now <= sc['window']['end']):
-        print('BIND-REJECT: out of window'); return 75
+        print('BIND-REJECT: out of window', file=sys.stderr); return 75
     exp = a.get('--days') and time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time() + int(a['--days']) * 86400)) or sc['window']['end']
     if exp > sc['window']['end']:
         exp = sc['window']['end']
@@ -64,12 +70,15 @@ def cmd_bind(args):
     rec = {'sha256': sha, 'target': target, 'exercise': sc['exercise'], 'exp': exp,
            'sig': sig_of(sha, target, sc['exercise'], exp)}
     json.dump(rec, open(side(p), 'w'), indent=1)
-    audit_log(AUDIT, 'BIND', 'bind', '', f'{os.path.basename(p)}\t{sha[:16]}\t{target}\texp={exp}')
+    audit_log(AUDIT, 'BIND', 'bind', sha[:16], f'{os.path.basename(p)} | {target} | exp={exp}')
     print(f'BOUND {p} → target={target} exp={exp} sha={sha[:16]}')
     return 0
 
 def cmd_verify(args):
     a = dict(zip(args[::2], args[1::2]))
+    # CS37-F4: 缺参干净 usage rc=2(此前 KeyError 裸栈)。
+    if '--payload' not in a:
+        print('用法: c2-bind.py verify --payload <file> [--target t]', file=sys.stderr); return 2
     p = a['--payload']
     if not os.path.exists(side(p)):
         print('VERIFY-FAIL: no binding sidecar'); return 81
@@ -91,7 +100,12 @@ def cmd_verify(args):
 
 def cmd_expire(args):
     a = dict(zip(args[::2], args[1::2]))
+    # CS37-F4: 缺参干净 usage rc=2。
+    if '--payload' not in a:
+        print('用法: c2-bind.py expire --payload <file>', file=sys.stderr); return 2
     p = a['--payload']
+    if not os.path.exists(side(p)):
+        print('EXPIRE-FAIL: no binding sidecar', file=sys.stderr); return 81
     rec = json.load(open(side(p)))
     rec['exp'] = '2000-01-01T00:00:00Z'
     rec['sig'] = sig_of(rec['sha256'], rec['target'], rec['exercise'], rec['exp'])

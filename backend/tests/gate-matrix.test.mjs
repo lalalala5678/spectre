@@ -72,3 +72,36 @@ test('无 env: 缺 scope 全族干净 75(非裸栈)', () => {
     rmSync(noDir, { recursive: true, force: true });
   }
 });
+
+test('门族矩阵: 坏 JSON scope 全族统一干净 75(CS37-F3 形态补位)', () => {
+  const badDir = mkdtempSync(join(tmpdir(), 'gate-b-'));
+  mkdirSync(join(badDir, 'tools', 'c2'), { recursive: true });
+  writeFileSync(join(badDir, 'tools', 'c2', 'scope.json'), 'not json {');
+  const payload = join(badDir, 'p.php');
+  writeFileSync(payload, '<?php // SPECTRE-MARK\n');
+  try {
+    for (const [tool, args] of [
+      ['c2-qa.py', ['scan', '--engine', 'echo']],
+      ['c2-basetype.py', ['list']],
+      ['c2-bytecode.py', ['selftest']],
+      ['c2-variant.py', ['gen', '--src', payload, '--out', join(badDir, 'o')]],
+      ['c2-bind.py', ['bind', '--payload', payload]],
+    ]) {
+      // bind 按设计无 EDUSRC 门(SKILL 表'functest/bind 不涉及')——只测无 env 侧
+      for (const edusrc of tool === 'c2-bind.py' ? [false] : [true, false]) {
+        const r = runTool(tool, args, badDir, edusrc);
+        const want = edusrc ? 76 : 75;
+        assert.equal(r.status, want,
+          `${tool}/坏JSON/${edusrc ? 'env=1' : '无env'}: 应 ${want}, 实得 ${r.status}\nstderr:${r.stderr?.slice(-300)}`);
+        assert.ok(!r.stderr.includes('Traceback'), `${tool}: 不得裸栈`);
+      }
+    }
+    // CS37-F4: bind verify/expire 缺参 usage rc=2
+    for (const sub of ['verify', 'expire']) {
+      const r = runTool('c2-bind.py', [sub], badDir, false);
+      assert.equal(r.status, 2, `c2-bind ${sub} 缺参应 rc=2, 实得 ${r.status}`);
+    }
+  } finally {
+    rmSync(badDir, { recursive: true, force: true });
+  }
+});

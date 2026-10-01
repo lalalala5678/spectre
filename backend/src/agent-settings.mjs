@@ -443,8 +443,16 @@ function unmaskSecret(stored, incoming) {
 export function getSettings() {
   const p = getPrefs();
   const bp = p.bruteParams ?? {};
+  // CS37-F1 修正: 掩码下钻到叶(此前整源字典塌成 '••••' 字符串, 全字段
+  // 回显空+徽标误报)。仅凭据叶掩码(key/token/secret/password + smtp.user);
+  // baseUrl/email/id 等非凭据叶原样回显。
+  const SECRET_LEAF_RE = /^(key|token|secret|password)$/;
+  const maskSrc = (o, srcId) => Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
+    [fk, (SECRET_LEAF_RE.test(fk) || (srcId === 'smtp' && fk === 'user')
+          || (fv && typeof fv === 'string' && fv.startsWith(MASK)))
+      ? maskSecret(fv) : fv]));
   const reconSources = Object.fromEntries(
-    Object.entries({ ...p.reconApiKeys }).map(([k, v]) => [k, maskSecret(v)]));
+    Object.entries({ ...p.reconApiKeys }).map(([k, v]) => [k, maskSrc(v, k)]));
   // weakcred brute params ride in reconSources under the pseudo-source id(CS3-N14 拼写)
   reconSources.brute = bp;
   const maskLlm = (cfg) => (cfg && typeof cfg === 'object')
