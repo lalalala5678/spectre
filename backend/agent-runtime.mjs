@@ -15,13 +15,12 @@ import http from 'node:http';
 
 import { CONFIG } from './src/config.mjs';
 import { Bus } from './src/bus.mjs';
-import { createShellRegistry } from './src/shells.mjs';
 import { createRouter } from './src/routes.mjs';
 import { SessionStore } from './src/sessions.mjs';
 import { entryKind as entryKindOf } from './src/tools.mjs';
 import { emitRevision } from './src/revision.mjs';
 import { buildPi, textOf, applyLlmPrefs } from './src/pi.mjs';
-import { shellBusAdapter } from './src/shells.mjs';
+import { createShellRegistry, shellBusAdapter } from './src/shells.mjs';  // CS24-F1: 合并双 import
 import { effectiveCommon, migrateLegacyLlmEnv } from './src/agent-settings.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
@@ -128,7 +127,7 @@ spawnSettingsFromWal(entries);  // F68: spawn policy WAL replay
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
 
-// Shell registry (C2 implant handles; transport 'local' for benchmark).
+// Shell registry (C2 植入通道句柄; transport 缺省 'web'——CS24-F4 统一口径)。
 // Scope reader mirrors /opt/tools/c2/scope.json — server-side hard gate.
 const shellScope = () => {
   // Read-per-call: benchmark windows open/close live; a boot-cached scope

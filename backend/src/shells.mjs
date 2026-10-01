@@ -159,7 +159,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     return null;
   }
 
-  function register({ name, target, transport = 'local', transportRef = '', note = '', tags = [], createdBy = 'operator', ttlHours = 24 }) {
+  function register({ name, target, transport = 'web', transportRef = '', note = '', tags = [], createdBy = 'operator', ttlHours = 24 }) {  // CS24-F4: 缺省统一 'web'(routes/tools 同口径)
     const id = 'sh-' + randomUUID().slice(0, 8);
     // 命名规范:<目标>-<面>-<权限> 建议(不强制,但重名/空名拒)
     const nm = String(name || '').trim();

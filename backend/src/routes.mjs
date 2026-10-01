@@ -77,16 +77,17 @@ function realRouter({ store, bus, caps, wal }) {
     if (path === '/api/shells' && method === 'POST') {
       const body = await readJson(req);
       if (!body?.target) return bad(res, 400, 'target 必填');
-      // F51: transport 枚举早期校验(此前 'quantum' 可注册,exec 才报未接入)
+      // F51/CS24-F4: 枚举早期校验(此前 'quantum' 可注册,exec 才报未接入)。
+      // 缺省统一 'web'(CS23-N16, 与 tools.mjs 工具面一致——agent 自注册
+      // 无本地沙箱语义)——先归一再校验, 此前 || 'web' 在守卫后不可达。
       const KNOWN_TRANSPORTS = ['local', 'ssh', 'web'];
-      if (!KNOWN_TRANSPORTS.includes(String(body.transport || ''))) {
+      const transport = String(body.transport || 'web');
+      if (!KNOWN_TRANSPORTS.includes(transport)) {
         return bad(res, 400, `transport 必须是 ${KNOWN_TRANSPORTS.join('/')} 之一`);
       }
       const sh = caps.shells.register({
         name: String(body.name || ''), target: String(body.target),
-        // CS23-N16: 缺省与工具面(tools.mjs 'web')对齐——agent 自注册
-        // 场景无本地沙箱语义; 显式传 'local' 不受影响。
-        transport: String(body.transport || 'web'), transportRef: String(body.transportRef || ''),
+        transport, transportRef: String(body.transportRef || ''),
         note: String(body.note || ''), tags: Array.isArray(body.tags) ? body.tags : [],
         createdBy: String(body.createdBy || 'operator'),
         ttlHours: Number(body.ttlHours) || 24,

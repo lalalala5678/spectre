@@ -86,7 +86,7 @@ export function ShellPage() {
       <div className="mb-3 grid grid-cols-2 gap-2 overflow-x-auto md:grid-cols-4">
         {shells.length === 0 && (
           <div className="col-span-full rounded border border-void-700 bg-void-900/30 px-3 py-4 text-center text-[11.5px] text-zinc-500">
-            无 shell。C2 agent 交付验收通过后注册;或经 POST /api/shells 注册(local 传输用于 benchmark)。
+            无 shell。C2 agent 交付验收通过后注册;或经 POST /api/shells 注册(缺省 web 传输; local 用于 benchmark)。
           </div>
         )}
         {shells.map(s => (

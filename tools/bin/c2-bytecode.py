@@ -171,7 +171,7 @@ def _load_result(classfile):
     fq = (cn or '?').replace('/', '.')
     d = os.path.dirname(os.path.abspath(classfile))
     r = subprocess.run(['java', '--patch-module', f'jdk.unsupported={PATCH}',
-                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:/opt/tools/c2/generators/jmg-all-1.0.9_250101.jar:{ART}:{STUBS}:{d}',
+                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:{os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')}{ART}:{STUBS}:{d}',
                         'RTHarness', 'load', fq, ''], capture_output=True, text=True, timeout=120)
     line = [l for l in r.stdout.splitlines() if l.startswith('RT-RESULT')]
     return ('OK' if r.returncode == 0 else 'FAIL',
@@ -199,7 +199,7 @@ def rt_exec(classfile):
     fq = (cn or '?').replace('/', '.')
     d = os.path.dirname(os.path.abspath(classfile))
     r = subprocess.run(['java', '--patch-module', f'jdk.unsupported={PATCH}',
-                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:/opt/tools/c2/generators/jmg-all-1.0.9_250101.jar:{ART}:{STUBS}:{d}',
+                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:{os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')}{ART}:{STUBS}:{d}',
                         'RTHarness', 'listener', fq, ''], capture_output=True, text=True, timeout=120)
     line = [l for l in r.stdout.splitlines() if l.startswith('RT-RESULT')]
     return r.returncode, (line[0] if line else r.stdout[-160:])

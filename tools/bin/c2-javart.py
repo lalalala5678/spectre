@@ -37,7 +37,12 @@ ART = os.path.join(_C2, 'javart')
 TC9 = f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar'
 TC10 = f'{LIBS}/tomcat-embed-core-10.1.42.jar:{LIBS}/jakarta.annotation-api-2.1.1.jar'
 STUBS_J = os.path.join(_C2, 'javastubs-jakarta/classes')
-SPRING = "/opt/tools/c2/libs/spring/spring-webmvc-6.0.9.jar:/opt/tools/c2/libs/spring/spring-web-6.0.9.jar:/opt/tools/c2/libs/spring/spring-core-6.0.9.jar:/opt/tools/c2/libs/spring/spring-context-6.0.9.jar:/opt/tools/c2/libs/spring/spring-beans-6.0.9.jar:/opt/tools/c2/libs/spring/spring-expression-6.0.9.jar:/opt/tools/c2/libs/spring/spring-aop-6.0.9.jar:/opt/tools/c2/libs/spring/spring-jcl-6.0.9.jar:/opt/tools/c2/libs/tomcat-embed-core-10.1.42.jar"
+SPRING = ':'.join(os.path.join(_C2, p) for p in [
+    'libs/spring/spring-webmvc-6.0.9.jar', 'libs/spring/spring-web-6.0.9.jar',
+    'libs/spring/spring-core-6.0.9.jar', 'libs/spring/spring-context-6.0.9.jar',
+    'libs/spring/spring-beans-6.0.9.jar', 'libs/spring/spring-expression-6.0.9.jar',
+    'libs/spring/spring-aop-6.0.9.jar', 'libs/spring/spring-jcl-6.0.9.jar',
+    'libs/tomcat-embed-core-10.1.42.jar'])  # CS24-F2: 双根化
 RXSTUB = os.path.join(_C2, 'javastubs-rx/classes')
 
 def extra_cp(logical):
@@ -78,7 +83,8 @@ def compile_src(src_path, outdir):
     xc = extra_cp(logical)
     cmd = ['javac', '-encoding', 'UTF-8', '-cp', f'{tc}:{stub_cp}' + (':' + xc if xc else ''), '-d', outdir, tmp]
     if 'sun.misc' in logical:
-        cmd[1:1] = ['--patch-module', 'jdk.unsupported=/opt/tools/c2/javastubs/patchsrc']
+        cmd[1:1] = ['--patch-module',
+                       'jdk.unsupported=' + os.path.join(_C2, 'javastubs/patchsrc')]  # CS24-F2
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     if r.returncode != 0:
         return None, 'javac:' + (r.stdout + r.stderr).strip()[:120]

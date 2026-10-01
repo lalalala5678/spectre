@@ -30,7 +30,12 @@ def _data_root():
 
 _C2 = os.path.join(_data_root(), 'c2')
 STUB_CP = os.path.join(_C2, 'javastubs/classes')
-SPRING = "/opt/tools/c2/libs/spring/spring-webmvc-6.0.9.jar:/opt/tools/c2/libs/spring/spring-web-6.0.9.jar:/opt/tools/c2/libs/spring/spring-core-6.0.9.jar:/opt/tools/c2/libs/spring/spring-context-6.0.9.jar:/opt/tools/c2/libs/spring/spring-beans-6.0.9.jar:/opt/tools/c2/libs/spring/spring-expression-6.0.9.jar:/opt/tools/c2/libs/spring/spring-aop-6.0.9.jar:/opt/tools/c2/libs/spring/spring-jcl-6.0.9.jar:/opt/tools/c2/libs/tomcat-embed-core-10.1.42.jar"
+SPRING = ':'.join(os.path.join(_C2, p) for p in [
+    'libs/spring/spring-webmvc-6.0.9.jar', 'libs/spring/spring-web-6.0.9.jar',
+    'libs/spring/spring-core-6.0.9.jar', 'libs/spring/spring-context-6.0.9.jar',
+    'libs/spring/spring-beans-6.0.9.jar', 'libs/spring/spring-expression-6.0.9.jar',
+    'libs/spring/spring-aop-6.0.9.jar', 'libs/spring/spring-jcl-6.0.9.jar',
+    'libs/tomcat-embed-core-10.1.42.jar'])  # CS24-F2: 双根化
 RXSTUB = os.path.join(_C2, 'javastubs-rx/classes')
 
 def extra_cp(body):
@@ -108,7 +113,7 @@ def main():
     ext = os.path.splitext(p)[1]
     if ext == '.java':
         # v3:编译级+运行级(c2-javart 嵌入式 Tomcat 桩:真 register+真触发+echo 断言)
-        r = subprocess.run(['python3', '/opt/tools/bin/c2-javart.py', '--src', p],
+        r = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-javart.py'), '--src', p],  # CS24-F2
                            capture_output=True, text=True, timeout=300)
         line = (r.stdout.strip().splitlines() or [''])[0]
         if r.returncode != 0:

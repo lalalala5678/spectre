@@ -4,7 +4,7 @@
  * 背景: shell 审计两跳丢失各存活多轮——第一跳(适配器签名)CS20 发现,
  * 第二跳(Bus.emit 固定字段白名单滤掉 kind/at/id/target/cmd/code/ms)
  * CS21 发现且 AG 批次的"单元活体"因用 mock bus 而未实锤。本测试走
- * 真实 Bus: 断言 WAL 事件含映射后的 summary(kind·shell·命令)与
+ * 真实 Bus: 断言 WAL 事件含映射后的 summary(kind·shell·target·命令)与
  * detail(JSON 全量)——任何一跳再断, 这里红。
  */
 import test from 'node:test';

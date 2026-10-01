@@ -33,6 +33,10 @@ export class Bus {
    *          severity?: string|null, title?: string|null,
    *          origin?: string|null, workSessionId?: string|null,
    *          status?: string|null, author?: string|null,
+   *          revises?: number|null, void?: number|null,
+   *          revision?: {n: number, reason?: string,
+   *                       requestedBy?: string, approvedBy?: string}|null,
+   *          requester?: string|null,
    *          detail?: string|null}} entry
    *
    * CS23-N10: origin/workSessionId/status/author 四字段此前 JSDoc 漏载
