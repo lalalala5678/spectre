@@ -185,3 +185,36 @@ test('c2-variant --families 未知/空族名 rc=2(CS53-NEW-A/D 锁)', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('c2-variant --families 合法族接受态 rc=0(CS54-F3 锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fam-ok-'));
+  mkdirSync(join(dir, 'tools', 'c2'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'c2', 'scope.json'),
+    JSON.stringify({ exercise: 'qa', targets: ['a.local'], window: { start: '2026-01-01T00:00:00Z', end: '2027-01-01T00:00:00Z' } }));
+  const payload = join(dir, 'p.php');
+  writeFileSync(payload, '<?php // SPECTRE-MARK\necho "SPECTRE-MARK";\n');
+  try {
+    const r = runTool('c2-variant.py', ['gen', '--src', payload, '--out', join(dir, 'o'), '--families', 'mask,decomp'], dir, false);
+    assert.equal(r.status, 0, `合法族应 rc=0, 实得 ${r.status}\nstderr:${r.stderr?.slice(-200)}`);
+    assert.ok(!r.stderr.includes('Traceback'), '不得裸栈');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('phish 族畸形参+EDUSRC→76 门先(R32D74-N1 锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'phish-gate-'));
+  try {
+    for (const [tool, args] of [
+      ['phish-send.py', ['--bogus-arg']],
+      ['phish-track.py', ['--bogus-arg']],
+      ['phish-proxy.py', ['--bogus']],
+      ['phishlet-proxy.py', ['--bogus']],
+    ]) {
+      const r = runTool(tool, args, dir, true);
+      assert.equal(r.status, 76, `${tool} 畸形参+EDUSRC 应 76(门先于用法), 实得 ${r.status}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

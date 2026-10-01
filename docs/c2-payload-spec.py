@@ -38,7 +38,7 @@ def resolve_spec_path(spec_path):
         if not os.path.isdir(SPEC_DIR):
             return None, f'spec 目录不存在: {SPEC_DIR}——先跑 init 生成内置样例'
     if not os.path.isfile(spec_path):
-        return None, f'spec 文件不存在: {spec_path}(裸名可用内置名; 先 init)'
+        return None, f'spec 文件不存在或不是常规文件: {spec_path}(裸名可用内置名; 先 init)'
     return spec_path, None
 
 def load_spec(path):

@@ -15,10 +15,10 @@
 功能核守卫:标记+php -l;EDUSRC:exit 76。
 """
 import sys, os, json, base64, random, string, uuid, re, subprocess, tempfile, glob, secrets
-from _common import scope_gate_full, _data_root, edusrc_gate, sha256f
+from _common import FAMILIES, scope_gate_full, _data_root, edusrc_gate, sha256f
 
 
-FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
+# CS54-P2: FAMILIES 单源 _common(此前本地手抄)。
 RULE_DIR = os.path.join(_data_root(), 'c2/yara-rules')  # CS10-4
 MASK_DEFAULT_KEYS = ['e45e329feb5d925b', '3c6e0b8a9c15224a', 'rebeyond', 'key321']
 MASK_QUOTED_VALUES = ['pass', 'key', 'md5']

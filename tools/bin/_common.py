@@ -94,3 +94,6 @@ def target_matches(pattern, target):
     精确 | '*.domain' 通配(大小写不敏感, 与 shells/SKILL 同义)。"""
     p_, t_ = str(pattern).lower(), str(target).lower()
     return p_ == t_ or (p_.startswith('*.') and t_.endswith(p_[1:]))
+
+# CS54-P2: 变形族名单源(此前 6 份手抄副本——漂移即 NEW-B 类复发)。
+FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']

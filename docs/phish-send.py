@@ -279,6 +279,14 @@ def track_sent(db_path, uid):
 
 
 def main():
+    # R32D74-N1: 门序契约 -h→EDUSRC(76)→…——argparse 用法检查在此前
+    # 会使畸形参 rc=2 先于 76(族间不对称), parse 前插门; -h 家族仍由
+    # 各自入口先行(下方 argparse/dispatch 自带)。
+    try:
+        from _common import edusrc_gate_phish
+        edusrc_gate_phish()
+    except SystemExit:
+        raise
     p = argparse.ArgumentParser()
     p.add_argument('mode', choices=['send', 'dryrun', 'genkey'])
     p.add_argument('--smtp', help='host:port')

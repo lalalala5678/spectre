@@ -282,7 +282,7 @@ def cmd_run(args):
     fams = a.get('--families', 'mask,decomp,id,struct')  # v3:伪装令 mask 先行+签名驱动,弃 enc/code 演示桩
     # CS53-NEW-B: 转发面前置校验(此前拼写错在子进程 rc=2 被吞, 8 轮
     # 空转+假 manifest 指针)。
-    _KNOWN = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
+    from _common import FAMILIES as _KNOWN  # CS54-P2: 单源
     _toks = fams.split(',')
     _bad = [x for x in _toks if x and x not in _KNOWN]
     if _bad or not any(_toks):
@@ -403,9 +403,13 @@ def cmd_run(args):
             if os.path.exists(mfp):
                 cands = [e['file'] for e in json.load(open(mfp))]  # 绝对路径直用
         else:
+            # CS54-F1: 读子进程失败透传(此前死赋值——非族类子失败也被吞)。
             g = subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cur, '--out', vo,
                                 '--rounds', '4', '--families', fams],
                                capture_output=True, text=True)
+            if g.returncode != 0:
+                print(f'c2-variant gen 失败 rc={g.returncode}: {(g.stderr or g.stdout).strip()[:200]}', file=sys.stderr)
+                return 1
             cands = sorted(f for f in os.listdir(vo) if f.startswith('variant_')) if os.path.isdir(vo) else []
         nxt, best, best_res = None, None, None
         for c in cands:

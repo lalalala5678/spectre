@@ -188,7 +188,10 @@ def report():
         print(f'  [{marks}] {uid}: open={v["open"]} click={v["click"]} submit={v["submit"]}')
 
 if __name__ == '__main__':
-    # V5 修复: 文档用法是 `serve --port N --db F`,旧代码只认 sys.argv[2] 位置参数
+    # R32D74-N1: 门序契约——argparse/子命令用法检查前插门(畸形
+    # 参 rc=2 先于 76 的族间不对称封堵; -h 仍由下方各自入口先行)。
+    edusrc_gate()
+        # V5 修复: 文档用法是 `serve --port N --db F`,旧代码只认 sys.argv[2] 位置参数
     # (--port → int() ValueError 崩溃;--db 被完全忽略,DB_FILE 硬编码)。
     import argparse
     ap = argparse.ArgumentParser(prog='phish-track')
