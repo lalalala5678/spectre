@@ -79,6 +79,21 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // effect 会抢在路由提交前洗掉 ?s=, fiber 实锤 ≈50% 丢目标); 冷
   // 加载/URL 直达仍走 ?s=(仅挂载时一次性读)。ref 只在此写入, 由
   // boot 首次运行末尾清零(R28-N1 pending 模型)。
+  // CS22-F3/F8: drill 开/关对称——开写 ?s=drill 目标, 关回写主会话。
+  // 此前入口一半同步(consumePending/closeDrill)一半裸 setDrillSession
+  // (四处页内入口), 且「返回主控会话」按钮绕过 closeDrill。
+  const openDrill = useCallback((id: string) => {
+    setDrillSession(id);
+    history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${id}`);
+  }, [liveKey]);
+  const closeDrill = useCallback(() => {
+    setDrillSession(null);
+    // R32D47-P2: 返回主控会话时 ?s= 同步回当前主会话(与切换同口径)。
+    if (sessionId) {
+      history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${sessionId}`);
+    }
+  }, [liveKey, sessionId]);
+
   const consumePending = useCallback(() => {
     const id = takePendingOpen(liveKey);
     if (!id) return;
@@ -86,11 +101,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // drill + R28-N2 跳过误建); 组件已在位(boot 已跑完)时写 ref 会
     // 让下一次项目切换复用旧 drill 并抑制新项目锚点(跨项目残留)。
     if (!bootDoneRef.current) deepLinkRef.current = id;
-    setDrillSession(id);
-    // R32D47-P2: URL 同步——搜索点击等 pendingOpen 通道此前剥掉 ?s=,
-    // 刷新恢复的是旧会话(URL/屏显脱钩的最后一个幸存通道)。
-    history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${id}`);
-  }, [liveKey]);
+    openDrill(id);
+  }, [liveKey, openDrill]);
   useEffect(() => {
     if (deepLink) {
       deepLinkRef.current = deepLink;
@@ -185,7 +197,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // Keep the sessions panel live: the runtime generates title/brief a few
   // seconds after each exchange — without polling the panel stays on the
   // bootstrap snapshot forever.
-  // workSession 对象每轮快照重建, 入 deps 会每 4s 拆装定时器; 语义键=ws.id
   // 语义键=ws.id(先取标量, effect 内不引用 workSession 整对象——
   // 对象每轮快照重建, 入 deps 会每 4s 拆装定时器)
   const panelWsId = workSession?.id;
@@ -285,13 +296,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // 有意最小 deps(见上注释); ws.id 变化由 bootstrapNonce 吸收
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [workSession?.id, liveKey]);
-  const closeDrill = useCallback(() => {
-    setDrillSession(null);
-    // R32D47-P2: 返回主控会话时 ?s= 同步回当前主会话(与切换同口径)。
-    if (sessionId) {
-      history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${sessionId}`);
-    }
-  }, [liveKey, sessionId]);
   const onResizeMove = (e: React.PointerEvent<HTMLDivElement>) => {
     if (!dragW.current) return;
     const delta = dragW.current.startX - e.clientX;
@@ -492,11 +496,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {/* 左：运行流（仅此处滚动） */}
           <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded border border-void-700 bg-void-850 p-2.5">
             {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => { setEntryView(null); setDrillSession(id); }} />
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => { setEntryView(null); openDrill(id); }} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2">
                 <button
-                  onClick={() => setDrillSession(null)}
+                  onClick={closeDrill}
                   className="flex w-fit items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[10px] text-zinc-400 hover:text-zinc-200"
                 >
                   <CornerUpLeft className="h-3 w-3" /> 返回主控会话
@@ -524,8 +528,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <div className="h-full pb-3.5">
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
-                  <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => { setEntryView(null); setDrillSession(id); }} />
-                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} onOpenSession={id => { setEntryView(null); setDrillSession(id); }} />
+                  <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => { setEntryView(null); openDrill(id); }} />
+                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} onOpenSession={id => { setEntryView(null); openDrill(id); }} />
                   <IntelNotesPanel workSessionId={workSession.id} onOpen={setEntryView} />
                   <TaskReportsPanel workSessionId={workSession.id} onOpen={setEntryView} />
                 </PanelStack>

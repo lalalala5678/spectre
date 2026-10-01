@@ -21,6 +21,7 @@ import { SessionStore } from './src/sessions.mjs';
 import { entryKind as entryKindOf } from './src/tools.mjs';
 import { emitRevision } from './src/revision.mjs';
 import { buildPi, textOf, applyLlmPrefs } from './src/pi.mjs';
+import { shellBusAdapter } from './src/shells.mjs';
 import { effectiveCommon, migrateLegacyLlmEnv } from './src/agent-settings.mjs';
 import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
@@ -137,17 +138,7 @@ const shellScope = () => {
 // (第一跳: 适配器单参签名; 第二跳: Bus.emit 固定字段白名单把
 // kind/at/id/target/cmd/code/ms 全滤掉, 20 轮审计中两跳先后实锤)。
 // 映射: summary=kind+shell+命令摘要(检索面), detail=JSON 全量(证据面)。
-const shellBus = {
-  emit: (type, payload) => bus.emit({
-    type,
-    channel: 'c2',
-    from: 'shells',
-    summary: [payload?.kind, payload?.id, payload?.target,
-      String(payload?.cmd ?? '').slice(0, 80)].filter(Boolean).join(' · ').slice(0, 500),
-    detail: JSON.stringify(payload),
-  }),
-};
-const shellRegistry = createShellRegistry({ bus: shellBus, listScope: shellScope });  // CS20-11: wal 死参数删
+const shellRegistry = createShellRegistry({ bus: shellBusAdapter(bus), listScope: shellScope });  // CS20-11: wal 死参数删
 
 /**
  * CS1-R5: reportWriter/revisionWriter/wakeAgent 三连的机械骨架——

@@ -13,7 +13,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
   mode?: 'override' | 'default';
   formats: LlmFormatMeta[];  // CS19-4/CS20-7/CS21-3: schema 单源必传
 }) {
-  const fmts = formats;
+
   const isDefault = mode === 'default';
   const [draft, setDraft] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
   const [orig, setOrig] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
@@ -60,7 +60,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
           {isDefault
             ? <option value="">openai(默认)</option>
             : <option value="">(继承默认)</option>}
-          {fmts.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
+          {formats.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
         </select>
       ) : (
         <input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
@@ -89,7 +89,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
             单源数据渲染。 */}
         <p className="pl-[94px] font-mono text-[9.5px] text-zinc-600">
           {draft.format === '' && !isDefault ? '继承默认供应商的格式'
-            : (fmts.find(f => f.id === (draft.format || 'openai'))?.hint ?? '')}
+            : (formats.find(f => f.id === (draft.format || 'openai'))?.hint ?? '')}
         </p>
         {field('baseUrl', 'Base URL', isDefault ? 'https://open.bigmodel.cn/api/paas/v4' : '留空=用默认')}
         {field('apiKey', 'API Key', isDefault ? '' : '留空=用默认', 'password')}

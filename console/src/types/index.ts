@@ -16,7 +16,7 @@ export type RouteKey =
   | 'skills'         // Skill 管理
   | 'mcp'            // MCP Server 管理
   | 'cli'            // CLI 工具导入
-  | 'settings'       // Agent 配置栏
+  | 'settings'       // 设置页(原 Agent 配置栏)
   | 'audit'         // 审计与证据链
   | 'shells'         // Shell 控制台
   // R32D39-N1: 配置三键是 agent 会话路由(搜索深链可直达)

@@ -31,19 +31,9 @@ const { Wal } = await import('./src/persist.mjs');
 const wal = new Wal(${JSON.stringify(join(dir, 'state.wal'))});
 wal.open();
 const bus = new Bus(wal);
-// 与 agent-runtime 同款映射适配器(CS21-1)
-const shellBus = {
-  emit: (type, payload) => bus.emit({
-    type,
-    channel: 'c2',
-    from: 'shells',
-    summary: [payload?.kind, payload?.id, payload?.target,
-      String(payload?.cmd ?? '').slice(0, 80)].filter(Boolean).join(' · ').slice(0, 500),
-    detail: JSON.stringify(payload),
-  }),
-};
+const { shellBusAdapter } = await import('./src/shells.mjs');
 const { createShellRegistry } = await import('./src/shells.mjs');
-const reg = createShellRegistry({ bus: shellBus,
+const reg = createShellRegistry({ bus: shellBusAdapter(bus),
   listScope: () => ({ targets: ['*.local'],
     window: { start: '2020-01-01T00:00:00Z', end: '2099-01-01T00:00:00Z' }, exercise: 'cs21' }) });
 const sh = reg.register({ transport: 'local', transportRef: 'pxlab',

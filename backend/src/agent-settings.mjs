@@ -610,7 +610,7 @@ export async function saveSetting({ group, field, value }, wal) {
     // R10-F2: validate(~15s 网络窗口)后重读——并发保存的兄弟字段不被
     // 陈旧快照覆盖(丢更新)。
     const freshAll = { ...getPrefs().reconApiKeys };
-    freshAll[srcId] = { ...freshAll[srcId], [leaf]: leafVal };
+    freshAll[srcId] = cur;  // CS22-F2: 探测过的 cur(空键已删)
     setPrefs({ reconApiKeys: freshAll }, wal);
     return { ok: true, mounted: true };
   }

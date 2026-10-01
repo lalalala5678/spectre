@@ -193,8 +193,11 @@ export function Topbar() {
                 // 里旧页消费 effect 会抢在路由提交前洗掉 ?s=(≈50% 丢)。
                 const key = s.agentKey;  // CS3-N20: 恒等三元删除
                 setOpen(false);
-                setPendingOpen(key, s.id);
+                // CS22-F1: 先 go 后 setPendingOpen——反向序时同步事件让已
+                // 挂载的同路由页写好 ?s=, 随后 go() 整体替换 hash 又剥掉
+                // (刷新恢复主控而非屏显会话)。
                 go(key);
+                setPendingOpen(key, s.id);
               }}
                 className="block w-full truncate rounded-sm px-2 py-1 text-left text-[11.5px] text-zinc-300 hover:bg-void-800">
                 <span className="font-mono text-[9.5px] text-zinc-600">{s.agentKey}</span>

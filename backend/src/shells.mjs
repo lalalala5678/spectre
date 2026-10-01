@@ -82,6 +82,23 @@ function boundedExecResult(err, so, se, timeoutNote) {
   return { stdout, stderr, code };
 }
 
+/** CS21-1/CS22-F4: shell 审计载荷 → Bus 白名单字段映射适配器。
+ * 生产(agent-runtime)与机锁(shell-bus.test)共用本导出——此前测试内
+ * 近逐字副本使映射本体回归时机锁仍绿(P0 级修复落在机锁射程外)。
+ * summary=kind·shell·target·命令摘要(检索面), detail=JSON 全量(证据面)。 */
+export function shellBusAdapter(bus) {
+  return {
+    emit: (type, payload) => bus.emit({
+      type,
+      channel: 'c2',
+      from: 'shells',
+      summary: [payload?.kind, payload?.id, payload?.target,
+        String(payload?.cmd ?? '').slice(0, 80)].filter(Boolean).join(' · ').slice(0, 500),
+      detail: JSON.stringify(payload),
+    }),
+  };
+}
+
 export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 死参数删(仅 persistShells 快照持久化)
   const audit = (kind, data) => {
     try { bus?.emit?.('shell-event', { kind, at: new Date().toISOString(), ...data }); } catch { /* bus optional */ }
