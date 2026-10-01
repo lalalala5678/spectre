@@ -116,13 +116,21 @@ def main():
     ext = os.path.splitext(p)[1]
     if ext == '.java':
         # v3:编译级+运行级(c2-javart 嵌入式 Tomcat 桩:真 register+真触发+echo 断言)
-        r = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-javart.py'), '--src', p],  # CS24-F2
-                           capture_output=True, text=True, timeout=300)
-        line = (r.stdout.strip().splitlines() or [''])[0]
-        if r.returncode != 0:
-            print(f'FAIL: {line or r.stderr.strip()[:80]} ({p})')
+        # R32D61-F5: 引擎缺失/未交付语义化(此前截 80 字段子进程 traceback
+        # 直接回显); 取首个非空行(指引性单行)。
+        jv = os.path.join(_data_root(), 'bin/c2-javart.py')
+        if not os.path.exists(jv):
+            print(f'FAIL: c2-javart 未交付({jv})——重跑 bash deploy/tools-sync.sh ({p})')
             return 1
-        print(f'OK: {line} ({p})')
+        r = subprocess.run(['python3', jv, '--src', p],  # CS24-F2
+                           capture_output=True, text=True, timeout=300)
+        if r.returncode != 0:
+            lines = r.stdout.strip().splitlines() + r.stderr.strip().splitlines()
+            line = next((l for l in lines if l.strip()), f'c2-javart exit {r.returncode}')
+            print(f'FAIL: {line} ({p})')
+            return 1
+        lines = r.stdout.strip().splitlines()
+        print(f'OK: {lines[0] if lines else "javart ok"} ({p})')
         return 0
     ok, note = {'php': php_check, '.php': php_check}.get(ext, (lambda x: (True, 'no-lang-check')))(p)
     if ext in ('.js', '.hta', '.jse'):

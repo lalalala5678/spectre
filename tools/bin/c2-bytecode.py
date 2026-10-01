@@ -103,6 +103,9 @@ def javap_members(path):
 
 def cmd_info(args):
     a = dict(zip(args[::2], args[1::2]))
+    # R32D61-F2: 缺参/文件缺干净 rc=2(此前 KeyError/FileNotFoundError 裸栈)。
+    if '--class' not in a or not os.path.isfile(a.get('--class', '')):
+        print('用法: c2-bytecode.py info --class <file.class>', file=sys.stderr); return 2
     n = this_class_name(a['--class'])
     print(json.dumps({'file': a['--class'], 'this_class': n,
                       'sha256': sha256f(a['--class'])[:16]}, ensure_ascii=False))
@@ -168,6 +171,9 @@ def _load_result(classfile):
 
 def cmd_verify(args):
     a = dict(zip(args[::2], args[1::2]))
+    # R32D61-F2: 缺参/文件缺干净 rc=2(此前 KeyError 裸栈)。
+    if not all(k in a and os.path.isfile(a[k]) for k in ('--orig', '--mod')):
+        print('用法: c2-bytecode.py verify --orig <a.class> --mod <b.class>', file=sys.stderr); return 2
     o, m = a['--orig'], a['--mod']
     sig_ok = javap_members(o) == javap_members(m)
     # 等价守恒:变体加载行为必须与原版一致(都成/同因失败)——

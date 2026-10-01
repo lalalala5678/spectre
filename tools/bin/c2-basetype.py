@@ -44,7 +44,12 @@ def parse_b64(out):
     return best or None
 
 def cmd_list(args):
+    # R32D61-F3: 非法类别干净 rc=2(此前 KeyError 裸栈); java 预检同 gen
+    # 且后置于门(门族矩阵: env=1→76 先于引擎缺 2)。
     gate()
+    import shutil
+    if not shutil.which('java'):
+        print('c2-basetype list 需要 java(jMG 生成器)——容器位内置; 宿主自装 JDK 或容器位运行', file=sys.stderr); return 2
     kind = args[0] if args else 'serverTypes'
     print(jmg_run([f'list {kind}']))
 

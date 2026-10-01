@@ -468,13 +468,17 @@ def cmd_selftest(args):
         ft = subprocess.run([sys.executable, os.path.join(_data_root(), 'bin/c2-functest.py'), vp],
                             capture_output=True, text=True)
         ok = (not resid) and ft.returncode == 0 and dgres.get('verdict') != 'REJECT'
-        print(f"SELFTEST {'OK  ' if ok else 'FAIL'} {f}: resid={len(resid)} ft={ft.returncode} disguise={dgres.get('verdict')} {str(dgres.get('bare_surfaces'))[:60]}")
+        why = ' [java 缺失——引擎供给问题非回归]' if (not ok and ft.returncode != 0 and f.endswith('.java') and java_missing) else ''
+        print(f"SELFTEST {'OK  ' if ok else 'FAIL'} {f}: resid={len(resid)} ft={ft.returncode} disguise={dgres.get('verdict')} {str(dgres.get('bare_surfaces'))[:60]}{why}")
         fails += 0 if ok else 1
         shutil.rmtree(out, ignore_errors=True)
-    print(f'SELFTEST SUMMARY: {fails} fail')
+    print(f'SELFTEST SUMMARY: {fails} fail' + ('  [java 车道受引擎缺失影响——ft=1 项非回归]' if java_missing and fails else ''))
     return 1 if fails else 0
 
 def cmd_fingerprint(args):
+    # R32D61-F1: 缺参干净 usage rc=2(此前 IndexError 裸栈)。
+    if not args:
+        print('用法: c2-variant.py fingerprint <payload>', file=sys.stderr); return 2
     print(sha256f(args[0]))
     return 0
 

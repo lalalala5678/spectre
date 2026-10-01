@@ -13,7 +13,7 @@
   expire: exp 置为过去(立即自废)
 """
 import sys, os, json, hmac, hashlib, time, secrets
-from _common import target_matches, audit_log, _data_root
+from _common import scope_gate_full, target_matches, audit_log, _data_root
 
 
 _C2 = os.path.join(_data_root(), 'c2')
@@ -44,16 +44,9 @@ def cmd_bind(args):
     # R32D60-NEW4: payload 不存在/是目录→干净 rc=2(此前裸栈 rc=1)。
     if not os.path.isfile(p):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
-    try:
-        sc = json.load(open(SCOPE))
-    except FileNotFoundError:
-        print('SCOPE-REJECT: no scope file', file=sys.stderr); return 75
-    except Exception as e:
-        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); return 75
-    # CS37-F4: 结构坏(缺 window/targets)干净 75 对齐族语义(此前 KeyError
-    # 裸栈; {} 误走 BIND-REJECT 70——空 targets=未授权=75)。
-    if not (sc.get('targets') and sc.get('exercise') and sc.get('window', {}).get('start') and sc.get('window', {}).get('end')):
-        print('SCOPE-REJECT: empty targets/exercise or out of window', file=sys.stderr); return 75
+    # R32D61-F9: 门收敛 _common 单源(此前本地 try/except+结构检查双实现,
+    # 与族消息口径分叉)——缺/坏/空/缺 exercise/出窗统一 75。
+    sc = scope_gate_full()
     if a.get('--days') and not a['--days'].lstrip('-').isdigit():
         print('用法: --days 须为整数天数', file=sys.stderr); return 2
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')

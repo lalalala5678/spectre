@@ -102,6 +102,12 @@ def run_harness(mode, name, marker, cp_extra, lane='javax'):
     return r.returncode, (line[0] if line else (r.stdout + r.stderr).strip()[:160])
 
 def main():
+    # R32D61-F5: java 工具链缺失干净 rc=2(此前 FileNotFoundError 裸栈;
+    # 同族 basetype/functest 均已引擎预检)。
+    import shutil
+    if not (shutil.which('javac') and shutil.which('java')):
+        print('c2-javart 需要 javac+java——容器位内置; 宿主自装 JDK 或容器位运行', file=sys.stderr)
+        return 2
     args = sys.argv[1:]
     # R32D42-P1/P2: --help/奇数参不再裸栈
     if not args or args[0] in ('-h', '--help'):
