@@ -12,7 +12,11 @@ import socket, sys, threading, time, os, datetime
 from collections import defaultdict, deque
 OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
 if not os.environ.get('SPECTRE_DATA_DIR'):
-    print('[oob] 提示: 未设置 SPECTRE_DATA_DIR —— 使用缺省 %s(生产路径; 测试请显式指定隔离目录)' % OUT, flush=True)
+    # R32D41-N1/CS15-3: 与 py 工具守卫同制式([warn] stderr);
+    # 服务常驻 stdout 留给监听/事件流。
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(oob 数据落 %s; 如非本意请先设置 SPECTRE_DATA_DIR)' % OUT,
+          file=sys.stderr, flush=True)
 QUOTA_BYTES = 512 * 1024 * 1024      # 目录总量上限
 RATE_PER_IP = 10                     # 每 IP 每分钟连接数
 RATE_WINDOW = 60.0

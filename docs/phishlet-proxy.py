@@ -21,6 +21,7 @@ phishlet 结构(Evilginx 兼容子集):
 用法:
   phishlet-proxy serve --listen :8443 --phishlet /opt/tools/phishlets/office365.json
   phishlet-proxy list  # 列出可用 phishlet
+  phishlet-proxy init  # 生成样例 phishlet 到数据根 phishlets/  (CS15-7)
 """
 import sys, os, json, time, hashlib, re, argparse
 

@@ -169,10 +169,11 @@ def _capture_internal_words(matchers, results, hay):
 
 def apply_matchers(matchers, status, headers, body, req_condition=None):
     """执行 matchers——组合语义由请求级 matchers-condition 决定
-    (nuclei 默认 and; or 时任一非 internal 命中即中, 见 F38 块)。
-    req_condition 同时记录到函数属性, 供 run_dns_matchers 读取
-    (同模板 HTTP 段先跑时 DNS 组合跟随; 见 CS14-6)。"""
-    apply_matchers._req_condition = req_condition or 'and'
+    (nuclei 默认 and; or 时任一非 internal 命中即中, 见 F38 块;
+    internal 占位不参与组合——F5/CS15-5)。纯 internal 模板的变量
+    捕获返回 dict: 纯 internal 组不带 __hit__(调用方 continue 走链),
+    真命中+同请求捕获带 __hit__: True(落 finding)(F29/F6)。"""
+    req_cond = req_condition or 'and'
     # F29: internal:true 是条件匹配器,不构成最终命中——纯 internal 模板
     # 一律不判中(防"任何 200 服务器被报 critical RCE")。
     matchers = matchers or []
@@ -281,8 +282,11 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
     # F38-修: 请求级组合读 nuclei 真实键 matchers-condition(默认 and);
     # 此前把 matcher 内 condition(其 words 的 or)误当请求级 →
     # status 单独命中即 FP(exposures 复扫 azure 类实锤)。
-    req_cond = getattr(apply_matchers, '_req_condition', 'and')
-    final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
+    # F5/CS15-5: internal 占位(results 里恒 True)不参与 or 组合——
+    # 此前 any(results) 被占位撑成恒 True, 全部真实 matcher 未命中
+    # 也判中(FP 方向, 与 :198 行内注释/docstring/F38 三处自述矛盾)。
+    real = [r for r, m in zip(results, matchers) if not m.get('internal')]
+    final = any(real) if req_cond == 'or' and len(matchers) > 1 else all(results)
     if final:
         captured = {}
         for m, hit in zip(matchers, results):
@@ -291,7 +295,11 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
             hay = header_str if m.get('part') == 'header' else body_str
             captured.update(_capture_internal_words([m], [hit], hay) or {})
         if captured:
-            return {'__vars__': captured}
+            # CS15-F6 修: 真命中(非纯 internal 组合)带 __hit__ 旗标——
+            # 捕获与命中可同请求并存; 纯 internal 捕获跳(早分支/全部
+            # internal)不带, 调用方 continue 走链。
+            return {'__vars__': captured, '__hit__': not all(
+                m.get('internal') for m in matchers)}
     return final
 
 def apply_extractors(extractors, status, headers, body):
@@ -361,14 +369,9 @@ def run_dns_matchers(matchers, answers, req_condition=None):
             results.append(matched)
         else:
             results.append(None)
-    if not results:
-        return False
-    # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
-    # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
-    # 请求级 or 语义 = 任一非 internal matcher 命中即可。
-    # F38-修: 请求级组合读 nuclei 真实键 matchers-condition(默认 and);
-    # 此前把 matcher 内 condition(其 words 的 or)误当请求级 →
-    # status 单独命中即 FP(exposures 复扫 azure 类实锤)。
+    # F38: 请求级组合读模板自身 matchers-condition(默认 and);
+    # CS15-4: 旧 `if not results` 守卫被 eff 滤除完全吸收, 已删。
+    # CS14-7: results 按索引对齐 matchers——非 word 型记 None 不参与。
     eff = [r for r in results if r is not None]
     if not eff:
         return False
@@ -487,11 +490,14 @@ def execute_template(tpl, target, timeout=15):
             _mres = apply_matchers(matchers, status, headers, body,
                                    (req_spec.get('matchers-condition') or 'and'))
             if isinstance(_mres, dict):
-                # R32D42-P1: 纯 internal 捕获跳是链的中间步骤——变量入
-                # 池后 continue 到下一请求, 不是最终命中(此前当命中
-                # →链首跳即断+末跳必败也报 FP+归因错)。
                 captured_vars.update(_mres.get('__vars__', {}))
-                continue
+                if not _mres.get('__hit__'):
+                    # R32D42-P1: 纯 internal 捕获跳是链的中间步骤——
+                    # 变量入池后 continue 到下一请求, 不是最终命中
+                    # (此前当命中→链首跳即断+末跳必败也报 FP+归因错)。
+                    continue
+                # 混合型: 真命中+同请求捕获——落 finding(走下方公共
+                # 命中路径; CS15-F6: 批次 X 曾把这类也 continue 丢报)。
             if _mres:
                 extractors = req_spec.get('extractors', tpl.get('extractors', []))
                 extracted = apply_extractors(extractors, status, headers, body)
