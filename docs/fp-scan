@@ -104,12 +104,12 @@ if [ "$DEEP" = "1" ]; then
   # NEW4: stdout 静音(此前原始 JSON 刷屏 1.3MB/2 发现)。
   nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" \
     -severity info,low,medium,high,critical -tags tech,fingerprint,panel \
-    -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >${FPTMP}.l4.log 2>&1 || true
+    -v -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >${FPTMP}.l4.log 2>&1 || true
   nuclei -l ${FPTMP}.in -t "$NT_DIR/plugins-0x727" \
     -severity info,low,medium,high,critical \
-    -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >${FPTMP}.l4b.log 2>&1 || true
-  # R32D58-F7/R32D59 证伪修: -silent 会吞 [INF] unresponsive 行——去掉
-  # -silent(日志只落盘不进控制台); 命中即计数一行 warn(NEW4 不刷屏保留)。
+    -v -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >${FPTMP}.l4b.log 2>&1 || true
+  # R32D58-F7/R32D59+D60 证伪修: unresponsive 是 [VER] 级(v3.4.7 实测,
+  # 去 -silent 不够)——加 -v; 日志只落盘不进控制台, 命中即计数一行 warn。
   UNRESP=$(grep -c 'unresponsive' ${FPTMP}.l4.log ${FPTMP}.l4b.log 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
   [ "$UNRESP" -gt 0 ] && echo "[fp-scan][warn] nuclei 标记 $UNRESP 条 unresponsive(超时目标被清零, 详见 nuclei 输出; 可提高 --timeout 或分批)" >&2
 fi

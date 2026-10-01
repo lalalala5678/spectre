@@ -113,8 +113,13 @@ def cmd_info(args):
     return 0
 
 def cmd_split(args):
-    sc = gate()
     a = dict(zip(args[::2], args[1::2]))
+    # R32D60-NEW4: 缺 --class 干净 usage rc=2(此前 KeyError 裸栈)。
+    if '--class' not in a:
+        print('用法: c2-bytecode.py split --class <file.class> [--out dir] [--rules dir]', file=sys.stderr); return 2
+    if not os.path.isfile(a['--class']):
+        print(f"用法错误: --class 文件不存在: {a['--class']}", file=sys.stderr); return 2
+    sc = gate()
     rules = a.get('--rules', DEFAULT_RULES)
     src = a['--class']
     outdir = a.get('--out') or tempfile.mkdtemp(prefix='c2bc-')
@@ -143,7 +148,7 @@ def cmd_split(args):
     mf = os.path.join(outdir, 'manifest.json')
     m = json.load(open(mf)) if os.path.exists(mf) else []
     m.append(rec); json.dump(m, open(mf, 'w'), indent=1)
-    audit_log(AUDIT, 'BYTECODE', 'split', '', f'{os.path.basename(src)}\t{rec["sha256"][:16]}\t{len(hits)}->{len(resid)}')
+    audit_log(AUDIT, 'BYTECODE', 'split', rec['sha256'][:16], f'{os.path.basename(src)} {len(hits)}->{len(resid)}')
     print(json.dumps(rec, ensure_ascii=False))
     return 0
 

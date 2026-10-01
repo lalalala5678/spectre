@@ -354,6 +354,10 @@ def cmd_gen(args):
     global RULE_DIR
     if a.get('--rules'):
         RULE_DIR = a['--rules']
+    # R32D60-NEW4: --src 不存在→干净 rc=2(此前裸栈 rc=1)。
+    import os as _os
+    if not _os.path.isfile(a['--src']):
+        print(f"用法错误: --src 文件不存在或不是常规文件: {a['--src']}", file=sys.stderr); return 2
     # CS36-Z2: 门序族统一=edusrc 先; Z3: 换 _common 单源门(exercise 必填)
     edusrc_gate([a['--src'], a.get('--out', '')])
     scope_gate_full()

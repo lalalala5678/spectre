@@ -55,6 +55,10 @@ def cmd_list(args):
 def cmd_gen(args):
     sc = gate()
     a = dict(zip(args[::2], args[1::2]))
+    # R32D60-NEW4: java 引擎缺失干净 rc=2(此前 FileNotFoundError 裸栈)。
+    import shutil
+    if not shutil.which('java'):
+        print('c2-basetype gen 需要 java(jMG 生成器)——容器位内置; 宿主自装 JDK 或 fetch-jars 后容器位运行', file=sys.stderr); return 2
     outdir = a.get('--out-dir', DEFAULT_DIR)
     os.makedirs(outdir, exist_ok=True)
     name = a.get('--name') or f"jmg_{a.get('--shell','x').lower()}_{a.get('--server','x').lower()}"

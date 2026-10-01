@@ -437,7 +437,9 @@ function maskSecret(v) {
 function unmaskSecret(stored, incoming) {
   if (typeof incoming !== 'string' || !incoming.startsWith(MASK)) return incoming;
   const real = typeof stored === 'string' ? stored : '';
-  return incoming === maskSecret(real) ? real : incoming;
+  // R32D60-NEW3: 掩码形但不匹配存量(粘贴了别处掩码/存量已清)——
+  // 返回 null 由调用方显式拒绝, 不得把字面掩码串落库。
+  return incoming === maskSecret(real) ? real : null;
 }
 
 export function getSettings() {
@@ -487,10 +489,12 @@ export async function saveSetting({ group, field, value }, wal) {
       }
       // CS19-3: 与 agent-llm 原子路径同款 trim(粘贴带尾随空格的 URL
       // 此前原样落盘)。
+      const ak = unmaskSecret(getPrefs().commonSettings?.llm?.apiKey, raw.apiKey.trim());
+      if (ak === null) return { ok: false, error: 'API Key 为掩码形态且与存量不符——粘贴完整值或清空后保存' };
       const v4 = {
         format: raw.format.trim(),
         baseUrl: raw.baseUrl.trim(),
-        apiKey: unmaskSecret(getPrefs().commonSettings?.llm?.apiKey, raw.apiKey.trim()),
+        apiKey: ak,
         model: raw.model.trim(),
       };
       if (v4.format && !Object.keys(LLM_FORMATS).includes(v4.format)) {
@@ -519,8 +523,9 @@ export async function saveSetting({ group, field, value }, wal) {
     }
     // R30: webSearch.apiKey 保存前校验 provider 连通——坏 key 此前
     // 直接落盘, 搜索回执把 401 吞成"0 命中"(api agent 四轮实测抓出)。
-    const vRaw = (field === 'webSearch.apiKey')
+    let vRaw = (field === 'webSearch.apiKey')
       ? unmaskSecret(getPrefs().commonSettings?.webSearch?.apiKey, v) : v;
+    if (vRaw === null) return { ok: false, error: 'API Key 为掩码形态且与存量不符——粘贴完整值或清空后保存' };
     if (field === 'webSearch.apiKey' && vRaw) {
       const ws = { ...getPrefs().commonSettings?.webSearch, apiKey: vRaw };
       if (ws.provider && ws.provider !== 'none' && ws.provider !== 'searxng') {
@@ -553,10 +558,12 @@ export async function saveSetting({ group, field, value }, wal) {
     if (!raw || ['format', 'baseUrl', 'apiKey', 'model'].some(k => typeof raw[k] !== 'string')) {
       return { ok: false, error: 'value 须为 { format, baseUrl, apiKey, model } 四字符串字段(空串=清除)' };
     }
+    const ak = unmaskSecret(getPrefs().agentLlm?.[agentKey]?.apiKey ?? effectiveCommon().apiKey, raw.apiKey.trim());
+    if (ak === null) return { ok: false, error: 'API Key 为掩码形态且与存量不符——粘贴完整值或清空后保存' };
     const cur = {
       format: raw.format.trim(),
       baseUrl: raw.baseUrl.trim(),
-      apiKey: unmaskSecret(getPrefs().agentLlm?.[agentKey]?.apiKey ?? effectiveCommon().apiKey, raw.apiKey.trim()),
+      apiKey: ak,
       model: raw.model.trim(),
     };
     if (cur.format && !Object.keys(LLM_FORMATS).includes(cur.format)) {
@@ -622,8 +629,10 @@ export async function saveSetting({ group, field, value }, wal) {
     if (!Object.keys(src.fields ?? {}).includes(leaf)) {
       return { ok: false, error: `未知字段 ${leaf}(该源字段: ${Object.keys(src.fields ?? {}).join('/')})` };
     }
-    // R32D59-N6: 掩码哨兵还原(读面已掩码, 表单原样回传不毁真钥)。
+    // R32D59-N6: 掩码哨兵还原(读面已掩码, 表单原样回传不毁真钥);
+    // R32D60-NEW3: 掩码形不匹配存量→显式拒绝(不得字面落库)。
     const leafVal = unmaskSecret(getPrefs().reconApiKeys?.[srcId]?.[leaf], clean(value));
+    if (leafVal === null) return { ok: false, error: `${leaf} 为掩码形态且与存量不符——粘贴完整值或清空后保存` };
     // R32D47-P3: 空串=删键(此前残留 "a":"" 空串键, 状态不整洁)。
     const prev = { ...getPrefs().reconApiKeys?.[srcId] };
     const cur = leafVal === '' ? (() => { const c2 = { ...prev }; delete c2[leaf]; return c2; })()

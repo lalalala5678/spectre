@@ -40,6 +40,10 @@ def cmd_bind(args):
         print('用法: c2-bind.py bind --payload <file> [--target t] [--days N]', file=sys.stderr)
         return 2
     p = a['--payload']
+    # R32D60-NEW4: payload 不存在/是目录→干净 rc=2(此前裸栈 rc=1)。
+    import os as _os
+    if not _os.path.isfile(p):
+        print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     try:
         sc = json.load(open(SCOPE))
     except FileNotFoundError:
@@ -80,6 +84,8 @@ def cmd_verify(args):
     if '--payload' not in a:
         print('用法: c2-bind.py verify --payload <file> [--target t]', file=sys.stderr); return 2
     p = a['--payload']
+    if not os.path.isfile(p):
+        print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     if not os.path.exists(side(p)):
         print('VERIFY-FAIL: no binding sidecar'); return 81
     rec = json.load(open(side(p)))
@@ -104,6 +110,8 @@ def cmd_expire(args):
     if '--payload' not in a:
         print('用法: c2-bind.py expire --payload <file>', file=sys.stderr); return 2
     p = a['--payload']
+    if not os.path.isfile(p):
+        print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     if not os.path.exists(side(p)):
         print('EXPIRE-FAIL: no binding sidecar', file=sys.stderr); return 81
     rec = json.load(open(side(p)))

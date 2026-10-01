@@ -45,7 +45,9 @@ test('ESC 控制字符路径 → 400 且 runtime 存活(F1 P0 回归锁)', { tim
   const port = 19500 + (process.pid % 400);  // CS37: 避开 18090/18081 审计段
   const child = spawn(process.execPath, ['agent-runtime.mjs'], {
     cwd: ROOT,
-    env: { ...process.env, DATA_DIR: dir, PORT: String(port), INTERNAL_TOKEN: 'guard-test-token', SPECTRE_SANDBOX_ROOT: dir },
+    // R32D60-NEW1: 数据根 env 是 SPECTRE_DATA_DIR(config.mjs:95)——此前传
+    // 不存在的 DATA_DIR 使子进程继承外层数据根, 与活体实例锁互斥致红。
+    env: { ...process.env, SPECTRE_DATA_DIR: dir, PORT: String(port), INTERNAL_TOKEN: 'guard-test-token', SPECTRE_SANDBOX_ROOT: dir },
     stdio: 'ignore',
   });
   try {
