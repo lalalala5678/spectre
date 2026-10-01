@@ -27,7 +27,9 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 ```json
 {"exercise": "EX-2026-01", "targets": ["*.example.com"],
  "window": {"start": "2026-01-01T00:00:00Z", "end": "2026-12-31T23:59:59Z"}}
-```位置: 数据根 `tools/c2/scope.json`
+```
+
+位置: 数据根 `tools/c2/scope.json`
 (容器视角 `/opt/tools/c2/scope.json`)。缺任一 → `SCOPE-REJECT` exit 75。
 
 ## 工具层落实表(2026-09-19 起)

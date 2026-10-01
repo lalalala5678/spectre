@@ -2,8 +2,7 @@
  * prefs-guard (CS46-F6a 机锁): PUT /api/prefs 三面守卫(currentWs id 域 /
  * ui 形状 / 凭据子树拒)与 setPrefs 嵌套 stackRatios 形状——纯函数面直测,
  * 防 F1 类(正则与 id 域分叉)盲区回归。
- * CS47-N5: HTTP 面锁待补(本文件只锁纯函数面——runtime-url-guard 不
- * 覆盖 prefs)。
+ * HTTP 面由 prefs-http.test.mjs 覆盖(CD 批次, CS47-N5 债已清)。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';

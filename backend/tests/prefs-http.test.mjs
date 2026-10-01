@@ -28,7 +28,7 @@ function onceUp(port, _tries = 40) {
 test('PUT /api/prefs 守卫路径 HTTP 面(null/未知键/凭据/ui 形状/currentWs)', { timeout: 30000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'prefs-http-'));
   writeFileSync(join(dir, '.env'), 'INTERNAL_TOKEN=phttp\n');
-  const port = 19800 + (process.pid % 150);
+  const port = 19950 + (process.pid % 49);  // CS51-5: 避开 runtime-url-guard 19500-19899
   const child = spawn(process.execPath, ['agent-runtime.mjs'], {
     cwd: ROOT,
     env: { ...process.env, SPECTRE_DATA_DIR: dir, PORT: String(port), INTERNAL_TOKEN: 'phttp', SPECTRE_SANDBOX_ROOT: dir },
@@ -39,7 +39,7 @@ test('PUT /api/prefs 守卫路径 HTTP 面(null/未知键/凭据/ui 形状/curre
   try {
     await onceUp(port);
     // null 体 / 非对象 / 未知键
-    for (const [label, raw] of [['null', 'null'], ['array', '[1]']]) {
+    for (const [label, raw] of [['null', 'null'], ['array', '[1]'], ['string', '"x"'], ['number', '42'], ['bool', 'true']]) {
       const r = await fetch(`http://127.0.0.1:${port}/api/prefs`, { method: 'PUT', headers: H, body: raw });
       assert.equal(r.status, 400, `${label} 体应 400`);
     }

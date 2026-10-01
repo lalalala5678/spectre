@@ -329,9 +329,8 @@ function realRouter({ store, bus, caps, wal }) {
       // entries (keeps ids so existing sessions stay grouped; CS47-N6:
       // 同 id 域校验, 域外项 skipped 明细随响应披露)
       if (Array.isArray(body.projects)) {
-        // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
-        // 却永远无法成为 currentWs)。R32D70: 域外项拒绝明细随响应披露。
-        // R32D71/N2: 明细分因(域外/缺 id/已存在——note 不再一刀切)。
+        // CS47-N6: 迁移注册同 id 域校验(此前 verbatim)。R32D71/N2:
+        // 明细分因 skipped(域外/缺 id)与 existed(已存在幂等跳过)。
         const skipped = [];
         const existed = [];
         for (const p of body.projects) {
@@ -428,11 +427,16 @@ function maskPrefs(raw) {
       // R32D66-NEW1: 凭据/LLM 子树拒绝裸写——契约「LLM 保存必真实连通
       // 探测」只在 /api/agent-settings/save 通道成立(此前经本端点可绕
       // 过探测直落坏配置且不热更)。
-      const body_ = body ?? {};
+      // CS51-2: 对象体守卫前置(标量 JSON "x"/42/true 此前穿透 'in'
+      // 检查后 setPrefs 抛 TypeError 500)。
+      if (body === null || body === undefined || typeof body !== 'object' || Array.isArray(body)) {
+        return bad(res, 400, '请求体须为 JSON 对象');
+      }
+      const body_ = body;
       // R32D67-A: 三凭据子树键整体拒(含 null/空对象/异形——此前 truthy
       // 判断使 {commonSettings:{}} 200 且静默清空 llm)。
       if ('commonSettings' in body_ || 'agentLlm' in body_ || 'reconApiKeys' in body_) {
-        return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(保存前真实连通探测+热更)——/api/prefs 不接受 commonSettings/agentLlm/reconApiKeys 键');
+        return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(POST, 保存前真实连通探测+热更)——/api/prefs 不接受 commonSettings/agentLlm/reconApiKeys 键');
       }
       // R32D68-NEW-1/CS47-N2: 非凭据键形状校验——ui 须普通对象(字符串
       // 会被 spread 成字符索引键持久化); currentWs 须项目 id 字符串或 null。
@@ -450,11 +454,6 @@ function maskPrefs(raw) {
       }
       // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。
       // CS48-5: 形状违规统一 400(setPrefs 同步 throw 此前冒泡 500);
-      // CS49-F5: null 体先短痛拒(守卫 body_ 兜空后 setPrefs(null) 曾
-      // 泄漏引擎原文 TypeError)。
-      if (body === null || body === undefined || typeof body !== 'object' || Array.isArray(body)) {
-        return bad(res, 400, '请求体须为 JSON 对象');
-      }
       // R32D71: 白名单顶层键(未知键拒——此前任意键原样持久化进 WAL)。
       const PREFS_KEYS = new Set(['ui', 'currentWs']);
       const unknown = Object.keys(body).filter(k => !PREFS_KEYS.has(k));
