@@ -329,14 +329,17 @@ function realRouter({ store, bus, caps, wal }) {
       // entries (keeps ids so existing sessions stay grouped; CS47-N6:
       // 同 id 域校验, 域外静默跳过)
       if (Array.isArray(body.projects)) {
+        // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
+        // 却永远无法成为 currentWs)。R32D70: 域外项拒绝明细随响应披露。
+        const skipped = [];
         for (const p of body.projects) {
-          // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
-          // 却永远无法成为 currentWs, F1 症状对另一 id 源重演)。
           if (p?.id && typeof p.id === 'string' && /^[\w-]{1,64}$/.test(p.id) && !getProject(p.id)) {
             ensureProject(p.id, wal, String(p.label ?? '').slice(0, 60));
+          } else if (p?.id && (typeof p.id !== 'string' || !/^[\w-]{1,64}$/.test(p.id))) {
+            skipped.push(String(p.id));
           }
         }
-        return json(res, 201, listProjects());
+        return json(res, 201, skipped.length ? { projects: listProjects(), skipped, note: '域外 id 未注册([a-zA-Z0-9_-]{1,64})' } : listProjects());
       }
       const created = createProject(String(body.label ?? ''), wal);
       // R32D31-N1: 此前无条件 setPrefs(currentWs)——API/CLI 建项目会

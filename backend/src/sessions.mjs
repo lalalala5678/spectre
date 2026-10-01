@@ -398,6 +398,7 @@ export class SessionStore {
       createdAt: record.createdAt,
       busy: record.busy,
       engagementId: record.engagementId,
+      workSessionId: record.workSessionId ?? null,  // R32D70: 与 list/tree 对称(POST 响应缺此字段)
       spawnName: record.spawnName,
       spawnDescription: record.spawnDescription,
       messages: (record.agent?.state.messages ?? []).map(m => normalizeMessage(m)),

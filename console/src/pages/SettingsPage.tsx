@@ -183,15 +183,22 @@ export function SettingsPage() {
   const [err, setErr] = useState('');
   const [verify, setVerify] = useState<Record<string, { ok: boolean; error?: string | null }> | null>(null);
   const [verifying, setVerifying] = useState(false);
+  // R32D70: 复查结果全局摘要(新装机零 recon 源时按钮此前零反馈——
+  // verifyState 只在源卡片渲染)。
+  const [verifySummary, setVerifySummary] = useState('');
   const runVerify = () => {
-    setVerifying(true);
+    setVerifying(true); setVerifySummary('');
     api<{ results: { id: string; ok?: boolean; error?: string | null }[] }>('/agent-settings/verify')
       .then((r) => {
         const m: Record<string, { ok: boolean; error?: string | null }> = {};
         for (const it of r.results) if (it.ok !== undefined) m[it.id] = { ok: it.ok, error: it.error };
         setVerify(m);
+        const n = Object.keys(m).length;
+        const ok = Object.values(m).filter(v => v.ok).length;
+        setVerifySummary(n ? `复查完成: ${ok}/${n} 个数据源可用${ok < n ? '(失败项见各源卡片红标)' : ''}`
+          : '无可复查的数据源(先在下方配置至少一家)');
       })
-      .catch(() => setVerify(null))
+      .catch(() => { setVerify(null); setVerifySummary('复查失败(接口错误)'); })
       .finally(() => setVerifying(false));
   };
 
@@ -242,6 +249,7 @@ export function SettingsPage() {
             className="mb-1 flex items-center gap-1.5 rounded-sm border border-void-600 px-2.5 py-1 font-mono text-[11px] text-zinc-300 transition-colors hover:border-orange-700 hover:text-orange-300 disabled:opacity-50">
             {verifying ? <><Loader2 className="h-3 w-3 animate-spin" />复查中</> : <><ShieldCheck className="h-3 w-3" />复查可用性</>}
           </button>
+          {verifySummary && <span className="mb-1 text-[11px] text-zinc-400">{verifySummary}</span>}
           <button onClick={() => void reload()} title="刷新"
             className="mb-1 text-zinc-600 transition-colors hover:text-zinc-300"><RotateCw className="h-3.5 w-3.5" /></button>
         </div>
