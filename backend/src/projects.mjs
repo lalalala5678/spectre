@@ -110,11 +110,19 @@ export function getPrefs() {
 }
 
 export function setPrefs(patch, wal) {
-  // CS46-F6b: 嵌套形状守卫——stackRatios 须普通对象(字符串仍会被
-  // spread 成字符索引键; 顶层守卫在 routes 只看 ui 一层)。
+  // CS46-F6b/CS47-N3: 嵌套形状守卫——stackRatios 须普通对象(非数组;
+  // 字符串/数组都会被 spread 成索引键), 值=number[] | null(消费契约
+  // PanelStack Record<string, number[] | null>)。
   if (patch.ui && Object.prototype.hasOwnProperty.call(patch.ui, 'stackRatios')
-    && (typeof patch.ui.stackRatios !== 'object' || patch.ui.stackRatios === null)) {
+    && (typeof patch.ui.stackRatios !== 'object' || patch.ui.stackRatios === null
+      || Array.isArray(patch.ui.stackRatios))) {
     throw new Error('ui.stackRatios 须为普通对象');
+  }
+  if (patch.ui?.stackRatios && typeof patch.ui.stackRatios === 'object') {
+    for (const v of Object.values(patch.ui.stackRatios)) {
+      const okShape = v === null || (Array.isArray(v) && v.every(n => typeof n === 'number'));
+      if (!okShape) throw new Error('ui.stackRatios 值须为 number[] 或 null');
+    }
   }
   const ui = { ...prefs.ui, ...patch.ui };
   // R13-F4: stackRatios 按 key 合并——ui 级浅合并此前使单 key patch

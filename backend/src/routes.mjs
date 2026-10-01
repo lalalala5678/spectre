@@ -28,7 +28,7 @@ import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
 
 const SESSION_ID = /^\/api\/sessions\/([a-z0-9-]+)(\/[a-z-]+)?$/;
-const PROJECT_ID = /^\/api\/projects\/([a-z0-9-]+)$/;  // CS3-N22: PUT/DELETE 双胞胎正则单源
+const PROJECT_ID = /^\/api\/projects\/([\w-]{1,64})$/;  // CS3-N22: 单源; CS47-N6: 与 workSessionId/currentWs 同 id 域
 
 function bad(res, code, message) {
   json(res, code, { error: message });
@@ -329,7 +329,9 @@ function realRouter({ store, bus, caps, wal }) {
       // entries verbatim (keeps ids so existing sessions stay grouped)
       if (Array.isArray(body.projects)) {
         for (const p of body.projects) {
-          if (p?.id && !getProject(p.id)) {
+          // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
+          // 却永远无法成为 currentWs, F1 症状对另一 id 源重演)。
+          if (p?.id && typeof p.id === 'string' && /^[\w-]{1,64}$/.test(p.id) && !getProject(p.id)) {
             ensureProject(p.id, wal, String(p.label ?? '').slice(0, 60));
           }
         }
@@ -422,15 +424,18 @@ function maskPrefs(raw) {
       if ('commonSettings' in body_ || 'agentLlm' in body_ || 'reconApiKeys' in body_) {
         return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(保存前真实连通探测+热更)——/api/prefs 不接受 commonSettings/agentLlm/reconApiKeys 键');
       }
-      // R32D68-NEW-1: 非凭据键形状校验——ui 须普通对象(字符串会被
-      // spread 成字符索引键持久化); currentWs 须 ws- 形串或 null。
+      // R32D68-NEW-1/CS47-N2: 非凭据键形状校验——ui 须普通对象(字符串
+      // 会被 spread 成字符索引键持久化); currentWs 须项目 id 字符串或 null。
       if ('ui' in body_ && (typeof body_.ui !== 'object' || body_.ui === null || Array.isArray(body_.ui))) {
         return bad(res, 400, 'ui 须为普通对象(键值对)——非对象值会被展开成字符索引');
       }
       // CS46-F1: currentWs 与 workSessionId 同 id 域([\w-]{1,64}——此前
       // ws- 前缀正则误伤 API 建的非前缀项目, console 选中即 400 静默吞)。
+      // CS47-N1: 先验原类型再验域——此前 String() 视图过门而 raw 落盘
+      // (number/数组原样持久化, 端点自身文案被破)。
       if ('currentWs' in body_ && !(body_.currentWs === null
-        || (/^[\w-]+$/.test(String(body_.currentWs)) && String(body_.currentWs).length <= 64))) {
+        || (typeof body_.currentWs === 'string' && /^[\w-]+$/.test(body_.currentWs)
+          && body_.currentWs.length <= 64))) {
         return bad(res, 400, 'currentWs 须为项目 id 字符串([a-zA-Z0-9_-]{1,64})或 null');
       }
       // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。

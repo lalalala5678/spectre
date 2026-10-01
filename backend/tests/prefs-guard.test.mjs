@@ -2,7 +2,8 @@
  * prefs-guard (CS46-F6a 机锁): PUT /api/prefs 三面守卫(currentWs id 域 /
  * ui 形状 / 凭据子树拒)与 setPrefs 嵌套 stackRatios 形状——纯函数面直测,
  * 防 F1 类(正则与 id 域分叉)盲区回归。
- * 端到端 HTTP 面由 runtime-url-guard 同族模式覆盖(端口项)。
+ * CS47-N5: HTTP 面锁待补(本文件只锁纯函数面——runtime-url-guard 不
+ * 覆盖 prefs)。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
@@ -24,11 +25,13 @@ test('currentWs 校验与 workSessionId 同 id 域(CS46-F1 锁)', async () => {
     // 非 ws- 前缀项目 id 是合法域(与 routes workSessionId 同)
     setPrefs({ currentWs: 'proj-abc123', ui: { theme: 'dark' } });
     assert.equal(getPrefs().currentWs, 'proj-abc123', '非 ws- 前缀 id 必须可持久化(F1: console switch 路径)');
-    // 嵌套形状守卫(F6b)
+    // 嵌套形状守卫(F6b/N3): 字符串/数组均拒
     assert.throws(() => setPrefs({ ui: { stackRatios: 'garbage' } }), /stackRatios 须为普通对象/);
-    // 正常对象通过
-    setPrefs({ ui: { stackRatios: { 'stage:recon': 0.4 } } });
-    assert.ok(getPrefs().ui.stackRatios['stage:recon'] === 0.4);
+    assert.throws(() => setPrefs({ ui: { stackRatios: [0.4, 0.3] } }), /stackRatios 须为普通对象/);
+    // 值形状=number[]|null(CS47-N4: 消费契约 PanelStack——标量拒)
+    assert.throws(() => setPrefs({ ui: { stackRatios: { 'stage:recon': 0.4 } } }), /number\[\] 或 null/);
+    setPrefs({ ui: { stackRatios: { 'stage:recon': [0.4, 0.3], 'even': null } } });
+    assert.deepEqual(getPrefs().ui.stackRatios['stage:recon'], [0.4, 0.3]);
   } finally {
     process.chdir(prevCwd);
     delete process.env.SPECTRE_DATA_DIR;
