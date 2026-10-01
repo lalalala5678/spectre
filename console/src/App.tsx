@@ -18,12 +18,16 @@ import { setPendingOpen } from './api/openSessionChannel';
 const STAGE_ROUTES: RouteKey[] = [
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
 ];
+// R32D39-N1: 配置三键也是 agent 会话——此前不进路由表, 全局搜索点击
+// 这些会话时 pendingOpen 无人消费, 静默死路到 autopwn 页(README 承诺
+// '任何 agent 的会话均可打开'被证伪)。
+const CONFIG_AGENT_ROUTES: RouteKey[] = ['skill-config', 'mcp-config', 'cli-config'];
 
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
     const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
-    const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
+    const valid: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
     return valid.includes(h) ? h : 'autopwn';
   });
 
@@ -59,7 +63,7 @@ export default function App() {
       // ——与搜索点击同一消费路径, 并 replaceState 清洗地址栏。
       const s = new URLSearchParams(raw.split('?')[1] ?? '').get('s');
       const h = raw.split('?')[0] as RouteKey;
-      const valid: RouteKey[] = [...STAGE_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
+      const valid: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
       if (s && valid.includes(h)) {
         setPendingOpen(h, s);
         history.replaceState(null, '', `${window.location.pathname}#${h}`);
@@ -83,7 +87,7 @@ export default function App() {
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
         <main className="min-h-0 flex-1 overflow-hidden bg-void-950">
-          {STAGE_ROUTES.includes(route) ? (
+          {[...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES].includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(route)} />
           ) : ['skills', 'mcp', 'cli'].includes(route) ? (
             // CS1-R9: 三配置页同构外壳收敛(页面组件查表)

@@ -188,6 +188,11 @@ def build_email(from_display, from_addr, to_addr, subject, html_body,
 def dkim_sign(msg_bytes, private_key_path, selector, domain):
     """DKIM 签名(标准 RFC 6376)"""
     if not HAS_DKIM:
+        # R32D39-N2: 此前静默 None——邮件无签名发出而无任何提示(实测
+        # 抓包缺 DKIM-Signature)。显式告警到 stderr。
+        print('[warn] dkimpy 未安装(--dkim-key 被忽略, 邮件将无 DKIM 签名)'
+              '——容器位已内置; 宿主位 pip install dkimpy 或挂 /opt/tools/py',
+              file=sys.stderr)
         return None
     with open(private_key_path, 'rb') as f:
         key = f.read()

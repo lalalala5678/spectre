@@ -13,6 +13,7 @@
 > Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。
 
 > npm 故障排障: 安装若以 `npm error Exit handler never called!` 或 `ENOTFOUND mirrors.tencentyun.com` 等网络错误崩溃, 先 `npm config get registry` 检查是否指向不可达镜像; 切换 `--registry=https://registry.npmjs.org` 并**删除半装的 node_modules 后重装**。
+> pip 镜像同坑(R32D39-N4): 云主机 pip 源常指向内网不可达镜像(触发面: 手动装 dkimpy/yara 等可选工具包)——`pip config set global.index-url https://pypi.org/simple` 或临时 `-i https://pypi.org/simple`; 网关与部署脚本零 pip 依赖。
 
 ## 组件清单
 

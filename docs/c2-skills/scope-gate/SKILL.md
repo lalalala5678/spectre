@@ -12,7 +12,7 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 {
   "targets": ["*.target-range.example", "203.0.113.0/24"],
   "exercise": "EX-2026-渗投-042",
-  "window": {"start": "2026-10-01T09:00:00Z", "end": "2026-10-08T18:00:00Z"}
+  "window": {"start": "2020-01-01T00:00:00Z", "end": "2099-01-01T00:00:00Z"}  // 改成你的演练起止(UTC)
 }
 ```
 三必填字段: `targets`(glob/网段清单)、`exercise`(本次演练标识, 入审计
