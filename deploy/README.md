@@ -121,7 +121,7 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 
 ## API 契约
 
-- `POST /api/sessions`: 必填 `agentKey`(14 键之一: autopwn/recon/nday/weakcred/api/exploit/phish/c2/persistence/postex/report/skill-config/mcp-config/cli-config); 可选 `workSessionId`(项目归组)
+- `POST /api/sessions`(须 `Content-Type: application/json`——裸表单体不解析, R32D62-P4): 必填 `agentKey`(14 键之一: autopwn/recon/nday/weakcred/api/exploit/phish/c2/persistence/postex/report/skill-config/mcp-config/cli-config); 可选 `workSessionId`(项目归组)
 - `POST /api/sessions/:id/messages`: 必填 `text`(202 异步——回执走 SSE `event: session`); `source=agent` 伪装注入需内部令牌
 - `GET /api/sessions/:id`: 会话摘要(消息内联在会话对象中——`GET .../messages` 端点不存在, 非对称属设计)
 - `POST /api/projects`: 可选 `label`(缺省=「未命名项目」; 其它字段名如 `name` 被静默忽略); `activate: true` 才切换控制台活跃项目(缺省不动——API/CLI 建项目不劫持 UI); `PUT /api/projects/:id` 用 `label` 改名

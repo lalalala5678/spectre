@@ -105,3 +105,18 @@ test('门族矩阵: 坏 JSON scope 全族统一干净 75(CS37-F3 形态补位)',
     rmSync(badDir, { recursive: true, force: true });
   }
 });
+
+test('variant selftest 空套件干净跑通(CS40-1 NameError 盲区锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-st-'));
+  mkdirSync(join(dir, 'tools', 'c2', 'basetypes'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'c2', 'scope.json'),
+    JSON.stringify({ exercise: 'qa', targets: ['a.local'], window: { start: '2026-01-01T00:00:00Z', end: '2027-01-01T00:00:00Z' } }));
+  try {
+    const r = runTool('c2-variant.py', ['selftest'], dir, false);
+    assert.equal(r.status, 0, `selftest 空套件应 rc=0, 实得 ${r.status}\nstderr:${r.stderr?.slice(-300)}`);
+    assert.ok(!r.stderr.includes('Traceback') && !r.stderr.includes('NameError'), '不得 NameError/裸栈');
+    assert.ok(r.stdout.includes('SELFTEST SUMMARY'), '应打印汇总行');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

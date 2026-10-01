@@ -44,8 +44,8 @@ def parse_b64(out):
     return best or None
 
 def cmd_list(args):
-    # R32D61-F3: 非法类别干净 rc=2(此前 KeyError 裸栈); java 预检同 gen
-    # 且后置于门(门族矩阵: env=1→76 先于引擎缺 2)。
+    # R32D61-F3/CS40-5: java 预检同 gen 制式且后置于门(门族矩阵:
+    # env=1→76 先于引擎缺 2)。非法类别交 jmg 交互式提示(无本地表)。
     gate()
     import shutil
     if not shutil.which('java'):

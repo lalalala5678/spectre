@@ -63,7 +63,7 @@ def path_style_uid(recipient):
     """路径式追踪 ID(不用 query 参数——网关对 ?uid= 敏感)
     V4: 无盐 md5 可由邮箱推导伪造(writer 复现伪造事件全落)——改
     HMAC-SHA256(共享密钥 数据根 c2/phish-uid.key(_data_root() 双运行位),与 phish-track 同源)。"""
-    import hmac as _hmac, os as _os, secrets as _sec
+    import hmac as _hmac, secrets as _sec  # CS40-7: os 顶层已在(别名收敛)
     KP = os.path.join(_data_root(), 'c2/phish-uid.key')
     try:
         k = open(KP, 'rb').read()
@@ -72,9 +72,9 @@ def path_style_uid(recipient):
     except Exception:
         k = _sec.token_bytes(32)
         try:
-            _os.makedirs(_os.path.dirname(KP), exist_ok=True)
-            fd = _os.open(KP, _os.O_WRONLY | _os.O_CREAT | _os.O_TRUNC, 0o600)
-            _os.write(fd, k); _os.close(fd)
+            os.makedirs(os.path.dirname(KP), exist_ok=True)
+            fd = os.open(KP, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+            os.write(fd, k); os.close(fd)
         except OSError:
             pass
     return _hmac.new(k, recipient.encode(), hashlib.sha256).hexdigest()[:12]

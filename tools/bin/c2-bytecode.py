@@ -120,6 +120,10 @@ def cmd_split(args):
         print(f"用法错误: --class 文件不存在: {a['--class']}", file=sys.stderr); return 2
     sc = gate()
     rules = a.get('--rules', DEFAULT_RULES)
+    # CS40-3: java 工具链预检(Splitter/rt_exec 依赖; yara 已有独立 SKIP)。
+    import shutil
+    if not (shutil.which('javap') and shutil.which('java')):
+        print('c2-bytecode split 需要 javap+java——容器位内置; 宿主自装 JDK 或容器位运行', file=sys.stderr); return 2
     src = a['--class']
     outdir = a.get('--out') or tempfile.mkdtemp(prefix='c2bc-')
     os.makedirs(outdir, exist_ok=True)
@@ -174,6 +178,12 @@ def cmd_verify(args):
     # R32D61-F2: 缺参/文件缺干净 rc=2(此前 KeyError 裸栈)。
     if not all(k in a and os.path.isfile(a[k]) for k in ('--orig', '--mod')):
         print('用法: c2-bytecode.py verify --orig <a.class> --mod <b.class>', file=sys.stderr); return 2
+    # CS40-3/R32D62-P2: verify 与 split/selftest 同门(授权一致性)+java
+    # 工具链预检(javap_members/rt_exec 均依赖, 此前 FileNotFoundError 裸栈)。
+    gate()
+    import shutil
+    if not (shutil.which('javap') and shutil.which('java')):
+        print('c2-bytecode verify 需要 javap+java——容器位内置; 宿主自装 JDK 或容器位运行', file=sys.stderr); return 2
     o, m = a['--orig'], a['--mod']
     sig_ok = javap_members(o) == javap_members(m)
     # 等价守恒:变体加载行为必须与原版一致(都成/同因失败)——

@@ -355,8 +355,7 @@ def cmd_gen(args):
     if a.get('--rules'):
         RULE_DIR = a['--rules']
     # R32D60-NEW4: --src 不存在→干净 rc=2(此前裸栈 rc=1)。
-    import os as _os
-    if not _os.path.isfile(a['--src']):
+    if not os.path.isfile(a['--src']):
         print(f"用法错误: --src 文件不存在或不是常规文件: {a['--src']}", file=sys.stderr); return 2
     # CS36-Z2: 门序族统一=edusrc 先; Z3: 换 _common 单源门(exercise 必填)
     edusrc_gate([a['--src'], a.get('--out', '')])
@@ -446,7 +445,9 @@ def cmd_selftest(args):
     bdir = a.get('--basetypes', os.path.join(_data_root(), 'c2/basetypes'))
     edusrc_gate([bdir])
     scope_gate_full()
+    # R32D61-F6/CS40-1: java 缺失归因标志(此前锚点落错函数致 NameError)。
     import shutil
+    java_missing = not shutil.which('java')
     fails = 0
     for f in sorted(os.listdir(bdir)):
         if f.endswith(('.bak',)):

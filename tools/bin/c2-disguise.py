@@ -14,6 +14,7 @@
 值归一化:\\uXXXX 解转义 + "a"+"b" / 'a'.'b' 拼接还原(防拆分/转义规避检测)。
 """
 import sys, os, re, json, glob
+from _common import edusrc_gate
 
 BANNED_WORDS = ['payload', 'shell', 'memshell', 'cmd', 'connect', 'backdoor', 'webshell', 'ghost', 'ice', 'behinder', 'godzilla']
 # ===== 二令·深度伪装十四项(面盘点:面在=必查,面缺=N/A 留痕) =====
@@ -223,6 +224,8 @@ def main():
         print(__doc__); return 0
     if len(sys.argv) < 3:
         print(__doc__); return 2
+    # R32D62-P3: env-only EDUSRC 门(家族一致)。
+    edusrc_gate()
     cmd, args = sys.argv[1], sys.argv[2:]
     a = dict(zip(args[::2], args[1::2]))
     if cmd == 'check':

@@ -11,7 +11,7 @@
 退出码:0=功能守恒;1=功能丢失(标记/语法层失);3=运行层劣化(基线可运行而变体不可)
 """
 import sys, os, re, subprocess, tempfile, shutil
-from _common import _data_root
+from _common import edusrc_gate, _data_root
 
 
 _C2 = os.path.join(_data_root(), 'c2')
@@ -105,6 +105,8 @@ def main():
     # 报干净错误 rc=2。
     if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
         print(__doc__); return 0 if sys.argv[1:] else 2
+    # R32D62-P3: env-only EDUSRC 门(家族一致; -h 永先)。
+    edusrc_gate()
     p = sys.argv[1]
     try:
         body = open(p, errors='replace').read()

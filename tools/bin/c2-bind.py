@@ -53,9 +53,8 @@ def cmd_bind(args):
     # CS30-F8/CS39-6: targets 通配语义单源(_common.target_matches)。
     if not any(target_matches(t, target) for t in sc.get('targets', [])):
         print(f'BIND-REJECT: target {target!r} not in scope targets', file=sys.stderr); return 70
-    now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-    if not (sc['window']['start'] <= now <= sc['window']['end']):
-        print('BIND-REJECT: out of window', file=sys.stderr); return 75
+    # CS40-8: 出窗复查删——scope_gate_full 已同窗断言(此处仅秒界竞态
+    # 可达, 消息与门分叉)。
     exp = a.get('--days') and time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(time.time() + int(a['--days']) * 86400)) or sc['window']['end']
     if exp > sc['window']['end']:
         exp = sc['window']['end']

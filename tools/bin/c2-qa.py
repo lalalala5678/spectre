@@ -21,7 +21,7 @@ def gate(payload=''):
     # R32D58-F5: 门序族统一=edusrc 先(phish 族同制, 同态退出码不分叉)。
     if _edusrc_hit():
         audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
         sys.exit(76)
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)

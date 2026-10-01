@@ -27,7 +27,7 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 | 检查 | 工具/位置 | 违规行为 |
 |---|---|---|
 | scope 空/出窗 | c2-qa.py gate() / c2-variant.py gen / c2-basetype.py gate() / c2-bytecode.py gate() | exit 75 拒绝 |
-| EDUSRC 硬隔离 | c2 族: qa/variant/basetype/bytecode 内联门 + phish 族: send/proxy/track/phishlet-proxy(\_common.edusrc_gate\_phish); functest/bind 不涉及 | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
+| EDUSRC 硬隔离 | 全员 env-only: qa/variant/basetype/bytecode/javart/functest/disguise(_common.edusrc_gate) + phish 族四工具(edusrc_gate_phish); bind 目标门另行(70) | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
 | 目标不在清单 | c2-bind.py bind | exit 70 |
 | 审计 | /opt/tools/c2/audit.log | 正常操作落行: qa scan/round、bind/expire、basetype gen、bytecode split、qa 的 EDUSRC 拒绝(target=EDUSRC); 其余拒绝(scope 75 等)与 variant/basetype/bytecode 的 EDUSRC 76 不落行 |
 
@@ -38,7 +38,7 @@ c2-bind.py verify --payload p [--target t]            # 交付前必过
 c2-bind.py expire --payload p                          # 人工提前作废
 ```
 退出码语义:0=OK;77=**EXPIRED(过期自废,qa 拒绝交付)**;78=目标越出当前 scope;
-79=载荷绑定后被改;80=签名坏;81=无 sidecar;70/75/76 同上。
+79=载荷绑定后被改;80=签名坏;81=无/坏 sidecar;70/75/76 同上。
 绑定=HMAC-SHA256(bind.key, sha256|target|exercise|exp);sidecar `<payload>.bind.json` 随交付包。
 c2-qa 交付路径已自动 bind+verify;任何下游 agent 拿到交付件先 `verify` 再用。
 
