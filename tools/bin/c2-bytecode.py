@@ -65,6 +65,10 @@ def yara_hits(path, rules_dir):
     """[(string, offset)] 所有规则文件的命中串。"""
     hits = []
     for rf in sorted(glob.glob(rules_dir + '/*.yar') + glob.glob(rules_dir + '/*.yara')):
+        import shutil
+        if not shutil.which('yara'):
+            print('[c2-bytecode] yara 不在 PATH——跳过规则扫描(容器位内置; 宿主自装或容器位运行)', file=sys.stderr)
+            return 0, []
         r = subprocess.run(['yara', '-s', rf, path], capture_output=True, text=True, timeout=60)
         for line in r.stdout.splitlines():
             m = re.match(r'^(0x[0-9a-fA-F]+):(\$[\w]+): ?(.*)$', line)

@@ -3,7 +3,7 @@
 # 用法: fp-scan -l assets.txt [-o out.tsv] [--deep] [--max N]
 #   assets: 域名或 URL 列表(每行一个)
 #   默认层(轻): httpx 内置 wappalyzer + webappanalyzer 扩展库 + whatweb
-#   --deep 层:  追加 nuclei 双指纹模板库(PD technologies 917 + 0x727 国产 3530)
+#   --deep 层:  追加 nuclei 双指纹模板库(数量以 fetch-fingerprints 实际交付为准)
 #               (每资产请求数↑,仅对存疑/高价值资产使用)
 #   --max: whatweb 批量上限(默认 120,防慢)
 # 输出: TSV — asset | status | title | server | apps(带版本) | sources
@@ -21,16 +21,6 @@ else
 fi
 CFF=$FP_DIR/webappanalyzer.json
 NT_DIR=$FP_DIR/../fingerprints
-# R32D55-N1: 供给守卫——缺件给可行动错误(此前 FileNotFoundError 裸栈)。
-if [ ! -f "$CFF" ]; then
-  echo "[fp-scan] 缺字典 $CFF——tools-sync 应已交付(tools/dicts/); 若无, 检查克隆完整性" >&2; exit 2
-fi
-if [ ! -d "$NT_DIR/nt-technologies" ]; then
-  echo "[fp-scan] 缺指纹库 $NT_DIR/nt-technologies——运行 bash deploy/fetch-fingerprints.sh(约 45MB, 网络下载)" >&2; exit 2
-fi
-for eng in httpx whatweb; do
-  command -v "$eng" >/dev/null 2>&1 || echo "[fp-scan][warn] 引擎 $eng 不在 PATH——对应层将跳过" >&2
-done
 OUT=out.tsv; LIST=""; DEEP=0; MAX=120
 FPTMP=$(mktemp -u /tmp/fp-scan.XXXXXX)  # R32D55-N4: 共享 /tmp/.fps.* 多实例碰撞→mktemp
 trap "rm -f ${FPTMP}*" EXIT
@@ -42,6 +32,17 @@ while [ $# -gt 0 ]; do case "$1" in
   -h|--help) sed -n '2,12p' "$0"; exit 0;;
   *) echo "[fp-scan] 未知参数: $1(用法: -h)" >&2; exit 2;;
 esac; done
+
+# R32D55-N1: 供给守卫——缺件给可行动错误(此前 FileNotFoundError 裸栈)。
+if [ ! -f "$CFF" ]; then
+  echo "[fp-scan] 缺字典 $CFF——重跑 bash deploy/tools-sync.sh(交付 tools/dicts/); 仍缺则检查克隆完整性" >&2; exit 2
+fi
+if [ ! -d "$NT_DIR/nt-technologies" ]; then
+  echo "[fp-scan] 缺指纹库 $NT_DIR/nt-technologies——运行 bash deploy/fetch-fingerprints.sh(约 45MB, 网络下载)" >&2; exit 2
+fi
+for eng in httpx whatweb; do
+  command -v "$eng" >/dev/null 2>&1 || echo "[fp-scan][warn] 引擎 $eng 不在 PATH——对应层将跳过" >&2
+done
 
 # F28: 清理陈旧临时文件——此前残留的 l1/l2/l4 会被下一会话当新鲜结果合并(跨会话污染)
 rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
@@ -56,8 +57,10 @@ cat ${FPTMP}.in | httpx -silent -title -tech-detect -status-code \
 # → 层2 静默零输出。首次遇到自动转换缓存到 ${FPTMP}.cff.json。
 CFF_OK="$CFF"
 if [ -f "$CFF" ] && ! grep -q '"technologies"' <(head -c 4096 "$CFF"); then
-  if [ ! -s ${FPTMP}.cff.json ]; then
-    python3 -c "import json,sys; d=json.load(open('$CFF')); json.dump({'technologies': d.get('apps', d.get('technologies', {}))}, open('${FPTMP}.cff.json','w'))" 2>/dev/null || true
+  if [ ! -s ${FPTMP}.cff.json ]; then CFF_P="$CFF"; export CFF_P
+    # CS31-P0: 此前 '${FPTMP}.cff.json' 在双引号 python -c 内不展开→写死
+    # 字面路径。改环境变量传递。
+    FPTMP="$FPTMP" python3 -c "import json,sys,os; d=json.load(open(os.environ['CFF_P'])); json.dump({'technologies': d.get('apps', d.get('technologies', {}))}, open(os.environ['FPTMP']+'.cff.json','w'))" 2>/dev/null || true
   fi
   [ -s ${FPTMP}.cff.json ] && CFF_OK=${FPTMP}.cff.json
 fi
@@ -89,8 +92,8 @@ if [ "$DEEP" = "1" ]; then
     -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json 2>/dev/null || true
 fi
 
-python3 - <<'PYEOF'
-import json, re, collections
+FPTMP="$FPTMP" python3 - <<'PYEOF'  # CS31-P0: FPTMP 走环境变量(引号 heredoc 内 ${} 不展开)
+import json, re, collections, os
 
 apps = collections.defaultdict(set)   # asset -> {(app, source)}
 meta = {}                             # asset -> {status,title,server}
@@ -99,7 +102,7 @@ def norm(u):
     u = u.strip()
     return re.sub(r'^https?://', '', u).rstrip('/')
 
-for line in open('${FPTMP}.l1.json'):
+for line in open(os.environ['FPTMP']+'.l1.json'):
     try: d = json.loads(line)
     except: continue
     a = norm(d.get('url', d.get('host', '')))
@@ -113,7 +116,7 @@ for line in open('${FPTMP}.l1.json'):
     fh = d.get('favicon') or d.get('favicon_hash')
     if fh: m['favicon'] = str(fh)
 
-for line in open('${FPTMP}.l2.json'):
+for line in open(os.environ['FPTMP']+'.l2.json'):
     try: d = json.loads(line)
     except: continue
     a = norm(d.get('url', d.get('host', '')))
@@ -121,7 +124,7 @@ for line in open('${FPTMP}.l2.json'):
         apps[a].add((str(t), 'webappanalyzer'))
 
 # whatweb: "host [HTTP] field1, field2[key=val], ..."
-for line in open('${FPTMP}.l3.txt'):
+for line in open(os.environ['FPTMP']+'.l3.txt'):
     line = line.strip()
     if not line: continue
     parts = re.split(r'\]\s*', line.replace('[', '', 1)) if ']' in line else [line]
@@ -135,8 +138,8 @@ for line in open('${FPTMP}.l3.txt'):
 
 import os
 seen_now = set(meta) | set(apps)
-if os.path.exists('${FPTMP}.l4.json'):
-    for line in open('${FPTMP}.l4.json'):
+if os.path.exists(os.environ['FPTMP']+'.l4.json'):
+    for line in open(os.environ['FPTMP']+'.l4.json'):
         try: d = json.loads(line)
         except: continue
         # F28: nuclei host 可能无端口/带 scheme——与 httpx 的 norm 键分裂,
@@ -158,7 +161,7 @@ if os.path.exists('${FPTMP}.l4.json'):
             apps[target].add((f"{tid}", 'nuclei'))
 
 seen = set(meta) | set(apps)
-with open('${FPTMP}.out', 'w') as f:
+with open(os.environ['FPTMP']+'.out', 'w') as f:
     f.write("asset\tstatus\ttitle\tserver\tapps\tfav\tsource\n")
     for a in sorted(seen):
         m = meta.get(a, {})

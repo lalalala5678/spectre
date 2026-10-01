@@ -14,7 +14,7 @@ GUARD_GEN=$(realpath -m "${GEN_DIR:-$ROOT/tools/c2/generators}")
 if [ "$GUARD_LIBS" = "/var/lib/spectre/tools/c2/libs" ] \
    || [ "$GUARD_GEN" = "/var/lib/spectre/tools/c2/generators" ]; then
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
-    echo "[fetch-jars] 拒绝: 未设 SPECTRE_DATA_DIR 且目标为生产缺省路径 $ROOT" >&2
+    echo "[fetch-jars] 拒绝: 目标为生产缺省路径(解析 GUARD_LIBS / $GUARD_GEN)" >&2
     echo "[fetch-jars] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
     exit 1
   fi

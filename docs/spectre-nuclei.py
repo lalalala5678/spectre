@@ -39,7 +39,10 @@ def load_template(path):
         return yaml.safe_load(f)
 
 def list_templates(template_dir, search=None):
-    """递归找所有 .yaml 模板"""
+    """递归找所有 .yaml 模板(R32D56-P1: 目录缺失/空给可行动错误——
+    此前缺失 rc=0 '[✓] 0 findings' 假成功)"""
+    if not os.path.isdir(template_dir):
+        raise SystemExit(f'模板目录不存在: {template_dir}——bash deploy/fetch-fingerprints.sh 或 git clone --depth 1 https://github.com/projectdiscovery/nuclei-templates')
     found = []
     for root, dirs, files in os.walk(template_dir):
         for fn in files:
@@ -583,7 +586,10 @@ def main():
         templates = [load_template(args.template)]
     elif args.templates:
         t_load0 = time.time()
-        for t in list_templates(args.templates, args.search):
+        _ts = list_templates(args.templates, args.search)
+        if not _ts:
+            raise SystemExit(f'模板目录零模板: {args.templates}——检查克隆/下载完整性')
+        for t in _ts:
             templates.append(load_template(t['path']))
         t_load = time.time() - t_load0
     else:
