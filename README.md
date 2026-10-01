@@ -10,7 +10,7 @@
 
 ```
 ┌─ console (React) ─── 网关(Python) ── agent-runtime (Node, :8090)
-│                                        ├─ 14 会话智能体(GLM/pi-agent-core)
+│                                        ├─ 14 会话智能体(pi-agent-core, LLM 由 .env 配置——任意 OpenAI 兼容厂商)
 │                                        ├─ MCP stdio 服务器群(recon/nday 情报源)
 │                                        └─ 沙箱(docker driver, CLI/skills 挂载)
 ├─ worker (Temporal activities) ── temporal-dev
@@ -37,7 +37,8 @@
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
 
-# ① 后端(Node ≥ 22)——先编辑 .env 填 INTERNAL_TOKEN(自定随机串)与 LLM_API_KEY
+# ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串)+ LLM 三行(BASE_URL/API_KEY/MODEL)
+#    任意 OpenAI 兼容厂商均可(示例为智谱 GLM, 换 DeepSeek/OpenAI/vLLM 只改这三行)
 cd backend && cp .env.example .env && ${EDITOR:-vi} .env
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test && \
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # npm 崩溃→deploy/README 排障节   # 测试隔离数据目录(生产缺省 /var/lib/spectre)

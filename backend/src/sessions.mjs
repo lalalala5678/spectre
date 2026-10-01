@@ -238,7 +238,7 @@ export class SessionStore {
         model: this.model,
         tools,
         // Thinking effort is user-configurable (settings bar); pi levels
-        // pass through the model's thinkingLevelMap (GLM) or raw to vendor.
+        // pass through the model's thinkingLevelMap(如 GLM 的 tier 映射) or raw to vendor.
         thinkingLevel: effectiveCommon().thinkingLevel,
         messages,
       },
@@ -757,7 +757,7 @@ export class SessionStore {
     }
     record.reportNudges = 0;
 
-    // GLM sometimes ends a turn right after a tool receipt with an EMPTY
+    // 某些厂商(实测 GLM) sometimes ends a turn right after a tool receipt with an EMPTY
     // final message — walk back to the newest assistant message with text.
     const replies = [...record.agent.state.messages]
       .reverse().filter(m => m.role === 'assistant');

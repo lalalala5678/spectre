@@ -121,7 +121,7 @@ export const STAGE_PROMPT = [
 ].join(' ');
 
 /**
- * GLM-4.6 emits `reasoning_content` before `content` (DeepSeek-style wire
+ * 某些厂商(如 GLM-4.6) emits `reasoning_content` before `content` (DeepSeek-style wire
  * format), hence the thinkingFormat compat flags below.
  */
 function modelCatalog(eff = {}) {
@@ -143,8 +143,8 @@ function modelCatalog(eff = {}) {
       requiresReasoningContentOnAssistantMessages: true,
       thinkingFormat: 'deepseek',
     },
-    // GLM always-thinking: 'off' rejected (code 1210). Map pi levels onto
-    // Zhipu tiers. This is OUR deployment's wiring for GLM — other vendors
+    // 智谱 GLM 特例: 'off' 被拒(code 1210)——pi 层级映射到 Zhipu tiers。
+    // 这是本仓默认示例厂商的适配; 其它厂商(该文件 base/参考其它条目)
     // get the level passed through as-is (user decision: no middle-station).
     thinkingLevelMap: {
       minimal: 'low',

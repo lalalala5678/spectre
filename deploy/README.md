@@ -33,7 +33,7 @@
 git clone https://github.com/lalalala5678/spectre /opt/spectre && cd /opt/spectre
 
 # 1) 后端(state.wal 属主——多实例共用数据目录会互相覆写, 测试务必隔离)
-cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN(自定义随机串) 与 LLM_API_KEY
+cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN+LLM 三行(BASE_URL/KEY/MODEL——任意 OpenAI 兼容厂商)
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # PORT 可覆盖; 生产缺省 /var/lib/spectre
 

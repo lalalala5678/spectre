@@ -647,7 +647,7 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
     );
   }
 
-  // Thinking-only phase (GLM streams reasoning BEFORE any text): the
+  // Thinking-only phase(部分厂商如 GLM streams reasoning BEFORE any text): the
   // reply box would sit empty for the entire thinking duration — reads
   // as "content missing". The thinking panel + footer pulse already
   // express the state; the box appears when the first text delta lands.

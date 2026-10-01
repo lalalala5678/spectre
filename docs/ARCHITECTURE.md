@@ -14,7 +14,7 @@ caddy (:443, /spectre*) ── 真实 TLS,唯一公网入口
 gateway (Python :8081, 仅 127.0.0.1)
   │  认证(scrypt+会话) → 静态 dist / API 反代(含 SSE 流式)
   ├── /spectre/api/* ──► agent-runtime (Node :8090, 仅 127.0.0.1)
-  │                        │  pi 会话池(pi-agent-core × GLM-5.3)
+  │                        │  pi 会话池(pi-agent-core × 用户配置的 LLM)
   │                        │  消息总线 journal + SSE
   │                        │  Temporal client(启动编排)
   │                        ▼
@@ -123,7 +123,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 ## 6. 已验证能力(基座,2026-09-07 全链路浏览器实测)
 
 - 单智能体会话:点击侧栏智能体 → 复用/新建 pi 会话(顶栏切换器可选
-  旧会话、「新任务」开新会话)→ 实时对话,GLM-5.3 流式回复经
+  旧会话、「新任务」开新会话)→ 实时对话, 所配 LLM 流式回复经
   caddy→网关→runtime 三级 SSE 透传
 - **AutoPwn = 单一对话框直连调度智能体**:`dispatch_agents` 工具启动
   Temporal 编排,orchestrator 自主拆解派发
