@@ -26,10 +26,10 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 ## 工具层落实表(2026-09-19 起)
 | 检查 | 工具/位置 | 违规行为 |
 |---|---|---|
-| scope 空/出窗 | c2-qa.py gate() / c2-variant.py gen / c2-basetype.py gate() | exit 75 拒绝 |
+| scope 空/出窗 | c2-qa.py gate() / c2-variant.py gen / c2-basetype.py gate() / c2-bytecode.py gate() | exit 75 拒绝 |
 | EDUSRC 硬隔离 | c2 族: qa/variant/basetype/bytecode 内联门 + phish 族: send/proxy/track/phishlet-proxy(\_common.edusrc_gate\_phish); functest/bind 不涉及 | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
 | 目标不在清单 | c2-bind.py bind | exit 70 |
-| 审计 | /opt/tools/c2/audit.log | 每轮扫描/绑定/生成/拒绝全落行 |
+| 审计 | /opt/tools/c2/audit.log | 正常操作落行: qa scan/round、bind/expire、basetype gen、bytecode split、qa 的 EDUSRC 拒绝(target=EDUSRC); 其余拒绝(scope 75 等)与 variant/basetype/bytecode 的 EDUSRC 76 不落行 |
 
 ## 一次性载荷绑定(c2-bind.py v2,交付协议一部分)
 ```
@@ -49,5 +49,5 @@ c2-qa 交付路径已自动 bind+verify;任何下游 agent 拿到交付件先 `v
 ## EDUSRC 判定细节
 - 旗标:SPECTRE_EDUSRC∈{1,true,yes}, 或值含 "edusrc"(大小写不敏感)——**唯一触发条件**
 - 路径/cwd 启发式已废除(R32D58 用户裁定: 目录名碰巧含 edusrc 不影响任何工具正常使用)
-- 审计留痕仅 c2-qa gate(action=EDUSRC); variant/basetype/bytecode 拒绝不落审计行
+- 审计留痕仅 c2-qa gate(target=EDUSRC, action=REJECT); variant/basetype/bytecode 拒绝不落审计行
 - **教育 SRC 工作区连 benchmark/本地面杀也不做**(硬纪律,无豁免口)

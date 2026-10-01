@@ -85,7 +85,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   ├── Caddyfile                  # TLS 反代样例(顶层单文件)
 │   ├── oob-collector.py           # OOB TCP 收集器
 │   └── tools-sync/skills-seed/fetch-jars/fetch-fingerprints/
-│       fetch-wordlists/bootstrap 六脚本(前四=SPECTRE_DATA_DIR
+│       fetch-wordlists/bootstrap 六脚本(前五=SPECTRE_DATA_DIR
 │       生产路径守卫族(含 fetch-wordlists, 落数据根 tools/, 容器
 │       内挂载为 /opt/tools); bootstrap=容器/宿主守卫)
 │

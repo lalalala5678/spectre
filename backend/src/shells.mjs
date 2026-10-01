@@ -230,8 +230,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}` };
     const g = gate(sh);
     if (!g.ok) {
-      // R32D50-F5: 拒绝也落审计——c2 工具的 SCOPE/EDUSRC 拒绝全落
-      // audit 行, 此前 shell 授权门拒绝静默(证据链纪律不对称)。
+      // R32D50-F5/CS35-5: shell 授权门拒绝落本侧 audit(与 c2 工具的
+      // 审计纪律对齐——c2 侧仅正常操作+qa 的 EDUSRC 拒绝落行, 见
+      // scope-gate SKILL 审计表)。
       audit('shell-gate-reject', { id, target: sh.target, reason: g.error });
       return { ok: false, error: g.error };
     }
