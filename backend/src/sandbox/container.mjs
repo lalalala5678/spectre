@@ -296,7 +296,10 @@ async function bootstrapToolchain() {
 export async function installCli(command) {
   const safeCmd = String(command).slice(0, 4000);
   const res = await runInSandbox(cfg, safeCmd);
-  if (res.code === 0) await appendInstallLog(safeCmd);
+  // R32D69-F2: 账本准入与 bash 通道同门槛(looksLikeInstall——此前 REST
+  // 通道任意 rc=0 命令(含诊断 cat/ls)无条件入账, 重建时逐条盲重放;
+  // 本轮实测 17 条记账仅 2 条真安装)。
+  if (res.code === 0 && looksLikeInstall(safeCmd)) await appendInstallLog(safeCmd);
   return { exitCode: res.code, output: res.out.slice(-4000), ok: res.code === 0 };
 }
 

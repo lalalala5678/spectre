@@ -26,13 +26,21 @@ mkdir -p "$LIBS" "$GEN"
 FAILED=()
 # R32D59 观测项: sha256 清单——首跑落账, 重跑校验(防篡改/半下载静默
 # 留存; HTTP 200 不等于内容完整)。清单恒在 libs 根, 增量维护。
-MANIFEST="$LIBS/.sha256"
+MANIFEST="${LIBS%/*}/.sha256"  # R32D69-F3: 置 c2 根+条目相对路径——cd c2 根 sha256sum -c 可用
 fetch() { # fetch <目录> <完整URL> <文件名>
   local dir=$1 url=$2 name=$3
+  # R32D69-F3: 清单条目=相对 c2 根路径(cd c2 根 sha256sum -c 可用)。
+  # 调用方两形态: LIBS 相对段("." / "spring"——cwd 已在 LIBS)与 GEN 绝对。
+  local rel
+  case "$dir" in
+    /*) rel="generators/$name" ;;
+    .)  rel="libs/$name" ;;
+    *)  rel="libs/$dir/$name" ;;
+  esac
   # R32D59 观测项/CS37: sha256 清单(awk 精确匹配文件名列, 免正则元字符错配);
   # 清单恒在 libs 根(GEN/spring jar 同账)。
   if [ -f "$dir/$name" ] && [ -f "$MANIFEST" ]; then
-    want=$(awk -v n="$name" '$2==n{print $1}' "$MANIFEST")
+    want=$(awk -v n="$rel" '$2==n{print $1}' "$MANIFEST")
     if [ -n "$want" ]; then
       got=$(sha256sum "$dir/$name" | awk '{print $1}')
       if [ "$want" != "$got" ]; then
@@ -43,13 +51,13 @@ fetch() { # fetch <目录> <完整URL> <文件名>
   fi
   if curl -fsSL --retry 2 -o "$dir/$name" "$url"; then
     got=$(sha256sum "$dir/$name" | awk '{print $1}')
-    want=$(awk -v n="$name" '$2==n{print $1}' "$MANIFEST" 2>/dev/null)
+    want=$(awk -v n="$rel" '$2==n{print $1}' "$MANIFEST" 2>/dev/null)
     if [ -n "$want" ]; then
       if [ "$want" != "$got" ]; then
         echo "  ✗ $name 新下载 sha256 与清单不符($want≠$got)"; rm -f "$dir/$name"; FAILED+=("$name"); return 1
       fi
     else
-      mkdir -p "$LIBS"; echo "$got  $name" >> "$MANIFEST"
+      mkdir -p "$LIBS"; echo "$got  $rel" >> "$MANIFEST"
     fi
     echo "  ✓ $name"
   else
