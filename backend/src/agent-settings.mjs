@@ -446,11 +446,10 @@ export function getSettings() {
   const p = getPrefs();
   const bp = p.bruteParams ?? {};
   // CS37-F1 修正: 掩码下钻到叶(此前整源字典塌成 '••••' 字符串, 全字段
-  // 回显空+徽标误报)。仅凭据叶掩码(key/token/secret/password + smtp.user);
+  // 回显空+徽标误报)。仅凭据叶掩码(isSecretLeaf 单源谓词);
   // baseUrl/email/id 等非凭据叶原样回显。
-  const SECRET_LEAF_RE = /^(key|token|secret|password)$/;
   const maskSrc = (o, srcId) => Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
-    [fk, (SECRET_LEAF_RE.test(fk) || (srcId === 'smtp' && fk === 'user')
+    [fk, (isSecretLeaf(srcId, fk)
           || (fv && typeof fv === 'string' && fv.startsWith(MASK)))
       ? maskSecret(fv) : fv]));
   const reconSources = Object.fromEntries(
@@ -711,6 +710,12 @@ export function effectiveCommon() {
  * smtp.user); id/cx 是参数型字段不算凭据(R10-F1)。save/verify/
  * enabledReconSources/keyfiles/前端 SourceCard/mountedCount 六处此前
  * 六种口径(注释还自称'同口径')。 */
+/** CS38-G7: 凭据叶谓词单源(CRED_FIELD 集合 + smtp.user 特例)——掩码
+ * 面/徽标面(hasSourceCredential)共用同一词源, 不再平行编码。 */
+export function isSecretLeaf(srcId, leaf) {
+  return CRED_FIELD.has(leaf) || (srcId === 'smtp' && leaf === 'user');
+}
+
 export function hasSourceCredential(cfg, srcId) {
   if (!cfg) return false;
   if (cfg.key || cfg.token || cfg.secret || cfg.password) return true;

@@ -14,11 +14,10 @@
   ③ 容器执行级:RTHarness listener 模式注册+请求触发无 5xx/无未捕获异常
 授权门/EDUSRC 隔离与 c2-qa 同源。
 """
-import sys, os, json, subprocess, tempfile, time, glob, re
+import sys, os, json, subprocess, tempfile, glob, re
 from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f
 
 _C2 = os.path.join(_data_root(), 'c2')
-SCOPE = os.path.join(_C2, 'scope.json')
 AUDIT = os.path.join(_C2, 'audit.log')
 LIBS = os.path.join(_C2, 'libs')
 ART = os.path.join(_C2, 'javart')
@@ -34,9 +33,6 @@ def gate():
     if _edusrc_hit():
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
     return scope_gate_full()
-
-
-    return sc
 
 def yara_hits(path, rules_dir):
     """[(string, offset)] 所有规则文件的命中串。CS32-F3: 缺 yara 返回

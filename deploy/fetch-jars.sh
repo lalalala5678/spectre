@@ -24,7 +24,7 @@ GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
 mkdir -p "$LIBS" "$GEN"
 FAILED=()
 # R32D59 观测项: sha256 清单——首跑落账, 重跑校验(防篡改/半下载静默
-# 留存; HTTP 200 不等于内容完整)。清单与 jar 同目录, 增量维护。
+# 留存; HTTP 200 不等于内容完整)。清单恒在 libs 根, 增量维护。
 MANIFEST="$LIBS/.sha256"
 fetch() { # fetch <目录> <完整URL> <文件名>
   local dir=$1 url=$2 name=$3

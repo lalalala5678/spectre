@@ -87,18 +87,32 @@ def cmd_verify(args):
     if not os.path.isfile(p):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     if not os.path.exists(side(p)):
-        print('VERIFY-FAIL: no binding sidecar'); return 81
-    rec = json.load(open(side(p)))
-    sc = json.load(open(SCOPE))
+        print('VERIFY-FAIL: no binding sidecar', file=sys.stderr); return 81
+    # CS38-G3: sidecar/scope 读面守卫(此前坏 JSON/缺 scope 裸栈 rc=1)。
+    try:
+        rec = json.load(open(side(p)))
+    except Exception as e:
+        print(f'VERIFY-FAIL: bad sidecar json: {e}', file=sys.stderr); return 81
+    try:
+        sc = json.load(open(SCOPE))
+    except FileNotFoundError:
+        print('SCOPE-REJECT: no scope file', file=sys.stderr); return 75
+    except Exception as e:
+        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); return 75
     sha = hashlib.sha256(open(p, 'rb').read()).hexdigest()
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if sha != rec['sha256']:
-        print('VERIFY-FAIL: payload changed after bind'); return 79
+        print('VERIFY-FAIL: payload changed after bind', file=sys.stderr); return 79
     if not hmac.compare_digest(rec.get('sig', ''), sig_of(sha, rec['target'], rec['exercise'], rec['exp'])):
-        print('VERIFY-FAIL: bad sig'); return 80
+        print('VERIFY-FAIL: bad sig', file=sys.stderr); return 80
     want = a.get('--target', rec['target'])
-    if want not in sc.get('targets', []):
-        print(f'VERIFY-FAIL: target {want} out of current scope'); return 78
+    # CS38-G2: 通配语义与 bind/_common 同源(此前纯精确成员——通配 scope
+    # 下绑定成功的具体 target 结构性 78, SKILL 样例即通配)。
+    def _tm(t, tg):
+        t, tg = str(t).lower(), str(tg).lower()
+        return t == tg or (t.startswith('*.') and tg.endswith(t[1:]))
+    if not any(_tm(t, want) for t in sc.get('targets', [])):
+        print(f'VERIFY-FAIL: target {want} out of current scope', file=sys.stderr); return 78
     if now > rec['exp']:
         print(f'EXPIRED: {p} (exp={rec["exp"]}) — 载荷自废,拒绝交付'); return 77
     print(f'VERIFY-OK: {p} target={want} exp={rec["exp"]} (剩余 {rec["exp"][:10]} 前可用)')
@@ -114,7 +128,10 @@ def cmd_expire(args):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     if not os.path.exists(side(p)):
         print('EXPIRE-FAIL: no binding sidecar', file=sys.stderr); return 81
-    rec = json.load(open(side(p)))
+    try:
+        rec = json.load(open(side(p)))
+    except Exception as e:
+        print(f'EXPIRE-FAIL: bad sidecar json: {e}', file=sys.stderr); return 81
     rec['exp'] = '2000-01-01T00:00:00Z'
     rec['sig'] = sig_of(rec['sha256'], rec['target'], rec['exercise'], rec['exp'])
     json.dump(rec, open(side(p), 'w'), indent=1)

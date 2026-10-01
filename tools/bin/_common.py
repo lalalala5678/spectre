@@ -43,7 +43,7 @@ def scope_gate_full():
     except Exception:
         ok = False
     if not ok:
-        print('SCOPE-REJECT: empty targets or out of window', file=sys.stderr)
+        print('SCOPE-REJECT: empty targets/exercise or out of window', file=sys.stderr)
         sys.exit(75)
     return sc
 

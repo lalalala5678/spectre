@@ -34,9 +34,10 @@ if [ "$(cat "$TOOLS/seclists/.done" 2>/dev/null)" != "$SPARSE_SET" ]; then
       https://github.com/danielmiessler/SecLists "$TMP/sl" 2>"$TMP/err"; then
     (cd "$TMP/sl" && git sparse-checkout set $SPARSE_SET)  # CS36-Z5: 集合单源(指纹同锚)
     mkdir -p "$TOOLS/seclists"
-    # CS37 观测项: 拷贝面由 SPARSE_SET 派生(顶层目录集合), 缺件即败——
-    # 扩第三顶层目录时 cp 不再静默漏拷。
-    for top in $SPARSE_SET; do
+    # CS37 观测项/CS38-G1: 拷贝面由 SPARSE_SET 派生——取顶层分量去重
+    # (Discovery/SNMP → Discovery, 保上游嵌套结构; 此前逐项 cp 把
+    # SNMP 拍平到 seclists/ 顶层, dir-brute/DNS 消费路径断供), 缺件即败。
+    for top in $(printf '%s\n' $SPARSE_SET | cut -d/ -f1 | sort -u); do
       cp -r "$TMP/sl/$top" "$TOOLS/seclists/" 2>/dev/null \
         || { echo "[fetch-wordlists] 拷贝缺件: $top" >&2; SL_FAILED=1; }
     done

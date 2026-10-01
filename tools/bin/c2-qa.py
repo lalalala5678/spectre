@@ -24,7 +24,7 @@ def gate(payload=''):
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
         sys.exit(76)
     if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT: no scope file'); sys.exit(75)
+        print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
     # CS37-F3: 坏 JSON 干净 75(此前裸栈 rc=1)。
     try:
         sc = json.load(open(SCOPE))
@@ -42,7 +42,7 @@ def gate(payload=''):
     if not ok:
         # CS8-P2-2: exercise 与 targets/window 同为必填(cmd_scan 等
         # 无条件消费 sc['exercise'], 此前按文档造的 scope 裸 KeyError)。
-        print('SCOPE-REJECT: empty targets/exercise or out of window')
+        print('SCOPE-REJECT: empty targets/exercise or out of window', file=sys.stderr)
         sys.exit(75)
     return sc
 

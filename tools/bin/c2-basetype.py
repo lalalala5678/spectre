@@ -14,11 +14,10 @@
 纪律: 授权门(scope.json)+EDUSRC 隔离+审计,与 c2-qa 同源。
 """
 
-import sys, base64, hashlib, json, os, re, subprocess, time  # CS29/F-B: 恢复全活集(sys 起头族例)-F2 恢复全活集
+import sys, base64, hashlib, json, os, re, subprocess
 from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root
 
 _C2 = os.path.join(_data_root(), 'c2')
-SCOPE = os.path.join(_C2, 'scope.json')
 AUDIT = os.path.join(_C2, 'audit.log')
 JMG_JAR = os.path.join(_C2, 'generators/jmg-cli-1.0.9.jar')
 DEFAULT_DIR = os.path.join(_C2, 'basetypes-jmg')
@@ -29,9 +28,6 @@ def gate():
     if _edusrc_hit():
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
     return scope_gate_full()
-
-
-    return sc
 
 def jmg_run(cmds):
     script = '\n'.join(cmds + ['exit']) + '\n'
