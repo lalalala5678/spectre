@@ -8,7 +8,7 @@ import { SkillsPage } from './pages/SkillsPage';
 import { McpPage } from './pages/McpPage';
 import { CliPage } from './pages/CliPage';
 import { SettingsPage } from './pages/SettingsPage';
-import { getPrefs } from './api/worksession';
+import { getPrefs, listWorkSessions, putPrefs } from './api/worksession';
 import { AuditPage } from './pages/AuditPage';
 import { ShellPage } from './pages/ShellPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
@@ -83,8 +83,27 @@ export default function App() {
   const [wsId, setWsId] = useState<string | null>(null);
   // R13-F1: 依赖 [route]——项目切换只写服务端 prefs, App 层 wsId 此前
   // 是启动快照永不刷新, skills/mcp/cli 页持续作用于旧项目(跨项目错写)。
+  // R32D43-N1: 解析完成前先置 null——切项目后首次进配置页此前以旧
+  // wsId 即时挂载, ToolingChat check-then-create 在旧项目建幽灵会话
+  // (实测 50ms 双建)。置 null 走既有加载占位, 拦住 stale 首渲染。
+  // R32D43-N2: currentWs 悬空(不存在 id)校验——此前真值门直接放行,
+  // 配置页 eager-create + ensureProject 把已删/坏 id 复活成幽灵项目。
   useEffect(() => {
-    getPrefs().then(p => setWsId(p.currentWs ?? '')).catch(() => {});  // R16-F3
+    let cancelled = false;
+    setWsId(null);
+    Promise.all([getPrefs(), listWorkSessions()]).then(([prefs, all]) => {
+      if (cancelled) return;
+      const cur = prefs.currentWs;
+      if (cur && all.some(p => p.id === cur)) { setWsId(cur); return; }
+      const fb = all[all.length - 1];
+      if (fb) {
+        setWsId(fb.id);
+        putPrefs({ currentWs: fb.id }).catch(() => {});  // 与 ensureWorkSession 同口径写回
+      } else {
+        setWsId('');
+      }
+    }).catch(() => { if (!cancelled) setWsId(''); });  // R16-F3
+    return () => { cancelled = true; };
   }, [route]);
 
   return (
