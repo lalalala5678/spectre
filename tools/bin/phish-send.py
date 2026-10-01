@@ -191,7 +191,7 @@ def dkim_sign(msg_bytes, private_key_path, selector, domain):
         # R32D39-N2: 此前静默 None——邮件无签名发出而无任何提示(实测
         # 抓包缺 DKIM-Signature)。显式告警到 stderr。
         print('[warn] dkimpy 未安装(--dkim-key 被忽略, 邮件将无 DKIM 签名)'
-              '——容器位已内置; 宿主位 pip install dkimpy 或挂 /opt/tools/py',
+              '——容器位已内置; 宿主位 pipx install dkimpy / pip --break-system-packages(PEP 668) 或挂 /opt/tools/py',
               file=sys.stderr)
         return None
     with open(private_key_path, 'rb') as f:
@@ -442,7 +442,15 @@ def main():
         if args.mode == 'dryrun':
             print(f'--- [{i+1}/{len(targets)}] {to_addr} (uid={uid}) ---')
             print(f'  Message-ID domain: {args.from_addr.split("@")[1] if "@" in args.from_addr else "?"}')
-            print(f'  DKIM: {"YES" if args.dkim_key else "NO (will fail gateway)"}')
+            # R32D40-NEW-2: dryrun 预检接 HAS_DKIM 实况——此前只看
+            # 旗标, 无 dkimpy 时预检谎报 YES 而 send 才告警。
+            if args.dkim_key and HAS_DKIM:
+                print('  DKIM: YES')
+            elif args.dkim_key:
+                print('  DKIM: SKIP (dkimpy 未安装——send 时将告警且不签名; '
+                      '容器位内置/宿主 pipx install dkimpy 或 pip install --break-system-packages dkimpy)')
+            else:
+                print('  DKIM: NO (will fail gateway)')
             print(f'  Tracking: {args.track_url}/r/{uid}')
             print(html_body[:400])
             continue

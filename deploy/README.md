@@ -14,6 +14,7 @@
 
 > npm 故障排障: 安装若以 `npm error Exit handler never called!` 或 `ENOTFOUND mirrors.tencentyun.com` 等网络错误崩溃, 先 `npm config get registry` 检查是否指向不可达镜像; 切换 `--registry=https://registry.npmjs.org` 并**删除半装的 node_modules 后重装**。
 > pip 镜像同坑(R32D39-N4): 云主机 pip 源常指向内网不可达镜像(触发面: 手动装 dkimpy/yara 等可选工具包)——`pip config set global.index-url https://pypi.org/simple` 或临时 `-i https://pypi.org/simple`; 网关与部署脚本零 pip 依赖。
+> Ubuntu 24.04 PEP 668(R32D40-NEW-3): 宿主裸 `pip install <pkg>` 被 externally-managed 拒——用 `pipx install <pkg>`、`pip install --break-system-packages` 或 venv(`apt install python3-venv` 后 `python3 -m venv`); 容器位无此限制。
 
 ## 组件清单
 

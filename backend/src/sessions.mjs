@@ -351,7 +351,15 @@ export class SessionStore {
     if (!text) return null;
     const line = (text.split('\n').find(l => l.trim()) ?? '').trim();
     if (!line) return null;
-    return line.length > 40 ? `${line.slice(0, 40)}…` : line;
+    if (line.length <= 40) return line;
+    // R32D40-NEW-4: 词边界截断——硬 slice 会把 CJK/ASCII 代号切半
+    // ('…与 OG' 半截 token 观感)。回退到最近的空格/连字符边界(≥20 字
+    // 才回退, 防超短碎片); 无边界则保硬切(纯 CJK 无词界)。
+    const hard = line.slice(0, 40);
+    const cut = hard.lastIndexOf(' ');
+    const hyphen = hard.lastIndexOf('-');
+    const boundary = Math.max(cut, hyphen);
+    return boundary >= 20 ? `${hard.slice(0, boundary)}…` : `${hard}…`;
   }
 
   list() {
