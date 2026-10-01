@@ -3,7 +3,7 @@
 import http.cookies
 import time
 import urllib.parse
-from http.server import BaseHTTPRequestHandler
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 from . import config, pages, proxy, static_files
 from .security import Security, audit
@@ -282,6 +282,21 @@ class GatewayHandler(BaseHTTPRequestHandler):
                        f"后端 runtime 不可达({error})".encode())
 
 
+class QuietHTTPServer(ThreadingHTTPServer):
+    """CS8/R32D37-P2-1: 读路径 RST 收敛——完整响应后客户端 RST 弃连,
+    keep-alive 下一请求行 readline() 抛 ConnectionResetError, 此前逃入
+    socketserver 默认 handle_error 每次刷整块 Traceback(5/5 确定复现)。
+    与 _send/_proxy 的写路径守卫同源。"""
+
+    def handle_error(self, request, client_address):
+        import sys
+        exc = sys.exc_info()[1]
+        if isinstance(exc, (ConnectionResetError, BrokenPipeError,
+                            TimeoutError)):
+            return  # peer went away mid-conversation; nothing to log
+        super().handle_error(request, client_address)
+
+
 def serve():
     """Entry point: wire state and start the threaded HTTP server."""
     import os
@@ -311,7 +326,7 @@ def serve():
             "FATAL: INTERNAL_TOKEN 仍是占位值 — 填入与 backend/.env 相同的真实随机令牌")
 
     GatewayHandler.security = Security()
-    server = ThreadingHTTPServer(
+    server = QuietHTTPServer(
         (config.BIND_HOST, config.BIND_PORT), GatewayHandler,
     )
     server.daemon_threads = True

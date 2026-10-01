@@ -35,13 +35,17 @@ def gate(payload=''):
     t = time.time()
     try:
         ok = (sc.get('targets') and
+              sc.get('exercise') and
               sc['window']['start'] and
               sc['window']['end'] and
               sc['window']['start'] <= time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t)) <= sc['window']['end'])
     except Exception:
         ok = False
     if not ok:
-        print('SCOPE-REJECT: empty targets or out of window'); sys.exit(75)
+        # CS8-P2-2: exercise 与 targets/window 同为必填(cmd_scan 等
+        # 无条件消费 sc['exercise'], 此前按文档造的 scope 裸 KeyError)。
+        print('SCOPE-REJECT: empty targets/exercise or out of window')
+        sys.exit(75)
     return sc
 
 def audit(target, action, sha, note=''):
@@ -255,6 +259,9 @@ def scan_all(p, engines):
 def cmd_scan(args):
     a0 = dict(zip(args[::2], args[1::2]))
     sc = gate(a0.get('--payload', ''))
+    if '--payload' not in a0:
+        print('用法: c2-qa.py scan --payload <文件> [--engines clamav,yara,...]')
+        return 2
     a = a0
     p = a['--payload']
     engines = a.get('--engines', 'auto').split(',')

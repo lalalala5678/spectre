@@ -243,30 +243,6 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
                                    text_body, attachments)
 
 
-def track_sent(db_path, uid):
-    """R15-F5: 发送成功记 sent 事件——漏斗分母(此前分母=已互动 uid,
-    打开率结构性 100%)。V6c 锁协议与 phish-track 同源; 失败不阻塞
-    发送循环(分母缺失时聚合端回退互动分母)。"""
-    import json, fcntl, time, os
-    try:
-        os.makedirs(os.path.dirname(db_path), exist_ok=True)
-        with open(db_path + '.lock', 'w') as lf:
-            fcntl.flock(lf, fcntl.LOCK_EX)
-            try:
-                db = {'events': []}
-                try:
-                    db = json.load(open(db_path))
-                except Exception:
-                    pass
-                db.setdefault('events', []).append(
-                    {'kind': 'sent', 'uid': uid,
-                     'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
-                json.dump(db, open(db_path, 'w'), indent=1)
-            finally:
-                fcntl.flock(lf, fcntl.LOCK_UN)
-    except Exception as e:
-        print(f'  (track-sent 失败不阻塞: {e})')
-
     for fpath in (attachments or []):
         with open(fpath, 'rb') as f:
             att = MIMEApplication(f.read(), Name=Path(fpath).name)
@@ -322,6 +298,31 @@ def track_sent(db_path, uid):
             else:
                 raise
     return True
+
+def track_sent(db_path, uid):
+    """R15-F5: 发送成功记 sent 事件——漏斗分母(此前分母=已互动 uid,
+    打开率结构性 100%)。V6c 锁协议与 phish-track 同源; 失败不阻塞
+    发送循环(分母缺失时聚合端回退互动分母)。"""
+    import json, fcntl, time, os
+    try:
+        os.makedirs(os.path.dirname(db_path), exist_ok=True)
+        with open(db_path + '.lock', 'w') as lf:
+            fcntl.flock(lf, fcntl.LOCK_EX)
+            try:
+                db = {'events': []}
+                try:
+                    db = json.load(open(db_path))
+                except Exception:
+                    pass
+                db.setdefault('events', []).append(
+                    {'kind': 'sent', 'uid': uid,
+                     'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
+                json.dump(db, open(db_path, 'w'), indent=1)
+            finally:
+                fcntl.flock(lf, fcntl.LOCK_UN)
+    except Exception as e:
+        print(f'  (track-sent 失败不阻塞: {e})')
+
 
 def main():
     p = argparse.ArgumentParser()
