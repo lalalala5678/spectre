@@ -62,13 +62,21 @@ def proxy(handler, api_path):
         upstream.close()
         raise ProxyError(message=str(error)) from error
 
-    handler.send_response(response.status)
-    skip = {"content-length", "transfer-encoding", "connection", "keep-alive"}
-    for name, value in response.getheaders():
-        if name.lower() not in skip:
-            handler.send_header(name, value)
-    handler.send_header("Transfer-Encoding", "chunked")
-    handler.end_headers()
+    # CS8-P1-1: 头块 flush(end_headers)与体写同受早断守卫——客户端在
+    # /api/* 请求上弃连时 BrokenPipe 不得穿到 handle_error 刷栈。
+    try:
+        handler.send_response(response.status)
+        skip = {"content-length", "transfer-encoding", "connection",
+                "keep-alive"}
+        for name, value in response.getheaders():
+            if name.lower() not in skip:
+                handler.send_header(name, value)
+        handler.send_header("Transfer-Encoding", "chunked")
+        handler.end_headers()
+    except (BrokenPipeError, ConnectionResetError):
+        handler.close_connection = True
+        upstream.close()
+        return
 
     try:
         while True:

@@ -9,19 +9,29 @@ import sys, os, json, time, hashlib, base64, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 
-DB_FILE = '/opt/tools/phish/track.json'  # 映射宿主 tools/phish/(campaigns API 可读)
-import os as _os; _os.makedirs('/opt/tools/phish', exist_ok=True)
 
-import time as _time
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+
+def _in_container():
+    return os.path.exists('/opt/tools/bootstrap-sandbox.sh')
+def _phish_dir():
+    return os.path.join(_data_root(), 'phish')
+DB_FILE = f'{_phish_dir()}/track.json'  # campaigns API 可读(phish-funnel 同目录)
+os.makedirs(_phish_dir(), exist_ok=True)
+
 def scope_gate_full():
     """完整授权门(同 c2-qa): targets+window 双校验,exit 75"""
-    import json as _json
-    SCOPE = '/opt/tools/c2/scope.json'
+    SCOPE = os.path.join(_data_root(), 'c2/scope.json')  # CS8-P1-2 统一制式
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
     try:
-        sc = _json.load(open(SCOPE))
-        now = _time.strftime('%Y-%m-%dT%H:%M:%SZ', _time.gmtime())
+        sc = json.load(open(SCOPE))
+        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         ok = (sc.get('targets') and
               sc['window']['start'] and sc['window']['end'] and
               sc['window']['start'] <= now <= sc['window']['end'])
@@ -81,18 +91,16 @@ def edusrc_gate(paths=()):
     """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
     ev = os.environ.get('SPECTRE_EDUSRC', '')
     ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
-    import sys as _s
     for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
         if m and 'edusrc' in str(m).lower():
-            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=_s.stderr)
-            _s.exit(76)
+            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=sys.stderr)
+            sys.exit(76)
 def _scope_ok():
     """V2: 逐请求 scope 复查——serve() 启动时一次校验后撤权不停服
     (writer 实证: 撤 scope 后运行中的 serve 仍接受 /submit)。"""
     try:
-        sc = json.load(open('/opt/tools/c2/scope.json'))
-        import time as _t
-        now = _t.strftime('%Y-%m-%dT%H:%M:%SZ', _t.gmtime())
+        sc = json.load(open(os.path.join(_data_root(), 'c2/scope.json')))
+        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         return bool(sc.get('targets') and
                     sc['window']['start'] <= now <= sc['window']['end'])
     except Exception:

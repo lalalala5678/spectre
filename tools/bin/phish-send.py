@@ -15,10 +15,18 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.utils import formataddr, formatdate
 from pathlib import Path
-import sys as _sys
 for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):
-    if _p not in _sys.path:
-        _sys.path.insert(0, _p)
+    if _p not in sys.path:
+        sys.path.insert(0, _p)
+
+import os as _o2
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    import os as _o
+    if _o.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return _o.path.join(_o.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
 
 try:
     PYTHONPATH = ['/opt/tools/py/dkim', '/opt/tools/py']
@@ -42,8 +50,8 @@ def edusrc_gate(paths=()):
             _s.exit(76)
 def load_smtp_default():
     """设置面板验证通过的 SMTP 通道(仅验证过才落盘)"""
-    for p in ('/opt/tools/phish/smtp.json',
-              '/opt/tools/c2/phish/smtp.json'):
+    # CS8-P2-4: 死候选删除——唯一写入方 keyfiles.mjs 只写 tools/phish。
+    for p in (_o2.path.join(_data_root(), 'phish/smtp.json'),):
         try:
             cfg = json.load(open(p))
             if cfg.get('host'):
@@ -54,7 +62,7 @@ def load_smtp_default():
 
 def load_scope():
     try:
-        return json.load(open('/opt/tools/c2/scope.json'))
+        return json.load(open(_o2.path.join(_data_root(), 'c2/scope.json')))
     except:
         return None
 
@@ -87,9 +95,9 @@ def forge_message_id(domain):
 def path_style_uid(recipient):
     """路径式追踪 ID(不用 query 参数——网关对 ?uid= 敏感)
     V4: 无盐 md5 可由邮箱推导伪造(writer 复现伪造事件全落)——改
-    HMAC-SHA256(共享密钥 /opt/tools/c2/phish-uid.key,与 phish-track 同源)。"""
+    HMAC-SHA256(共享密钥 数据根 c2/phish-uid.key(_data_root() 双运行位),与 phish-track 同源)。"""
     import hmac as _hmac, os as _os, secrets as _sec
-    KP = '/opt/tools/c2/phish-uid.key'
+    KP = _o2.path.join(_data_root(), 'c2/phish-uid.key')
     try:
         k = open(KP, 'rb').read()
         if len(k) < 32:
@@ -328,7 +336,7 @@ def main():
     p.add_argument('--subject', required=False)
     p.add_argument('--html', help='HTML 模板')
     p.add_argument('--track-url', default='https://t.local')
-    p.add_argument('--track-db', default='/var/lib/spectre/tools/phish/track.json',
+    p.add_argument('--track-db', default=_o2.path.join(_data_root(), 'phish/track.json'),
                     help='发送事件落库(漏斗分母, R15-F5)')
     p.add_argument('--attach', action='append')
     p.add_argument('--rate', default='5/min')
@@ -359,7 +367,7 @@ def main():
         if not args.genkey_domain:
             print('genkey 需要 --genkey-domain', file=sys.stderr); sys.exit(1)
         import subprocess
-        d = f'/opt/tools/c2/dkim/{args.genkey_domain}'
+        d = _o2.path.join(_data_root(), f'c2/dkim/{args.genkey_domain}')
         os.makedirs(d, exist_ok=True)
         subprocess.run(['openssl', 'genrsa', '-out', f'{d}/{args.genkey_selector}.pem', '2048'],
                       capture_output=True)
@@ -425,7 +433,7 @@ def main():
     if args.mode == 'send':
         # V5 修复: dryrun 也写审计日志(实测写了 PHISH-V2 ... 0/1)=审计污染,
         # 只对真实发送落账
-        with open('/opt/tools/c2/audit.log', 'a') as f:
+        with open(_o2.path.join(_data_root(), 'c2/audit.log'), 'a') as f:
             f.write(f'PHISH-V2\t{(args.subject or "")[:50]}\t{sent}/{len(targets)}\n')
     return 0 if failed == 0 else 1
 

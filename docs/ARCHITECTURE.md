@@ -41,18 +41,18 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   │   ├── components/            # 通用组件(Sidebar/Topbar/ui)
 │   │   ├── components/session/    # 会话视图(消息流/事件流/聊天输入)
 │   │   ├── pages/                 # 路由页(AutoPwn/BusView/Audit/…)
-│   │   ├── mock/                  # mock 数据(逐步退役,仅开发用)
-│   │   ├── types/                 # 前后端共享类型镜像
+│   │   ├── types/                 # 共享类型(RouteKey/AgentMeta 等活消费面)
 │   │   └── utils/
 │   ├── dist/                      # 构建产物(gateway 托管的唯一静态源)
 │   └── package.json
 │
-├── gateway/                       # Python 认证网关(已拆包,全部文件 ≤193 行)
+├── gateway/                       # Python 认证网关(已拆包;tests/ 回归测试)
 │   ├── spectre_gateway/
 │   │   ├── __init__.py
 │   │   ├── config.py              # 路径/超时/cookie 常量
 │   │   ├── security.py            # scrypt 校验、会话存储、限速锁定、审计
-│   │   ├── static.py              # dist 静态服务(防穿越、缓存头)
+│   │   ├── static_files.py        # dist 静态服务(防穿越、缓存头)
+│   │   ├── session_store.py       # 会话持久化(JSON 落盘, 防抖写)
 │   │   ├── proxy.py               # /spectre/api 反代(SSE 透传,read1 逐帧)
 │   │   ├── pages.py               # 登录页模板
 │   │   └── handler.py             # 路由分发
@@ -101,7 +101,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 | activities 是 workflow 唯一出站副作用点 | Temporal 可观测性(history 完整记录每次副作用) |
 | `config.mjs` 是后端唯一配置源 | 换 LLM 厂商/端口 = 改 `.env` 一处 |
 | 智能体身份(agent impersonation)必须带 INTERNAL_TOKEN | 浏览器会话不能伪造 [DM] 注入 |
-| 每文件 ≤500 行、单一职责(Python 严格遵循 python-code-style) | 可读性/可维护性 |
+| 单一职责;行数软指引(核心文件 tools/sessions/pi ~1000 行属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
 
 ## 4. 控制面 vs 数据面
 
@@ -169,8 +169,8 @@ gateway (Python :8081, 仅 127.0.0.1)
 
 ## 7. 已知限制与后续路线
 
-1. **会话内存态**:runtime 重启丢会话 → 接 pi SQLite session backend + 会话恢复
+1. ~~会话内存态~~ 已解决: WAL append-only 重放(agent-runtime 启动恢复全部会话/bus/项目)
 2. **智能体零定制**:逐智能体定制在 backend/src/agents.mjs 注册表+sessions.mjs 提示词层接入(无 backend/agents/ 目录)
-3. **无工具、无沙箱**:渗透工具接入必须先落 beforeToolCall 审批门 + 容器隔离(pi 官方:pi 无内置权限系统)
+3. ~~无工具、无沙箱~~ 已解决: sandbox/ 九模块(local/docker 双驱动 ExecutionEnv)+ tools.mjs 工具面
 4. **审计链未接 Merkle**:auth.log 已有,业务事件(journal)待对账入链
 5. **Temporal dev server**:单机开发态;生产需换正式集群 + PostgreSQL

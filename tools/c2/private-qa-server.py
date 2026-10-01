@@ -18,8 +18,12 @@ import sys, os, json, glob, subprocess, tempfile, secrets
 from http.server import BaseHTTPRequestHandler
 
 CONTAINER = os.environ.get('SPECTRE_SANDBOX_CONTAINER', '')
-INBOX = '/var/lib/spectre/tools/c2/qa-inbox'
-CFG = '/var/lib/spectre/tools/c2/private-qa.json'
+# CS8-P1-3: 数据根走 SPECTRE_DATA_DIR(镜像 deploy/oob-collector.py 先例)
+# ——该服务以 $SPECTRE_DATA_DIR 部署启动, 此前硬编码使隔离实例读生产。
+_TOOLS = os.path.join(
+    os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+INBOX = os.path.join(_TOOLS, 'c2/qa-inbox')
+CFG = os.path.join(_TOOLS, 'c2/private-qa.json')
 TOKEN = os.environ.get('PRIVATE_QA_TOKEN', '')
 
 if not TOKEN:
@@ -52,10 +56,10 @@ def scan(path_host, name):
     if r1.returncode == 0 and 'FOUND' in r1.stdout:
         sigs.append(r1.stdout.split('FOUND')[0].split(':')[-1].strip())
     # YARA 全规则
-    rules = sorted(glob.glob('/var/lib/spectre/tools/c2/yara-rules/*.yar')
-                   + glob.glob('/var/lib/spectre/tools/c2/yara-rules/*.yara'))
+    rules = sorted(glob.glob(os.path.join(_TOOLS, 'c2/yara-rules/*.yar'))
+                   + glob.glob(os.path.join(_TOOLS, 'c2/yara-rules/*.yara')))
     for rf in rules:
-        crule = rf.replace('/var/lib/spectre/tools', '/opt/tools')
+        crule = rf.replace(_TOOLS, '/opt/tools')
         r2 = dexec('yara', crule, cpath, timeout=60)
         if r2.stdout.strip():
             sigs.append(r2.stdout.split()[0])

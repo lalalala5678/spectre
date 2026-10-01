@@ -45,7 +45,15 @@ def scope_gate_full():
         sys.exit(75)
     return sc
 
-DB_FILE = '/tmp/phish-track.json'
+# CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
+# tools/phish——此前 /tmp 使经代理的 click/submit 对 campaigns 面板
+# 永久不可见)。容器位 /opt/tools, 宿主位 SPECTRE_DATA_DIR。
+import os as _po
+def _pdata_root():
+    if _po.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return _po.path.join(_po.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+DB_FILE = _po.path.join(_pdata_root(), 'phish/track.json')
 
 def load_db():
     try: return json.load(open(DB_FILE))

@@ -6,12 +6,19 @@
 引擎适配器:clamav(本地,clamscan)/yara(本地规则集)/threatbook(微步云,需
 THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)。
 输出:JSON 结果矩阵;run 模式联动 c2-variant 迭代(全过=交付包)。
-授权门:读 /opt/tools/c2/scope.json,targets 空/出窗=拒绝运行。
+授权门:读数据根 c2/scope.json(_data_root() 双运行位),targets 空/出窗=拒绝运行。
 """
 import sys, os, json, subprocess, hashlib, time, glob
 
-SCOPE = '/opt/tools/c2/scope.json'
-AUDIT = '/opt/tools/c2/audit.log'
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+
+SCOPE = os.path.join(_data_root(), 'c2/scope.json')
+AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS8-P1-2 统一制式
 
 def gate(payload=''):
     if not os.path.exists(SCOPE):
@@ -58,7 +65,8 @@ def eng_clamav(p):
 
 def eng_yara(p):
     import glob
-    rules = sorted(glob.glob('/opt/tools/c2/yara-rules/*.yar') + glob.glob('/opt/tools/c2/yara-rules/*.yara'))
+    rules = sorted(glob.glob(os.path.join(_data_root(), 'c2/yara-rules/*.yar'))
+                 + glob.glob(os.path.join(_data_root(), 'c2/yara-rules/*.yara')))
     if not rules:
         return {'engine': 'yara', 'detected': False, 'signature': '', 'note': 'no rules configured'}
     for rf in rules:
@@ -71,14 +79,12 @@ def eng_yara(p):
     return {'engine': 'yara', 'detected': False, 'signature': ''}
 
 def _load_api_keys():
-    """读设置面板写入的已验证 keys(仅验证通过的才落盘)"""
-    for kp in ('/opt/tools/c2/api-keys.json',
-               '/var/lib/spectre/tools/c2/api-keys.json'):
-        try:
-            return json.load(open(kp))
-        except Exception:
-            continue
-    return {}
+    """读设置面板写入的已验证 keys(仅验证通过的才落盘)。路径经
+    _data_root() 双运行位统一(CS8-P1-2)。"""
+    try:
+        return json.load(open(os.path.join(_data_root(), 'c2/api-keys.json')))
+    except Exception:
+        return {}
 
 def eng_threatbook(p):
     """微步云查: 文件上传接口 https://x.threatbook.com/api/v3/file/upload"""
@@ -87,8 +93,8 @@ def eng_threatbook(p):
     key = tb.get('key') or os.environ.get('THREATBOOK_API_KEY', '')
     if not key:
         return {'engine': 'threatbook', 'error': '未配置微步 API key(设置面板 → C2 免杀云查)——显式报错不静默'}
-    import urllib.request, uuid as _uuid
-    b = _uuid.uuid4().hex
+    import urllib.request, uuid
+    b = uuid.uuid4().hex
     sha = sha256f(p)
     with open(p, 'rb') as f:
         content = f.read()
@@ -181,11 +187,11 @@ def eng_hybridanalysis(p):
         with urllib.request.urlopen(req, timeout=30) as r:
             j = json.loads(r.read().decode())
     except urllib.error.HTTPError as e:
-        body = e.read().decode()[:120] if e.fp else ''
         # 404=hash 未收录(新文件未扩散, 与 VT 的 404 语义一致)=clean 而非错误
         if e.code == 404:
             return {'engine': 'hybridanalysis', 'detected': False,
                     'note': 'HA 无此样本(新文件,未扩散=好事)', 'sha256': sha}
+        body = e.read().decode()[:120] if e.fp else ''
         return {'engine': 'hybridanalysis', 'error': f'HA HTTP {e.code}: {body}'}
     except Exception as e:
         return {'engine': 'hybridanalysis', 'error': str(e)[:100]}
@@ -204,14 +210,14 @@ def eng_private(p):
     # 部署级私架: 文件优先(持久挂载, 重建不丢), env 兜底(裸机)
     pq = {}
     try:
-        pq = json.load(open('/opt/tools/c2/private-qa.json'))
+        pq = json.load(open(os.path.join(_data_root(), 'c2/private-qa.json')))
     except Exception:
         pass
     url = os.environ.get('PRIVATE_QA_URL') or pq.get('url')
     if not url:
         return {'engine': 'private', 'error': 'PRIVATE_QA_URL not set(私架未部署;文件 /opt/tools/c2/private-qa.json 或环境变量)'}
-    import urllib.request, uuid as _u
-    b = '----spectre' + _u.uuid4().hex
+    import urllib.request, uuid
+    b = '----spectre' + uuid.uuid4().hex
     body = ((f'--{b}\r\nContent-Disposition: form-data; name="sample"; '
              f'filename="{os.path.basename(p)}"\r\nContent-Type: application/octet-stream\r\n\r\n'
             ).encode() + open(p, 'rb').read() + f'\r\n--{b}--\r\n'.encode())
@@ -235,7 +241,7 @@ def scan_all(p, engines):
         # 噪声治理: private 未配 PRIVATE_QA_URL 时 auto 不带它
         # (此前恒打一行 error,自评点名)。
         _base = ['clamav', 'yara']
-        if os.environ.get('PRIVATE_QA_URL') or os.path.exists('/opt/tools/c2/private-qa.json'):
+        if os.environ.get('PRIVATE_QA_URL') or os.path.exists(os.path.join(_data_root(), 'c2/private-qa.json')):
             _base.append('private')
         engines = _base + configured_cloud_engines()
     out = []
