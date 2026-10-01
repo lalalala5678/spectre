@@ -5,8 +5,10 @@
 # 幂等: 重复执行安全; 安装账本(install-log)由平台 installCli 通道自动维护
 set -e
 
-# R32D42-P2: 宿主守卫——文档称四脚本统一数据根守卫但本脚本无。
-# 容器内(.dockerenv 存在)正常执行; 宿主裸跑须显式确认(apt 改宿机)。
+# R32D42-P2/CS33-3: 宿主守卫。数据根守卫族(tools-sync/fetch-jars/
+# skills-seed/fetch-fingerprints)不适用本脚本(不写 SPECTRE_DATA_DIR);
+# 本脚本防的是宿机 apt 变更——容器内(.dockerenv)正常执行, 宿主裸跑
+# 须显式确认。
 if [ ! -f /.dockerenv ] && [ "${SPECTRE_ALLOW_HOST_BOOTSTRAP:-0}" != "1" ]; then
   echo "[bootstrap] 拒绝: 检测到宿主机直跑(会 apt 安装系统级包改动宿机)。" >&2
   echo "[bootstrap] 容器内执行: docker exec spectre-sbx-<sha8> bash /opt/tools/bootstrap-sandbox.sh" >&2

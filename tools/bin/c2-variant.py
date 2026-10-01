@@ -15,21 +15,8 @@
 功能核守卫:标记+php -l;EDUSRC:exit 76。
 """
 import sys, os, json, hashlib, base64, random, string, uuid, re, subprocess, tempfile, glob, secrets
+from _common import _data_root, edusrc_gate, sha256f
 
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
-    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
-    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
 
 FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
 RULE_DIR = os.path.join(_data_root(), 'c2/yara-rules')  # CS10-4
@@ -59,8 +46,6 @@ COLLATERAL = {
     'ps': ['Invoke-Expression', 'DownloadString', 'Net.WebClient'],
 }
 
-def sha256f(p):
-    return hashlib.sha256(open(p, 'rb').read()).hexdigest()
 
 def rand_name(n=8, prefix='a'):
     return prefix + ''.join(random.choice(string.ascii_lowercase + string.digits) for _ in range(n - 1))
@@ -78,13 +63,6 @@ def scope_gate():
         print('SCOPE-REJECT: empty targets or out of window')
         sys.exit(75)
 
-def edusrc_gate(paths):
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
-    for m in [(ev_hit and 'EDUSRC-FLAG') or '', os.getcwd()] + list(paths):
-        if m and 'edusrc' in str(m).lower():
-            print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
-            sys.exit(76)
 
 def core_guard(body, ext):
     if 'SPECTRE-MARK' not in body:

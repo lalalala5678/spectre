@@ -12,50 +12,12 @@
 import sys, os, json, time, hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
-    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
-    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
+
 from urllib.parse import urlparse, parse_qs
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
+from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate
 
-
-def edusrc_gate(paths=()):
-    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
-    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
-        if m and 'edusrc' in str(m).lower():
-            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=sys.stderr)
-            sys.exit(76)
-def scope_gate_full():
-    """完整授权门(同 c2-qa): targets+window 双校验,exit 75"""
-    SCOPE = os.path.join(_data_root(), 'c2/scope.json')  # CS10-4
-    if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
-    try:
-        sc = json.load(open(SCOPE))
-        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        ok = (sc.get('targets') and
-              sc['window']['start'] and sc['window']['end'] and
-              sc['window']['start'] <= now <= sc['window']['end'])
-    except Exception:
-        ok = False
-    if not ok:
-        print('SCOPE-REJECT: empty targets or out of window', file=sys.stderr)
-        sys.exit(75)
-    return sc
 
 # CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
 # tools/phish——此前 /tmp 使经代理的 click/submit 对 campaigns 面板

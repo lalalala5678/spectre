@@ -11,21 +11,8 @@
 退出码:0=功能守恒;1=功能丢失(标记/语法层失);3=运行层劣化(基线可运行而变体不可)
 """
 import sys, os, re, subprocess, tempfile, shutil
+from _common import _data_root
 
-
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
-    硬编码 /opt/tools 单根——c2-qa 等在宿主位调用时读不到宿主 scope,
-    一律 SCOPE-REJECT(75)。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
 
 _C2 = os.path.join(_data_root(), 'c2')
 STUB_CP = os.path.join(_C2, 'javastubs/classes')

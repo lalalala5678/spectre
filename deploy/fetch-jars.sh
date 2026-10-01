@@ -15,7 +15,6 @@ if [ "$GUARD_LIBS" = "/var/lib/spectre/tools/c2/libs" ] \
    || [ "$GUARD_GEN" = "/var/lib/spectre/tools/c2/generators" ]; then
   if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
     echo "[fetch-jars] 拒绝: 目标为生产缺省路径(解析 $GUARD_LIBS / $GUARD_GEN)——设 SPECTRE_DATA_DIR=<隔离目录> 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
-    echo "[fetch-jars] 设 SPECTRE_DATA_DIR=<隔离目录>, 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
     exit 1
   fi
   echo "[fetch-jars] 警告: SPECTRE_ALLOW_DEFAULT_DATA=1 —— 写入生产路径 $ROOT" >&2

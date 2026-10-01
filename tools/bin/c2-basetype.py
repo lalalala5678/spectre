@@ -15,22 +15,9 @@
 """
 
 
-
 import sys, base64, hashlib, json, os, re, subprocess, time  # CS29/F-B: 恢复全活集(sys 起头族例)-F2 恢复全活集
+from _common import _data_root
 
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
-    硬编码 /opt/tools 单根——c2-qa 等在宿主位调用时读不到宿主 scope,
-    一律 SCOPE-REJECT(75)。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
 
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
@@ -45,8 +32,10 @@ def gate():
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
         print('SCOPE-REJECT: empty targets or out of window'); sys.exit(75)
+    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发——getcwd 启发式
+    # 会误伤正常使用(目录名碰巧含 edusrc 即拒), 废除。
     ev = os.environ.get('SPECTRE_EDUSRC', '')
-    if ev.lower() in ('1', 'true', 'yes') or 'edusrc' in (os.getcwd() + ' ' + ev).lower():
+    if ev.lower() in ('1', 'true', 'yes') or 'edusrc' in ev.lower():
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力'); sys.exit(76)
     return sc
 

@@ -6,8 +6,10 @@
 #   --deep 层:  追加 nuclei 双指纹模板库(数量以 fetch-fingerprints 实际交付为准)
 #               (每资产请求数↑,仅对存疑/高价值资产使用)
 #   --max: whatweb 批量上限(默认 120,防慢)
-# 输出: TSV — asset | status | title | server | apps(带版本) | sources
+# 输出: TSV — asset | status | title | server | apps(带版本) | fav | sources
 set -u
+# R32D54: -h/--help 契约(家族统一); R32D57-NEW8: 先于 env-warn。
+if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,12p' "$0"; exit 0; fi
 # F28-bis: 显式 PATH——裸 docker exec 下 /usr/bin/httpx 是 python-httpx 库 CLI,
 # 层1静默无产出。工具真身在 /opt/tools/bin(shared-tool 层)。
 export PATH="/opt/tools/bin:$PATH"
@@ -24,8 +26,7 @@ NT_DIR=$FP_DIR/../fingerprints
 OUT=out.tsv; LIST=""; DEEP=0; MAX=120
 FPTMP=$(mktemp -u /tmp/fp-scan.XXXXXX)  # R32D55-N4: 共享 /tmp/.fps.* 多实例碰撞→mktemp
 trap "rm -f ${FPTMP}*" EXIT
-# R32D54: -h/--help 契约(家族统一; 此前未知 flag 静默吞)。
-if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,12p' "$0"; exit 0; fi
+
 while [ $# -gt 0 ]; do case "$1" in
   -l) LIST="$2"; shift 2;; -o) OUT="$2"; shift 2;;
   --deep) DEEP=1; shift;; --max) MAX="$2"; shift 2;;
@@ -45,9 +46,11 @@ for eng in httpx whatweb; do
 done
 
 # F28: 清理陈旧临时文件——此前残留的 l1/l2/l4 会被下一会话当新鲜结果合并(跨会话污染)
-rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
+rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.l4b.json ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
 if [ -n "$LIST" ]; then cp "$LIST" ${FPTMP}.in; else cat > ${FPTMP}.in; fi
-[ -s ${FPTMP}.in ] || { echo "fp-scan: empty input" >&2; exit 1; }
+[ -s ${FPTMP}.in ] || { echo "fp-scan: empty input" >&2; exit 2; }
+# R32D57-NEW11: 纯空白行不算输入(-s 只查字节非空)。
+grep -q '[^[:space:]]' ${FPTMP}.in || { echo 'fp-scan: whitespace-only input' >&2; exit 2; }
 
 echo "[fp-scan] layer1: httpx builtin wappalyzer..."
 cat ${FPTMP}.in | httpx -silent -title -tech-detect -status-code \
@@ -69,13 +72,16 @@ echo "[fp-scan] layer2: httpx + webappanalyzer(7613)..."
 # 务实降级: 先探测 cff 可载,失败则层2 用内置 wappalyzer 重跑交叉(标记 source=webappanalyzer-builtin),
 # 绝不静默空转;扩展库兼容留待 httpx 升级。
 L2_CFF=""
+L2_SRC="webappanalyzer"
 if [ -s "$CFF_OK" ]; then
   if echo "http://127.0.0.1:1" | timeout 10 httpx -silent -tech-detect -cff "$CFF_OK" -json >/dev/null 2>&1; then
     L2_CFF="-cff $CFF_OK"
   else
     echo "[fp-scan] layer2: cff 不兼容 httpx wappalyzer loader,降级内置引擎(交叉验证)" >&2
+    L2_SRC="webappanalyzer-builtin"   # R32D57-NEW5: 溯源如实标注
   fi
 fi
+export L2_SRC
 cat ${FPTMP}.in | httpx -silent -tech-detect -status-code \
   $L2_CFF -threads 15 -timeout 8 -json -o ${FPTMP}.l2.json >/dev/null 2>&1
 
@@ -87,9 +93,15 @@ whatweb -q --no-errors --input-file ${FPTMP}.ww 2>/dev/null \
 
 if [ "$DEEP" = "1" ]; then
   echo "[fp-scan] layer4(deep): nuclei fingerprint templates(以 fetch-fingerprints 实际交付为准)..."
-  nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" -t "$NT_DIR/plugins-0x727" \
+  # R32D57-NEW3: 0x727 国产库模板不带 tech/fingerprint/panel tag(3577 实测
+  # 零命中)——tags 过滤只适用于 nt-technologies;两库分跑, 否则 98.7% 被滤死。
+  # NEW4: stdout 静音(此前原始 JSON 刷屏 1.3MB/2 发现)。
+  nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" \
     -severity info,low,medium,high,critical -tags tech,fingerprint,panel \
-    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json 2>/dev/null || true
+    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >/dev/null 2>&1 || true
+  nuclei -l ${FPTMP}.in -t "$NT_DIR/plugins-0x727" \
+    -severity info,low,medium,high,critical \
+    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >/dev/null 2>&1 || true
 fi
 
 FPTMP="$FPTMP" python3 - <<'PYEOF'  # CS31-P0: FPTMP 走环境变量(引号 heredoc 内 ${} 不展开)
@@ -121,7 +133,7 @@ for line in open(os.environ['FPTMP']+'.l2.json'):
     except: continue
     a = norm(d.get('url', d.get('host', '')))
     for t in d.get('tech', []) or []:
-        apps[a].add((str(t), 'webappanalyzer'))
+        apps[a].add((str(t), os.environ.get('L2_SRC', 'webappanalyzer')))
 
 # whatweb: "host [HTTP] field1, field2[key=val], ..."
 for line in open(os.environ['FPTMP']+'.l3.txt'):
@@ -137,8 +149,10 @@ for line in open(os.environ['FPTMP']+'.l3.txt'):
             apps[a].add((fld, 'whatweb'))
 
 seen_now = set(meta) | set(apps)
-if os.path.exists(os.environ['FPTMP']+'.l4.json'):
-    for line in open(os.environ['FPTMP']+'.l4.json'):
+# R32D57-NEW3: 两库分跑(l4=nt+tags 过滤, l4b=0x727 无过滤)
+for _l4f in ('.l4.json', '.l4b.json'):
+  if not os.path.exists(os.environ['FPTMP']+_l4f): continue
+  for line in open(os.environ['FPTMP']+_l4f):
         try: d = json.loads(line)
         except: continue
         # F28: nuclei host 可能无端口/带 scheme——与 httpx 的 norm 键分裂,

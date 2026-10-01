@@ -84,7 +84,10 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   ├── systemd/                   # 单元文件 ×6
 │   ├── Caddyfile                  # TLS 反代样例(顶层单文件)
 │   ├── oob-collector.py           # OOB TCP 收集器
-│   └── tools-sync/skills-seed/fetch-jars/bootstrap 四脚本
+│   └── tools-sync/skills-seed/fetch-jars/fetch-fingerprints/
+│       fetch-wordlists/bootstrap 六脚本(前四=SPECTRE_DATA_DIR
+│       生产路径守卫族; fetch-wordlists 落 /opt/tools 共享层;
+│       bootstrap=容器/宿主守卫)
 │
 └── (运行时数据,不在仓库)
     /etc/spectre-auth/             #   passwd(多用户 scrypt)

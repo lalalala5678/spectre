@@ -9,21 +9,8 @@ THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)�
 授权门:读数据根 c2/scope.json(_data_root() 双运行位),targets 空/出窗=拒绝运行。
 """
 import sys, os, json, subprocess, hashlib, time, glob
+from _common import _data_root, sha256f
 
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
-    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
-    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
 
 SCOPE = os.path.join(_data_root(), 'c2/scope.json')
 AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS8-P1-2 统一制式
@@ -31,14 +18,13 @@ AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS8-P1-2 统一制式
 def gate(payload=''):
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file'); sys.exit(75)
-    # EDUSRC 硬隔离(工具层):旗标=1/true/yes,或工作区/载荷路径含 edusrc
+    # EDUSRC 硬隔离(工具层)——R32D58 用户裁定: 仅显式 env 旗标触发,
+    # cwd/载荷路径启发式废除(误伤正常使用)。
     ev = os.environ.get('SPECTRE_EDUSRC', '')
-    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
-    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), payload):
-        if m and 'edusrc' in str(m).lower():
-            audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
-            print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
-            sys.exit(76)
+    if ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower()):
+        audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
+        sys.exit(76)
     sc = json.load(open(SCOPE))
     t = time.time()
     try:
@@ -61,8 +47,6 @@ def audit(target, action, sha, note=''):
     with open(AUDIT, 'a') as f:
         f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\t{target}\t{action}\t{sha}\t{note}\n')
 
-def sha256f(p):
-    return hashlib.sha256(open(p, 'rb').read()).hexdigest()
 
 def eng_clamav(p):
     # 容器重建丢包防护(2026-09-29): FileNotFoundError 此前裸栈崩溃整轮 run

@@ -10,12 +10,15 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync, existsSync } from 'node:fs';
+import { createRequire } from 'node:module';
+const require = createRequire(import.meta.url);
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 const EXPECTED_BIN_TWINS = [
+  '_common.py',   // CS33-6: 共享函数单源(与各工具同目录 sibling import)
   'c2-payload-spec.py', 'c2-qa.py', 'c2-variant.py', 'openapi-paths.py',
   'phish-proxy.py', 'phish-send.py', 'phish-track.py', 'phishlet-proxy.py',
   'spectre-arl.py', 'spectre-bloodhound.py', 'spectre-nuclei.py',
@@ -175,4 +178,19 @@ test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移�
     assert.ok(listed.includes(`${name}(${actual})`),
       `行数表漂移: ${name} 实际 ${actual} 行, 表内为「${listed.join(',')}」——改文件须同步 docs/ARCHITECTURE.md:105`);
   }
+});
+
+// CS33-6 机锁: 四共享函数唯一定义点=_common.py(docs+bin 双侧)。
+// 任何工具内重新落盘 def 即红——防函数级复制回归。
+test('共享函数唯一定义点: _data_root/scope_gate_full/edusrc_gate*/sha256f 仅 _common.py', () => {
+  const { readdirSync } = require('node:fs');
+  const offenders = [];
+  for (const dir of ['docs', 'tools/bin']) {
+    for (const f of readdirSync(join(ROOT, dir))) {
+      if (!f.endsWith('.py') || f === '_common.py') continue;
+      const src = readFileSync(join(ROOT, dir, f), 'utf8');
+      if (/^def (_data_root|scope_gate_full|edusrc_gate|sha256f)\(/m.test(src)) offenders.push(`${dir}/${f}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `共享函数私有复制: ${offenders.join(', ')}——应 from _common import`);
 });

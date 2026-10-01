@@ -54,6 +54,10 @@ def list_templates(template_dir, search=None):
             if not fn.endswith(('.yaml', '.yml')):
                 continue
             p = os.path.join(root, fn)
+            # CS33-7: load_template 的 SystemExit 会逃逸 except Exception——
+            # walk 场景(坏符号链接/竞态消失)跳过该文件, 不中止整库扫描。
+            if not os.path.isfile(p):
+                continue
             try:
                 t = load_template(p)
                 if not t or 'id' not in t:

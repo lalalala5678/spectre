@@ -15,21 +15,8 @@
 授权门/EDUSRC 隔离与 c2-qa 同源。
 """
 import sys, os, json, subprocess, tempfile, time, hashlib, glob, re
+from _common import _data_root, sha256f
 
-
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
-    硬编码 /opt/tools 单根——c2-qa 等在宿主位调用时读不到宿主 scope,
-    一律 SCOPE-REJECT(75)。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
 
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
@@ -49,8 +36,9 @@ def gate():
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
         print('SCOPE-REJECT'); sys.exit(75)
+    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发(getcwd 启发式废除)。
     ev = os.environ.get('SPECTRE_EDUSRC', '')
-    if ev.lower() in ('1', 'true', 'yes') or 'edusrc' in (os.getcwd() + ' ' + ev).lower():
+    if ev.lower() in ('1', 'true', 'yes') or 'edusrc' in ev.lower():
         print('EDUSRC-REJECT'); sys.exit(76)
     return sc
 
@@ -58,8 +46,6 @@ def audit(action, note):
     with open(AUDIT, 'a') as f:
         f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\tBYTECODE\t{action}\t{note}\n')
 
-def sha256f(p):
-    return hashlib.sha256(open(p, 'rb').read()).hexdigest()
 
 def yara_hits(path, rules_dir):
     """[(string, offset)] 所有规则文件的命中串。CS32-F3: 缺 yara 返回
@@ -218,6 +204,15 @@ def rt_exec(classfile):
 
 def cmd_selftest(args):
     sc = gate()
+    # R32D57-NEW7: 空套件=假绿封堵(0 fail 但什么都没测)。
+    if not glob.glob(JMG_DIR + '/*.class'):
+        print(f'SELFTEST ERROR: 基型目录零 .class({JMG_DIR})——fetch-jars 应已交付 jMG 产物', file=sys.stderr)
+        return 1
+    # R32D57-NEW7: yara 缺失→split 全 SKIP(无 manifest)会被误计 FAIL——前置引擎门。
+    import shutil
+    if not shutil.which('yara'):
+        print('SELFTEST SKIP: yara 不在 PATH(容器位内置; 宿主自装)——split/verify 链不可测', file=sys.stderr)
+        return 0
     fails = 0
     for f in sorted(glob.glob(JMG_DIR + '/*.class')):
         out = tempfile.mkdtemp(prefix='c2bc-st-')
@@ -226,7 +221,7 @@ def cmd_selftest(args):
         try:
             mod = json.load(open(os.path.join(out, 'manifest.json')))[-1]['file']
         except Exception:
-            print(f'SELFTEST FAIL {os.path.basename(f)}: split failed: {g.stdout.strip()[:80]}')
+            print(f'SELFTEST FAIL {os.path.basename(f)}: split failed: {(g.stdout + g.stderr).strip()[:160]}')
             fails += 1; continue
         resid = yara_hits(mod, DEFAULT_RULES)
         v = subprocess.run([sys.executable, os.path.abspath(__file__), 'verify', '--orig', f, '--mod', mod],

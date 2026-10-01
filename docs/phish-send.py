@@ -15,24 +15,11 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.utils import formataddr, formatdate
 from pathlib import Path
+from _common import _data_root, edusrc_gate_phish as edusrc_gate
 for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
 
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
-    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    env = os.environ.get('SPECTRE_DATA_DIR', '')
-    if env:
-        return os.path.join(env, 'tools')
-    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
-    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
-    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
-    return '/var/lib/spectre/tools'
 
 try:
     PYTHONPATH = ['/opt/tools/py/dkim', '/opt/tools/py']
@@ -45,15 +32,6 @@ except ImportError:
     HAS_DKIM = False
 
 
-def edusrc_gate(paths=()):
-    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
-    import sys as _s
-    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
-        if m and 'edusrc' in str(m).lower():
-            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=_s.stderr)
-            _s.exit(76)
 def load_smtp_default():
     """设置面板验证通过的 SMTP 通道(仅验证过才落盘)"""
     # CS8-P2-4: 死候选删除——唯一写入方 keyfiles.mjs 只写 tools/phish。
