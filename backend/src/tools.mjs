@@ -9,15 +9,13 @@
  * Tool matrix (LLM-facing; usability rule: one obvious tool per intent,
  * never a hard reject when a sensible default exists; CS2-#4 按 14924dc
  * 漏洞撰写收权后的现行实况重写——publish_vulnerability 仅 report 会话持有):
- *   orchestrator session  → dispatch_agents, relay_to_agents, spawn_agent,
- *                           submit/query + report_vulnerability, publish_intel,
- *                           request_vulnerability_revision(CS4-M1: 编排器
- *                           叠 buildChildTools 尾巴, matrix.test 机锁)
- *   engagement/spawn child→ report_vulnerability, publish_intel,
- *                           request_vulnerability_revision, spawn_agent, submit/query
- *   direct user session   → report_vulnerability, publish_intel,
- *                           request_vulnerability_revision, submit/query
- *   report(writer) session→ publish_vulnerability, revise_entry, publish_intel
+ *   基础面(全会话): bash/read/write/edit 官方四件 + query_intel/
+ *                   read_session/revise_entry + search_web/fetch_url(各持
+ *                   独立实例)——逐项以 buildToolingTools/装配代码为准。
+ *   差异面: 编排器另持 dispatch_agents/relay_to_agents(+buildChildTools
+ *           尾巴, matrix.test 机锁); 子会话另持 spawn_agent;
+ *           report 会话独占 publish_vulnerability(CS23-N12: 此前逐行
+ *           罗列每轮新增工具都漏同步——改摘要式, 清单见装配处)。
  */
 
 import { Type } from '@earendil-works/pi-ai';

@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """phish-send v2 — SMTP 钓鱼邮件发送器(企业级仿真)
 v2 新增: DKIM 签名 / Message-ID 域名一致性 / Reply-To 同域 / 路径式追踪 URL /
-         内容混淆(base64 URL/CSS 拆词) / 附件 Mimetype 修正 / 多部分文本降级
+         附件 Mimetype 修正 / 多部分文本降级(CS23-N6: '内容混淆'虚标删除——obfuscate_url 恒等空转从未接线)
 用法:
   phish-send.py send --smtp host:port --user u --pass p \\
       --from "Display <a@b>" --to targets.txt --subject "..." \\
@@ -117,12 +117,6 @@ def path_style_uid(recipient):
         except OSError:
             pass
     return _hmac.new(k, recipient.encode(), hashlib.sha256).hexdigest()[:12]
-
-def obfuscate_url(url):
-    """URL 轻度混淆: Hex 编码 host 部分(部分网关不解析 hex)"""
-    # 保持简单可靠——仅对 tracking URL 做首字符 hex 替代
-    # 过度混淆会破坏点击,宁可保守
-    return url
 
 def render(html, recipient, track_base):
     """渲染模板: 注入路径式追踪 + 混淆"""

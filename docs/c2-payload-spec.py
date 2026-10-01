@@ -88,7 +88,7 @@ def gen(spec, src, out_dir, rounds):
     r = subprocess.run(cmd, capture_output=True, text=True)
     # BUG-2: 只回显尾 500 字符砍头,下游 json.loads 必炸——读磁盘 manifest 全文
     import os as _os
-    mani = _os.path.join(out, 'manifest.json')
+    mani = _os.path.join(out_dir, 'manifest.json')  # CS23-P0: 第9轮起笔误 out(未定义)
     full = open(mani).read() if _os.path.exists(mani) else r.stdout[-500:]
     return r.returncode, full, r.stderr[-200:]
 

@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """authmatrix — 鉴权矩阵执行器:N 身份 × M 端点重放 + 四态初判。
-记账:与 httpq.sh 同一口径——每发写入 HTTPQ_DIR/ledger.tsv 并递增 count,
+记账:内置预算账本(HTTPQ_DIR/ledger.tsv + HTTPQ_BUDGET, 历史上与 httpq.sh
+同口径; 该 shell 工具已不在交付面——CS23-N7 后口径由本工具自带)。
 预算耗尽即拒(HTTPQ_BUDGET,默认 600)。响应体全量存档 resp_<n>.json,
 供 jsondiff.py 做字段级 PPOR 判定。
 
@@ -21,7 +22,7 @@ SENSITIVE = ('password', 'hash', 'idcard', 'sfzh', 'salary', 'phone',
              'secret', 'paypassword', 'token', 'apikey', 'api_key')
 
 def ledger(label, code, dt, body_path):
-    """与 httpq.sh 兼容的同一记账口径(单一预算)。"""
+    """预算记账口径: ledger.tsv + count, 超预算即拒(单一预算)。"""
     d = os.environ.get('HTTPQ_DIR', '/tmp/httpq')
     budget = int(os.environ.get('HTTPQ_BUDGET', '600'))
     os.makedirs(d, exist_ok=True)

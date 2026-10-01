@@ -7,7 +7,9 @@
  * 被设置), 且洞穿 R27-N2 保护产生 0-msg 空会话。
  *
  * 通道语义: pendingOpen 是模块级一次性令牌(带序号)。Topbar 点击时
- * setPendingOpen(key, id) + go(key); 目标 agent 页挂载或已在位时
+ * go(key) 后 setPendingOpen(key, id)(CS22-F1 序——反向会先触发同步
+ * 事件写好 ?s= 又被 go 的整体 hash 赋值剥掉); 目标 agent 页挂载或
+ * 已在位时
  * takePendingOpen(liveKey) 取走——key 不匹配的页面取不走也不会清
  * 洗, 杜绝旧页抢先消费。URL ?s= 深链保留, 仅服务冷加载/直达。
  */

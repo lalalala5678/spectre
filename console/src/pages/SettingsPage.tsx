@@ -7,7 +7,7 @@ import { hasCred } from '../utils/hasCred';
 import type { LlmFormatMeta } from '../api/llmFormats';
 
 /**
- * Agent 设置栏 — 通用配置(全局)+ Agent 特有配置(本轮:资产测绘数据源)。
+ * 设置页 — 通用配置(全局)+ Agent 特有配置(数据源/LLM 覆盖)。
  *
  * 交互铁律(用户设计):大多数字段独立保存按钮(改动高亮→转圈→探测/范围
  * 校验→失败红字不落盘/成功绿勾);LLM 供应商两类(默认+单 agent 覆盖)为

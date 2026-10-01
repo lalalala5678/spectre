@@ -84,7 +84,9 @@ function realRouter({ store, bus, caps, wal }) {
       }
       const sh = caps.shells.register({
         name: String(body.name || ''), target: String(body.target),
-        transport: String(body.transport || 'local'), transportRef: String(body.transportRef || ''),
+        // CS23-N16: 缺省与工具面(tools.mjs 'web')对齐——agent 自注册
+        // 场景无本地沙箱语义; 显式传 'local' 不受影响。
+        transport: String(body.transport || 'web'), transportRef: String(body.transportRef || ''),
         note: String(body.note || ''), tags: Array.isArray(body.tags) ? body.tags : [],
         createdBy: String(body.createdBy || 'operator'),
         ttlHours: Number(body.ttlHours) || 24,

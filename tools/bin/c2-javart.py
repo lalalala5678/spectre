@@ -13,15 +13,32 @@
 """
 import sys, os, re, subprocess, tempfile, shutil
 
-LIBS = '/opt/tools/c2/libs'
-STUBS = '/opt/tools/c2/javastubs/classes'
-PATCH = '/opt/tools/c2/javastubs/patchclasses'
-ART = '/opt/tools/c2/javart'
+
+
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
+    硬编码 /opt/tools 单根——c2-qa 等在宿主位调用时读不到宿主 scope,
+    一律 SCOPE-REJECT(75)。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    env = os.environ.get('SPECTRE_DATA_DIR', '')
+    if env:
+        return os.path.join(env, 'tools')
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    return '/var/lib/spectre/tools'
+
+_C2 = os.path.join(_data_root(), 'c2')
+LIBS = os.path.join(_C2, 'libs')
+STUBS = os.path.join(_C2, 'javastubs/classes')
+PATCH = os.path.join(_C2, 'javastubs/patchclasses')
+ART = os.path.join(_C2, 'javart')
 TC9 = f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar'
 TC10 = f'{LIBS}/tomcat-embed-core-10.1.42.jar:{LIBS}/jakarta.annotation-api-2.1.1.jar'
-STUBS_J = '/opt/tools/c2/javastubs-jakarta/classes'
+STUBS_J = os.path.join(_C2, 'javastubs-jakarta/classes')
 SPRING = "/opt/tools/c2/libs/spring/spring-webmvc-6.0.9.jar:/opt/tools/c2/libs/spring/spring-web-6.0.9.jar:/opt/tools/c2/libs/spring/spring-core-6.0.9.jar:/opt/tools/c2/libs/spring/spring-context-6.0.9.jar:/opt/tools/c2/libs/spring/spring-beans-6.0.9.jar:/opt/tools/c2/libs/spring/spring-expression-6.0.9.jar:/opt/tools/c2/libs/spring/spring-aop-6.0.9.jar:/opt/tools/c2/libs/spring/spring-jcl-6.0.9.jar:/opt/tools/c2/libs/tomcat-embed-core-10.1.42.jar"
-RXSTUB = '/opt/tools/c2/javastubs-rx/classes'
+RXSTUB = os.path.join(_C2, 'javastubs-rx/classes')
 
 def extra_cp(logical):
     e = []

@@ -13,9 +13,9 @@
  * window (HVV scope file). exec() refuses outside scope — same hard gate
  * as c2-qa.py (exit discipline) but enforced server-side.
  *
- * Transports: 'local' (benchmark/dev: command runs in a designated sandbox
- * box) — real implant transports (jmreport/http channel) plug in later via
- * the same interface.
+ * Transports: 'local'(基准/开发: 命令跑指定沙箱容器) / 'web'({CMD} 模板
+ * URL) / 'ssh'(user:pass@host)——CS23-N14: 'plug in later' 失实(web/ssh
+ * 已实现, register 校验即在三枚举内)。
  */
 import { randomUUID } from 'node:crypto';
 import { sandboxConfig } from './sandbox/container.mjs';

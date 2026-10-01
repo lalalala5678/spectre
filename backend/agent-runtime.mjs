@@ -139,10 +139,8 @@ const shellScope = () => {
   catch { return null; }
 };
 
-// CS20-3/CS21-1: shell 审计载荷经 Bus 白名单字段映射——此前两跳丢失
-// (第一跳: 适配器单参签名; 第二跳: Bus.emit 固定字段白名单把
-// kind/at/id/target/cmd/code/ms 全滤掉, 20 轮审计中两跳先后实锤)。
-// 映射: summary=kind+shell+命令摘要(检索面), detail=JSON 全量(证据面)。
+// CS21-1: shell 审计载荷映射见 shells.mjs shellBusAdapter 单源
+// (summary/detail 白名单字段; 历史两跳丢失的考古记录也在彼处注释)。
 const shellRegistry = createShellRegistry({ bus: shellBusAdapter(bus), listScope: shellScope });  // CS20-11: wal 死参数删
 
 /**

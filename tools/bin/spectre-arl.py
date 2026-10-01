@@ -91,7 +91,8 @@ def diff(conn, project):
     # 消失=上次看到但这次没更新
     all_assets = cur.execute('SELECT type, value, last_seen, first_seen FROM assets WHERE project=?',
                              (project,)).fetchall()
-    removed = [(t, v) for t, v, ls, fs in all_assets if ls <= prev and fs <= prev]  # F27 off-by-one: prev 在场(ls==prev)而 latest 未更新才消失
+    removed = [(t, v) for t, v, ls, fs in all_assets if ls <= prev and fs <= prev]  # CS23-N8: 消失=两次扫描都未见(ls/fs 均不晚于 prev)
+    # (F27 原注释'ls==prev'与 <= 谓词不符)
 
     changes = {'added': [{'type': t, 'value': v, 'meta': json.loads(m)} for t, v, m in added],
                'removed': [{'type': t, 'value': v} for t, v in removed],

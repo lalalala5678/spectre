@@ -83,14 +83,18 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // 此前入口一半同步(consumePending/closeDrill)一半裸 setDrillSession
   // (四处页内入口), 且「返回主控会话」按钮绕过 closeDrill。
   const openDrill = useCallback((id: string) => {
+    setEntryView(null);  // CS23-N18: 收编六入口的前置清场(不对称消除)
     setDrillSession(id);
     history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${id}`);
   }, [liveKey]);
   const closeDrill = useCallback(() => {
     setDrillSession(null);
     // R32D47-P2: 返回主控会话时 ?s= 同步回当前主会话(与切换同口径)。
+    // CS23-N19: 无主会话(边缘)时剥掉 ?s= 而非残留指向已关 drill。
     if (sessionId) {
       history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${sessionId}`);
+    } else {
+      history.replaceState(null, '', `${window.location.pathname}#${liveKey}`);
     }
   }, [liveKey, sessionId]);
 
@@ -496,7 +500,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {/* 左：运行流（仅此处滚动） */}
           <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded border border-void-700 bg-void-850 p-2.5">
             {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => { setEntryView(null); openDrill(id); }} />
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id)} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-2">
                 <button
@@ -528,8 +532,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <div className="h-full pb-3.5">
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
-                  <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => { setEntryView(null); openDrill(id); }} />
-                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} onOpenSession={id => { setEntryView(null); openDrill(id); }} />
+                  <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => openDrill(id)} />
+                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} onOpenSession={id => openDrill(id)} />
                   <IntelNotesPanel workSessionId={workSession.id} onOpen={setEntryView} />
                   <TaskReportsPanel workSessionId={workSession.id} onOpen={setEntryView} />
                 </PanelStack>
@@ -545,7 +549,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     agentKey={liveKey}
                     workSessionId={workSession.id}
                     onOpen={setEntryView}
-                    onOpenSession={id => { setEntryView(null); openDrill(id); }}
+                    onOpenSession={id => openDrill(id)}
                   />
                   <IntelNotesPanel
                     agentKey={liveKey}
@@ -576,7 +580,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                   <div className="px-3 py-4 text-[11.5px] text-zinc-500">本项目该 agent 暂无历史会话。</div>
                 ) : [...mySessions].reverse().slice(0, 30).map(s => (
                   <button key={s.id}
-                    onClick={() => { setTab('session'); setDrillSession(s.id); }}
+                    onClick={() => { setTab('session'); openDrill(s.id); }}
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-void-800/60">
                     <Dot tone={s.busy ? 'orange' : 'cyan'} />
                     <div className="min-w-0 flex-1">
@@ -632,7 +636,7 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
     api<{ common: Record<string, Record<string, string | number>> | null;
       agentLlm: Record<string, Record<string, string>>;
       reconSources: Record<string, Record<string, string>>;
-      schema: { agents: typeof schemaAgents; llmFormats?: { id: string; label: string; hint: string }[] } }>('/agent-settings')
+      schema: { agents: typeof schemaAgents; llmFormats?: LlmFormatMeta[] } }>('/agent-settings')
       .then(d => { if (!cancelled) { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); setLlmFormats(d.schema?.llmFormats ?? []); setReconSources(d.reconSources ?? {}); setSchemaAgents(d.schema?.agents ?? []); } })
       .catch(() => { if (!cancelled) setCommon({}); });
     api<typeof mcps>('/sandbox/mcp')

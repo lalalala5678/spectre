@@ -31,7 +31,12 @@ export class Bus {
    *          summary: string, payloadRef?: string|null,
    *          engagement?: string|null,
    *          severity?: string|null, title?: string|null,
+   *          origin?: string|null, workSessionId?: string|null,
+   *          status?: string|null, author?: string|null,
    *          detail?: string|null}} entry
+   *
+   * CS23-N10: origin/workSessionId/status/author 四字段此前 JSDoc 漏载
+   * 而 emit 白名单实收——文档与白名单对齐。
    *
    * `severity`/`title`/`detail` carry structured vulnerability payloads:
    * the panel lists severity + title and expands the full detail.

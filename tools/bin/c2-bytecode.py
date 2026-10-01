@@ -16,15 +16,32 @@
 """
 import sys, os, json, subprocess, tempfile, time, hashlib, glob, re
 
-SCOPE = '/opt/tools/c2/scope.json'
-AUDIT = '/opt/tools/c2/audit.log'
-LIBS = '/opt/tools/c2/libs'
-ART = '/opt/tools/c2/javart'
-STUBS = '/opt/tools/c2/javastubs/classes'
-PATCH = '/opt/tools/c2/javastubs/patchclasses'
+
+
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
+    硬编码 /opt/tools 单根——c2-qa 等在宿主位调用时读不到宿主 scope,
+    一律 SCOPE-REJECT(75)。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    env = os.environ.get('SPECTRE_DATA_DIR', '')
+    if env:
+        return os.path.join(env, 'tools')
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    return '/var/lib/spectre/tools'
+
+_C2 = os.path.join(_data_root(), 'c2')
+SCOPE = os.path.join(_C2, 'scope.json')
+AUDIT = os.path.join(_C2, 'audit.log')
+LIBS = os.path.join(_C2, 'libs')
+ART = os.path.join(_C2, 'javart')
+STUBS = os.path.join(_C2, 'javastubs/classes')
+PATCH = os.path.join(_C2, 'javastubs/patchclasses')
 SPLITTER = 'CpSplitter'  # 主类名;cp 由调用处拼
-DEFAULT_RULES = '/opt/tools/c2/yara-rules'
-JMG_DIR = '/opt/tools/c2/basetypes-jmg'
+DEFAULT_RULES = os.path.join(_C2, 'yara-rules')
+JMG_DIR = os.path.join(_C2, 'basetypes-jmg')
 
 def gate():
     if not os.path.exists(SCOPE):

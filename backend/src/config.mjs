@@ -68,12 +68,8 @@ export const CONFIG = Object.freeze({
   maxIdleWaitMs: 600_000,
   busJournalLimit: 5_000,
 
-  /**
-   * [DM] spawn-completion report body cap. Beyond it the body is clipped
-   * with an explicit truncation marker + pointer to the full session —
-   * LLM-facing messages must never be cut silently.
-   */
-  dmReportMaxChars: 4_000,
+  // CS23-N13: dmReportMaxChars 已删(全仓零引用; 实际生效的 DM 裁剪
+  // 是 dmDigestChars=400, sessions.mjs 消费)。
   /** Bus vulnerability detail cap (漏洞 panel expand view), marker-clipped. */
   busDetailMaxChars: 4_000,
   /** Completion-DM digest cap (full text lives in the task report). */

@@ -79,7 +79,7 @@ bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SP
 SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 三变量与 runtime 同源
 
 # 7) 数据源凭据
-#    控制台「Agent 配置」页填入(验证通过才落盘, 未配置不注入);
+#    控制台「设置」页填入(验证通过才落盘, 未配置不注入);
 #    LLM 凭据登录后在「设置」页配置(平台化; 旧 .env LLM_* 首靴一次性导入)
 ```
 

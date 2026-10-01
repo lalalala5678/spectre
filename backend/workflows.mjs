@@ -74,7 +74,8 @@ const CHILD_SUMMARY_MAX = 2000;
 
 /**
  * @param {{engagementId: string, instruction: string, agents: string[],
- *          orchestratorSessionId?: string|null}} input
+ *          orchestratorSessionId?: string|null,
+ *          workSessionId?: string|null}} input
  */
 export async function autoPwnWorkflow(input) {
   const { engagementId, instruction, agents, orchestratorSessionId,
@@ -232,7 +233,8 @@ export async function autoPwnWorkflow(input) {
 
 /**
  * @param {{agentKey: string, engagementId: string, instruction: string,
- *          orchestratorSessionId?: string|null}} input
+ *          orchestratorSessionId?: string|null,
+ *          workSessionId?: string|null}} input
  */
 export async function agentTaskWorkflow(input) {
   const { agentKey, engagementId, instruction, orchestratorSessionId,
@@ -293,6 +295,8 @@ export async function agentTaskWorkflow(input) {
     // Task-report gate: a task may only finish with a report on file.
     // Nudge ≤2 (followUp fires an idle agent; steer would only queue),
     // then synthesize from the final reply so readers never see a hole.
+    // CS23-N15: 2 = reportNudgeMax 的 workflow 侧 twin(架构禁 import
+    // runtime 侧模块, 同 clipMarked 先例)——改值须两处同步。
     for (let nudge = 0; nudge < 2; nudge++) {
       report = await quick.reportState(session.sessionId);
       if (report.count > base.count) break;

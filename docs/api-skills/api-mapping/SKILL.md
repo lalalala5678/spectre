@@ -43,7 +43,7 @@ page_size=9999,任一通道跳变即登记。
 ## 7. 会话起步协议(apibench 净跑 64 发实证)
 1. query_intel 拉历史档案与负空间(平台记忆=合法资产,先查再打)
 2. 目标若重置:立即 publish 地面真值快照(种子数/ID 段/令牌方案有效性)
-3. 预算执行体:source /opt/tools/bin/httpq.sh(httpq <label> <curl...>
-   一发一账;HTTPQ_BUDGET 控制,超发自动拒)
+3. 预算执行体:authmatrix.py 内置记账(HTTPQ_DIR/ledger.tsv 一发一账;
+   HTTPQ_BUDGET 控制,超发自动拒——httpq.sh 已不在交付面)
 4. 工具:/opt/tools/bin/{toklab.py,jsondiff.py,authmatrix.py}
    (令牌工位/响应差分/鉴权矩阵——见各技能)
