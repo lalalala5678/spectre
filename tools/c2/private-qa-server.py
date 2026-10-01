@@ -42,7 +42,7 @@ if not TOKEN:
     try:
         os.makedirs(os.path.dirname(CFG), exist_ok=True)
         json.dump({'url': 'http://127.0.0.1:8899/scan', 'token': TOKEN},
-                  open(CFG, 'w'), indent=1)
+                  open(CFG, 'w'), indent=1, ensure_ascii=False)
     except Exception:
         pass
 

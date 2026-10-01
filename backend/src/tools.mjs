@@ -222,12 +222,18 @@ export function buildIntelTools(record, caps) {
         const hasDetail = Boolean(e.detail);
         const full = String(e.detail ?? e.summary ?? '');
         const body = full.slice(0, 400);
-        // Never cut silently (repo rule): mark per-entry truncation and
-        // CS44-F2: detail 缺失时 summary 在 emit 已截 500+——seq 取不回
-        // 全文(措辞如实, 不再谎报总数/承诺取全文)。
-        const mark = hasDetail
-          ? (full.length > 400 ? `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)` : '')
-          : (full.length > 400 ? `\n(摘要已截断:显示 ${body.length} 字符——原文仅 detail 通道可取全文)` : '');
+        // Never cut silently (repo rule): shown/total + 可行动补全手段
+        // (AGENTS.md:39-44)。CS44-F2/CS45-N2: 消费 emit 的 summaryClipped
+        // 标志分三态——detail 在=seq 可取全文; detail 缺+emit 已截=如实
+        // 声明不可恢复; detail 缺+未截但本处超 400=seq 仍可取。
+        let mark = '';
+        if (full.length > 400) {
+          if (hasDetail || !e.summaryClipped) {
+            mark = `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)`;
+          } else {
+            mark = `\n(摘要 ${body.length}/500+ 字符,emit 已截断,seq 不可恢复,原文须 detail 通道重发)`;
+          }
+        }
         const voidTag = e.void ? '[已作废——本条不再出现在常规查询中]' : '';
         const revTag = e.revisedCount
           ? ` ⟳已修订${e.revisedCount}次(seq=${e.seq} 为原始条目,现行版为修订后的内容)` : '';

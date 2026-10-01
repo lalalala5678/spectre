@@ -6,7 +6,7 @@
 # CS34-F2b: 此前硬编码宿主 /opt/tools 绕过数据根双运行位制式)。
 # 幂等: 分段 .done 标记——半量交付重跑只补缺段; seclists 标记携带
 # 稀疏集指纹, 同段扩集后旧装机重跑自动补齐(CS35-6)。
-set -euo pipefail
+set -u  # CS45-N6: 族制式——累积式(jars/fingerprints/wordlists)=set -u 不用 -e(ANY_FAILED 显式汇总)
 
 TOOLS="${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools"
 # 生产路径守卫族(同 tools-sync 等; realpath 归一尾斜杠变体)

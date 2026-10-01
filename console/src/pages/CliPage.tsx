@@ -125,6 +125,7 @@ export function CliPage({ wsId }: { wsId: string }) {
             <Package className="h-3.5 w-3.5 text-orange-400/80" />
             driver={status.driver}
             {status.driver === 'docker' && ` container=${status.container} image=${status.image}`}
+            {status.driver !== 'docker' && ' local 驱动=安装到宿主机(包管理器命令须服务端 SPECTRE_ALLOW_HOST_BOOTSTRAP=1)'}
           </p>
         )}
         <textarea

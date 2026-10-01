@@ -5,8 +5,6 @@ import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Dot } from '../components/ui/Badge';
 
-
-
 import { Panel } from '../components/ui/Panel';
 import { PanelStack } from '../components/ui/PanelStack';
 import { LiveSession } from '../components/session/LiveSession';
@@ -34,7 +32,6 @@ import { AgentConfigTab } from '../components/agent/AgentConfigTab';
 const DEFAULT_RIGHT_RATIO = 0.24;
 
 const errText = (e: unknown) => String(e instanceof Error ? e.message : e);
-
 
 /** 单个 Agent 工作台页（资产测绘 / 漏洞挖掘 / … 共用骨架） */
 export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
@@ -275,7 +272,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     setNaming(false);
     setSwitcherOpen(false);
   };
-
 
   // Right column width as a viewport ratio: user-draggable, persisted as a
   // ratio (adapts across monitors), CSS does all the math on resize.
@@ -628,7 +624,3 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     </div>
   );
 }
-
-
-
-

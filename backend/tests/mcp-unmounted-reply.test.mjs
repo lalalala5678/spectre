@@ -9,13 +9,21 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
 import { join, dirname } from 'node:path';
+import { mkdtempSync, rmSync } from 'node:fs';
+import { tmpdir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
 function mcpCall(procPath, name) {
   return new Promise((resolve, reject) => {
-    const child = spawn('node', [procPath], { stdio: ['pipe', 'pipe', 'pipe'] });
+    // CS45-N5: 数据根钉临时目录(gate-matrix 先例)——环境机装了 ipinfo
+    // 凭据时桥会真挂载并外发请求, 断言失败+网络副作用双坏。
+    const dir = mkdtempSync(join(tmpdir(), 'mcp-lock-'));
+    const child = spawn('node', [procPath], {
+      stdio: ['pipe', 'pipe', 'pipe'],
+      env: { ...process.env, SPECTRE_DATA_DIR: dir },
+    });
     let out = '', err = '';
     child.stdout.on('data', d => { out += d; });
     child.stderr.on('data', d => { err += d; });
@@ -25,6 +33,7 @@ function mcpCall(procPath, name) {
       if (out.includes('\n')) {
         clearTimeout(timer);
         child.kill('SIGKILL');
+        rmSync(dir, { recursive: true, force: true });
         resolve({ out, err });
       }
     });

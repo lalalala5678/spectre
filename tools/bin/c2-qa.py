@@ -242,6 +242,10 @@ def cmd_scan(args):
     res = scan_all(p, engines)
     sha = sha256f(p)
     audit(sc['exercise'], 'scan', sha, json.dumps(res, ensure_ascii=False)[:200])
+    # R32D68-OBS2: 全引擎缺席时 stderr 人类可读一行(stdout JSON 保持
+    # 机器可消费/rc 不变——智能体按 error 字段判)。
+    if res and all((r or {}).get('error') for r in res.values() if isinstance(r, dict)):
+        print('注: 本机零引擎可用——全部结果为"未安装"错误, 修复指引见各引擎 error 字段', file=sys.stderr)
     print(json.dumps(res, indent=1))
     return 0
 

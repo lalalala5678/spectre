@@ -3,7 +3,7 @@
 # 警告: 直接在宿主机运行会 apt 安装系统级包(需 root 且改动宿机)——
 # 除非你明确要裸机部署, 否则经 docker exec / API 通道派发。
 # 幂等: 重复执行安全; 安装账本(install-log)由平台 installCli 通道自动维护
-set -e
+set -e  # CS45-N6: 族制式——即时式(sync/seed/bootstrap)=set -e 失败即停
 
 # R32D42-P2/CS33-3: 宿主守卫。数据根守卫族(tools-sync/fetch-jars/
 # skills-seed/fetch-fingerprints/fetch-wordlists)不适用本脚本(不写 SPECTRE_DATA_DIR);

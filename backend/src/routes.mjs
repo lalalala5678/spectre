@@ -422,6 +422,14 @@ function maskPrefs(raw) {
       if ('commonSettings' in body_ || 'agentLlm' in body_ || 'reconApiKeys' in body_) {
         return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(保存前真实连通探测+热更)——/api/prefs 不接受 commonSettings/agentLlm/reconApiKeys 键');
       }
+      // R32D68-NEW-1: 非凭据键形状校验——ui 须普通对象(字符串会被
+      // spread 成字符索引键持久化); currentWs 须 ws- 形串或 null。
+      if ('ui' in body_ && (typeof body_.ui !== 'object' || body_.ui === null || Array.isArray(body_.ui))) {
+        return bad(res, 400, 'ui 须为普通对象(键值对)——非对象值会被展开成字符索引');
+      }
+      if ('currentWs' in body_ && !(body_.currentWs === null || /^ws-[a-z0-9][a-z0-9-]*$/i.test(String(body_.currentWs)))) {
+        return bad(res, 400, 'currentWs 须为 ws- 前缀项目 id 字符串或 null');
+      }
       // R32D67-B: 回显与 GET 同掩码(此前 200 响应原样回明文 apiKey)。
       return json(res, 200, maskPrefs(setPrefs(body, wal)));
     }
@@ -465,6 +473,13 @@ function maskPrefs(raw) {
       const body = await readJson(req);
       const cmd = String(body.command || '').trim();
       if (!cmd) return bad(res, 400, 'command 必填');
+      // R32D68-OBS1: local 驱动=宿主执行——宿主包管理器命令须显式
+      // opt-in(与启动 bootstrap 的 SPECTRE_ALLOW_HOST_BOOTSTRAP 同哲学)。
+      const hostPkg = /\b(apt|apt-get|pip3?|snap)\b/.test(cmd);
+      if (hostPkg && sandboxConfig().driver !== 'docker'
+        && process.env.SPECTRE_ALLOW_HOST_BOOTSTRAP !== '1') {
+        return bad(res, 400, 'local 驱动下该命令将变更宿主机——设 SPECTRE_ALLOW_HOST_BOOTSTRAP=1 显式确认(或用 docker 驱动)');
+      }
       const result = await installCli(cmd);
       return json(res, 200, result);
     }

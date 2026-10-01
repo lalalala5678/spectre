@@ -40,6 +40,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   │   ├── api/                   # 后端客户端:fetch 封装 + SSE 订阅(client.ts)
 │   │   ├── components/            # 通用组件(Sidebar/Topbar/ui)
 │   │   ├── components/session/    # 会话视图(消息流/事件流/聊天输入)
+│   │   ├── components/agent/      # agent 配置页签组件(CS44-F17 拆分)
 │   │   ├── pages/                 # 路由页(AutoPwn/BusView/Audit/…)
 │   │   ├── types/                 # 共享类型(RouteKey/AgentMeta 等活消费面)
 │   │   └── utils/
@@ -105,7 +106,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 | activities 是 workflow 唯一出站副作用点 | Temporal 可观测性(history 完整记录每次副作用) |
 | `config.mjs` 是后端唯一配置源 | LLM 厂商在平台「设置」页换(R32D44 平台化); 端口等 = 改 `.env` 一处 |
 | 智能体身份(agent impersonation)必须带 INTERNAL_TOKEN | 浏览器会话不能伪造 [DM] 注入 |
-| 单一职责;行数软指引(tools(1057)/pi(1054)/sessions(1006)/routes(845)/agent-settings(766)/sandbox·tooling(784)/sandbox·container(554) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
+| 单一职责;行数软指引(tools(1063)/pi(1054)/sessions(1006)/routes(860)/agent-settings(766)/sandbox·tooling(784)/sandbox·container(554) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
 
 ## 4. 控制面 vs 数据面
 

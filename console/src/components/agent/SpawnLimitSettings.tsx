@@ -1,11 +1,12 @@
 /** SpawnLimitSettings — 调度限制; CS44-F17 拆出。 */
+import { useEffect, useState } from 'react';
+import { api } from '../../api/client';
+import { Panel } from '../ui/Panel';
+
 interface SpawnSettings {
   spawnMaxDepth: number;
   spawnMaxAgents: number;
 }
-import { useEffect, useState } from 'react';
-import { api } from '../../api/client';
-import { Panel } from '../ui/Panel';
 
 /** 调度限制(spawn policy)— runtime-enforced, console-edited. */
 export function SpawnLimitSettings() {

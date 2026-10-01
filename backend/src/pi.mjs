@@ -427,7 +427,7 @@ export const TOOLS_GUIDE = [
   '- revise_entry: 修订情报/任务报告(任意agent,reason留审计);writer 可修订漏洞',
   '- request_vulnerability_revision: 漏洞修订申请——writer 审核必要性与正确性',
   '- spawn_agent / dispatch_agents / relay_to_agents: 派生/批量调度/定向转发',
-  '  (spawn 仅派生会话持有; dispatch/relay 仅编排器持有——直连会话没有,以提示词末尾实际注册清单为准)',
+  '  (spawn 编排器/派生会话持有; dispatch/relay 仅编排器持有——直连会话没有,以提示词末尾实际注册清单为准)',
   '- publish_vulnerability: 仅报告agent会话持有——漏洞落账唯一入口',
 ].join('\n');
 

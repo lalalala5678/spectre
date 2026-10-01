@@ -1,7 +1,7 @@
 #!/bin/bash
 # 仓库工具链 → 运行时数据目录(private-qa.service 等的引用路径)
 # 用法: tools-sync.sh [目标根](默认 /var/lib/spectre)
-set -e
+set -e  # CS45-N6: 族制式——即时式(sync/seed/bootstrap)=set -e 失败即停
 cd "$(dirname "$0")/.."
 DST="${1:-${SPECTRE_DATA_DIR:-/var/lib/spectre}}"
 # R13-1(十三轮): 生产缺省路径守卫——与 skills-seed NEW-B 同款(该脚本

@@ -7,7 +7,7 @@ import { stripEventTitle } from './eventTitle';
 
 /**
  * INTEL-NOTE list panel: any information that might help the task
- * (leads, observations, environment details, hypotheses). Emerald
+ * (leads, observations, environment details, hypotheses). Teal (CS44-F11 补落: 实色 teal——emerald 在 VulnPanel)
  * accent distinguishes it from the vulnerability ledger. SSE-driven;
  * `agentKey` scopes the feed to notes authored by that agent only.
  */
