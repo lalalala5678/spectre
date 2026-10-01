@@ -22,7 +22,7 @@ import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import { syncSourceKeyFiles } from './keyfiles.mjs';
 import { phishCampaignFunnel } from './phish-funnel.mjs';
 import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
-import { getSettings, saveSetting, hasSourceCredential, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { maskSecret, isSecretLeaf, getSettings, saveSetting, hasSourceCredential, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
@@ -364,7 +364,25 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, { deleted: true, id: pid });
     }
     if (path === '/api/prefs' && method === 'GET') {
-      return json(res, 200, getPrefs());
+      // R32D66-NEW2: 凭据叶掩码回显(llm/webSearch/agentLlm/reconApiKeys——
+      // 掩码哨兵写面在 agent-settings save 路径, 本端点只读)。
+      const raw = getPrefs();
+      const masked = {
+        ...raw,
+        commonSettings: raw.commonSettings ? {
+          ...raw.commonSettings,
+          llm: raw.commonSettings.llm ? { ...raw.commonSettings.llm,
+            apiKey: raw.commonSettings.llm.apiKey ? maskSecret(raw.commonSettings.llm.apiKey) : raw.commonSettings.llm.apiKey } : raw.commonSettings.llm,
+          webSearch: raw.commonSettings.webSearch ? { ...raw.commonSettings.webSearch,
+            apiKey: raw.commonSettings.webSearch.apiKey ? maskSecret(raw.commonSettings.webSearch.apiKey) : raw.commonSettings.webSearch.apiKey } : raw.commonSettings.webSearch,
+        } : raw.commonSettings,
+        agentLlm: Object.fromEntries(Object.entries(raw.agentLlm ?? {}).map(([k, v]) =>
+          [k, v?.apiKey ? { ...v, apiKey: maskSecret(v.apiKey) } : v])),
+        reconApiKeys: Object.fromEntries(Object.entries(raw.reconApiKeys ?? {}).map(([src, o]) =>
+          [src, Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
+            [fk, isSecretLeaf(src, fk) ? maskSecret(fv) : fv]))])),
+      };
+      return json(res, 200, masked);
     }
 
     // ---------- agent settings (user-facing config bar) ----------
@@ -391,6 +409,14 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path === '/api/prefs' && method === 'PUT') {
       const body = await readJson(req);
+      // R32D66-NEW1: 凭据/LLM 子树拒绝裸写——契约「LLM 保存必真实连通
+      // 探测」只在 /api/agent-settings/save 通道成立(此前经本端点可绕
+      // 过探测直落坏配置且不热更)。
+      const body_ = body ?? {};
+      if ((body_.commonSettings && (body_.commonSettings.llm || body_.commonSettings.webSearch))
+        || body_.agentLlm || body_.reconApiKeys) {
+        return bad(res, 400, '凭据/LLM 配置须经 /api/agent-settings/save(保存前真实连通探测+热更)');
+      }
       return json(res, 200, setPrefs(body, wal));
     }
 

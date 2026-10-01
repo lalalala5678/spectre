@@ -430,8 +430,8 @@ const fieldTypeOf = fid => (CRED_FIELD.has(fid) ? 'password' : 'text');
 // R32D59-N6: 凭据读面掩码(••••+尾4)/写面掩码哨兵还原——多账号共享
 // 机下低权登录者不再能读管理员 LLM Key 全文; 保存表单原样回传掩码时
 // 解析回存量, 探测/落盘用真值(掩码哨兵撞真钥概率≈0, 且以尾4校验)。
-const MASK = '••••';
-function maskSecret(v) {
+export const MASK = '••••';
+export function maskSecret(v) {
   return (typeof v === 'string' && v.length > 4) ? MASK + v.slice(-4) : (v ? MASK : v);
 }
 function unmaskSecret(stored, incoming) {
