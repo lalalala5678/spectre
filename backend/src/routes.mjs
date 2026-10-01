@@ -335,8 +335,9 @@ function realRouter({ store, bus, caps, wal }) {
         for (const p of body.projects) {
           if (p?.id && typeof p.id === 'string' && /^[\w-]{1,64}$/.test(p.id) && !getProject(p.id)) {
             ensureProject(p.id, wal, String(p.label ?? '').slice(0, 60));
-          } else if (p?.id && (typeof p.id !== 'string' || !/^[\w-]{1,64}$/.test(p.id))) {
-            skipped.push(String(p.id));
+          } else {
+            // R32D71: 域外/缺 id/非串一律入明细(此前仅域外非空 id)。
+            skipped.push(p?.id == null ? '(missing id)' : String(p.id));
           }
         }
         // CS49-F6: 响应形状恒定(机器消费免 Array.isArray 分叉)。
@@ -450,8 +451,14 @@ function maskPrefs(raw) {
       // CS48-5: 形状违规统一 400(setPrefs 同步 throw 此前冒泡 500);
       // CS49-F5: null 体先短痛拒(守卫 body_ 兜空后 setPrefs(null) 曾
       // 泄漏引擎原文 TypeError)。
-      if (body === null || body === undefined) {
+      if (body === null || body === undefined || typeof body !== 'object' || Array.isArray(body)) {
         return bad(res, 400, '请求体须为 JSON 对象');
+      }
+      // R32D71: 白名单顶层键(未知键拒——此前任意键原样持久化进 WAL)。
+      const PREFS_KEYS = new Set(['ui', 'currentWs']);
+      const unknown = Object.keys(body).filter(k => !PREFS_KEYS.has(k));
+      if (unknown.length) {
+        return bad(res, 400, `未知 prefs 键: ${unknown.join(', ')}(允许: ui/currentWs——凭据/LLM 走 /api/agent-settings)`);
       }
       try {
         return json(res, 200, maskPrefs(setPrefs(body, wal)));
