@@ -110,6 +110,42 @@ class ProxyMalformedCL(unittest.TestCase):
         finally:
             proxy.http.client.HTTPConnection = orig
 
+    def test_zero_cl_forwarded(self):
+        """CS10-3: CL:0 是无体 POST 标准头, 必须放行到上游."""
+        from unittest.mock import MagicMock
+        from spectre_gateway import proxy
+
+        handler = MagicMock()
+        handler.headers = {"Content-Length": "0"}
+        reached = []
+        resp = MagicMock()
+        resp.status = 200
+        resp.getheaders.return_value = []
+        resp.read1 = lambda _: b""
+
+        class _OK:
+            def __init__(self, *a, **k):
+                pass
+
+            def request(self, *a, **k):
+                reached.append(1)
+
+            def getresponse(self):
+                return resp
+
+            def close(self):
+                pass
+
+        orig = proxy.http.client.HTTPConnection
+        proxy.http.client.HTTPConnection = _OK
+        try:
+            proxy.proxy(handler, "/api/shells/x/close")
+            self.assertEqual(reached, [1])
+            self.assertFalse(handler._send.called and
+                             handler._send.call_args[0][0] == 413)
+        finally:
+            proxy.http.client.HTTPConnection = orig
+
 
 if __name__ == "__main__":
     unittest.main()

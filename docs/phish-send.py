@@ -358,6 +358,13 @@ def main():
             if not args.from_name:
                 args.from_name = _disp
             args.from_addr = _addr
+    # CS10-8: --reply-to 同款 parseaddr 对称("Name <a@b>" 此前整串
+    # 裸切致 reply_domain 带括号≠from_domain, Reply-To 静默丢弃)
+    if getattr(args, 'reply_to', None):
+        from email.utils import parseaddr as _pa
+        _rd, _ra = _pa(args.reply_to)
+        if _ra:
+            args.reply_to = _ra
     # NEW-2: send 模式必填前置(此前逐目标打 'NoneType is not iterable')
     if args.mode == 'send' and not getattr(args, 'from_addr', None):
         print('缺少 --from <email@domain>(可选 --from-name "Display")', file=sys.stderr)

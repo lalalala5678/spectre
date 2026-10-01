@@ -13,9 +13,17 @@
 import sys, os, json, sqlite3, time, argparse, hashlib
 from pathlib import Path
 
-DB_PATH = '/opt/tools/c2/arl-assets.db'
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+
+DB_PATH = os.path.join(_data_root(), 'c2/arl-assets.db')  # CS10-4
 
 def get_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
     conn = sqlite3.connect(DB_PATH)
     conn.execute('''CREATE TABLE IF NOT EXISTS assets (
         id INTEGER PRIMARY KEY,

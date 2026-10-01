@@ -221,7 +221,7 @@ def eng_private(p):
         pass
     url = os.environ.get('PRIVATE_QA_URL') or pq.get('url')
     if not url:
-        return {'engine': 'private', 'error': 'PRIVATE_QA_URL not set(私架未部署;文件 /opt/tools/c2/private-qa.json 或环境变量)'}
+        return {'engine': 'private', 'error': f"PRIVATE_QA_URL not set(私架未部署;文件 {os.path.join(_data_root(), 'c2/private-qa.json')} 或环境变量)"}
     import urllib.request, uuid
     b = '----spectre' + uuid.uuid4().hex
     body = ((f'--{b}\r\nContent-Disposition: form-data; name="sample"; '

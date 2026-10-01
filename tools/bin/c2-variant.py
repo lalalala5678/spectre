@@ -16,8 +16,15 @@
 """
 import sys, os, json, hashlib, base64, random, string, uuid, re, subprocess, tempfile, glob, secrets
 
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
+    (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+        return '/opt/tools'
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+
 FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
-RULE_DIR = '/opt/tools/c2/yara-rules'
+RULE_DIR = os.path.join(_data_root(), 'c2/yara-rules')  # CS10-4
 MASK_DEFAULT_KEYS = ['e45e329feb5d925b', '3c6e0b8a9c15224a', 'rebeyond', 'key321']
 MASK_QUOTED_VALUES = ['pass', 'key', 'md5']
 MASK_FIELDS = {'cmd': 'log_id', 'exec': 'task_run', 'connect': 'report_up'}
@@ -57,7 +64,7 @@ def _rand_token(n, hexed=False):
 def scope_gate():
     """授权门(scope.json:targets 空/出窗=拒)——与 c2-qa 同源。"""
     import time as _t, json as _j
-    sc = _j.load(open('/opt/tools/c2/scope.json'))
+    sc = _j.load(open(os.path.join(_data_root(), 'c2/scope.json')))
     now = _t.strftime('%Y-%m-%dT%H:%M:%SZ', _t.gmtime())
     if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
         print('SCOPE-REJECT: empty targets or out of window')
@@ -446,7 +453,7 @@ def cmd_selftest(args):
     global RULE_DIR
     if a.get('--rules'):
         RULE_DIR = a['--rules']
-    bdir = a.get('--basetypes', '/opt/tools/c2/basetypes')
+    bdir = a.get('--basetypes', os.path.join(_data_root(), 'c2/basetypes'))
     scope_gate()
     edusrc_gate([bdir])
     import shutil
@@ -465,10 +472,10 @@ def cmd_selftest(args):
             fails += 1; continue
         vp = os.path.join(out, cands[0])
         resid = yara_string_hits(vp)
-        dg = subprocess.run(['python3', '/opt/tools/bin/c2-disguise.py', 'check', '--payload', vp],
+        dg = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-disguise.py'), 'check', '--payload', vp],
                             capture_output=True, text=True)
         dgres = json.loads(dg.stdout) if dg.stdout.strip().startswith('{') else {'verdict': 'ERROR'}
-        ft = subprocess.run([sys.executable, '/opt/tools/bin/c2-functest.py', vp],
+        ft = subprocess.run([sys.executable, os.path.join(_data_root(), 'bin/c2-functest.py'), vp],
                             capture_output=True, text=True)
         ok = (not resid) and ft.returncode == 0 and dgres.get('verdict') != 'REJECT'
         print(f"SELFTEST {'OK  ' if ok else 'FAIL'} {f}: resid={len(resid)} ft={ft.returncode} disguise={dgres.get('verdict')} {str(dgres.get('bare_surfaces'))[:60]}")
