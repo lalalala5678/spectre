@@ -355,9 +355,11 @@ def write_samples(directory):
         print(f'  {p}')
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2 or sys.argv[1] not in ('serve', 'list', 'init', '-h', '--help'):
-        # R32D41-N3: 未知子命令此前静默 exit 0(--help 也零输出)。
-        print(__doc__); sys.exit(0 if sys.argv[1:] and sys.argv[1] in ('-h', '--help') else 2)
+    # R32D42-P1: 子命令归一(同 phish-proxy)——已知子命令以外一律用法;
+    # 帮助 rc=0, 未知/缺失 rc=2。
+    if len(sys.argv) < 2 or sys.argv[1] not in ('serve', 'list', 'init'):
+        print(__doc__)
+        sys.exit(0 if sys.argv[1:] and sys.argv[1] in ('-h', '--help') else 2)
     if sys.argv[1] == 'serve':
         listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8443'
         pl_path = '--phishlet' in sys.argv and sys.argv[sys.argv.index('--phishlet') + 1]

@@ -43,7 +43,10 @@ def main():
     if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'):
         print(__doc__)
         return 2 if len(sys.argv) != 2 else 0
-    plan = json.load(open(sys.argv[1]))
+    try:
+        plan = json.load(open(sys.argv[1]))
+    except (OSError, ValueError) as e:
+        print(f'[authmatrix] 读取计划失败: {e}', file=sys.stderr); return 2
     base, ids, eps = plan['base'], plan['identities'], plan['endpoints']
     d = os.environ.get('HTTPQ_DIR', '/tmp/httpq')
     os.makedirs(d, exist_ok=True)

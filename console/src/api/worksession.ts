@@ -88,7 +88,14 @@ export function ensureWorkSession(): Promise<WorkSession> {
         const found = all.find(p => p.id === prefs.currentWs);
         if (found) return found;
       }
-      if (all.length > 0) return all[all.length - 1];
+      if (all.length > 0) {
+        // R32D42-P2: 回退分支写回 currentWs——此前 agent 页静默用最新
+        // 项目而 skills/mcp/cli/reports 读 prefs 显示「无当前项目」,
+        // 同一控制台双口径(需手动重点项目才一致)。
+        const fallback = all[all.length - 1];
+        try { await putPrefs({ currentWs: fallback.id }); } catch { /* 后端不可达时保持本地一致 */ }
+        return fallback;
+      }
       return await newWorkSession('');
     } finally {
       ensuring = null;  // 失败后允许重试(不缓存错误态)

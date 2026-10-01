@@ -23,7 +23,13 @@ def flat(o, prefix=''):
     return out
 
 def main():
-    a, b = load(sys.argv[1]), load(sys.argv[2])
+    # R32D42-P1/P2: --help/参数不足/坏 JSON 均不再裸栈。
+    if len(sys.argv) < 3 or any(x in ('-h', '--help') for x in sys.argv[1:3]):
+        print(__doc__); return 0 if '--help' in sys.argv or '-h' in sys.argv else 2
+    try:
+        a, b = load(sys.argv[1]), load(sys.argv[2])
+    except (OSError, ValueError) as e:
+        print(f'[jsondiff] 读取失败: {e}', file=sys.stderr); return 2
     fa, fb = flat(a), flat(b)
     rows = 0
     for k in sorted(set(fa) | set(fb)):

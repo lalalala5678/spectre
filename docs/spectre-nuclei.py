@@ -487,7 +487,11 @@ def execute_template(tpl, target, timeout=15):
             _mres = apply_matchers(matchers, status, headers, body,
                                    (req_spec.get('matchers-condition') or 'and'))
             if isinstance(_mres, dict):
+                # R32D42-P1: 纯 internal 捕获跳是链的中间步骤——变量入
+                # 池后 continue 到下一请求, 不是最终命中(此前当命中
+                # →链首跳即断+末跳必败也报 FP+归因错)。
                 captured_vars.update(_mres.get('__vars__', {}))
+                continue
             if _mres:
                 extractors = req_spec.get('extractors', tpl.get('extractors', []))
                 extracted = apply_extractors(extractors, status, headers, body)

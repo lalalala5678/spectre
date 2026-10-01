@@ -79,6 +79,10 @@ def run_harness(mode, name, marker, cp_extra, lane='javax'):
 
 def main():
     args = sys.argv[1:]
+    if not args or args[0] in ('-h', '--help'):
+        print(__doc__); return 0 if args else 2
+    if len(args) % 2:
+        print(f'[c2-javart] 参数须为键值对(收到奇数个): {args}', file=sys.stderr); return 2
     a = dict(zip(args[::2], args[1::2]))
     d = tempfile.mkdtemp(prefix='c2javart-')
     try:

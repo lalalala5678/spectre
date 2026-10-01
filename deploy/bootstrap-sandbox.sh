@@ -5,6 +5,15 @@
 # 幂等: 重复执行安全; 安装账本(install-log)由平台 installCli 通道自动维护
 set -e
 
+# R32D42-P2: 宿主守卫——文档称四脚本统一数据根守卫但本脚本无。
+# 容器内(.dockerenv 存在)正常执行; 宿主裸跑须显式确认(apt 改宿机)。
+if [ ! -f /.dockerenv ] && [ "${SPECTRE_ALLOW_HOST_BOOTSTRAP:-0}" != "1" ]; then
+  echo "[bootstrap] 拒绝: 检测到宿主机直跑(会 apt 安装系统级包改动宿机)。" >&2
+  echo "[bootstrap] 容器内执行: docker exec spectre-sbx-<sha8> bash /opt/tools/bootstrap-sandbox.sh" >&2
+  echo "[bootstrap] 确要裸机部署: SPECTRE_ALLOW_HOST_BOOTSTRAP=1 bash $0" >&2
+  exit 78
+fi
+
 echo "[bootstrap] 系统包(面杀引擎+JDK+运行时)"
 apt-get update -qq
 apt-get install -y -qq clamav yara openjdk-17-jdk-headless \

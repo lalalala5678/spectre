@@ -8,7 +8,7 @@ F12 加固(2026-09-27 QA 循环6,公网 IP 已实际触达):
 - 每 IP 频率限制 10 连接/分钟(滑动窗口)——防刷
 - 单连接 64KB 不变;0.0.0.0 绑定不变(靶机回连必需)
 """
-import socket, threading, time, os, datetime
+import socket, sys, threading, time, os, datetime
 from collections import defaultdict, deque
 OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
 if not os.environ.get('SPECTRE_DATA_DIR'):
@@ -78,7 +78,12 @@ def handle(c, addr):
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
-s.bind(('0.0.0.0', int(os.environ.get('OOB_PORT', '19999')))); s.listen(16)
+# R32D42-P3: 端口占用(OSError 98)此前裸栈——给一行可行动提示。
+try:
+    s.bind(('0.0.0.0', int(os.environ.get('OOB_PORT', '19999')))); s.listen(16)
+except OSError as e:
+    print(f'[oob] 监听失败: {e}(端口被占? 换 OOB_PORT=<端口> 或停占用进程)', flush=True)
+    sys.exit(1)
 print(f'[oob] listening :{os.environ.get("OOB_PORT", "19999")} (quota={QUOTA_BYTES//(1024*1024)}MB, rate={RATE_PER_IP}/min/ip)', flush=True)
 while True:
     c, addr = s.accept()

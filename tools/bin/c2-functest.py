@@ -76,10 +76,15 @@ def php_check(p):
     return True, 'php OK-static (runtime echo n/a: ' + r2.stdout.strip()[:30].replace('\n', ' ') + ')'
 
 def main():
-    if len(sys.argv) < 2:
-        print(__doc__); return 2
+    # R32D42-P1/P2: --help 进用法(此前裸栈 FileNotFoundError); 坏路径
+    # 报干净错误 rc=2。
+    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
+        print(__doc__); return 0 if sys.argv[1:] else 2
     p = sys.argv[1]
-    body = open(p, errors='replace').read()
+    try:
+        body = open(p, errors='replace').read()
+    except OSError as e:
+        print(f'[c2-functest] 无法读取 {p}: {e}', file=sys.stderr); return 2
     if 'SPECTRE-MARK' not in body:
         print(f'FAIL: functional core marker missing in {p}')
         return 1

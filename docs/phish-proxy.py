@@ -268,9 +268,12 @@ def serve(listen, target, db_file=None, strip_csp=True):
     server.serve_forever()
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2 or sys.argv[1] not in ('serve', '-h', '--help'):
-        # R32D41-N3: 未知子命令此前静默 exit 0(--help 也零输出)。
-        print(__doc__); sys.exit(0 if sys.argv[1:] and sys.argv[1] in ('-h', '--help') else 2)
+    # R32D42-P1: 子命令归一——serve 以外(含 -h/--help)一律用法输出;
+    # 帮助 rc=0, 未知/缺失 rc=2(此前 --help 在白名单被放行后无分支
+    # 可走, 静默 rc=0)。
+    if len(sys.argv) < 2 or sys.argv[1] not in ('serve',):
+        print(__doc__)
+        sys.exit(0 if sys.argv[1:] and sys.argv[1] in ('-h', '--help') else 2)
     if sys.argv[1] == 'serve':
         listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8080'
         target = '--target' in sys.argv and sys.argv[sys.argv.index('--target') + 1] or 'https://login.microsoft.com'
