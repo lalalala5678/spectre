@@ -1,10 +1,10 @@
 #!/bin/bash
-# 第三方 jar 依赖装载(~25MB 不入 git, 首次部署下载)
+# 第三方 jar 依赖装载(~51MB 实测, 不入 git, 首次部署下载)
 # 目标: $SPECTRE_DATA_DIR/tools/c2/{libs,generators}(挂载进容器为 /opt/tools/c2/*)
 # 任何一项失败都会在结尾汇总报错并以非零退出(不静默吞)。
 ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
 # R14-1(十四轮): 生产缺省守卫——同族 tools-sync/skills-seed 已三修, 此为
-# 最后缺位者(漏 env 直跑即静默写 ~25MB jar 进生产路径)。
+# 最后缺位者(漏 env 直跑即静默写 ~51MB jar 进生产路径)。
 # CS3-N19: 守卫判实际写目标(LIBS/GEN 可覆盖 ROOT), 而非仅 ROOT
 # CS3-N19/CS4-M11: 守卫判全部实际写目标(LIBS 与 GEN 任一落在生产路径即拦)
 # R32D55-N2: realpath 归一——尾斜杠/./ 变体此前绕过守卫写生产。

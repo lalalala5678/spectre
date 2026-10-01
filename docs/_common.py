@@ -59,7 +59,7 @@ def edusrc_gate(paths=()):
     含 edusrc 即拒), 一律废除——不影响任何未显式声明的工作区。paths
     形参保留以稳调用面, 不再参与判定。"""
     if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
         sys.exit(76)
 
 
@@ -83,3 +83,9 @@ def audit_log(path, target, action, sha='', note=''):
     with open(path, 'a') as f:
         f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\t'
                 f'{target}\t{action}\t{sha}\t{note}\n')
+
+def target_matches(pattern, target):
+    """targets 通配语义单源(CS39-6: 此前 c2-bind 双闭包本地复制)——
+    精确 | '*.domain' 通配(大小写不敏感, 与 shells/SKILL 同义)。"""
+    p_, t_ = str(pattern).lower(), str(target).lower()
+    return p_ == t_ or (p_.startswith('*.') and t_.endswith(p_[1:]))

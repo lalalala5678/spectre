@@ -39,7 +39,7 @@ if [ ! -f "$CFF" ]; then
   echo "[fp-scan] 缺字典 $CFF——重跑 bash deploy/tools-sync.sh(交付 tools/dicts/); 仍缺则检查克隆完整性" >&2; exit 2
 fi
 if [ ! -d "$NT_DIR/nt-technologies" ]; then
-  echo "[fp-scan] 缺指纹库 $NT_DIR/nt-technologies——运行 bash deploy/fetch-fingerprints.sh(约 45MB, 网络下载)" >&2; exit 2
+  echo "[fp-scan] 缺指纹库 $NT_DIR/nt-technologies——运行 bash deploy/fetch-fingerprints.sh(约 20MB 实测, 网络下载)" >&2; exit 2
 fi
 for eng in httpx whatweb; do
   command -v "$eng" >/dev/null 2>&1 || echo "[fp-scan][warn] 引擎 $eng 不在 PATH——对应层将跳过" >&2

@@ -8,11 +8,12 @@
   bind  : 目标必须在 /opt/tools/c2/scope.json targets 内;exp 默认=scope 窗口 end,
           --days N 可提前(不可晚于窗口 end);写入 <payload>.bind.json
           {sha256,target,exercise,exp,sig};sig=HMAC-SHA256(bind.key, sha|target|exercise|exp)
-  verify: 载荷被改(sha 不符)=79;目标不在当前 scope=78;过期=77;sig 不符=80;OK=0
+  verify: OK=0;载荷被改(sha 不符)=79;目标不在当前 scope=78;过期=77;sig 不符=80;
+         无/坏 sidecar=81;scope 缺/坏=75;缺参=2
   expire: exp 置为过去(立即自废)
 """
 import sys, os, json, hmac, hashlib, time, secrets
-from _common import audit_log, _data_root
+from _common import target_matches, audit_log, _data_root
 
 
 _C2 = os.path.join(_data_root(), 'c2')
@@ -41,8 +42,7 @@ def cmd_bind(args):
         return 2
     p = a['--payload']
     # R32D60-NEW4: payload 不存在/是目录→干净 rc=2(此前裸栈 rc=1)。
-    import os as _os
-    if not _os.path.isfile(p):
+    if not os.path.isfile(p):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
     try:
         sc = json.load(open(SCOPE))
@@ -57,12 +57,8 @@ def cmd_bind(args):
     if a.get('--days') and not a['--days'].lstrip('-').isdigit():
         print('用法: --days 须为整数天数', file=sys.stderr); return 2
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')
-    # CS30-F8: targets 语义与 SKILL/shells 对齐(精确|'*.domain' 通配——
-    # 此前纯精确成员, 通配 scope 条目下具体主机结构性 BIND-REJECT 70)。
-    def _tm(t, tg):
-        t, tg = str(t).lower(), str(tg).lower()
-        return t == tg or (t.startswith('*.') and tg.endswith(t[1:]))
-    if not any(_tm(t, target) for t in sc.get('targets', [])):
+    # CS30-F8/CS39-6: targets 通配语义单源(_common.target_matches)。
+    if not any(target_matches(t, target) for t in sc.get('targets', [])):
         print(f'BIND-REJECT: target {target!r} not in scope targets', file=sys.stderr); return 70
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc['window']['start'] <= now <= sc['window']['end']):
@@ -93,6 +89,10 @@ def cmd_verify(args):
         rec = json.load(open(side(p)))
     except Exception as e:
         print(f'VERIFY-FAIL: bad sidecar json: {e}', file=sys.stderr); return 81
+    # CS39-2: 结构坏 sidecar(合法 JSON 缺键)与解析坏同拒——此前 rec['sha256']
+    # 等 KeyError 裸栈, 同函数 rec.get('sig','') 却防御(自相矛盾)。
+    if not all(k in rec for k in ('sha256', 'target', 'exercise', 'exp')):
+        print('VERIFY-FAIL: bad sidecar shape(缺 sha256/target/exercise/exp)', file=sys.stderr); return 81
     try:
         sc = json.load(open(SCOPE))
     except FileNotFoundError:
@@ -106,15 +106,11 @@ def cmd_verify(args):
     if not hmac.compare_digest(rec.get('sig', ''), sig_of(sha, rec['target'], rec['exercise'], rec['exp'])):
         print('VERIFY-FAIL: bad sig', file=sys.stderr); return 80
     want = a.get('--target', rec['target'])
-    # CS38-G2: 通配语义与 bind/_common 同源(此前纯精确成员——通配 scope
-    # 下绑定成功的具体 target 结构性 78, SKILL 样例即通配)。
-    def _tm(t, tg):
-        t, tg = str(t).lower(), str(tg).lower()
-        return t == tg or (t.startswith('*.') and tg.endswith(t[1:]))
-    if not any(_tm(t, want) for t in sc.get('targets', [])):
+    # CS38-G2/CS39-6: 通配语义单源(_common.target_matches)。
+    if not any(target_matches(t, want) for t in sc.get('targets', [])):
         print(f'VERIFY-FAIL: target {want} out of current scope', file=sys.stderr); return 78
     if now > rec['exp']:
-        print(f'EXPIRED: {p} (exp={rec["exp"]}) — 载荷自废,拒绝交付'); return 77
+        print(f'EXPIRED: {p} (exp={rec["exp"]}) — 载荷自废,拒绝交付', file=sys.stderr); return 77
     print(f'VERIFY-OK: {p} target={want} exp={rec["exp"]} (剩余 {rec["exp"][:10]} 前可用)')
     return 0
 
@@ -132,6 +128,8 @@ def cmd_expire(args):
         rec = json.load(open(side(p)))
     except Exception as e:
         print(f'EXPIRE-FAIL: bad sidecar json: {e}', file=sys.stderr); return 81
+    if not all(k in rec for k in ('sha256', 'target', 'exercise', 'exp')):
+        print('EXPIRE-FAIL: bad sidecar shape(缺 sha256/target/exercise/exp)', file=sys.stderr); return 81
     rec['exp'] = '2000-01-01T00:00:00Z'
     rec['sig'] = sig_of(rec['sha256'], rec['target'], rec['exercise'], rec['exp'])
     json.dump(rec, open(side(p), 'w'), indent=1)

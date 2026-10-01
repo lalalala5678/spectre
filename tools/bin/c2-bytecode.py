@@ -31,7 +31,7 @@ def gate():
     # CS37-F2/F3: 收敛 _common 单源门——此前本地副本不查 exercise(SKILL
     # 三必填契约分叉)且坏 JSON 裸栈 rc=1(单源门干净 75)。
     if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr); sys.exit(76)
     return scope_gate_full()
 
 def yara_hits(path, rules_dir):

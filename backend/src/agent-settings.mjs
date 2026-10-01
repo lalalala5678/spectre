@@ -718,8 +718,8 @@ export function isSecretLeaf(srcId, leaf) {
 
 export function hasSourceCredential(cfg, srcId) {
   if (!cfg) return false;
-  if (cfg.key || cfg.token || cfg.secret || cfg.password) return true;
-  return srcId === 'smtp' && Boolean(cfg.user);
+  // CS39-3: 词源接 isSecretLeaf 单源(此前平行枚举, 注释却自称共用)。
+  return Object.entries(cfg).some(([k, v]) => v && isSecretLeaf(srcId, k));
 }
 
 /** R32D44-llm: 某 agent 的生效 LLM 配置=默认之上按字段覆盖。 */

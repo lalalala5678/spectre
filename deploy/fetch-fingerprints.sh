@@ -1,5 +1,5 @@
 #!/bin/bash
-# R32D55-N1: 指纹库供给(nt-technologies + plugins-0x727, 共 ~45MB 不入 git)。
+# R32D55-N1: 指纹库供给(nt-technologies + plugins-0x727, 共 ~20MB 实测不入 git)。
 # 目标: $SPECTRE_DATA_DIR/tools/fingerprints/; 失败汇总非零退出。
 ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
 DEST=${FP_DIR:-$ROOT/tools/fingerprints}
