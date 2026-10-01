@@ -16,7 +16,7 @@
 
 
 import sys, base64, hashlib, json, os, re, subprocess, time  # CS29/F-B: 恢复全活集(sys 起头族例)-F2 恢复全活集
-from _common import _data_root
+from _common import _edusrc_hit, _data_root
 
 
 _C2 = os.path.join(_data_root(), 'c2')
@@ -32,11 +32,10 @@ def gate():
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
         print('SCOPE-REJECT: empty targets or out of window'); sys.exit(75)
-    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发——getcwd 启发式
-    # 会误伤正常使用(目录名碰巧含 edusrc 即拒), 废除。
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    if ev.lower() in ('1', 'true', 'yes') or 'edusrc' in ev.lower():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力'); sys.exit(76)
+    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发(getcwd 启发式废除)。
+    # CS34-F7/F12: 谓词收口 _common._edusrc_hit; 文案统一 C2 族全式。
+    if _edusrc_hit():
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
     return sc
 
 def audit(action, note):

@@ -5,7 +5,7 @@
   phish-track.py report              # 同上, --db 可覆盖
 追踪点: /open.gif (打开) / /click/<uid> (点击) / /submit (凭据提交)
 """
-import sys, os, json, time, hashlib, base64, re
+import os, json, time, hashlib, base64, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate

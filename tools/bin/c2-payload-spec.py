@@ -82,9 +82,8 @@ def gen(spec, src, out_dir, rounds):
     families = ','.join(spec['transform_families'])
     cmd = ['python3', ENGINE, 'gen', '--src', src, '--out', out_dir,
            '--rounds', str(rounds), '--families', families]
-    v = spec.get('validation', {})
-    if v.get('edusrc_block', True):
-        pass  # c2-variant 内置 EDUSRC 门
+    # spec 'validation.edusrc_block' 为纯文档位: EDUSRC 门由 c2-variant
+    # 引擎内置(_common.edusrc_gate, env-only), 此处无可执行动作(CS34-F13)。
     r = subprocess.run(cmd, capture_output=True, text=True)
     # BUG-2: 只回显尾 500 字符砍头,下游 json.loads 必炸——读磁盘 manifest 全文
     import os as _os

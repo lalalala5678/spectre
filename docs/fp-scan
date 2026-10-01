@@ -6,7 +6,7 @@
 #   --deep 层:  追加 nuclei 双指纹模板库(数量以 fetch-fingerprints 实际交付为准)
 #               (每资产请求数↑,仅对存疑/高价值资产使用)
 #   --max: whatweb 批量上限(默认 120,防慢)
-# 输出: TSV — asset | status | title | server | apps(带版本) | fav | sources
+# 输出: TSV — asset | status | title | server | apps(带版本) | fav | source
 set -u
 # R32D54: -h/--help 契约(家族统一); R32D57-NEW8: 先于 env-warn。
 if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,12p' "$0"; exit 0; fi
@@ -159,8 +159,6 @@ for _l4f in ('.l4.json', '.l4b.json'):
         # 三级回退匹配: 精确 → 剥 scheme → 裸 host 前缀
         raw = str(d.get('host', ''))
         a = norm(raw)
-        if a not in seen_now and not raw:
-            pass
         tid = d.get('template-id') or d.get('info', {}).get('name', '?')
         target = None
         if a in seen_now:

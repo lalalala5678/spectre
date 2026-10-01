@@ -9,9 +9,7 @@
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync } from 'node:fs';
-import { createRequire } from 'node:module';
-const require = createRequire(import.meta.url);
+import { readFileSync, existsSync, readdirSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -180,16 +178,16 @@ test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移�
   }
 });
 
-// CS33-6 机锁: 四共享函数唯一定义点=_common.py(docs+bin 双侧)。
+// CS33-6 机锁(CS34-F3 补漏): 六共享函数唯一定义点=_common.py(docs+bin
+// 双侧)。edusrc_gate\w* 覆盖 edusrc_gate 与 edusrc_gate_phish。
 // 任何工具内重新落盘 def 即红——防函数级复制回归。
-test('共享函数唯一定义点: _data_root/scope_gate_full/edusrc_gate*/sha256f 仅 _common.py', () => {
-  const { readdirSync } = require('node:fs');
+test('共享函数唯一定义点: _data_root/scope_gate_full/_edusrc_hit/edusrc_gate*/sha256f 仅 _common.py', () => {
   const offenders = [];
   for (const dir of ['docs', 'tools/bin']) {
     for (const f of readdirSync(join(ROOT, dir))) {
       if (!f.endsWith('.py') || f === '_common.py') continue;
       const src = readFileSync(join(ROOT, dir, f), 'utf8');
-      if (/^def (_data_root|scope_gate_full|edusrc_gate|sha256f)\(/m.test(src)) offenders.push(`${dir}/${f}`);
+      if (/^def (_data_root|scope_gate_full|_edusrc_hit|edusrc_gate\w*|sha256f)\(/m.test(src)) offenders.push(`${dir}/${f}`);
     }
   }
   assert.deepEqual(offenders, [], `共享函数私有复制: ${offenders.join(', ')}——应 from _common import`);

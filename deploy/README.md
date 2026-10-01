@@ -66,7 +66,7 @@ sudo cp deploy/systemd/spectre-*.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtime spectre-console
 
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
-# 四脚本统一数据根(不要设默认值兜底——留空让脚本守卫拦截生产误写;
+# 五脚本统一数据根(不要设默认值兜底——留空让脚本守卫拦截生产误写;
 # 真要装生产才显式 export SPECTRE_DATA_DIR=/var/lib/spectre)
 export SPECTRE_DATA_DIR=/tmp/spectre-data   # 与步骤 1/3 同根(runtime 挂载/网关会话/技能播种读同一棵树)
 bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据根(先行: 交付容器内引导)
@@ -80,7 +80,7 @@ docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
   || { echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2; exit 1; }
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
 bash deploy/fetch-fingerprints.sh   # 指纹库 nt-technologies+plugins-0x727(FingerprintHub, ~45MB, R32D55-N1 供给面; 生产守卫同族)
-bash deploy/fetch-wordlists.sh      # 爆破字典 seclists+rockyou+jwt_tool(~250MB, R32D57-NEW6; /opt/tools 共享层)
+bash deploy/fetch-wordlists.sh      # 爆破字典 seclists+rockyou+jwt_tool(~260MB, R32D57-NEW6; 落 $SPECTRE_DATA_DIR/tools, 容器内挂载为 /opt/tools)
 SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 三变量与 runtime 同源
 
 # 7) 数据源凭据

@@ -14,7 +14,7 @@
   struct 垃圾注释(java/js 块;php/ps 行尾)
 功能核守卫:标记+php -l;EDUSRC:exit 76。
 """
-import sys, os, json, hashlib, base64, random, string, uuid, re, subprocess, tempfile, glob, secrets
+import sys, os, json, base64, random, string, uuid, re, subprocess, tempfile, glob, secrets
 from _common import _data_root, edusrc_gate, sha256f
 
 

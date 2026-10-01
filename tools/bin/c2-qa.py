@@ -8,8 +8,8 @@ THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)�
 输出:JSON 结果矩阵;run 模式联动 c2-variant 迭代(全过=交付包)。
 授权门:读数据根 c2/scope.json(_data_root() 双运行位),targets 空/出窗=拒绝运行。
 """
-import sys, os, json, subprocess, hashlib, time, glob
-from _common import _data_root, sha256f
+import sys, os, json, subprocess, time, glob
+from _common import _edusrc_hit, _data_root, sha256f
 
 
 SCOPE = os.path.join(_data_root(), 'c2/scope.json')
@@ -19,9 +19,8 @@ def gate(payload=''):
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file'); sys.exit(75)
     # EDUSRC 硬隔离(工具层)——R32D58 用户裁定: 仅显式 env 旗标触发,
-    # cwd/载荷路径启发式废除(误伤正常使用)。
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    if ev.lower() in ('1', 'true', 'yes') or ('edusrc' in ev.lower()):
+    # cwd/载荷路径启发式废除(误伤正常使用)。CS34-F7: 谓词收口 _common。
+    if _edusrc_hit():
         audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
         sys.exit(76)

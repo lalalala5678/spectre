@@ -14,8 +14,8 @@
   ③ 容器执行级:RTHarness listener 模式注册+请求触发无 5xx/无未捕获异常
 授权门/EDUSRC 隔离与 c2-qa 同源。
 """
-import sys, os, json, subprocess, tempfile, time, hashlib, glob, re
-from _common import _data_root, sha256f
+import sys, os, json, subprocess, tempfile, time, glob, re
+from _common import _edusrc_hit, _data_root, sha256f
 
 
 _C2 = os.path.join(_data_root(), 'c2')
@@ -36,10 +36,9 @@ def gate():
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
         print('SCOPE-REJECT'); sys.exit(75)
-    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发(getcwd 启发式废除)。
-    ev = os.environ.get('SPECTRE_EDUSRC', '')
-    if ev.lower() in ('1', 'true', 'yes') or 'edusrc' in ev.lower():
-        print('EDUSRC-REJECT'); sys.exit(76)
+    # R32D58 用户裁定: 仅 env 旗标; CS34-F7/F12: 谓词收口+文案统一。
+    if _edusrc_hit():
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
     return sc
 
 def audit(action, note):

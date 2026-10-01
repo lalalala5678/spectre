@@ -1,21 +1,34 @@
 #!/bin/bash
 # fetch-wordlists — 爆破字典与 jwt_tool 供给(R32D57-NEW6: 技能引用
-# /opt/tools/{seclists,wordlists,jwt_tool} 此前零供给面)。
-# 产物 ~250MB 不入 git; 落 /opt/tools(CLI 共享层, 全员可用)。
+# seclists/rockyou/jwt_tool 此前零供给面)。
+# 产物 ~260MB 不入 git; 落 ${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools
+# (容器内经 bind 挂载解析为 /opt/tools——与技能消费路径同一模型,
+# CS34-F2b: 此前硬编码宿主 /opt/tools 绕过数据根双运行位制式)。
 # 幂等: 分段 .done 标记——半量交付重跑只补缺段。
 set -euo pipefail
 
-TOOLS=/opt/tools
+TOOLS="${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools"
+# 生产路径守卫族(同 tools-sync 等; realpath 归一尾斜杠变体)
+TOOLS_N=$(realpath -m "$TOOLS")
+if [ "$TOOLS_N" = "/var/lib/spectre/tools" ]; then
+  if [ "${SPECTRE_ALLOW_DEFAULT_DATA:-0}" != "1" ]; then
+    echo "[fetch-wordlists] 拒绝: 目标为生产缺省路径 $TOOLS(解析为 $TOOLS_N)——设 SPECTRE_DATA_DIR=<隔离目录> 或显式 SPECTRE_ALLOW_DEFAULT_DATA=1" >&2
+    exit 1
+  fi
+  echo "[fetch-wordlists] 警告: SPECTRE_ALLOW_DEFAULT_DATA=1 —— 写入生产路径 $TOOLS_N" >&2
+fi
 ANY_FAILED=0
 
-# seclists: 稀疏克隆只取技能实际引用的目录(cone 模式只认目录——
+# seclists: 稀疏克隆只取技能/平台实际引用的目录(cone 模式只认目录——
 # 文件路径会使整组 pattern 失效, R32D57 实测踩坑)。
+# CS34-F2a: 消费面含 Discovery/Web-Content+DNS(agent-settings/
+# dir-brute/pi 提示词), 此前稀疏集缺这两目录。
 if [ ! -f "$TOOLS/seclists/.done" ]; then
   SL_FAILED=0
   TMP=$(mktemp -d)
   if git clone --depth 1 --filter=blob:none --sparse \
       https://github.com/danielmiessler/SecLists "$TMP/sl" 2>"$TMP/err"; then
-    (cd "$TMP/sl" && git sparse-checkout set Usernames Discovery/SNMP)
+    (cd "$TMP/sl" && git sparse-checkout set Usernames Discovery/SNMP Discovery/Web-Content Discovery/DNS)
     mkdir -p "$TOOLS/seclists"
     cp -r "$TMP/sl/Usernames" "$TMP/sl/Discovery" "$TOOLS/seclists/" 2>/dev/null || SL_FAILED=1
     [ "$SL_FAILED" = "0" ] && touch "$TOOLS/seclists/.done"
@@ -42,17 +55,21 @@ if [ ! -f "$TOOLS/wordlists/.rockyou-done" ]; then
   [ "$RK_FAILED" = "1" ] && ANY_FAILED=1
 fi
 
-# jwt_tool: web-login-brute 引用(/opt/tools/jwt_tool/jwt_tool.py)
+# jwt_tool: web-login-brute 引用(jwt_tool/jwt_tool.py)
 if [ ! -f "$TOOLS/jwt_tool/.done" ]; then
   JT_FAILED=0
   TMP=$(mktemp -d)
   if git clone --depth 1 https://github.com/ticarpi/jwt_tool "$TMP/jwt" 2>"$TMP/err2"; then
     mkdir -p "$TOOLS/jwt_tool"
     cp -r "$TMP/jwt/." "$TOOLS/jwt_tool/" 2>/dev/null || JT_FAILED=1
-    # 依赖入共享 py 层——失败仅 warn(部分模式缺 pycryptodome 才受限)
+    # 依赖入共享 py 层——失败仅 warn(部分模式缺 pycryptodome 才受限)。
+    # CS34-F2c: 目标基镜像 debian:bookworm(PEP 668)须
+    # --break-system-packages(照 bootstrap-sandbox.sh 先例)。
     if [ -f "$TOOLS/jwt_tool/requirements.txt" ]; then
-      pip install --target "$TOOLS/py" -q -r "$TOOLS/jwt_tool/requirements.txt" 2>/dev/null \
-        || echo "[fetch-wordlists][warn] jwt_tool 依赖装失败(pypi 不可达?)——缺库模式自装" >&2
+      pip install --target "$TOOLS/py" -q --break-system-packages \
+        -r "$TOOLS/jwt_tool/requirements.txt" 2>/dev/null \
+        || pip install --target "$TOOLS/py" -q -r "$TOOLS/jwt_tool/requirements.txt" 2>/dev/null \
+        || echo "[fetch-wordlists][warn] jwt_tool 依赖装失败(网络?)——缺库模式自装" >&2
     fi
     [ "$JT_FAILED" = "0" ] && touch "$TOOLS/jwt_tool/.done"
   else
@@ -67,4 +84,4 @@ if [ "$ANY_FAILED" = "1" ]; then
   echo "[fetch-wordlists] ✗ 部分供给失败——已保留成功段, 重跑补齐" >&2
   exit 1
 fi
-echo "[fetch-wordlists] 完成: seclists(Usernames+Discovery/SNMP) + wordlists/rockyou.txt + jwt_tool"
+echo "[fetch-wordlists] 完成: $TOOLS_N/seclists(Usernames+Discovery/{SNMP,Web-Content,DNS}) + wordlists/rockyou.txt + jwt_tool(容器内经挂载即 /opt/tools/...)"

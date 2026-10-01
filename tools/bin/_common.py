@@ -1,8 +1,9 @@
-"""_common — 工具层共享函数单源(CS33-6: 此前 _data_root×13 文件/
-scope_gate_full×6/edusrc_gate×5/sha256f×5 函数级复制, 违反仓库
-≥20 行重复硬线)。同目录 sibling import——工具按
-`python3 <dataroot>/tools/bin/<tool>.py` 运行时 sys.path[0] 即本目录。
-docs/_common.py 为权威孪生; tools-sync 整目录交付自动携带。"""
+"""_common — 工具层共享函数单源(CS33-6)。此前函数级复制(按逻辑工具
+数, 孪生对计 1): _data_root×13 / scope_gate_full×3 / edusrc_gate×5
+(含 phish 变体) / sha256f×3, 违反仓库 ≥20 行重复硬线。同目录 sibling
+import——工具按 `python3 <dataroot>/tools/bin/<tool>.py` 运行时
+sys.path[0] 即本目录。docs/_common.py 为权威孪生; tools-sync 整目录
+交付自动携带。"""
 import os, sys, json, time, hashlib
 
 
@@ -18,13 +19,17 @@ def _data_root():
     env = os.environ.get('SPECTRE_DATA_DIR', '')
     if env:
         return os.path.join(env, 'tools')
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    # CS34-F11: 家族契约"-h 永先"——求助时帮助不该被 env 警告前置,
+    # 单源静默(py 工具模块级常量在 import 期即触发本函数)。
+    if not any(a in ('-h', '--help') for a in sys.argv[1:]):
+        print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+              '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
     return '/var/lib/spectre/tools'
 
 
 def scope_gate_full():
-    """完整授权门(同 c2-qa): targets+window 双校验,exit 75"""
+    """完整授权门: targets+window 双校验, exit 75。与 c2-qa.gate 的
+    差异: 后者另强制 sc.exercise 必填(CS8-P2-2)——勿再写'同 c2-qa'。"""
     SCOPE = os.path.join(_data_root(), 'c2/scope.json')
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)

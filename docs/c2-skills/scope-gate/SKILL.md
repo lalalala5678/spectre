@@ -27,7 +27,7 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 | 检查 | 工具/位置 | 违规行为 |
 |---|---|---|
 | scope 空/出窗 | c2-qa.py gate() / c2-variant.py gen / c2-basetype.py gate() | exit 75 拒绝 |
-| EDUSRC 硬隔离 | 同上三处 + functest 不涉及 | 环境旗标 `SPECTRE_EDUSRC=1|true|yes` 或 cwd/载荷路径含 `edusrc` → **exit 76** 拒+审计 |
+| EDUSRC 硬隔离 | 同上三处 + functest 不涉及 | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
 | 目标不在清单 | c2-bind.py bind | exit 70 |
 | 审计 | /opt/tools/c2/audit.log | 每轮扫描/绑定/生成/拒绝全落行 |
 
@@ -47,6 +47,7 @@ c2-qa 交付路径已自动 bind+verify;任何下游 agent 拿到交付件先 `v
 不做"为续期改 scope"的动作——窗口变更走编排器侧重新授权,会话不得自改 scope.json。
 
 ## EDUSRC 判定细节
-- 旗标:SPECTRE_EDUSRC∈{1,true,yes}(大小写不敏感)
-- 路径:cwd、--src/--out、--payload 任一含 "edusrc"(大小写不敏感)
-- 拒绝时审计行 action=EDUSRC;**教育 SRC 工作区连 benchmark/本地面杀也不做**(硬纪律,无豁免口)
+- 旗标:SPECTRE_EDUSRC∈{1,true,yes}, 或值含 "edusrc"(大小写不敏感)——**唯一触发条件**
+- 路径/cwd 启发式已废除(R32D58 用户裁定: 目录名碰巧含 edusrc 不影响任何工具正常使用)
+- 审计留痕仅 c2-qa gate(action=EDUSRC); variant/basetype/bytecode 拒绝不落审计行
+- **教育 SRC 工作区连 benchmark/本地面杀也不做**(硬纪律,无豁免口)
