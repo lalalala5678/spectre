@@ -16,14 +16,15 @@ SCOPE = os.path.join(_data_root(), 'c2/scope.json')
 AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS8-P1-2 统一制式
 
 def gate(payload=''):
-    if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT: no scope file'); sys.exit(75)
     # EDUSRC 硬隔离(工具层)——R32D58 用户裁定: 仅显式 env 旗标触发,
     # cwd/载荷路径启发式废除(误伤正常使用)。CS34-F7: 谓词收口 _common。
+    # R32D58-F5: 门序族统一=edusrc 先(phish 族同制, 同态退出码不分叉)。
     if _edusrc_hit():
         audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)')
         sys.exit(76)
+    if not os.path.exists(SCOPE):
+        print('SCOPE-REJECT: no scope file'); sys.exit(75)
     sc = json.load(open(SCOPE))
     t = time.time()
     try:

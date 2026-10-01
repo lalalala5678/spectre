@@ -447,6 +447,14 @@ const compactWal = () => wal.compact([
   { t: 'spawn', d: getSpawnSettings() },  // F68: compact 白名单补 spawn
 ]);
 compactWal();
+// R32D58-F1(P0) 兜底: 任何漏网异步异常打日志而非杀进程——核心资产是
+// 自身存活率; F1 主修(URL 解析守卫)之外的最后防线。
+process.on('unhandledRejection', (reason, origin) => {
+  console.error(`[runtime] unhandledRejection(${origin}):`, reason);
+});
+process.on('uncaughtException', err => {
+  console.error('[runtime] uncaughtException:', err);
+});
 process.on('SIGTERM', () => {
   // R27-F2: WAL 关闭必须后于连接排空——此前先 close 再等 server, 排空
   // 窗口(≤1.5s)内完成的消息 safeWalAppend 吞异常后永久丢(已流给 SSE
@@ -460,7 +468,17 @@ process.on('SIGTERM', () => {
 const route = createRouter({ store, bus, caps, wal });
 
 const server = http.createServer(async (req, res) => {
-  const url = new URL(req.url, 'http://localhost');
+  // R32D58-F1(P0): new URL 对含字面 ESC 等控制字符的路径抛 ERR_INVALID_URL
+  // ——此前在 try 外, 单个可打印请求即可 unhandledRejection 击杀整个
+  // runtime(0x727 OSC-8 模板可自然触发)。解析失败回 400, 进程存活。
+  let url;
+  try {
+    url = new URL(req.url, 'http://localhost');
+  } catch {
+    res.writeHead(400, { 'Content-Type': 'application/json; charset=utf-8' });
+    res.end(JSON.stringify({ error: `bad request url: ${JSON.stringify(req.url)}` }));
+    return;
+  }
   try {
     await route(req, res, url);
   } catch (err) {

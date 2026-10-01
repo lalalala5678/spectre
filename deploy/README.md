@@ -8,7 +8,7 @@
 |---|---|
 | Node | ≥ 22（engines 下限; ≥22.19 依赖链零 EBADENGINE 警告） |
 | Python | ≥ 3.7（网关零第三方依赖，纯 stdlib） |
-| Docker | 沙箱 driver 需要(启动即 bootstrap 基础包)——**装了 Docker 的机器上 runtime 启动即自动建沙箱容器+挂载, 并 bootstrap 基础包(nodejs/python3/git/build-essential 等, 数分钟+数百 MB); 重型引擎(ClamAV/JDK/面杀)需手动执行 bootstrap-sandbox.sh(脚本有宿主守卫: 非 Docker 环境 direct 跑会被拒——裸机部署显式 `SPECTRE_ALLOW_HOST_BOOTSTRAP=1`)**; 设 `SPECTRE_SANDBOX_DRIVER=local` 可免 Docker 冒烟——注意宿主副作用: bootstrap 会在宿主 apt 安装基础包(nodejs/python3/build-essential 等), 配置文件只写数据目录(不碰 ~/.npmrc/pip.conf) |
+| Docker | 沙箱 driver 需要(启动即 bootstrap 基础包)——**装了 Docker 的机器上 runtime 启动即自动建沙箱容器+挂载, 并 bootstrap 基础包(nodejs/python3/git/build-essential 等, 数分钟+数百 MB); 重型引擎(ClamAV/JDK/面杀)需手动执行 bootstrap-sandbox.sh(脚本有宿主守卫: 非 Docker 环境 direct 跑会被拒——裸机部署显式 `SPECTRE_ALLOW_HOST_BOOTSTRAP=1`)**; 无 Docker 时 runtime 自动回退 local 驱动; 显式 `SPECTRE_SANDBOX_DRIVER=local` 可免 Docker 冒烟——宿主 apt 副须显式 `SPECTRE_ALLOW_HOST_BOOTSTRAP=1`(R32D58-F2: 此前静默宿主 apt, 现缺省跳过并留横幅); 配置文件只写数据目录(不碰 ~/.npmrc/pip.conf) |
 
 > Node 22.x（<22.19）安装时 npm 会打出一墙 `EBADENGINE` 警告（@earendil-works/* 依赖链声明 22.19）——实测 22.14 安装与运行均正常，该警告可忽略。
 

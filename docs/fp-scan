@@ -46,7 +46,7 @@ for eng in httpx whatweb; do
 done
 
 # F28: 清理陈旧临时文件——此前残留的 l1/l2/l4 会被下一会话当新鲜结果合并(跨会话污染)
-rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.l4b.json ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
+rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.l4b.json ${FPTMP}.l4.log ${FPTMP}.l4b.log ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
 if [ -n "$LIST" ]; then cp "$LIST" ${FPTMP}.in; else cat > ${FPTMP}.in; fi
 [ -s ${FPTMP}.in ] || { echo "fp-scan: empty input" >&2; exit 2; }
 # R32D57-NEW11: 纯空白行不算输入(-s 只查字节非空)。
@@ -98,10 +98,14 @@ if [ "$DEEP" = "1" ]; then
   # NEW4: stdout 静音(此前原始 JSON 刷屏 1.3MB/2 发现)。
   nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" \
     -severity info,low,medium,high,critical -tags tech,fingerprint,panel \
-    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >/dev/null 2>&1 || true
+    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >${FPTMP}.l4.log 2>&1 || true
   nuclei -l ${FPTMP}.in -t "$NT_DIR/plugins-0x727" \
     -severity info,low,medium,high,critical \
-    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >/dev/null 2>&1 || true
+    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >${FPTMP}.l4b.log 2>&1 || true
+  # R32D58-F7: nuclei 对 6s 超时目标标 unresponsive permanently 并静默
+  # 清零——此后层产出为空时给一行 warn(日志落盘不刷屏, NEW4 制式保留)。
+  UNRESP=$(grep -c 'unresponsive' ${FPTMP}.l4.log ${FPTMP}.l4b.log 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
+  [ "$UNRESP" -gt 0 ] && echo "[fp-scan][warn] nuclei 标记 $UNRESP 条 unresponsive(超时目标被清零, 详见 nuclei 输出; 可提高 --timeout 或分批)" >&2
 fi
 
 FPTMP="$FPTMP" python3 - <<'PYEOF'  # CS31-P0: FPTMP 走环境变量(引号 heredoc 内 ${} 不展开)

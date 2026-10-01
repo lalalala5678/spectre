@@ -225,7 +225,12 @@ function bootstrapScript() {
     'set -e',
     'export DEBIAN_FRONTEND=noninteractive',
     `mkdir -p ${base}/bin ${base}/npm-global ${uploads}`,
-    'if command -v apt-get >/dev/null 2>&1; then '
+    // R32D58-F2(P1): local 驱动=宿主执行, apt 变异宿机须显式 opt-in
+    // (SPECTRE_ALLOW_HOST_BOOTSTRAP=1, 镜像 bootstrap-sandbox.sh 先例)——
+    // 此前无 Docker 机器静默回退 local 即在宿主跑全套 apt。
+    'if [ "${SPECTRE_ALLOW_HOST_BOOTSTRAP:-0}" != "1" ]; then '
+    + 'echo "[sandbox][local] 跳过宿主 apt(装基础包须显式 SPECTRE_ALLOW_HOST_BOOTSTRAP=1)" >&2; '
+    + 'elif command -v apt-get >/dev/null 2>&1; then '
     + 'apt-get update -qq && apt install -y -qq '
     + 'nodejs npm python3 python3-pip git curl unzip build-essential jq >/dev/null || exit 100; fi',
     ...cfgFiles,

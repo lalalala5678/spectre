@@ -357,6 +357,10 @@ FAM_FN = {'id': fam_id, 'enc': fam_enc, 'code': fam_code, 'struct': fam_struct}
 
 def cmd_gen(args):
     a = dict(zip(args[::2], args[1::2]))
+    # R32D58-F3: 必填参缺失干净 usage rc=2(此前 KeyError 裸栈 rc=1)。
+    if '--src' not in a or '--out' not in a:
+        print('用法: c2-variant.py gen --src <payload> --out <dir> [--rounds N] [--families ...]', file=sys.stderr)
+        return 2
     global RULE_DIR
     if a.get('--rules'):
         RULE_DIR = a['--rules']

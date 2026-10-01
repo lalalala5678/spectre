@@ -17,7 +17,6 @@
 import sys, os, json, subprocess, tempfile, time, glob, re
 from _common import _edusrc_hit, _data_root, sha256f
 
-
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
 AUDIT = os.path.join(_C2, 'audit.log')
@@ -30,21 +29,23 @@ DEFAULT_RULES = os.path.join(_C2, 'yara-rules')
 JMG_DIR = os.path.join(_C2, 'basetypes-jmg')
 
 def gate():
+    # R32D58 用户裁定: EDUSRC 门仅显式 env 旗标触发(getcwd 启发式废除)。
+    # CS34-F7/F12: 谓词收口 _common._edusrc_hit; 文案统一 C2 族全式。
+    # R32D58-F5: 门序族统一=edusrc 先(phish 族同制)。
+    if _edusrc_hit():
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT'); sys.exit(75)
     sc = json.load(open(SCOPE))
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
         print('SCOPE-REJECT'); sys.exit(75)
-    # R32D58 用户裁定: 仅 env 旗标; CS34-F7/F12: 谓词收口+文案统一。
-    if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)'); sys.exit(76)
+
     return sc
 
 def audit(action, note):
     with open(AUDIT, 'a') as f:
         f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\tBYTECODE\t{action}\t{note}\n')
-
 
 def yara_hits(path, rules_dir):
     """[(string, offset)] 所有规则文件的命中串。CS32-F3: 缺 yara 返回
@@ -155,7 +156,6 @@ def cmd_split(args):
     print(json.dumps(rec, ensure_ascii=False))
     return 0
 
-
 def _rt_cp():
     """RTHarness 运行时 classpath 单源(CS26-1: 此前两处孪生串, AN 的
     count=1 替换只落一处留下 P0 丢冒号粘连)。"""
@@ -205,7 +205,7 @@ def cmd_selftest(args):
     sc = gate()
     # R32D57-NEW7: 空套件=假绿封堵(0 fail 但什么都没测)。
     if not glob.glob(JMG_DIR + '/*.class'):
-        print(f'SELFTEST ERROR: 基型目录零 .class({JMG_DIR})——fetch-jars 应已交付 jMG 产物', file=sys.stderr)
+        print(f'SELFTEST ERROR: 基型目录零 .class({JMG_DIR})——先 c2-basetype gen --engine jmg 生成基型(需 java+fetch-jars 桩)', file=sys.stderr)
         return 1
     # R32D57-NEW7: yara 缺失→split 全 SKIP(无 manifest)会被误计 FAIL——前置引擎门。
     import shutil
