@@ -8,7 +8,17 @@
   spectre-nuclei list --templates /path/to/nuclei-templates/ --search weblogic
 """
 import sys, os, json, re, argparse, time
-import yaml
+# R32D54: yaml 装在共享层 /opt/tools/py(pip target 重定向)——容器位在
+# PATH, 宿主位需补 sys.path 才可 import。
+try:
+    import yaml
+except ImportError:
+    _p = '/opt/tools/py'
+    if os.path.isdir(_p):
+        sys.path.insert(0, _p)
+        import yaml
+    else:
+        raise SystemExit('spectre-nuclei 需要 PyYAML——容器位内置; 宿主位 PYTHONPATH=/opt/tools/py 或 pip install pyyaml')
 import urllib.request, urllib.error
 import ssl
 

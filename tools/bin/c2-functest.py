@@ -88,6 +88,11 @@ def node_check(p):
     return True, 'js runtime OK echo; ProgIDs=' + (progids.group(1) if progids else '?')
 
 def pwsh_check(p):
+    # R32D54: pwsh 无供给路径(bootstrap 不装)——此前 FileNotFoundError
+    # 裸栈。降级为干净 SKIP 说明(语法层已过; 运行层须自装 pwsh)。
+    import shutil
+    if not shutil.which('pwsh'):
+        return True, 'ps runtime SKIP: pwsh 未安装(容器外自装: apt/powershell 官方源; 语法层已过)'
     r = subprocess.run(['pwsh', '-NoProfile', '-File', p], capture_output=True, text=True, timeout=30)
     if 'SPECTRE-MARK' not in r.stdout:
         return False, f'ps runtime: stdout 无标记 (rc={r.returncode}, out={r.stdout.strip()[:60]!r})'

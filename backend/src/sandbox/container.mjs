@@ -227,7 +227,7 @@ function bootstrapScript() {
     `mkdir -p ${base}/bin ${base}/npm-global ${uploads}`,
     'if command -v apt-get >/dev/null 2>&1; then '
     + 'apt-get update -qq && apt install -y -qq '
-    + 'nodejs npm python3 python3-pip git curl unzip build-essential jq >/dev/null; fi',
+    + 'nodejs npm python3 python3-pip git curl unzip build-essential jq >/dev/null || exit 100; fi',
     ...cfgFiles,
     `date -Iseconds > ${base}/.bootstrapped`,
   ].join('\n');
