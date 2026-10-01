@@ -487,7 +487,7 @@ def cmd_selftest(args):
     # CS41-A2: 横幅归因与逐项同过滤(仅当确有 .java 车道 fail——此前
     # 纯 php fail 也被归因 java, 误导非回归判断)。
     java_fail = any(e[0].endswith('.java') and e[1].startswith('ft=') and e[1] != 'ft=0' for e in per_file_fail)
-    print(f'SELFTEST SUMMARY: {fails} fail' + ('  [java 车道受引擎缺失影响——ft=1 项非回归]' if java_missing and java_fail else ''))
+    print(f'SELFTEST SUMMARY: {fails} fail' + ('  [java 车道受引擎缺失影响——ft≠0 项非回归]' if java_missing and java_fail else ''))
     return 1 if fails else 0
 
 def cmd_fingerprint(args):

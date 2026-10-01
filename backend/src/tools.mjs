@@ -441,7 +441,7 @@ export function buildIntelTools(record, caps) {
         const raw = m.text || '(无文本)';
         const who = m.role === 'user' ? '用户' : m.role === 'toolResult' ? '工具结果' : '智能体';
         return raw.length > 300
-          ? `${who}: ${raw.slice(0, 300)} [已截断:原文 ${raw.length} 字符——API GET /api/sessions/:id 取全文]`
+          ? `${who}: ${raw.slice(0, 300)} [已截断:原文 ${raw.length} 字符,API GET /api/sessions/:id 取全文]`
           : `${who}: ${raw}`;
       });
       return { content: [{ type: 'text',

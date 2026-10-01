@@ -323,7 +323,7 @@ export function settingsSchema() {
         // 此前是全平台唯一不经面板的 key 面(消费方 tooling.mjs PROVIDERS)。
         { id: 'webSearch.provider', label: '通用 Web 搜索 Provider', type: 'select',
           options: ['none', 'zhipu', 'brave', 'tavily', 'searxng'], default: 'none',
-          hint: '全员 search_web 兜底通道;none=仅垂直通道(MCP registry/GitHub/npm/pip,零 key)且回执如实声明' },
+          hint: '全员 search_web 兜底通道;none=仅垂直通道(MCP registry/GitHub/npm,零 key)且回执如实声明' },  // CS43-N1: pip 通道已删同步
         { id: 'webSearch.apiKey', label: '搜索 API Key', type: 'password',
           hint: 'zhipu(智谱 web_search)/brave/tavily 需要;searxng 自建免 key' },
         { id: 'webSearch.baseUrl', label: 'SearXNG 地址', type: 'text',
