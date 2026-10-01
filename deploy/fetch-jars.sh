@@ -23,10 +23,32 @@ LIBS=${LIBS_DIR:-$ROOT/tools/c2/libs}
 GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
 mkdir -p "$LIBS" "$GEN"
 FAILED=()
+# R32D59 观测项: sha256 清单——首跑落账, 重跑校验(防篡改/半下载静默
+# 留存; HTTP 200 不等于内容完整)。清单与 jar 同目录, 增量维护。
+MANIFEST="$LIBS/.sha256"
 fetch() { # fetch <目录> <完整URL> <文件名>
   local dir=$1 url=$2 name=$3
-  [ -f "$dir/$name" ] && return 0
+  if [ -f "$dir/$name" ]; then
+    # 在场即校验清单(有账才查; 无账=存量免验)
+    if [ -f "$MANIFEST" ] && grep -q "  $name$" "$MANIFEST"; then
+      want=$(grep "  $name$" "$MANIFEST" | awk '{print $1}')
+      got=$(sha256sum "$dir/$name" | awk '{print $1}')
+      if [ "$want" != "$got" ]; then
+        echo "  ✗ $name sha256 不符(清单 $want 实际 $got)——删除重取"; rm -f "$dir/$name"
+      fi
+    fi
+    [ -f "$dir/$name" ] && return 0
+  fi
   if curl -fsSL --retry 2 -o "$dir/$name" "$url"; then
+    got=$(sha256sum "$dir/$name" | awk '{print $1}')
+    if [ -f "$MANIFEST" ] && grep -q "  $name$" "$MANIFEST"; then
+      want=$(grep "  $name$" "$MANIFEST" | awk '{print $1}')
+      if [ "$want" != "$got" ]; then
+        echo "  ✗ $name 新下载 sha256 与清单不符($want≠$got)"; rm -f "$dir/$name"; FAILED+=("$name"); return 1
+      fi
+    else
+      mkdir -p "$LIBS"; echo "$got  $name" >> "$MANIFEST"
+    fi
     echo "  ✓ $name"
   else
     rm -f "$dir/$name"; echo "  ✗ $name ← $url"; FAILED+=("$name")

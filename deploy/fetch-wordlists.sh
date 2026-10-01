@@ -32,7 +32,7 @@ if [ "$(cat "$TOOLS/seclists/.done" 2>/dev/null)" != "$SPARSE_SET" ]; then
   TMP=$(mktemp -d)
   if git clone --depth 1 --filter=blob:none --sparse \
       https://github.com/danielmiessler/SecLists "$TMP/sl" 2>"$TMP/err"; then
-    (cd "$TMP/sl" && git sparse-checkout set Usernames Discovery/SNMP Discovery/Web-Content Discovery/DNS)
+    (cd "$TMP/sl" && git sparse-checkout set $SPARSE_SET)  # CS36-Z5: 集合单源(指纹同锚)
     mkdir -p "$TOOLS/seclists"
     cp -r "$TMP/sl/Usernames" "$TMP/sl/Discovery" "$TOOLS/seclists/" 2>/dev/null || SL_FAILED=1
     [ "$SL_FAILED" = "0" ] && printf '%s' "$SPARSE_SET" > "$TOOLS/seclists/.done"

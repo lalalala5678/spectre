@@ -12,7 +12,7 @@
   expire: exp 置为过去(立即自废)
 """
 import sys, os, json, hmac, hashlib, time, secrets
-from _common import _data_root
+from _common import audit_log, _data_root
 
 
 _C2 = os.path.join(_data_root(), 'c2')
@@ -26,10 +26,6 @@ def _key():
         os.chmod(KEYF, 0o600)
     return bytes.fromhex(open(KEYF).read().strip())
 
-def _audit(action, note):
-    with open(AUDIT, 'a') as f:
-        f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\tBIND\t{action}\t{note}\n')
-
 def sig_of(sha, target, exercise, exp, key=None):
     msg = f'{sha}|{target}|{exercise}|{exp}'.encode()
     return hmac.new(key or _key(), msg, hashlib.sha256).hexdigest()
@@ -39,8 +35,17 @@ def side(p):
 
 def cmd_bind(args):
     a = dict(zip(args[::2], args[1::2]))
+    # R32D59-N5: 缺参干净 usage rc=2; scope 缺/坏干净 75(此前裸栈 rc=1)。
+    if '--payload' not in a:
+        print('用法: c2-bind.py bind --payload <file> [--target t] [--days N]', file=sys.stderr)
+        return 2
     p = a['--payload']
-    sc = json.load(open(SCOPE))
+    try:
+        sc = json.load(open(SCOPE))
+    except FileNotFoundError:
+        print('SCOPE-REJECT: no scope file', file=sys.stderr); return 75
+    except Exception as e:
+        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); return 75
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')
     # CS30-F8: targets 语义与 SKILL/shells 对齐(精确|'*.domain' 通配——
     # 此前纯精确成员, 通配 scope 条目下具体主机结构性 BIND-REJECT 70)。
@@ -59,7 +64,7 @@ def cmd_bind(args):
     rec = {'sha256': sha, 'target': target, 'exercise': sc['exercise'], 'exp': exp,
            'sig': sig_of(sha, target, sc['exercise'], exp)}
     json.dump(rec, open(side(p), 'w'), indent=1)
-    _audit('bind', f'{os.path.basename(p)}\t{sha[:16]}\t{target}\texp={exp}')
+    audit_log(AUDIT, 'BIND', 'bind', '', f'{os.path.basename(p)}\t{sha[:16]}\t{target}\texp={exp}')
     print(f'BOUND {p} → target={target} exp={exp} sha={sha[:16]}')
     return 0
 
@@ -91,7 +96,7 @@ def cmd_expire(args):
     rec['exp'] = '2000-01-01T00:00:00Z'
     rec['sig'] = sig_of(rec['sha256'], rec['target'], rec['exercise'], rec['exp'])
     json.dump(rec, open(side(p), 'w'), indent=1)
-    _audit('expire', os.path.basename(p))
+    audit_log(AUDIT, 'BIND', 'expire', '', os.path.basename(p))
     print(f'EXPIRED (manual): {p}')
     return 0
 

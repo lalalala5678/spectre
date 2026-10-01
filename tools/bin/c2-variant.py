@@ -15,7 +15,7 @@
 功能核守卫:标记+php -l;EDUSRC:exit 76。
 """
 import sys, os, json, base64, random, string, uuid, re, subprocess, tempfile, glob, secrets
-from _common import _data_root, edusrc_gate, sha256f
+from _common import scope_gate_full, _data_root, edusrc_gate, sha256f
 
 
 FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
@@ -53,16 +53,6 @@ def rand_name(n=8, prefix='a'):
 def _rand_token(n, hexed=False):
     return secrets.token_hex((n + 1) // 2)[:n] if hexed else \
         ''.join(secrets.choice('abcdefghijklmnopqrstuvwxyz0123456789') for _ in range(n))
-
-def scope_gate():
-    """授权门(scope.json:targets 空/出窗=拒)——与 c2-qa 同源。"""
-    import time as _t, json as _j
-    sc = _j.load(open(os.path.join(_data_root(), 'c2/scope.json')))
-    now = _t.strftime('%Y-%m-%dT%H:%M:%SZ', _t.gmtime())
-    if not (sc.get('targets') and sc['window']['start'] <= now <= sc['window']['end']):
-        print('SCOPE-REJECT: empty targets or out of window')
-        sys.exit(75)
-
 
 def core_guard(body, ext):
     if 'SPECTRE-MARK' not in body:
@@ -364,8 +354,9 @@ def cmd_gen(args):
     global RULE_DIR
     if a.get('--rules'):
         RULE_DIR = a['--rules']
-    scope_gate()
+    # CS36-Z2: 门序族统一=edusrc 先; Z3: 换 _common 单源门(exercise 必填)
     edusrc_gate([a['--src'], a.get('--out', '')])
+    scope_gate_full()
     src = open(a['--src']).read()
     srcpath = a['--src']
     outdir = a.get('--out', '/tmp/c2-variants')
@@ -449,8 +440,8 @@ def cmd_selftest(args):
     if a.get('--rules'):
         RULE_DIR = a['--rules']
     bdir = a.get('--basetypes', os.path.join(_data_root(), 'c2/basetypes'))
-    scope_gate()
     edusrc_gate([bdir])
+    scope_gate_full()
     import shutil
     fails = 0
     for f in sorted(os.listdir(bdir)):

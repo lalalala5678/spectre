@@ -28,15 +28,16 @@ def _data_root():
 
 
 def scope_gate_full():
-    """完整授权门: targets+window 双校验, exit 75。与 c2-qa.gate 的
-    差异: 后者另强制 sc.exercise 必填(CS8-P2-2)——勿再写'同 c2-qa'。"""
+    """完整授权门: targets+exercise+window 三必填(SKILL 契约), exit 75。"""
     SCOPE = os.path.join(_data_root(), 'c2/scope.json')
     if not os.path.exists(SCOPE):
         print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
     try:
         sc = json.load(open(SCOPE))
         now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        ok = (sc.get('targets') and
+        # CS36-Z3: SKILL 三必填契约(targets/exercise/window)——exercise
+        # 此前仅 c2-qa 查, 单源门补齐族内一致。
+        ok = (sc.get('targets') and sc.get('exercise') and
               sc['window']['start'] and sc['window']['end'] and
               sc['window']['start'] <= now <= sc['window']['end'])
     except Exception:
@@ -72,3 +73,12 @@ def edusrc_gate_phish(paths=()):
 
 def sha256f(p):
     return hashlib.sha256(open(p, 'rb').read()).hexdigest()
+
+def audit_log(path, target, action, sha='', note=''):
+    """审计账本单源写者(CS36-Z4: 此前 qa 5 列/bind 4 列/basetype/
+    bytecode 名义 4 列实 6-7 字段/phish-send 3 列无时间戳——统一五列
+    ts\ttarget\taction\tsha\tnote)。"""
+    os.makedirs(os.path.dirname(path), exist_ok=True)
+    with open(path, 'a') as f:
+        f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\t'
+                f'{target}\t{action}\t{sha}\t{note}\n')

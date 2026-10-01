@@ -15,7 +15,7 @@
 授权门/EDUSRC 隔离与 c2-qa 同源。
 """
 import sys, os, json, subprocess, tempfile, time, glob, re
-from _common import _edusrc_hit, _data_root, sha256f
+from _common import audit_log, _edusrc_hit, _data_root, sha256f
 
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
@@ -42,10 +42,6 @@ def gate():
         print('SCOPE-REJECT'); sys.exit(75)
 
     return sc
-
-def audit(action, note):
-    with open(AUDIT, 'a') as f:
-        f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\tBYTECODE\t{action}\t{note}\n')
 
 def yara_hits(path, rules_dir):
     """[(string, offset)] 所有规则文件的命中串。CS32-F3: 缺 yara 返回
@@ -152,7 +148,7 @@ def cmd_split(args):
     mf = os.path.join(outdir, 'manifest.json')
     m = json.load(open(mf)) if os.path.exists(mf) else []
     m.append(rec); json.dump(m, open(mf, 'w'), indent=1)
-    audit('split', f'{os.path.basename(src)}\t{rec["sha256"][:16]}\t{len(hits)}->{len(resid)}')
+    audit_log(AUDIT, 'BYTECODE', 'split', '', f'{os.path.basename(src)}\t{rec["sha256"][:16]}\t{len(hits)}->{len(resid)}')
     print(json.dumps(rec, ensure_ascii=False))
     return 0
 

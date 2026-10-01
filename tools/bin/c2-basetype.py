@@ -15,7 +15,7 @@
 """
 
 import sys, base64, hashlib, json, os, re, subprocess, time  # CS29/F-B: 恢复全活集(sys 起头族例)-F2 恢复全活集
-from _common import _edusrc_hit, _data_root
+from _common import audit_log, _edusrc_hit, _data_root
 
 _C2 = os.path.join(_data_root(), 'c2')
 SCOPE = os.path.join(_C2, 'scope.json')
@@ -37,10 +37,6 @@ def gate():
         print('SCOPE-REJECT: empty targets or out of window'); sys.exit(75)
 
     return sc
-
-def audit(action, note):
-    with open(AUDIT, 'a') as f:
-        f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\tBASETYPE\t{action}\t{note}\n')
 
 def jmg_run(cmds):
     script = '\n'.join(cmds + ['exit']) + '\n'
@@ -98,7 +94,7 @@ def cmd_gen(args):
                'tool': a.get('--tool', 'Godzilla'), 'format': a.get('--format', 'BASE64'),
                'lane': 'real-lane(class-bytes)', 'info': info.strip().splitlines()[-3:]})
     json.dump(mf, open(mf_path, 'w'), indent=1)
-    audit('gen', f'{name}\t{sha[:16]}\treal-lane')
+    audit_log(AUDIT, 'BASETYPE', 'gen', sha[:16], f'{name}\treal-lane')
     print(f'GEN-OK: {cp} ({len(raw)} bytes, sha={sha[:16]}) → manifest 注册,车道=real-lane(class-bytes)')
     print('注意: real-lane 不适用文本 decomp;QA 需字节码变换族(未建)。')
     return 0

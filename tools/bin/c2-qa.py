@@ -9,11 +9,11 @@ THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)�
 授权门:读数据根 c2/scope.json(_data_root() 双运行位),targets 空/出窗=拒绝运行。
 """
 import sys, os, json, subprocess, time, glob
-from _common import _edusrc_hit, _data_root, sha256f
+from _common import audit_log, _edusrc_hit, _data_root, sha256f
 
 
 SCOPE = os.path.join(_data_root(), 'c2/scope.json')
-AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS8-P1-2 统一制式
+AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS36-Z4: 五列制式单源(_common.audit_log)
 
 def gate(payload=''):
     # EDUSRC 硬隔离(工具层)——R32D58 用户裁定: 仅显式 env 旗标触发,
@@ -43,9 +43,7 @@ def gate(payload=''):
     return sc
 
 def audit(target, action, sha, note=''):
-    os.makedirs(os.path.dirname(AUDIT), exist_ok=True)
-    with open(AUDIT, 'a') as f:
-        f.write(f'{time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}\t{target}\t{action}\t{sha}\t{note}\n')
+    audit_log(AUDIT, target, action, sha, note)  # CS36-Z4: 单源写者
 
 
 def eng_clamav(p):

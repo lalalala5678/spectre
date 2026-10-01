@@ -15,7 +15,7 @@ from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication
 from email.utils import formataddr, formatdate
 from pathlib import Path
-from _common import _data_root, edusrc_gate_phish as edusrc_gate
+from _common import audit_log, scope_gate_full, _data_root, edusrc_gate_phish as edusrc_gate
 for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):
     if _p not in sys.path:
         sys.path.insert(0, _p)
@@ -44,28 +44,11 @@ def load_smtp_default():
             continue
     return {}
 
-def load_scope():
-    try:
-        return json.load(open(os.path.join(_data_root(), 'c2/scope.json')))
-    except:
-        return None
-
 def gate():
+    # CS36-Z3: 收敛 _common 单源门(edusrc 先+三必填 scope), 删本地
+    # 劣化副本("同 c2-qa.py 语义" docstring 与缺文件/exercise 事实漂移)。
     edusrc_gate()
-    """完整授权门(F10 修复): targets+时间窗,同 c2-qa.py 语义"""
-    sc = load_scope()
-    import time as _t
-    try:
-        now = _t.strftime('%Y-%m-%dT%H:%M:%SZ', _t.gmtime())
-        ok = (sc and sc.get('targets') and
-              sc['window']['start'] and sc['window']['end'] and
-              sc['window']['start'] <= now <= sc['window']['end'])
-    except Exception:
-        ok = False
-    if not ok:
-        print('SCOPE-REJECT: empty targets or out of window', file=sys.stderr)
-        sys.exit(75)
-    return sc
+    return scope_gate_full()
 
 # ============================================================
 # 仿真度核心函数
@@ -439,9 +422,9 @@ def main():
     print(f'\n{sent} sent / {failed} failed / {len(targets)} total')
     if args.mode == 'send':
         # V5 修复: dryrun 也写审计日志(实测写了 PHISH-V2 ... 0/1)=审计污染,
-        # 只对真实发送落账
-        with open(os.path.join(_data_root(), 'c2/audit.log'), 'a') as f:
-            f.write(f'PHISH-V2\t{(args.subject or "")[:50]}\t{sent}/{len(targets)}\n')
+        # 只对真实发送落账(CS36-Z4: 五列单源制式, 补时间戳)
+        audit_log(os.path.join(_data_root(), 'c2/audit.log'), 'PHISH-V2', 'send',
+                  '', f'{(args.subject or "")[:50]}\t{sent}/{len(targets)}')
     return 0 if failed == 0 else 1
 
 if __name__ == '__main__':

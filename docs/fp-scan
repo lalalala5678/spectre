@@ -44,6 +44,10 @@ fi
 for eng in httpx whatweb; do
   command -v "$eng" >/dev/null 2>&1 || echo "[fp-scan][warn] 引擎 $eng 不在 PATH——对应层将跳过" >&2
 done
+# R32D59-N4: 预警环补 nuclei(--deep 时)
+if [ "$DEEP" = "1" ] && ! command -v nuclei >/dev/null 2>&1; then
+  echo "[fp-scan][warn] 引擎 nuclei 不在 PATH——deep 层(层4)将跳过" >&2
+fi
 
 # F28: 清理陈旧临时文件——此前残留的 l1/l2/l4 会被下一会话当新鲜结果合并(跨会话污染)
 rm -f ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt ${FPTMP}.l4.json ${FPTMP}.l4b.json ${FPTMP}.l4.log ${FPTMP}.l4b.log ${FPTMP}.out ${FPTMP}.in ${FPTMP}.ww
@@ -92,22 +96,25 @@ whatweb -q --no-errors --input-file ${FPTMP}.ww 2>/dev/null \
   > ${FPTMP}.l3.txt || true
 
 if [ "$DEEP" = "1" ]; then
+  command -v nuclei >/dev/null 2>&1 || { touch ${FPTMP}.l4.json ${FPTMP}.l4b.json ${FPTMP}.l4.log ${FPTMP}.l4b.log; }
   echo "[fp-scan] layer4(deep): nuclei fingerprint templates(以 fetch-fingerprints 实际交付为准)..."
   # R32D57-NEW3: 0x727 国产库模板不带 tech/fingerprint/panel tag(3577 实测
   # 零命中)——tags 过滤只适用于 nt-technologies;两库分跑, 否则 98.7% 被滤死。
   # NEW4: stdout 静音(此前原始 JSON 刷屏 1.3MB/2 发现)。
   nuclei -l ${FPTMP}.in -t "$NT_DIR/nt-technologies" \
     -severity info,low,medium,high,critical -tags tech,fingerprint,panel \
-    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >${FPTMP}.l4.log 2>&1 || true
+    -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4.json >${FPTMP}.l4.log 2>&1 || true
   nuclei -l ${FPTMP}.in -t "$NT_DIR/plugins-0x727" \
     -severity info,low,medium,high,critical \
-    -silent -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >${FPTMP}.l4b.log 2>&1 || true
-  # R32D58-F7: nuclei 对 6s 超时目标标 unresponsive permanently 并静默
-  # 清零——此后层产出为空时给一行 warn(日志落盘不刷屏, NEW4 制式保留)。
+    -nc -timeout 6 -retries 1 -rl 30 -c 20 -jsonl -o ${FPTMP}.l4b.json >${FPTMP}.l4b.log 2>&1 || true
+  # R32D58-F7/R32D59 证伪修: -silent 会吞 [INF] unresponsive 行——去掉
+  # -silent(日志只落盘不进控制台); 命中即计数一行 warn(NEW4 不刷屏保留)。
   UNRESP=$(grep -c 'unresponsive' ${FPTMP}.l4.log ${FPTMP}.l4b.log 2>/dev/null | awk -F: '{s+=$2} END{print s+0}')
   [ "$UNRESP" -gt 0 ] && echo "[fp-scan][warn] nuclei 标记 $UNRESP 条 unresponsive(超时目标被清零, 详见 nuclei 输出; 可提高 --timeout 或分批)" >&2
 fi
 
+# R32D59-N4: 引擎缺失/零产出时合并段输入文件预创建——干净空表而非裸栈
+touch ${FPTMP}.l1.json ${FPTMP}.l2.json ${FPTMP}.l3.txt
 FPTMP="$FPTMP" python3 - <<'PYEOF'  # CS31-P0: FPTMP 走环境变量(引号 heredoc 内 ${} 不展开)
 import json, re, collections, os
 

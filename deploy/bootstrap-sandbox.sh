@@ -6,7 +6,7 @@
 set -e
 
 # R32D42-P2/CS33-3: 宿主守卫。数据根守卫族(tools-sync/fetch-jars/
-# skills-seed/fetch-fingerprints)不适用本脚本(不写 SPECTRE_DATA_DIR);
+# skills-seed/fetch-fingerprints/fetch-wordlists)不适用本脚本(不写 SPECTRE_DATA_DIR);
 # 本脚本防的是宿机 apt 变更——容器内(.dockerenv)正常执行, 宿主裸跑
 # 须显式确认。
 if [ ! -f /.dockerenv ] && [ "${SPECTRE_ALLOW_HOST_BOOTSTRAP:-0}" != "1" ]; then
