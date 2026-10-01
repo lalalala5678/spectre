@@ -331,20 +331,21 @@ function realRouter({ store, bus, caps, wal }) {
       if (Array.isArray(body.projects)) {
         // CS47-N6: 迁移注册同 id 域校验(此前 verbatim——任意串可注册,
         // 却永远无法成为 currentWs)。R32D70: 域外项拒绝明细随响应披露。
+        // R32D71/N2: 明细分因(域外/缺 id/已存在——note 不再一刀切)。
         const skipped = [];
+        const existed = [];
         for (const p of body.projects) {
-          if (p?.id && typeof p.id === 'string' && /^[\w-]{1,64}$/.test(p.id) && !getProject(p.id)) {
-            ensureProject(p.id, wal, String(p.label ?? '').slice(0, 60));
-          } else {
-            // R32D71: 域外/缺 id/非串一律入明细(此前仅域外非空 id)。
-            skipped.push(p?.id == null ? '(missing id)' : String(p.id));
-          }
+          const idOk = p?.id != null && typeof p.id === 'string' && /^[\w-]{1,64}$/.test(p.id);
+          if (!idOk) { skipped.push(p?.id == null ? '(missing id)' : String(p.id)); continue; }
+          if (getProject(p.id)) { existed.push(String(p.id)); continue; }
+          ensureProject(p.id, wal, String(p.label ?? '').slice(0, 60));
         }
         // CS49-F6: 响应形状恒定(机器消费免 Array.isArray 分叉)。
         const projects = listProjects();
-        return json(res, 201, skipped.length
-          ? { projects, skipped, note: '域外 id 未注册([a-zA-Z0-9_-]{1,64})' }
-          : { projects });
+        const parts = [];
+        if (skipped.length) parts.push(`域外/缺 id 未注册: ${skipped.join(', ')}`);
+        if (existed.length) parts.push(`已存在跳过: ${existed.join(', ')}`);
+        return json(res, 201, parts.length ? { projects, skipped, existed, note: parts.join('; ') } : { projects });
       }
       const created = createProject(String(body.label ?? ''), wal);
       // R32D31-N1: 此前无条件 setPrefs(currentWs)——API/CLI 建项目会

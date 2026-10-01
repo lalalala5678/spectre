@@ -238,6 +238,10 @@ def cmd_scan(args):
         return 2
     a = a0
     p = a['--payload']
+    # R32D72-N1: 文件缺干净 rc=2(此前 FileNotFoundError 裸栈——门序表
+    # '用法(2)'契约)。
+    if not os.path.isfile(p):
+        print(f'用法错误: --payload 文件不存在: {p}', file=sys.stderr); return 2
     engines = a.get('--engines', 'auto').split(',')
     res = scan_all(p, engines)
     sha = sha256f(p)
