@@ -280,6 +280,14 @@ def cmd_run(args):
     engines = a.get('--engines', 'auto').split(',')
     maxr = int(a.get('--max-rounds', '8'))
     fams = a.get('--families', 'mask,decomp,id,struct')  # v3:伪装令 mask 先行+签名驱动,弃 enc/code 演示桩
+    # CS53-NEW-B: 转发面前置校验(此前拼写错在子进程 rc=2 被吞, 8 轮
+    # 空转+假 manifest 指针)。
+    _KNOWN = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
+    _toks = fams.split(',')
+    _bad = [x for x in _toks if x and x not in _KNOWN]
+    if _bad or not any(_toks):
+        print(f"用法错误: --families 未知/空族名: {fams}(合法: {','.join(_KNOWN)})", file=sys.stderr)
+        return 2
     base = os.path.splitext(os.path.basename(p))[0]
     work = f'/tmp/c2-qa-{base}-{int(time.time())}'
     os.makedirs(work, exist_ok=True)

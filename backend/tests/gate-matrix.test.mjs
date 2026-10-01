@@ -164,3 +164,24 @@ test('c2-qa run/scan 缺文件干净 rc=2(CS52-F1 锁)', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('c2-variant --families 未知/空族名 rc=2(CS53-NEW-A/D 锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'fam-'));
+  mkdirSync(join(dir, 'tools', 'c2'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'c2', 'scope.json'),
+    JSON.stringify({ exercise: 'qa', targets: ['a.local'], window: { start: '2026-01-01T00:00:00Z', end: '2027-01-01T00:00:00Z' } }));
+  const payload = join(dir, 'p.php');
+  writeFileSync(payload, '<?php // SPECTRE-MARK\n');
+  try {
+    for (const fams of ['totally-bogus', '', ',']) {
+      const r = runTool('c2-variant.py', ['gen', '--src', payload, '--out', join(dir, 'o'), '--families', fams], dir, false);
+      assert.equal(r.status, 2, `--families ${JSON.stringify(fams)} 应 rc=2, 实得 ${r.status}`);
+      assert.ok(!r.stderr.includes('Traceback'), '不得裸栈');
+    }
+    // 转发面(c2-qa run)同拒
+    const q = runTool('c2-qa.py', ['run', '--payload', payload, '--families', 'bogus'], dir, false);
+    assert.equal(q.status, 2, `c2-qa run --families bogus 应 rc=2, 实得 ${q.status}`);
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

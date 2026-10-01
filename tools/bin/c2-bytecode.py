@@ -119,7 +119,7 @@ def cmd_split(args):
     if '--class' not in a:
         print('用法: c2-bytecode.py split --class <file.class> [--out dir] [--rules dir]', file=sys.stderr); return 2
     if not os.path.isfile(a['--class']):
-        print(f"用法错误: --class 文件不存在: {a['--class']}", file=sys.stderr); return 2
+        print(f"用法错误: --class 文件不存在或不是常规文件: {a['--class']}", file=sys.stderr); return 2
     rules = a.get('--rules', DEFAULT_RULES)
     # CS40-3: java 工具链预检(Splitter/rt_exec 依赖; yara 已有独立 SKIP)。
     import shutil

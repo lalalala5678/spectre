@@ -371,6 +371,10 @@ def cmd_gen(args):
     # R32D73-NEW2: 未知族名干净 rc=2(此前拼写错被吞静默回退全族池,
     # 变形族归因失真)。
     bad_fams = [f for f in fams if f and f not in FAMILIES]
+    # CS53-NEW-A: 全空规格(''/',')与未知名同拒——此前静默零产出 rc=0。
+    if not any(fams):
+        print(f"用法错误: --families 至少一个合法族名(合法: {','.join(FAMILIES)})", file=sys.stderr)
+        return 2
     if bad_fams:
         print(f"用法错误: --families 未知族名: {','.join(bad_fams)}(合法: {','.join(FAMILIES)})", file=sys.stderr)
         return 2
