@@ -23,6 +23,9 @@ MemShellParty·jMG 族谱(中间件×注入位×协议兼容)。
 ## jMG 真实生成器接入(v2,已可用)
 ```
 c2-basetype.py list serverTypes|shellTypes|formatTypes
+<!-- R32D51-7: jmg 产物是"注入器类"(生成并注入 memshell 实例), 不是
+     Listener/Filter 本体——不能直接用 c2-javart --class --mode listener
+     验证(类型不符); 走 manifest sha256/jmg-info 记账验证。 -->
 c2-basetype.py gen --engine jmg --server Tomcat --shell Filter --tool Godzilla \
                    --format BASE64 --name jmg_filter_godzilla
 c2-basetype.py verify

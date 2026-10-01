@@ -62,6 +62,23 @@ public class RTHarness {
         return d;
     }
 
+    /** R32D51: 101 Switching Protocols 裸 socket 探针——握手即证
+     * upgrade handler init 已执行(marker 打在服务端 stdout)。 */
+    static String raw101(int port) {
+        try (java.net.Socket sock = new java.net.Socket()) {
+            sock.connect(new java.net.InetSocketAddress("127.0.0.1", port), 3000);
+            sock.setSoTimeout(3000);
+            sock.getOutputStream().write(("GET / HTTP/1.1\r\nHost: 127.0.0.1\r\nConnection: Upgrade\r\nUpgrade: websocket\r\n\r\n").getBytes("UTF-8"));
+            sock.getOutputStream().flush();
+            byte[] b = new byte[2048]; int n = sock.getInputStream().read(b);
+            String head = n > 0 ? new String(b, 0, n, "UTF-8") : "";
+            String status = head.split("\r\n", 2)[0];
+            return status.contains(" 101 ") ? "GET=101 " + status : "GET-error:" + status;
+        } catch (Exception e) {
+            return "GET-error:" + e;
+        }
+    }
+
     static String one(int port, String method) {
         try {
             HttpURLConnection c = (HttpURLConnection) new URL("http://127.0.0.1:" + port + "/").openConnection();
@@ -103,7 +120,7 @@ public class RTHarness {
         ctx.setParentClassLoader(RTHarness.class.getClassLoader());
         reg.reg(ctx);
         t.start();
-        String http = "get".equals(probe) ? one(port, "GET") : httpGet(port);
+        String http = "raw101".equals(probe) ? raw101(port) : ("get".equals(probe) ? one(port, "GET") : httpGet(port));
         try { t.stop(); t.destroy(); } catch (Exception ignore) {}
         boolean okCode = !http.contains("=5") && !http.contains("-error:");  // 5xx/连接错误才 BAD;404/405=合法(无 doGet/无映射)
         return (okCode ? "OK " : "BAD ") + http;
@@ -153,7 +170,13 @@ public class RTHarness {
     }
 
     static String rtUpgrade(String cn) throws Exception {        // 三令新位#2:协议升级通道(SCI 注册)
-        return rtViaSci(cn, "upgrade", "get");   // 101 切换后只探 GET
+        // R32D51: 101 探针改裸 socket——HttpURLConnection 对协议切换必抛
+        // ProtocolException 被判 -error(结构性 BAD)。裸 socket 读状态行,
+        // 101 即成功(handler init 已跑, marker 在服务端 stdout)。
+        return rtUpgradeRaw(cn);
+    }
+    static String rtUpgradeRaw(String cn) throws Exception {
+        return rtViaSci(cn, "upgrade", "raw101");  // SCI 注册(同原路径), 探针换裸 socket
     }
     static String rtFilter(String cn) throws Exception { return rtViaSci(cn, "filter"); }
     static String rtServlet(String cn) throws Exception { return rtViaSci(cn, "servlet"); }

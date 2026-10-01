@@ -41,6 +41,20 @@ REQUIRED = ['name', 'language', 'protocol', 'injection_points', 'transform_famil
 KNOWN_FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
 KNOWN_LANGS = ['php', 'java', 'js', 'ps', 'aspx', 'jsp']
 
+
+def resolve_spec_path(spec_path):
+    """R32D50-F9/CS26-5: 裸文件名解析到 SPEC_DIR + 缺失驯化(validate/
+    gen 双分支共用; 此前 ~10 行孪生×2)。rc 语义: 2=用法/缺失类。"""
+    if not os.path.isfile(spec_path) and '/' not in spec_path:
+        cand = os.path.join(SPEC_DIR, spec_path if spec_path.endswith('.json') else spec_path + '.json')
+        if os.path.isfile(cand):
+            return cand, None
+        if not os.path.isdir(SPEC_DIR):
+            return None, f'spec 目录不存在: {SPEC_DIR}——先跑 init 生成内置样例'
+    if not os.path.isfile(spec_path):
+        return None, f'spec 文件不存在: {spec_path}(裸名可用内置名; 先 init)'
+    return spec_path, None
+
 def load_spec(path):
     spec = json.load(open(path))
     errors = []
@@ -130,8 +144,11 @@ def init_builtin():
 
 if __name__ == '__main__':
     # BUG-3: --help/拼错子命令零输出 RC=0——与姊妹工具一致兜底
-    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help') or sys.argv[1] not in ('list', 'validate', 'gen', 'init'):
-        print(__doc__); sys.exit(2 if len(sys.argv) >= 2 else 0)
+    # R32D51-5: 退出码与姊妹 CLI 统一——无参/未知子命令 rc=2, -h/--help rc=0。
+    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__); sys.exit(0)
+    if len(sys.argv) < 2 or sys.argv[1] not in ('list', 'validate', 'gen', 'init'):
+        print(__doc__); sys.exit(2)
     mode = sys.argv[1]
     if mode == 'list':
         for s in list_specs():
@@ -143,16 +160,9 @@ if __name__ == '__main__':
         spec_path = sys.argv[sys.argv.index('--spec') + 1] if '--spec' in sys.argv else None
         if not spec_path:
             print('validate 需要 --spec'); sys.exit(1)
-        # R32D50-F9: 裸名/缺失驯化(同 gen 分支)
-        import os as _os2
-        if not _os2.path.isfile(spec_path) and '/' not in spec_path:
-            cand = _os2.path.join(SPEC_DIR, spec_path if spec_path.endswith('.json') else spec_path + '.json')
-            if _os2.path.isfile(cand):
-                spec_path = cand
-            elif not _os2.path.isdir(SPEC_DIR):
-                print(f'spec 目录不存在: {SPEC_DIR}——先跑 init 生成内置样例', file=sys.stderr); sys.exit(2)
-        if not _os2.path.isfile(spec_path):
-            print(f'spec 文件不存在: {spec_path}(裸名可用内置名; 先 init)', file=sys.stderr); sys.exit(2)
+        spec_path, serr = resolve_spec_path(spec_path)
+        if serr:
+            print(serr, file=sys.stderr); sys.exit(2)
         spec, errs = load_spec(spec_path)
         if errs:
             print('✗ ' + '; '.join(errs)); sys.exit(1)
@@ -164,19 +174,9 @@ if __name__ == '__main__':
         rounds = int(sys.argv[sys.argv.index('--rounds') + 1]) if '--rounds' in sys.argv else 3
         if not spec_path or not src:
             print('gen 需要 --spec --src'); sys.exit(1)
-        # R32D50-F9: 裸文件名(不带 / 与 .json)解析到 SPEC_DIR——
-        # 'gen --spec http-jsp' 此前 FileNotFoundError 裸栈。
-        import os as _os2
-        if not _os2.path.isfile(spec_path) and '/' not in spec_path:
-            cand = _os2.path.join(SPEC_DIR, spec_path if spec_path.endswith('.json') else spec_path + '.json')
-            if _os2.path.isfile(cand):
-                spec_path = cand
-            elif not _os2.path.isdir(SPEC_DIR):
-                print(f'spec 目录不存在: {SPEC_DIR}——先跑 init 生成内置样例', file=sys.stderr); sys.exit(2)
-        if not _os2.path.isfile(spec_path):
-            print(f'spec 文件不存在: {spec_path}(裸名可用内置名如 http-webshell; 先 init)', file=sys.stderr); sys.exit(2)
-        if not _os2.path.isfile(src):
-            print(f'--src 文件不存在: {src}', file=sys.stderr); sys.exit(2)
+        spec_path, serr = resolve_spec_path(spec_path)
+        if serr:
+            print(serr, file=sys.stderr); sys.exit(2)
         spec, errs = load_spec(spec_path)
         if errs:
             print('spec 非法: ' + '; '.join(errs)); sys.exit(1)

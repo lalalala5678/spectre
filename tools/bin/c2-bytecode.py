@@ -165,12 +165,20 @@ def cmd_split(args):
     print(json.dumps(rec, ensure_ascii=False))
     return 0
 
+
+def _rt_cp():
+    """RTHarness 运行时 classpath 单源(CS26-1: 此前两处孪生串, AN 的
+    count=1 替换只落一处留下 P0 丢冒号粘连)。"""
+    jmg = os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')
+    return (f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar'
+            f':{jmg}:{ART}:{STUBS}')
+
 def _load_result(classfile):
     cn = this_class_name(classfile)
     fq = (cn or '?').replace('/', '.')
     d = os.path.dirname(os.path.abspath(classfile))
     r = subprocess.run(['java', '--patch-module', f'jdk.unsupported={PATCH}',
-                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:{os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')}:{ART}:{STUBS}:{d}',
+                        '-cp', _rt_cp() + f':{d}',
                         'RTHarness', 'load', fq, ''], capture_output=True, text=True, timeout=120)
     line = [l for l in r.stdout.splitlines() if l.startswith('RT-RESULT')]
     return ('OK' if r.returncode == 0 else 'FAIL',
@@ -198,7 +206,7 @@ def rt_exec(classfile):
     fq = (cn or '?').replace('/', '.')
     d = os.path.dirname(os.path.abspath(classfile))
     r = subprocess.run(['java', '--patch-module', f'jdk.unsupported={PATCH}',
-                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:{os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')}{ART}:{STUBS}:{d}',
+                        '-cp', _rt_cp() + f':{d}',
                         'RTHarness', 'listener', fq, ''], capture_output=True, text=True, timeout=120)
     line = [l for l in r.stdout.splitlines() if l.startswith('RT-RESULT')]
     return r.returncode, (line[0] if line else r.stdout[-160:])

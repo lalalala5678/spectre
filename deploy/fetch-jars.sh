@@ -40,7 +40,7 @@ fetch . "$MVN"/org/apache/tomcat/embed/tomcat-embed-core/10.1.42/tomcat-embed-co
 fetch . "$MVN"/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1.jar jakarta.annotation-api-2.1.1.jar
 # 字节码变换(ASM 9.x)
 fetch . "$MVN"/org/ow2/asm/asm/9.7/asm-9.7.jar asm-9.7.jar
-fetch . "$MVN"/org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar asm-commons-9.7.jar
+# CS26-6: asm-commons 已删——下载后全仓零引用(CpSplitter 仅 import org.objectweb.asm.*)
 # CS25-N2/R32D50-F2/F3: jar 供给面与工具引用对齐(此前三套口径错位——
 # 供 10.1.39/spring5.3.39×4/jmg-cli-1.0.9_250101, 工具引 10.1.42/
 # spring6.0.9×8/annotations-api-6.0.53/jmg-all+短名 jmg-cli)。

@@ -37,7 +37,8 @@
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
 
-# ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串)
+# ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串; 占位行删除而非追加——
+#    逐行 first-wins, 保留 change-me 行会遮蔽你在后面写的值)
 #    LLM 不走 env: 登录控制台后在「设置」页配置(见下方「配置大模型」)
 cd backend && cp .env.example .env && ${EDITOR:-vi} .env
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test && \

@@ -513,6 +513,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               </div>
             ) : sessionId ? (
               <LiveSession agentKey={liveKey} sessionId={sessionId} onGone={handleSessionGone} />
+            ) : !bootDoneRef.current ? (
+              /* CS26-7: boot 在途(拉锚点/建会话中)——闪现'还没有主会话'
+                 可点按钮会与 :180 自动建会话竞争产重复空会话。 */
+              <div className="flex flex-1 items-center justify-center text-[12px] text-zinc-600 animate-pulse">正在准备会话…</div>
             ) : (
               /* R32D50-F6: 冷深链进入后 drill 关闭, 主会话可能尚未建——
                  此前渲染 LiveSession(null) 即 composer 静默 no-op+永久

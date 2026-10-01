@@ -80,7 +80,10 @@ def compile_src(src_path, outdir):
     tc = TC10 if lane == 'jakarta' else TC9
     stub_cp = f'{STUBS_J}:{STUBS}' if lane == 'jakarta' else STUBS
     xc = extra_cp(logical)
-    cmd = ['javac', '-encoding', 'UTF-8', '-cp', f'{tc}:{stub_cp}' + (':' + xc if xc else ''), '-d', outdir, tmp]
+    # R32D51: 真实依赖(xc=SPRING/RXSTUB)必须前置于桩树——javax 桩树
+    # (STUBS)里有 org.springframework 接口桩, jakarta 道此前桩先于真 jar
+    # 解析, j10_interceptor_spring 编译必败(签名不匹配)。
+    cmd = ['javac', '-encoding', 'UTF-8', '-cp', (f'{xc}:' if xc else '') + f'{tc}:{stub_cp}', '-d', outdir, tmp]
     if 'sun.misc' in logical:
         cmd[1:1] = ['--patch-module',
                 'jdk.unsupported=' + os.path.join(_C2, 'javastubs/patchsrc')]  # CS24-F2/N4
@@ -94,7 +97,7 @@ def run_harness(mode, name, marker, cp_extra, lane='javax'):
     harness = 'RTHarnessJakarta' if lane == 'jakarta' else 'RTHarness'
     stub_cp = f'{STUBS_J}:{STUBS}' if lane == 'jakarta' else STUBS
     cmd = ['java', '--patch-module', f'jdk.unsupported={PATCH}',
-           '-cp', f'{tc}:{ART}:{stub_cp}:{cp_extra}', harness, mode, name, marker or '']
+           '-cp', (f'{cp_extra}:' if cp_extra else '') + f'{tc}:{ART}:{stub_cp}', harness, mode, name, marker or '']  # R32D51: 真实依赖前置(同 javac)
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=120)
     line = [l for l in r.stdout.splitlines() if l.startswith('RT-RESULT:')]
     return r.returncode, (line[0] if line else (r.stdout + r.stderr).strip()[:160])

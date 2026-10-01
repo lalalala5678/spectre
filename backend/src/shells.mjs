@@ -104,20 +104,24 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     try { bus?.emit?.('shell-event', { kind, at: new Date().toISOString(), ...data }); } catch { /* bus optional */ }
   };
 
-  function gate(shell) {
+  /** CS26-2: scope targets 匹配器单源——精确串 | '*.domain' 通配;
+ * 大小写不敏感(DNS 语义)。gate 标签门与 exec 目的地校验共用。 */
+function targetMatches(t, target) {
+  const tt = String(t).toLowerCase(), dt = String(target).toLowerCase();
+  return tt === dt || (tt.startsWith('*.') && dt.endsWith(tt.slice(1)));
+}
+
+function gate(shell) {
     // Server-side authorization: exercise window + target binding.
     const sc = listScope?.() ?? null;
     if (!sc) return { ok: false, error: 'scope 不可读:授权门配置缺失' };
     const now = isoNow();
     const inWindow = sc.window && sc.window.start <= now && now <= sc.window.end;
-    // R32D50-F8: targets 语义与 scope 文档对齐(glob/清单)——此前精确
-    // 串匹配, 文档写 glob/网段, '*.target-range.example' 永不命中。
-    // 与 :130 exec 目的地的点后缀子域匹配同族; 网段目标对 shell 无
-    // 意义(shell.target 是主机名), 精确串仍直配。
-    const targetMatches = (t, target) => t === target
-      || (t.startsWith('*.') && target.endsWith(t.slice(1)));
+    // R32D50-F8/CS26-2: targets 语义与 scope 文档对齐(glob/清单)——
+    // 匹配器 targetMatches 提为模块级单源, gate 标签门与 exec 目的地
+    // 校验共用(支持 '*.domain' 通配+大小写不敏感)。
     const inTargets = Array.isArray(sc.targets)
-      && sc.targets.some(t => targetMatches(String(t), shell.target));
+      && sc.targets.some(t => targetMatches(t, shell.target));
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
     if (!inTargets) return { ok: false, error: `授权门:目标 ${shell.target} 不在清单(拒绝)` };
     if (shell.expiresAt && now > shell.expiresAt) {
@@ -134,11 +138,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     if (shell.transport === 'web' || shell.transport === 'ssh') {
       const dest = destinationHost(shell);
       if (dest) {
-        const ok = (sc.targets || []).some(t => {
-          const tt = String(t).toLowerCase();
-          const d = dest.toLowerCase();
-          return d === tt || d.endsWith('.' + tt);
-        });
+        const ok = (sc.targets || []).some(t => targetMatches(t, dest));
         if (!ok) {
           return { ok: false, error:
             `授权门:通道目的地 ${dest} 不在目标清单(拒绝)——target 标签与 transportRef 端点不一致` };
@@ -201,7 +201,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
   function list(f = {}) {
     let out = [...shells.values()];
     if (f.target) out = out.filter(x => x.target === f.target);
-    if (f.transport) out = out.filter(x => x.transport === f.transport);
+    if (f.transport) out = out.filter(x => x.transport === String(f.transport).toLowerCase());  // CS26-8: 与 register 归一同口径
     if (f.tag) out = out.filter(x => (x.tags ?? []).includes(f.tag));
     if (f.name) out = out.filter(x => String(x.name).toLowerCase().includes(String(f.name).toLowerCase()));
     if (f.status) out = out.filter(x => x.status === f.status);
