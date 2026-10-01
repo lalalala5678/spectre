@@ -14,7 +14,6 @@
 import sys, os, json, hmac, hashlib, time, secrets
 
 
-
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具

@@ -18,7 +18,7 @@ mkdir -p "$DST/tools/bin" "$DST/tools/c2"
 cp -v tools/bin/*.py "$DST/tools/bin/"
 # CS9-N5: fp-scan 统一指纹入口(pi.mjs 提示词引用)——bash 本体随 bin 交付
 cp -v docs/fp-scan "$DST/tools/bin/fp-scan"; chmod +x "$DST/tools/bin/fp-scan"
-for d in basetypes basetypes-jakarta javastubs yara-rules mock; do
+for d in basetypes basetypes-jakarta javastubs javart yara-rules mock; do  # CS25: javart(RTHarness 源+类)入交付面
   [ -d "tools/c2/$d" ] && cp -r "tools/c2/$d" "$DST/tools/c2/"
 done
 cp -v tools/c2/private-qa-server.py tools/c2/mcp-echo.mjs "$DST/tools/c2/"

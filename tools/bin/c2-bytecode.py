@@ -17,7 +17,6 @@
 import sys, os, json, subprocess, tempfile, time, hashlib, glob, re
 
 
-
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
@@ -171,7 +170,7 @@ def _load_result(classfile):
     fq = (cn or '?').replace('/', '.')
     d = os.path.dirname(os.path.abspath(classfile))
     r = subprocess.run(['java', '--patch-module', f'jdk.unsupported={PATCH}',
-                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:{os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')}{ART}:{STUBS}:{d}',
+                        '-cp', f'{LIBS}/tomcat-embed-core-9.0.106.jar:{LIBS}/annotations-api-6.0.53.jar:{os.path.join(_C2, 'generators/jmg-all-1.0.9_250101.jar')}:{ART}:{STUBS}:{d}',
                         'RTHarness', 'load', fq, ''], capture_output=True, text=True, timeout=120)
     line = [l for l in r.stdout.splitlines() if l.startswith('RT-RESULT')]
     return ('OK' if r.returncode == 0 else 'FAIL',

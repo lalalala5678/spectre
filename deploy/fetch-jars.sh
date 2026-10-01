@@ -36,19 +36,26 @@ MVN=https://repo1.maven.org/maven2
 cd "$LIBS"
 # Tomcat 9(javax)/10.1(jakarta) 嵌入式桩 + 注解 API
 fetch . "$MVN"/org/apache/tomcat/embed/tomcat-embed-core/9.0.106/tomcat-embed-core-9.0.106.jar tomcat-embed-core-9.0.106.jar
-fetch . "$MVN"/org/apache/tomcat/embed/tomcat-embed-core/10.1.39/tomcat-embed-core-10.1.39.jar tomcat-embed-core-10.1.39.jar
+fetch . "$MVN"/org/apache/tomcat/embed/tomcat-embed-core/10.1.42/tomcat-embed-core-10.1.42.jar tomcat-embed-core-10.1.42.jar
 fetch . "$MVN"/jakarta/annotation/jakarta.annotation-api/2.1.1/jakarta.annotation-api-2.1.1.jar jakarta.annotation-api-2.1.1.jar
 # 字节码变换(ASM 9.x)
 fetch . "$MVN"/org/ow2/asm/asm/9.7/asm-9.7.jar asm-9.7.jar
 fetch . "$MVN"/org/ow2/asm/asm-commons/9.7/asm-commons-9.7.jar asm-commons-9.7.jar
-# Spring 编译桩(按 javastubs/patchsrc 声明的版本补齐; 显式坐标, 失败汇总)
+# CS25-N2/R32D50-F2/F3: jar 供给面与工具引用对齐(此前三套口径错位——
+# 供 10.1.39/spring5.3.39×4/jmg-cli-1.0.9_250101, 工具引 10.1.42/
+# spring6.0.9×8/annotations-api-6.0.53/jmg-all+短名 jmg-cli)。
+fetch . "$MVN"/org/apache/tomcat/annotations-api/6.0.53/annotations-api-6.0.53.jar annotations-api-6.0.53.jar
+# Spring 编译桩(c2-functest/c2-javart SPRING 类路径 8 jar; 显式坐标, 失败汇总)
 mkdir -p spring
-fetch spring "$MVN"/org/springframework/spring-core/5.3.39/spring-core-5.3.39.jar spring-core-5.3.39.jar
-fetch spring "$MVN"/org/springframework/spring-web/5.3.39/spring-web-5.3.39.jar spring-web-5.3.39.jar
-fetch spring "$MVN"/org/springframework/spring-context/5.3.39/spring-context-5.3.39.jar spring-context-5.3.39.jar
-fetch spring "$MVN"/org/springframework/spring-beans/5.3.39/spring-beans-5.3.39.jar spring-beans-5.3.39.jar
+for a in spring-webmvc spring-web spring-core spring-context spring-beans spring-expression spring-aop spring-jcl; do
+  fetch spring "$MVN"/org/springframework/$a/6.0.9/$a-6.0.9.jar $a-6.0.9.jar
+done
 # jMG 真实载荷生成器(上游 pen4uin/java-memshell-generator, tag v1.0.9_250101)
-fetch "$GEN" https://github.com/pen4uin/java-memshell-generator/releases/download/v1.0.9_250101/jmg-cli-1.0.9_250101.jar jmg-cli-1.0.9_250101.jar
+JMG=https://github.com/pen4uin/java-memshell-generator/releases/download/v1.0.9_250101
+fetch "$GEN" "$JMG"/jmg-cli-1.0.9_250101.jar jmg-cli-1.0.9_250101.jar
+fetch "$GEN" "$JMG"/jmg-all-1.0.9_250101.jar jmg-all-1.0.9_250101.jar
+# c2-basetype 引用短名 jmg-cli-1.0.9.jar(md5 实证=同 release 资产重命名)
+[ -f "$GEN/jmg-cli-1.0.9.jar" ] || cp "$GEN/jmg-cli-1.0.9_250101.jar" "$GEN/jmg-cli-1.0.9.jar"
 if [ ${#FAILED[@]} -gt 0 ]; then
   echo "[fetch-jars] ✗ 失败 ${#FAILED[@]} 项: ${FAILED[*]}"; exit 1
 fi

@@ -14,7 +14,6 @@
 import sys, os, re, subprocess, tempfile, shutil
 
 
-
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。CS23-N9: 此前本工具
@@ -84,7 +83,7 @@ def compile_src(src_path, outdir):
     cmd = ['javac', '-encoding', 'UTF-8', '-cp', f'{tc}:{stub_cp}' + (':' + xc if xc else ''), '-d', outdir, tmp]
     if 'sun.misc' in logical:
         cmd[1:1] = ['--patch-module',
-                       'jdk.unsupported=' + os.path.join(_C2, 'javastubs/patchsrc')]  # CS24-F2
+                'jdk.unsupported=' + os.path.join(_C2, 'javastubs/patchsrc')]  # CS24-F2/N4
     r = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
     if r.returncode != 0:
         return None, 'javac:' + (r.stdout + r.stderr).strip()[:120]

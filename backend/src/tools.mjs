@@ -809,7 +809,8 @@ export function buildShellTools(record, caps) {
           if (!p.transportRef || !p.target) return say({ ok: false, error: 'register 需 transportRef+target' });
           const sh = R.register({
             name: p.name, target: p.target,
-            transport: p.transport || 'web', transportRef: p.transportRef,
+            transport: String(p.transport ?? 'web').toLowerCase(),  // CS25-N3: 入口归一化(AGENTS 原则5; 'Web'/'LOCAL' 变体不再硬拒)
+            transportRef: p.transportRef,
             tags: p.tags, note: 'agent 自注册(' + (record.agentKey || 'agent') + ')',
             createdBy: record.agentKey || 'agent',
           });
