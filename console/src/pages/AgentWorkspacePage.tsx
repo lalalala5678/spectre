@@ -6,6 +6,7 @@ import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Dot } from '../components/ui/Badge';
 import { AgentLlmOverride } from '../components/AgentLlmOverride';
 import { hasCred } from '../utils/hasCred';
+import type { LlmFormatMeta } from '../api/llmFormats';
 import { Panel } from '../components/ui/Panel';
 import { PanelStack } from '../components/ui/PanelStack';
 import { LiveSession } from '../components/session/LiveSession';
@@ -614,7 +615,7 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
     sources: { id: string; label: string; fields: { id: string; label: string }[] }[] }[]>([]);
   const [reconSources, setReconSources] = useState<Record<string, Record<string, string>>>({});
   const [agentLlm, setAgentLlm] = useState<Record<string, Record<string, string>>>({});
-  const [llmFormats, setLlmFormats] = useState<{ id: string; label: string; hint: string }[]>([]);
+  const [llmFormats, setLlmFormats] = useState<LlmFormatMeta[]>([]);
   const [mcps, setMcps] = useState<{ name: string; transport: string; enabled?: boolean;
     url?: string; command?: string; agents?: string[] }[] | null>(null);
 

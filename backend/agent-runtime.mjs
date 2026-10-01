@@ -133,10 +133,21 @@ const shellScope = () => {
   catch { return null; }
 };
 
-// CS20-3: 签名对齐——shells.audit 调 emit(type, payload) 双参, 此前
-// 适配器只收首参(字符串), 载荷整体丢失→总线只收到空壳(shell 审计
-// '每条命令进证据链'承诺 19 轮未兑现, 静默失败无测试覆盖)。
-const shellRegistry = createShellRegistry({ bus: { emit: (type, payload) => bus.emit({ type, ...payload }) }, listScope: shellScope });  // CS20-11: wal 死参数删
+// CS20-3/CS21-1: shell 审计载荷经 Bus 白名单字段映射——此前两跳丢失
+// (第一跳: 适配器单参签名; 第二跳: Bus.emit 固定字段白名单把
+// kind/at/id/target/cmd/code/ms 全滤掉, 20 轮审计中两跳先后实锤)。
+// 映射: summary=kind+shell+命令摘要(检索面), detail=JSON 全量(证据面)。
+const shellBus = {
+  emit: (type, payload) => bus.emit({
+    type,
+    channel: 'c2',
+    from: 'shells',
+    summary: [payload?.kind, payload?.id, payload?.target,
+      String(payload?.cmd ?? '').slice(0, 80)].filter(Boolean).join(' · ').slice(0, 500),
+    detail: JSON.stringify(payload),
+  }),
+};
+const shellRegistry = createShellRegistry({ bus: shellBus, listScope: shellScope });  // CS20-11: wal 死参数删
 
 /**
  * CS1-R5: reportWriter/revisionWriter/wakeAgent 三连的机械骨架——

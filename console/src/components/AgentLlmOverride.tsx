@@ -1,23 +1,19 @@
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { cn } from '../utils/cn';
+import type { LlmFormatMeta } from '../api/llmFormats';
 
 /** R32D44-llm: 供应商四字段原子编辑器(设置页与 agent 配置页签共用)。
  * 保存协议(CS16-P1/R32D45-N1 原子提交): 四字段一个请求整体提交, 后端
  * 用完整生效配置做真实连通探测, 失败零落盘。
  * - mode='override'(默认): agent 覆盖——留空字段=清除该项回默认。
  * - mode='default': 默认供应商——三项必填(格式默认 openai)。 */
-export interface LlmFormatMeta { id: string; label: string; hint: string; }
-
 export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', formats }: {
   agentId: string; ov?: Record<string, string>; onSaved: () => void;
   mode?: 'override' | 'default';
-  formats: LlmFormatMeta[];  // CS19-4/CS20-7: schema.llmFormats 单源必传
+  formats: LlmFormatMeta[];  // CS19-4/CS20-7/CS21-3: schema 单源必传
 }) {
-  // CS20-7: 第 4 份硬编码兜底已删——兜底曾与后端单源漂移(label 不一致),
-  // 且两消费方缺省策略相反(一处走兜底一处空下拉)。缺 schema 即空列表,
-  // 与 AgentWorkspacePage 归一口径一致。
-  const fmts = formats ?? [];
+  const fmts = formats;
   const isDefault = mode === 'default';
   const [draft, setDraft] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
   const [orig, setOrig] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });

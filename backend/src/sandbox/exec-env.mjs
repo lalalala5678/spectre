@@ -368,10 +368,16 @@ export function makeExecutionEnv(cfg, wsId) {
   // LITERAL (docker -e does not expand) — the container then had no bash
   // on PATH (exit 127, "bash not found"). Expand the HOST path list here
   // so the container PATH = shared-tool dirs + sane system defaults.
+  // CS21-2: 第三处 'spectre-sandbox' 字面量回退删——现况调用面恒传
+  // sandboxConfig()(死回退), 但'容器名单源'宣称不容字面量幸存; 缺
+  // container 即 fail-fast(命名空间契约, 防隔离实例落生产容器)。
+  if (cfg.driver === 'docker' && !cfg.container) {
+    throw new Error('docker driver 需要 sandboxConfig().container(数据根命名空间容器名)');
+  }
   const execArgv = cfg.driver === 'docker'
     ? ['docker', 'exec', '-w', cwdContainer,
       '-e', `PATH=${toolPath}:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin`,
-      cfg.container ?? 'spectre-sandbox']
+      cfg.container]
     : [];
   const shell = {
     exec: (command, options, _ctx) => {
