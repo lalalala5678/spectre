@@ -186,7 +186,7 @@ def check_deep(raw, nrm, path):
                       'note': '请求序列先静态资源后 API(操作员侧执行纪律)'}
     # ⑭ 部署清单:交付级检查(check_delivery)
     out['deploy_checklist'] = {'present': True, 'verdict': 'CHECK',
-                               'note': '交付包应含 deploy-checklist 引用(模板+校验脚本已出)'}
+                               'note': '交付包应含 deploy-checklist.yaml+check-deploy.sh 两件(仓内无模板, 按交付场景自拟)'}
     return out
 
 GOVERNANCE_FILES = {'deploy-checklist.yaml', 'check-deploy.sh', 'report.json',
@@ -212,8 +212,12 @@ def check_delivery(d):
                     'note': 'mtime 与目录均值偏差<1h'}
     # ⑭ 部署清单(二令第十四项,交付包必备):缺=裸奔面
     out['deploy_checklist'] = os.path.exists(os.path.join(d, 'deploy-checklist.yaml'))
-    out['deploy_check_script'] = os.path.exists(os.path.join(d, 'check-deploy.sh'))
-    bare14 = [] if (out['deploy_checklist'] and out['deploy_check_script']) else ['deploy_checklist(⑭)']
+    out['check_deploy_script'] = os.path.exists(os.path.join(d, 'check-deploy.sh'))
+    # R32D65-N1: 归因精确化——缺哪件点名哪件(此前任一缺失都笼统报
+    # deploy_checklist, 清单在只缺脚本时误导)。
+    miss14 = [n for n, ok in (('deploy-checklist.yaml', out['deploy_checklist']),
+                              ('check-deploy.sh', out['check_deploy_script'])) if not ok]
+    bare14 = [f'{"+".join(miss14)}(⑭)'] if miss14 else []
     out['verdict'] = 'REJECT' if (bare or out['mtime']['verdict'] == 'FAIL' or bare14) else 'ACCEPT'
     out['bare_surfaces'] = (out.get('bare_surfaces') or []) + bare14
     out['note'] = ('密钥材料须随 connect-info.json' if not out['connect_info'] else '')

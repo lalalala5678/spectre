@@ -30,10 +30,15 @@ def _data_root():
 def scope_gate_full():
     """完整授权门: targets+exercise+window 三必填(SKILL 契约), exit 75。"""
     SCOPE = os.path.join(_data_root(), 'c2/scope.json')
-    if not os.path.exists(SCOPE):
-        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE})', file=sys.stderr); sys.exit(75)
+    # R32D65-N3: 解析错/校验错分报(此前 JSON 异常折叠进'empty targets'
+    # 误导排障——与 qa 内联门的真因消息分叉)。
     try:
         sc = json.load(open(SCOPE))
+    except FileNotFoundError:
+        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE})', file=sys.stderr); sys.exit(75)
+    except Exception as e:
+        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); sys.exit(75)
+    try:
         now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         # CS36-Z3: SKILL 三必填契约(targets/exercise/window)——exercise
         # 此前仅 c2-qa 查, 单源门补齐族内一致。
