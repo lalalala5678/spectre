@@ -84,5 +84,32 @@ class NormalizeContentLength(unittest.TestCase):
         self.assertEqual(normalize_content_length("128"), 128)
 
 
+class ProxyMalformedCL(unittest.TestCase):
+    """R32D38-NEW-7: 有声明但 CL<=0 的 /api 转发前 413 断连."""
+
+    def test_negative_cl_rejected_before_upstream(self):
+        from unittest.mock import MagicMock
+        from spectre_gateway import proxy
+
+        handler = MagicMock()
+        handler.headers = {"Content-Length": "-3"}
+
+        class _Blocked:
+            def __init__(self, *a, **k):
+                pass
+
+            def request(self, *a, **k):
+                raise AssertionError("must not reach upstream")
+
+        orig = proxy.http.client.HTTPConnection
+        proxy.http.client.HTTPConnection = _Blocked
+        try:
+            proxy.proxy(handler, "/api/projects")
+            self.assertEqual(handler._send.call_args[0][0], 413)
+            self.assertTrue(handler.close_connection)
+        finally:
+            proxy.http.client.HTTPConnection = orig
+
+
 if __name__ == "__main__":
     unittest.main()

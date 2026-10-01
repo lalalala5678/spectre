@@ -348,6 +348,26 @@ def main():
     p.add_argument('--genkey-selector', default='s1')
     args = p.parse_args()
 
+    # R32D38-NEW-1: --from 接受 "Display <a@b>" 全形式(docstring 示范
+    # 的写法此前整串当裸地址——from_domain 带尾括号, Message-ID 双闭
+    # 括号+DKIM 域污染, 静默损坏)。parseaddr 拆解, --from-name 优先。
+    if getattr(args, 'from_addr', None):
+        from email.utils import parseaddr
+        _disp, _addr = parseaddr(args.from_addr)
+        if _addr and _addr != args.from_addr:
+            if not args.from_name:
+                args.from_name = _disp
+            args.from_addr = _addr
+    # NEW-2: send 模式必填前置(此前逐目标打 'NoneType is not iterable')
+    if args.mode == 'send' and not getattr(args, 'from_addr', None):
+        print('缺少 --from <email@domain>(可选 --from-name "Display")', file=sys.stderr)
+        return 2
+    # NEW-3: --html 文件存在性友好报错(此前裸 FileNotFoundError 栈)
+    if getattr(args, 'html', None) and args.mode in ('send', 'dryrun') \
+            and not os.path.isfile(args.html):
+        print(f'--html 文件不存在: {args.html}', file=sys.stderr)
+        return 2
+
     # DKIM 密钥生成模式
     if args.mode == 'genkey':
         # V1 修复: genkey 先过授权门(此前 return 先于 gate()=旁路);

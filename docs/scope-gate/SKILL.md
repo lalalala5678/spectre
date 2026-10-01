@@ -6,6 +6,19 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 # 授权门(硬纪律)
 一切载荷生成/检测/交付的前置条件。**工具层已落实,不要只靠会话自觉。**
 
+## scope.json 权威样例(字段 schema 唯一记载处——R32D38 观-1)
+
+```json
+{
+  "targets": ["*.target-range.example", "203.0.113.0/24"],
+  "exercise": "EX-2026-渗投-042",
+  "window": {"start": "2026-10-01T09:00:00Z", "end": "2026-10-08T18:00:00Z"}
+}
+```
+三必填字段: `targets`(glob/网段清单)、`exercise`(本次演练标识, 入审计
+账)、`window`(UTC ISO-8601, 起止闭区间)。位置: 数据根 `tools/c2/scope.json`
+(容器视角 `/opt/tools/c2/scope.json`)。缺任一 → `SCOPE-REJECT` exit 75。
+
 ## 工具层落实表(2026-09-19 起)
 | 检查 | 工具/位置 | 违规行为 |
 |---|---|---|

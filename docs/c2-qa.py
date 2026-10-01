@@ -72,7 +72,9 @@ def eng_yara(p):
     rules = sorted(glob.glob(os.path.join(_data_root(), 'c2/yara-rules/*.yar'))
                  + glob.glob(os.path.join(_data_root(), 'c2/yara-rules/*.yara')))
     if not rules:
-        return {'engine': 'yara', 'detected': False, 'signature': '', 'note': 'no rules configured'}
+        # R32D38-NEW-5: 无规则=引擎未运行(detected:False 会污染
+        # AV-clean 判定)——归 error 面, run 侧 usable 过滤接管。
+        return {'engine': 'yara', 'error': 'yara 无规则集(数据根 c2/yara-rules/ 空)'}
     for rf in rules:
         try:
             r = subprocess.run(['yara', rf, p], capture_output=True, text=True, timeout=60)
@@ -286,6 +288,10 @@ def functest(p, orig=None):
 def cmd_run(args):
     a0 = dict(zip(args[::2], args[1::2]))
     sc = gate(a0.get('--payload', ''))
+    if '--payload' not in a0:  # R32D38-NEW-4: 与 scan 同款用法行
+        print('用法: c2-qa.py run --payload <文件> [--engines ...] '
+              '[--max-rounds N] [--families mask,decomp,id,struct]')
+        return 2
     a = a0
     p = a['--payload']
     engines = a.get('--engines', 'auto').split(',')
@@ -300,6 +306,15 @@ def cmd_run(args):
         res = scan_all(cur, engines)
         audit(sc['exercise'], f'round{r}', sha, json.dumps(res, ensure_ascii=False)[:200])
         print(f'-- round {r}: {json.dumps(res)}')
+        # R32D38-NEW-5: 引擎全 error ≠ AV-clean——error 条目无 detected
+        # 键, 此前 not any(detected) 成立即进交付流(全新部署未装重型
+        # 引擎时空转全绿)。可用引擎=0 时拒绝交付。
+        usable = [x for x in res if 'detected' in x]
+        if not usable:
+            print('ENGINES-UNAVAILABLE: 全部引擎报错(未安装/未配置)——'
+                  '面杀判定空转, 拒绝交付。先 bootstrap(容器内 '
+                  'bootstrap-sandbox.sh 装 clamav/yara)或配置云查 key。')
+            return 3
         if not any(x.get('detected') for x in res):
             f_ok, f_note = functest(cur)              # 交付终验:功能门
             pkg = os.path.join(work, 'DELIVERY')

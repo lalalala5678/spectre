@@ -36,7 +36,13 @@ def proxy(handler, api_path):
     `api_path` is the runtime-relative path (PREFIX already stripped).
     """
     # CS4-M3/CS5-N3: 非数与负值的归一化单源 normalize_content_length
-    length = normalize_content_length(handler.headers.get("Content-Length"))
+    # R32D38-NEW-7: 有声明但 CL≤0 属畸形——转发空体会把缺省语义当
+    # 有效副作用(login 路径同款 413 断连, 不对称收口)。
+    raw_cl = handler.headers.get("Content-Length")
+    if raw_cl is not None and normalize_content_length(raw_cl) <= 0:
+        handler.close_connection = True
+        return handler._send(413, b"too large")
+    length = normalize_content_length(raw_cl)
     body = handler.rfile.read(length) if length else None
 
     upstream = http.client.HTTPConnection(
