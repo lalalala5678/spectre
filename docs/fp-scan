@@ -14,7 +14,11 @@ export PATH="/opt/tools/bin:$PATH"
 # CS9-N5: 双运行位——容器内 /opt/tools(dicts 在挂载内), 宿主侧
 # SPECTRE_DATA_DIR(与 py 工具 _data_root() 同语义; 此前不认 env)。
 if [ -d /opt/tools/dicts ]; then FP_DIR=/opt/tools/dicts
-else FP_DIR="${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools/dicts"; fi
+else
+  FP_DIR="${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools/dicts"
+  # R32D41-N1(对齐 py 工具守卫): 缺 env 静默回退生产数据根即警。
+  [ -z "${SPECTRE_DATA_DIR:-}" ] && echo '[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre(如非本意请先设置 SPECTRE_DATA_DIR)' >&2
+fi
 CFF=$FP_DIR/webappanalyzer.json
 NT_DIR=$FP_DIR/../fingerprints
 OUT=out.tsv; LIST=""; DEEP=0; MAX=120

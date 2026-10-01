@@ -10,8 +10,6 @@ F12 加固(2026-09-27 QA 循环6,公网 IP 已实际触达):
 """
 import socket, threading, time, os, datetime
 from collections import defaultdict, deque
-
-import os
 OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
 if not os.environ.get('SPECTRE_DATA_DIR'):
     print('[oob] 提示: 未设置 SPECTRE_DATA_DIR —— 使用缺省 %s(生产路径; 测试请显式指定隔离目录)' % OUT, flush=True)

@@ -32,7 +32,9 @@ def _data_root():
     env = os.environ.get('SPECTRE_DATA_DIR', '')
     if env:
         return os.path.join(env, 'tools')
-    # R32D41-N1: 静默回退生产数据根曾实测跨实例误写——回退即警。
+    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
+    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
+    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
     print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
           '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
     return '/var/lib/spectre/tools'
@@ -83,6 +85,10 @@ def load_phishlet(path):
 
 def list_phishlets(directory):
     out = []
+    if not os.path.isdir(directory):
+        print(f'[phishlet-proxy] 目录不存在: {directory}(可先 init 生成样例)',
+              file=sys.stderr)
+        return out
     for fn in os.listdir(directory):
         if fn.endswith('.json'):
             try:
@@ -349,7 +355,7 @@ def write_samples(directory):
         print(f'  {p}')
 
 if __name__ == '__main__':
-    if len(sys.argv) < 2 or sys.argv[1] not in ('serve', '-h', '--help'):
+    if len(sys.argv) < 2 or sys.argv[1] not in ('serve', 'list', 'init', '-h', '--help'):
         # R32D41-N3: 未知子命令此前静默 exit 0(--help 也零输出)。
         print(__doc__); sys.exit(0 if sys.argv[1:] and sys.argv[1] in ('-h', '--help') else 2)
     if sys.argv[1] == 'serve':

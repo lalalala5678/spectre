@@ -153,12 +153,14 @@ def do_http(req_spec, target, timeout=10):
 def _capture_internal_words(matchers, results, hay):
     """F39: internal matcher 命中值→变量(多请求传递: nuclei 语义
     internal word 命中的具体词可在后续请求 {{name}} 引用)。
-    hay 为待搜文本(HTTP 版=part 对应的 header/body 串; DNS 版=
-    answers 全文本)。返回捕获 dict 或 None。
+    只捕 internal:true 且命中且带 name 的 matcher, 累积到同一 dict
+    (CS14-2/3: 恢复 internal-only 过滤与累积语义——去重时曾丢失)。
+    hay 为待搜文本(HTTP 版=part 对应的 header/body 串, 由调用侧
+    路由; DNS 版=answers 全文本)。返回捕获 dict 或 None。
     CS13-6: 此前 HTTP/DNS 两份逐行重复(复制改名事故的温床)。"""
     captured = {}
     for m, hit in zip(matchers, results):
-        if hit and m.get('name'):
+        if m.get('internal') and hit and m.get('name'):
             for w in (m.get('words') or []):
                 if w.lower() in hay.lower():
                     captured[m['name']] = w
@@ -166,8 +168,11 @@ def _capture_internal_words(matchers, results, hay):
     return captured or None
 
 def apply_matchers(matchers, status, headers, body, req_condition=None):
+    """执行 matchers——组合语义由请求级 matchers-condition 决定
+    (nuclei 默认 and; or 时任一非 internal 命中即中, 见 F38 块)。
+    req_condition 同时记录到函数属性, 供 run_dns_matchers 读取
+    (同模板 HTTP 段先跑时 DNS 组合跟随; 见 CS14-6)。"""
     apply_matchers._req_condition = req_condition or 'and'
-    """执行 matchers——全部 AND 关系(nuclei 默认)"""
     # F29: internal:true 是条件匹配器,不构成最终命中——纯 internal 模板
     # 一律不判中(防"任何 200 服务器被报 critical RCE")。
     matchers = matchers or []
@@ -279,13 +284,14 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
     req_cond = getattr(apply_matchers, '_req_condition', 'and')
     final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
     if final:
+        captured = {}
         for m, hit in zip(matchers, results):
-            if not (hit and m.get('name')):
+            if not (m.get('internal') and hit and m.get('name')):
                 continue
             hay = header_str if m.get('part') == 'header' else body_str
-            captured = _capture_internal_words([m], [hit], hay)
-            if captured:
-                return {'__vars__': captured}
+            captured.update(_capture_internal_words([m], [hit], hay) or {})
+        if captured:
+            return {'__vars__': captured}
     return final
 
 def apply_extractors(extractors, status, headers, body):
@@ -342,13 +348,19 @@ def do_dns(req_spec, target_domain):
     except Exception:
         return []
 
-def run_dns_matchers(matchers, answers):
+def run_dns_matchers(matchers, answers, req_condition=None):
+    """执行 DNS matchers。组合语义: 请求级 matchers-condition(默认 and)。
+    CS14-6: 显式传参——此前经 apply_matchers._req_condition 函数属性
+    通道隐式继承同模板 HTTP 段的条件。CS14-7: results 按索引对齐
+    matchers(非 word 型记 None 不参与组合, 修复 zip 配对错位)。"""
     results = []
     for m in matchers or []:
         if m.get('type') == 'word':
             words = m.get('words', [])
             matched = any(any(w.lower() in str(a).lower() for a in answers) for w in words)
             results.append(matched)
+        else:
+            results.append(None)
     if not results:
         return False
     # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
@@ -357,8 +369,11 @@ def run_dns_matchers(matchers, answers):
     # F38-修: 请求级组合读 nuclei 真实键 matchers-condition(默认 and);
     # 此前把 matcher 内 condition(其 words 的 or)误当请求级 →
     # status 单独命中即 FP(exposures 复扫 azure 类实锤)。
-    req_cond = getattr(apply_matchers, '_req_condition', 'and')
-    final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
+    eff = [r for r in results if r is not None]
+    if not eff:
+        return False
+    req_cond = req_condition or 'and'
+    final = any(eff) if req_cond == 'or' and len(matchers) > 1 else all(eff)
     # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
     # internal word 命中的具体词可在后续请求 {{name}} 引用)
     if final:
@@ -501,7 +516,8 @@ def execute_template(tpl, target, timeout=15):
             break
         answers = do_dns(req_spec, target.replace('https://', '').replace('http://', ''))
         matchers = req_spec.get('matchers', [])
-        if run_dns_matchers(matchers, answers):
+        dns_cond = req_spec.get('matchers-condition')
+        if run_dns_matchers(matchers, answers, req_condition=dns_cond):
             findings.append({
                 'template-id': tpl_id,
                 'name': info.get('name', tpl_id),

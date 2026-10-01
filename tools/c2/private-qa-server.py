@@ -20,8 +20,13 @@ from http.server import BaseHTTPRequestHandler
 CONTAINER = os.environ.get('SPECTRE_SANDBOX_CONTAINER', '')
 # CS8-P1-3: 数据根走 SPECTRE_DATA_DIR(镜像 deploy/oob-collector.py 先例)
 # ——该服务以 $SPECTRE_DATA_DIR 部署启动, 此前硬编码使隔离实例读生产。
-_TOOLS = os.path.join(
-    os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+# R32D41-N1: 缺 env 静默回退生产数据根即警(与 py 工具守卫同制式)。
+_ROOT = os.environ.get('SPECTRE_DATA_DIR', '')
+if not _ROOT:
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    _ROOT = '/var/lib/spectre'
+_TOOLS = os.path.join(_ROOT, 'tools')
 INBOX = os.path.join(_TOOLS, 'c2/qa-inbox')
 CFG = os.path.join(_TOOLS, 'c2/private-qa.json')
 TOKEN = os.environ.get('PRIVATE_QA_TOKEN', '')

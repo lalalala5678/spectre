@@ -21,6 +21,8 @@ def _data_root():
     env = os.environ.get('SPECTRE_DATA_DIR', '')
     if env:
         return os.path.join(env, 'tools')
+    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
+    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退即警。
     print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
           '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
     return '/var/lib/spectre/tools'
