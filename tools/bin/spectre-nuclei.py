@@ -10,7 +10,6 @@
 import sys, os, json, re, argparse, hashlib, time
 import yaml
 import urllib.request, urllib.error
-import socket
 import ssl
 
 for _p in ('/opt/tools/py', '/opt/tools/py/dkim', '/opt/tools/py/semgrep', '/opt/tools/py/dirsearch'):

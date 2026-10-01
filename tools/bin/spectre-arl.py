@@ -11,7 +11,6 @@
   spectre-arl assets --project mycorp [--type subdomain|port|service]
 """
 import sys, os, json, sqlite3, time, argparse, hashlib
-from pathlib import Path
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载

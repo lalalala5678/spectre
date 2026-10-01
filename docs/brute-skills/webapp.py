@@ -3,9 +3,8 @@
 密码与算法在 config 里;判定文件 /tmp/brutebench-hits.log(命中即 append)。
 端口:18080(明文) 18081(MD5+salt) 18082(AES-CBC) 18083(JWT weak secret) 18084(API basic)
 """
-import hashlib, hmac, json, base64, os, threading, time
-from flask import Flask, request, jsonify, abort
-
+import hashlib, json, base64, os, threading, time  # CS27-10: hmac 已由 :77 as _h 局部别名
+from flask import Flask, request, jsonify  # CS27-10: abort 死引用已删
 HITS = '/tmp/brutebench-hits.log'
 def hit(tag):
     with open(HITS, 'a') as f:

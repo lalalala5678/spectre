@@ -279,7 +279,7 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
                 # 降级到手工对话投递(实测本地 qa-smtp 即此行为)
                 print('[warn] relay replied 250 to DATA (non-RFC), fallback to dialog send',
                       file=sys.stderr)
-                from email import policy as _policy
+                # CS27-10: 死 import _policy 已删(as_bytes 用 compat32 缺省;
                 # 注: msg.as_bytes(policy=SMTP) 对 compat32 非ASCII头(中文主题/显示名)
                 # fold 时报 UnicodeEncodeError —— 改用与 send_message 内部一致的
                 # compat32 原始字节(8-bit UTF-8),再手工 CRLF 规范化(RFC 5321 线序)

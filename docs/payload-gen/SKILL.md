@@ -12,6 +12,8 @@ MemShellParty·jMG 族谱(中间件×注入位×协议兼容)。
 |---|---|---|---|
 | source-lane | /opt/tools/c2/basetypes/ 源码骨架 | **SPECTRE-MARK 承重**(见下) | decomp 文本族+全流水线 |
 | real-lane | jMG 真实 class 字节(c2-basetype.py 生成) | manifest sha256/jmg-info | 需字节码变换族(未建,如实声明) |
+| jakarta 道 | javastubs-jakarta/(CS27-13) | RT-COMPILE/RT | c2-functest 已接 TC10+STUBS_J |
+| reactor 道 | javastubs-rx/(仅 classes, 见其 README) | RT-COMPILE | c2-javart/functest RXSTUB |
 
 ## 基型契约(source-lane 新增基型必须满足,否则不收)
 1. **标记承重**:SPECTRE-MARK 必须是字面量且参与运行时自证
@@ -23,13 +25,14 @@ MemShellParty·jMG 族谱(中间件×注入位×协议兼容)。
 ## jMG 真实生成器接入(v2,已可用)
 ```
 c2-basetype.py list serverTypes|shellTypes|formatTypes
-<!-- R32D51-7: jmg 产物是"注入器类"(生成并注入 memshell 实例), 不是
-     Listener/Filter 本体——不能直接用 c2-javart --class --mode listener
-     验证(类型不符); 走 manifest sha256/jmg-info 记账验证。 -->
 c2-basetype.py gen --engine jmg --server Tomcat --shell Filter --tool Godzilla \
                    --format BASE64 --name jmg_filter_godzilla
 c2-basetype.py verify
 ```
+
+> R32D51-7: jmg 产物是"注入器类"(生成并注入 memshell 实例), 不是
+> Listener/Filter 本体——不能直接用 `c2-javart --class --mode listener`
+> 验证(类型不符); 走 manifest sha256/jmg-info 记账验证。
 - 生成器:/opt/tools/c2/generators/jmg-cli-1.0.9.jar(sha256=31186f1e…,上游 pen4uin/java-memshell-generator)
 - 输出落 /opt/tools/c2/basetypes-jmg/(勿混入 benchmark 基型目录)
 - **实测警告:jMG 1.0.9 生成物硬依赖 sun.misc.BASE64Decoder(JDK8 API)——

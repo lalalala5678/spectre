@@ -82,6 +82,10 @@ def write_lines(lines):
 
 def main():
     argv = sys.argv[1:]
+    # R32D52-N2: -h/--help rc=0(全 CLI 家族统一)。
+    if len(argv) >= 1 and argv[0] in ("-h", "--help"):
+        print(__doc__)
+        sys.exit(0)
     if len(argv) < 1 or argv[0] not in ("add", "del", "list"):
         print(__doc__)
         sys.exit(2)

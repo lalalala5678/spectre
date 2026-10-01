@@ -251,7 +251,12 @@ async function bootstrapToolchain() {
   // R24-3: 输出单行化——此前多行 apt 输出与状态粘连不可读
   // R26: 固定文案——此前取尾行, apt/pip 的 WARNING/Writing 行语义拧巴
   console.log(`[sandbox] bootstrap ${res.code === 0 ? 'ok' : 'FAILED'}(基础包 nodejs/python3/git/build-essential)${res.code === 0 ? '' : `: ${String(res.out).slice(-160)}`}`);
-  if (res.code === 0) {
+  if (res.code !== 0) {
+    // R32D52-N4: 失败不写 marker(下次启动重试)且不谎报 ok——此前
+    // 失败仍返回 ok:true, 调用方(健康面)与文档承诺脱节。
+    return { bootstrapped: false, error: `bootstrap exit ${res.code}: ${String(res.out).slice(-160)}` };
+  }
+  {
     // write the identity marker + ledger the apt toolchain so a rebuild
     // can replay it even if the marker path itself is ever lost
     // R24-2: marker 路径与读路径同源(base)——local 此前硬编码 /opt/tools

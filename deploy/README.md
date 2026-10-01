@@ -73,6 +73,9 @@ bash deploy/tools-sync.sh             # 仓库工具链+引导脚本 → 数据�
 # 容器名按数据根哈希精确派生(共享机勿盲打缺省名——隔离实例是
 # spectre-sbx-<sha256(数据根)前8位>, 缺省数据根才是 spectre-sandbox)
 SBX="spectre-sbx-$(printf %s "$SPECTRE_DATA_DIR" | sha256sum | cut -c1-8)"
+# R32D52-N4: 先等 runtime 的自动 bootstrap(基础包)完成再手动跑重型引擎——
+# 并发 apt 会撞 dpkg 锁(error(1)); 自动 bootstrap 失败会在日志打 FAILED 且
+# 不写 marker, 重启 runtime 即重试。
 docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
   || { echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2; exit 1; }
 bash deploy/fetch-jars.sh             # 第三方 jar(~25MB, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)

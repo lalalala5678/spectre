@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""c2-javart — Java 运行时验证包装(嵌入式 Tomcat 9 桩,/opt/tools/c2/javart/RTHarness)。
+"""c2-javart — Java 运行时验证包装(双车道: Tomcat 9 javax / Tomcat 10.1 jakarta,\nRTHarness/RTHarnessJakarta 于 $C2/javart; CS27-11 双车道化表述)。
 用法:
   c2-javart.py --src variant.java             # 源码 → 编译 → 模式探测 → RT
   c2-javart.py --class x.class --name fqcn    # real-lane:class 文件 → load/注册模式
@@ -63,7 +63,18 @@ def detect_mode(logical):
     m = re.search(r'public\s+class\s+(\w+)', logical)
     return 'load', (m.group(1) if m else '')
 
-def lane_of(logical):
+def lane_of(logical, src_path=''):
+    # R32D52-N3: 三级判据——①源文件首行 lane= 声明(基型自带)②jakarta
+    # 目录归属③包名特征。此前仅③, j10_controller_spring(无 jakarta.
+    # 字样的 jakarta 道)误入 javax 道必败。
+    if src_path:
+        try:
+            head = open(src_path, errors='replace').read(200)
+            if 'lane=jakarta' in head: return 'jakarta'
+            if 'lane=javax' in head: return 'javax'
+        except OSError:
+            pass
+        if 'basetypes-jakarta' in src_path: return 'jakarta'
     return 'jakarta' if 'jakarta.' in logical else 'javax'
 
 def compile_src(src_path, outdir):
@@ -76,7 +87,7 @@ def compile_src(src_path, outdir):
     name = m.group(1)
     tmp = os.path.join(outdir, name + '.java')
     shutil.copy(src_path, tmp)
-    lane = lane_of(logical)
+    lane = lane_of(logical, src_path)
     tc = TC10 if lane == 'jakarta' else TC9
     stub_cp = f'{STUBS_J}:{STUBS}' if lane == 'jakarta' else STUBS
     xc = extra_cp(logical)
@@ -118,7 +129,7 @@ def main():
                 print(f'RT-COMPILE-FAIL: {logical}'); return 1
             mode, marker = detect_mode(logical)
             xc = extra_cp(logical)
-            rc, line = run_harness(mode, name, marker, d + (':' + xc if xc else ''), lane_of(logical))
+            rc, line = run_harness(mode, name, marker, d + (':' + xc if xc else ''), lane_of(logical, a.get('--src') or ''))
         else:
             cls = a['--class']
             outd = os.path.dirname(os.path.abspath(cls)) or '.'

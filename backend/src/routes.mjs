@@ -81,7 +81,7 @@ function realRouter({ store, bus, caps, wal }) {
       // 缺省统一 'web'(CS23-N16, 与 tools.mjs 工具面一致——agent 自注册
       // 无本地沙箱语义)——先归一再校验, 此前 || 'web' 在守卫后不可达。
       const KNOWN_TRANSPORTS = ['local', 'ssh', 'web'];
-      const transport = String(body.transport || 'web');
+      const transport = String(body.transport || 'web').toLowerCase();  // CS27-14: 与 agent 入口同归一('WEB'→'web' 不再 400)
       if (!KNOWN_TRANSPORTS.includes(transport)) {
         return bad(res, 400, `transport 必须是 ${KNOWN_TRANSPORTS.join('/')} 之一`);
       }

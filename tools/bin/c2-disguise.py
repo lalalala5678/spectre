@@ -218,6 +218,9 @@ def check_delivery(d):
     return out
 
 def main():
+    # CS27-9: -h/--help rc=0(家族统一)。
+    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__); return 0
     if len(sys.argv) < 3:
         print(__doc__); return 2
     cmd, args = sys.argv[1], sys.argv[2:]

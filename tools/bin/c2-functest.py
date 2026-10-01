@@ -36,9 +36,15 @@ SPRING = ':'.join(os.path.join(_C2, p) for p in [
     'libs/spring/spring-aop-6.0.9.jar', 'libs/spring/spring-jcl-6.0.9.jar',
     'libs/tomcat-embed-core-10.1.42.jar'])  # CS24-F2: 双根化
 RXSTUB = os.path.join(_C2, 'javastubs-rx/classes')
+# CS27-4: jakarta 车道桩(j10_* 基型 implements jakarta.* 此前结构性
+# 不可编译——STUB_CP 只含 javax 桩)。
+STUBS_J = os.path.join(_C2, 'javastubs-jakarta/classes')
+TC10 = os.path.join(_C2, 'libs/tomcat-embed-core-10.1.42.jar')
 
 def extra_cp(body):
     e = []
+    if 'jakarta.servlet' in body:
+        e.append(TC10); e.append(STUBS_J)
     if 'org.springframework' in body: e.append(SPRING)
     if 'reactor.core.publisher' in body or 'web.reactive' in body: e.append(RXSTUB)
     return ':'.join(e)
@@ -58,7 +64,9 @@ def javac_check(p):
     try:
         shutil.copy(p, os.path.join(d, name + '.java'))
         xc = extra_cp(src)
-        cmd = ['javac', '-encoding', 'UTF-8', '-cp', STUB_CP + (':' + xc if xc else ''), '-d', os.path.join(d, 'out'),
+        # CS27-4: 真实依赖(xc)前置于桩树——javax 桩的 spring 接口先于真
+        # jar 解析会使 jakarta 形参不构成 override(c2-javart 同款已修)。
+        cmd = ['javac', '-encoding', 'UTF-8', '-cp', (xc + ':' if xc else '') + STUB_CP, '-d', os.path.join(d, 'out'),
                os.path.join(d, name + '.java')]
         if 'sun.misc' in logical:
             cmd[1:1] = ['--patch-module', 'jdk.unsupported=' + SUN_PATCH]

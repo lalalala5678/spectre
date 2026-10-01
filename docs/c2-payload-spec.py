@@ -32,7 +32,6 @@ def _data_root():
     print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
           '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
     return '/var/lib/spectre/tools'
-from pathlib import Path
 
 SPEC_DIR = os.path.join(_data_root(), 'c2/payload-specs')  # CS10-4
 ENGINE = os.path.join(_data_root(), 'bin/c2-variant.py')  # CS10-4

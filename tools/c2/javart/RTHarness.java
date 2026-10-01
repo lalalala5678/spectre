@@ -173,10 +173,8 @@ public class RTHarness {
         // R32D51: 101 探针改裸 socket——HttpURLConnection 对协议切换必抛
         // ProtocolException 被判 -error(结构性 BAD)。裸 socket 读状态行,
         // 101 即成功(handler init 已跑, marker 在服务端 stdout)。
-        return rtUpgradeRaw(cn);
-    }
-    static String rtUpgradeRaw(String cn) throws Exception {
-        return rtViaSci(cn, "upgrade", "raw101");  // SCI 注册(同原路径), 探针换裸 socket
+        // CS27-12: 透传包装并入本层。
+        return rtViaSci(cn, "upgrade", "raw101");
     }
     static String rtFilter(String cn) throws Exception { return rtViaSci(cn, "filter"); }
     static String rtServlet(String cn) throws Exception { return rtViaSci(cn, "servlet"); }

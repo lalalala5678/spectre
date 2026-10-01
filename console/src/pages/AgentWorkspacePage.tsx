@@ -49,6 +49,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const [uiReady, setUiReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
+    // CS27-2: 每轮 boot 复位——bootDoneRef 此前只在首挂载置 true 后
+    // 永不复位, 原地 re-boot(项目切换/重试)期间空态分支误放行可点
+    // '新建会话'(与自动建会话竞争产重复空会话)。
+    bootDoneRef.current = false;
     Promise.all([ensureWorkSession(), getPrefs()]).then(async ([ws, prefs]) => {
       if (cancelled) return;
       uiPrefsRef.current = prefs.ui ?? {};
@@ -192,7 +196,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       bootDoneRef.current = true;  // R32D32-R3
     })().catch((err: unknown) => {
       // Bootstrap failures (runtime down, auth expired, …) must surface —
-      // never a silent empty workspace.
+      // never a silent empty workspace. CS27-2: 失败也算 boot 完成——
+      // 空态分支此前永久 pulse '正在准备会话…'(状态谎报)。
+      bootDoneRef.current = true;
       if (!cancelled) setWsError(errText(err));
     });
     return () => { cancelled = true; };

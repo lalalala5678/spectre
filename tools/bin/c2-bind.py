@@ -104,6 +104,9 @@ def cmd_expire(args):
     return 0
 
 def main():
+    # CS27-9: -h/--help rc=0(与 javart/functest/payload-spec 家族统一)。
+    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+        print(__doc__); return 0
     if len(sys.argv) < 2:
         print(__doc__); return 2
     cmd, args = sys.argv[1], sys.argv[2:]
