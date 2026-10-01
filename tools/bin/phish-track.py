@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """phish-track — 钓鱼追踪端点(HTTP) + 数据收集
 用法:
-  phish-track.py serve --port 8080 --db /tmp/phish-track.json
-  phish-track.py report --db /tmp/phish-track.json
+  phish-track.py serve --port 8080   # 事件库缺省=数据根 tools/phish/track.json
+  phish-track.py report              # 同上, --db 可覆盖
 追踪点: /open.gif (打开) / /click/<uid> (点击) / /submit (凭据提交)
 """
 import sys, os, json, time, hashlib, base64, re
@@ -17,8 +17,6 @@ def _data_root():
         return '/opt/tools'
     return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
 
-def _in_container():
-    return os.path.exists('/opt/tools/bootstrap-sandbox.sh')
 def _phish_dir():
     return os.path.join(_data_root(), 'phish')
 DB_FILE = f'{_phish_dir()}/track.json'  # campaigns API 可读(phish-funnel 同目录)
@@ -226,7 +224,7 @@ if __name__ == '__main__':
     ap.add_argument('mode', choices=['serve', 'report'])
     ap.add_argument('port_pos', nargs='?', type=int, help='兼容旧位置参数形式')
     ap.add_argument('--port', type=int)
-    ap.add_argument('--db', help='事件库路径(默认 /opt/tools/phish/track.json)')
+    ap.add_argument('--db', help='事件库路径(缺省=数据根 tools/phish/track.json, 双运行位)')
     a = ap.parse_args()
     if a.db:
         DB_FILE = a.db  # load_db/save_db 均引用模块全局,重绑即生效

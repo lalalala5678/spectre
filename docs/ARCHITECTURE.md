@@ -81,9 +81,10 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   └── package.json
 │
 ├── deploy/                        # 运维物料
-│   ├── systemd/                   # 单元文件(或符号链接说明)
-│   ├── caddy/                     # Caddyfile 备份 + 接入片段
-│   └── passwd                       # spectre-passwd CLI 生成(scrypt)
+│   ├── systemd/                   # 单元文件 ×6
+│   ├── Caddyfile                  # TLS 反代样例(顶层单文件)
+│   ├── oob-collector.py           # OOB TCP 收集器
+│   └── tools-sync/skills-seed/fetch-jars/bootstrap 四脚本
 │
 └── (运行时数据,不在仓库)
     /etc/spectre-auth/             #   passwd(多用户 scrypt)
@@ -101,7 +102,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 | activities 是 workflow 唯一出站副作用点 | Temporal 可观测性(history 完整记录每次副作用) |
 | `config.mjs` 是后端唯一配置源 | 换 LLM 厂商/端口 = 改 `.env` 一处 |
 | 智能体身份(agent impersonation)必须带 INTERNAL_TOKEN | 浏览器会话不能伪造 [DM] 注入 |
-| 单一职责;行数软指引(核心文件 tools/sessions/pi ~1000 行属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
+| 单一职责;行数软指引(tools(1036)/sessions(989)/pi(977)/routes(794)/sandbox·tooling(783)/agent-settings(532)/sandbox·container(531) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
 
 ## 4. 控制面 vs 数据面
 
@@ -142,6 +143,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 - followUp 竞态修复:忙判用 pi 的 isStreaming + 失败回退队列,
   「already processing」错误不再外泄(用户原始路径回归通过)
 - 网关 SSE 修复:反代必须用 `read1()` 逐帧转发(chunked 流不能用
+  缓冲式 read,否则 SSE 帧被攒住;头/体早断均已 BrokenPipe 守卫)
 
 ## 6.5 工具配置三智能体(2026-09-10 落地,独立审计复核)
 
@@ -171,6 +173,6 @@ gateway (Python :8081, 仅 127.0.0.1)
 
 1. ~~会话内存态~~ 已解决: WAL append-only 重放(agent-runtime 启动恢复全部会话/bus/项目)
 2. **智能体零定制**:逐智能体定制在 backend/src/agents.mjs 注册表+sessions.mjs 提示词层接入(无 backend/agents/ 目录)
-3. ~~无工具、无沙箱~~ 已解决: sandbox/ 九模块(local/docker 双驱动 ExecutionEnv)+ tools.mjs 工具面
+3. ~~无工具、无沙箱~~ 已解决: sandbox/ 十模块(local/docker 双驱动 ExecutionEnv)+ tools.mjs 工具面
 4. **审计链未接 Merkle**:auth.log 已有,业务事件(journal)待对账入链
 5. **Temporal dev server**:单机开发态;生产需换正式集群 + PostgreSQL

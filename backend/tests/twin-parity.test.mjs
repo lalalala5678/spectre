@@ -1,39 +1,71 @@
 /**
- * twin-parity (CS8-P0): 双胞胎副本一致性机锁。
+ * twin-parity (CS8-P0/CS9-N2/N14): 双胞胎副本一致性机锁。
  *
- * 约定: docs/*.py 是唯一权威源, tools/bin/*.py 是部署产物
- * (deploy/tools-sync.sh 从 tools/bin 复制到数据根)。docs/*-skills/
- * 的技能双胞胎以 skills-seed 实际部署份为准做逐字节 parity。
- * 任一侧单边编辑即红——AGENTS.md:67 "全仓 grep 引用一次同步"的
- * 机器防线(此前 10 对 .py 双胞胎 4 对漂移、修复落在非运行位副本)。
+ * 约定:
+ * - docs/*.py 权威, tools/bin/*.py 部署产物(tools-sync 交付);
+ * - docs/<技能>/ 与 docs/<skills-root>/<技能>/ 的技能双胞胎逐字节一致;
+ * - 双侧存在性纳入断言(N14: 任一侧被删即红, 无静默逃生道)。
+ * 单侧编辑/删除任一侧 → 本测试红(AGENTS.md:67 的机器防线)。
  */
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { readFileSync, existsSync, readdirSync } from 'node:fs';
+import { readFileSync, existsSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..', '..');
 
-test('tools/bin ↔ docs: 全部共有 .py 双胞胎逐字节一致(docs 为权威源)', () => {
-  const bin = join(ROOT, 'tools', 'bin');
-  const drifted = [];
-  for (const f of readdirSync(bin)) {
-    if (!f.endsWith('.py')) continue;
-    const docsCopy = join(ROOT, 'docs', f);
-    if (!existsSync(docsCopy)) continue;  // 独立件(无 docs 版)不在此约
-    if (readFileSync(join(bin, f), 'utf8') !== readFileSync(docsCopy, 'utf8')) {
-      drifted.push(f);
-    }
-  }
-  assert.deepEqual(drifted, [],
-    `双胞胎漂移(以 docs/ 为权威同步 tools/bin/): ${drifted.join(', ')}`);
-});
+const EXPECTED_BIN_TWINS = [
+  'c2-payload-spec.py', 'c2-qa.py', 'c2-variant.py', 'openapi-paths.py',
+  'phish-proxy.py', 'phish-send.py', 'phish-track.py', 'phishlet-proxy.py',
+  'spectre-arl.py', 'spectre-bloodhound.py', 'spectre-nuclei.py',
+];
 
-test('cve-intel 技能双胞胎一致(部署份=docs/nday-skills)', () => {
-  const a = join(ROOT, 'docs', 'cve-intel', 'SKILL.md');
-  const b = join(ROOT, 'docs', 'nday-skills', 'cve-intel', 'SKILL.md');
-  if (!existsSync(a) || !existsSync(b)) return;  // 结构变化时本测自然失效
-  assert.equal(readFileSync(a, 'utf8'), readFileSync(b, 'utf8'),
-    'docs/cve-intel 与 docs/nday-skills/cve-intel 漂移(nvd_cve 指导块曾单侧缺)');
+test('tools/bin ↔ docs: 期望清单内逐字节一致且双侧必须存在', () => {
+  const drifted = [], missing = [];
+  for (const f of EXPECTED_BIN_TWINS) {
+    const a = join(ROOT, 'docs', f), b = join(ROOT, 'tools', 'bin', f);
+    if (!existsSync(a) || !existsSync(b)) { missing.push(f); continue; }
+    if (readFileSync(a, 'utf8') !== readFileSync(b, 'utf8')) drifted.push(f);
+  }
+  assert.deepEqual(missing, [], `双胞胎缺侧: ${missing.join(', ')}`);
+  assert.deepEqual(drifted, [], `双胞胎漂移(docs 为权威): ${drifted.join(', ')}`);
+});
+// 技能双胞胎期望清单(CS9-N2: 全量 21 对枚举锁定——新增双胞胎须入表;
+// skills-root 独有件(无顶层双胞胎)不受约, 删侧逃避因双侧存在性断言封死)。
+const EXPECTED_SKILL_TWINS = [
+  'brute-skills/nmap-cheatsheet',
+  'nday-skills/cve-intel',
+  'nday-skills/exploit-triage',
+  'nday-skills/nday-report',
+  'nday-skills/poc-adapt',
+  'nday-skills/variant-bypass',
+  'phish-skills/email-craft',
+  'phish-skills/landing-page',
+  'phish-skills/smtp-send',
+  'phish-skills/track-report',
+  'recon-skills/attribution-hunt',
+  'recon-skills/cdn-bypass',
+  'recon-skills/cidr-decision',
+  'recon-skills/host-profile',
+  'recon-skills/nmap-cheatsheet',
+  'recon-skills/osint-dork',
+  'recon-skills/pi-discovery',
+  'recon-skills/recon-report',
+  'recon-skills/subdomain-sweep',
+  'recon-skills/vhost-collide',
+  'recon-skills/web-topology',
+];
+
+test('技能双胞胎全量一致(期望清单, 双侧必须存在)', () => {
+  const drifted = [], missing = [];
+  for (const t of EXPECTED_SKILL_TWINS) {
+    const [root, name] = t.split('/');
+    const a = join(ROOT, 'docs', name, 'SKILL.md');
+    const b = join(ROOT, 'docs', root, name, 'SKILL.md');
+    if (!existsSync(a) || !existsSync(b)) { missing.push(t); continue; }
+    if (readFileSync(a, 'utf8') !== readFileSync(b, 'utf8')) drifted.push(t);
+  }
+  assert.deepEqual(missing, [], `技能双胞胎缺侧: ${missing.join(', ')}`);
+  assert.deepEqual(drifted, [], `技能双胞胎漂移: ${drifted.join(', ')}`);
 });

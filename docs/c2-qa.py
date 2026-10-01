@@ -274,12 +274,12 @@ def cmd_scan(args):
 def functest(p, orig=None):
     """v2.1 功能门:文本载荷走 c2-functest;.class 走 c2-bytecode 等价守恒(签名集+加载行为)。"""
     if p.endswith('.class'):
-        r = subprocess.run(['python3', '/opt/tools/bin/c2-bytecode.py', 'verify',
+        r = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'verify',
                             '--orig', orig or p, '--mod', p],
                            capture_output=True, text=True, timeout=180)
         line = (r.stdout.strip().splitlines() or [''])[0]
         return r.returncode == 0, line[:110]
-    r = subprocess.run(['python3', '/opt/tools/bin/c2-functest.py', p],
+    r = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-functest.py'), p],
                        capture_output=True, text=True, timeout=300)
     return r.returncode == 0, (r.stdout.strip().splitlines() or [''])[0]
 
@@ -313,7 +313,7 @@ def cmd_run(args):
                 print(f'AV-CLEAN but FUNCTEST FAIL ({f_note}) — 不算通过,如实交付残骸')
                 return 1
             # 伪装令交付门禁(2026-09 用户令):任一裸奔面=REJECT,不交付
-            dg = subprocess.run(['python3', '/opt/tools/bin/c2-disguise.py', 'check', '--payload', cur],
+            dg = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-disguise.py'), 'check', '--payload', cur],
                                 capture_output=True, text=True)
             dgres = json.loads(dg.stdout) if dg.stdout.strip().startswith('{') else {'verdict': 'ERROR', 'bare_surfaces': ['checker-error']}
             if dgres.get('verdict') == 'REJECT':
@@ -324,7 +324,7 @@ def cmd_run(args):
                     cands2 = sorted(f for f in os.listdir(vo2) if f.startswith('variant_'))
                     for c in cands2:
                         cp2 = os.path.join(vo2, c)
-                        g2 = subprocess.run(['/opt/tools/bin/c2-variant.py', 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
+                        g2 = subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
                                             capture_output=True, text=True)
                         for c2 in [x for x in os.listdir(vo2 + '-m') if x.startswith('variant_')] if os.path.isdir(vo2 + '-m') else []:
                             cp3 = os.path.join(vo2 + '-m', c2)
@@ -365,9 +365,9 @@ def cmd_run(args):
                       open(os.path.join(pkg, 'connect-info.json'), 'w'), ensure_ascii=False, indent=1)
             cur = dstf
             # 一次性绑定:目标×窗口×指纹,交付前 verify(过期/越界=拒)
-            b = subprocess.run(['python3', '/opt/tools/bin/c2-bind.py', 'bind', '--payload', cur],
+            b = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bind.py'), 'bind', '--payload', cur],
                                capture_output=True, text=True)
-            v = subprocess.run(['python3', '/opt/tools/bin/c2-bind.py', 'verify', '--payload', cur],
+            v = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bind.py'), 'verify', '--payload', cur],
                                capture_output=True, text=True)
             brec = {}
             sb = os.path.join(pkg, os.path.basename(cur) + '.bind.json')
@@ -390,14 +390,14 @@ def cmd_run(args):
         vo = os.path.join(work, f'v{r}')
         if cur.endswith('.class'):
             # real-lane:字节码变换族(cp-ldc-split)
-            g = subprocess.run(['python3', '/opt/tools/bin/c2-bytecode.py', 'split',
+            g = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'split',
                                 '--class', cur, '--out', vo], capture_output=True, text=True)
             cands = []
             mfp = os.path.join(vo, 'manifest.json')
             if os.path.exists(mfp):
                 cands = [e['file'] for e in json.load(open(mfp))]  # 绝对路径直用
         else:
-            g = subprocess.run(['/opt/tools/bin/c2-variant.py', 'gen', '--src', cur, '--out', vo,
+            g = subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cur, '--out', vo,
                                 '--rounds', '4', '--families', fams],
                                capture_output=True, text=True)
             cands = sorted(f for f in os.listdir(vo) if f.startswith('variant_')) if os.path.isdir(vo) else []

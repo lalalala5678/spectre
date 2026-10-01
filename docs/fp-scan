@@ -11,7 +11,10 @@ set -u
 # F28-bis: 显式 PATH——裸 docker exec 下 /usr/bin/httpx 是 python-httpx 库 CLI,
 # 层1静默无产出。工具真身在 /opt/tools/bin(shared-tool 层)。
 export PATH="/opt/tools/bin:$PATH"
-FP_DIR=$( [ -d /opt/tools/dicts ] && echo /opt/tools/dicts || echo /var/lib/spectre/tools/dicts )
+# CS9-N5: 双运行位——容器内 /opt/tools(dicts 在挂载内), 宿主侧
+# SPECTRE_DATA_DIR(与 py 工具 _data_root() 同语义; 此前不认 env)。
+if [ -d /opt/tools/dicts ]; then FP_DIR=/opt/tools/dicts
+else FP_DIR="${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools/dicts"; fi
 CFF=$FP_DIR/webappanalyzer.json
 NT_DIR=$FP_DIR/../fingerprints
 OUT=out.tsv; LIST=""; DEEP=0; MAX=120

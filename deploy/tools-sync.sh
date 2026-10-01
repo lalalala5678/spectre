@@ -16,6 +16,8 @@ if [ -z "$SPECTRE_DATA_DIR" ] && [ -z "$1" ] && [ "$DST" = "/var/lib/spectre" ];
 fi
 mkdir -p "$DST/tools/bin" "$DST/tools/c2"
 cp -v tools/bin/*.py "$DST/tools/bin/"
+# CS9-N5: fp-scan 统一指纹入口(pi.mjs 提示词引用)——bash 本体随 bin 交付
+cp -v docs/fp-scan "$DST/tools/bin/fp-scan"; chmod +x "$DST/tools/bin/fp-scan"
 for d in basetypes basetypes-jakarta javastubs yara-rules mock; do
   [ -d "tools/c2/$d" ] && cp -r "tools/c2/$d" "$DST/tools/c2/"
 done
