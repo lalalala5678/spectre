@@ -9,42 +9,20 @@ THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)�
 授权门:$SPECTRE_DATA_DIR/tools/c2/scope.json(容器位 /opt/tools/c2/, 宿主位数据根 tools/c2/),targets/exercise/窗口三必填。
 """
 import sys, os, json, subprocess, time, glob
-from _common import audit_log, _edusrc_hit, _data_root, sha256f
+from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f
 
 
-SCOPE = os.path.join(_data_root(), 'c2/scope.json')
 AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS36-Z4: 五列制式单源(_common.audit_log)
 
-def gate(payload=''):
-    # EDUSRC 硬隔离(工具层)——R32D58 用户裁定: 仅显式 env 旗标触发,
-    # cwd/载荷路径启发式废除(误伤正常使用)。CS34-F7: 谓词收口 _common。
-    # R32D58-F5: 门序族统一=edusrc 先(phish 族同制, 同态退出码不分叉)。
+def gate():
+    # CS44-F3: 收敛 _common 单源门(basetype/bytecode 同款 wrapper——此前
+    # ~29 行本地孤本+死参 payload)。qa 独有差异仅 EDUSRC 拒绝落审计行。
+    # 门序族统一=edusrc 先; scope 三必填/缺/坏 JSON 全在单源门。
     if _edusrc_hit():
         audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
         sys.exit(76)
-    if not os.path.exists(SCOPE):
-        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE})', file=sys.stderr); sys.exit(75)
-    # CS37-F3: 坏 JSON 干净 75(此前裸栈 rc=1)。
-    try:
-        sc = json.load(open(SCOPE))
-    except Exception as e:
-        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); sys.exit(75)
-    t = time.time()
-    try:
-        ok = (sc.get('targets') and
-              sc.get('exercise') and
-              sc['window']['start'] and
-              sc['window']['end'] and
-              sc['window']['start'] <= time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime(t)) <= sc['window']['end'])
-    except Exception:
-        ok = False
-    if not ok:
-        # CS8-P2-2: exercise 与 targets/window 同为必填(cmd_scan 等
-        # 无条件消费 sc['exercise'], 此前按文档造的 scope 裸 KeyError)。
-        print('SCOPE-REJECT: empty targets/exercise or out of window', file=sys.stderr)
-        sys.exit(75)
-    return sc
+    return scope_gate_full()
 
 def audit(target, action, sha, note=''):
     audit_log(AUDIT, target, action, sha, note)  # CS36-Z4: 单源写者
@@ -254,7 +232,7 @@ def scan_all(p, engines):
 
 def cmd_scan(args):
     a0 = dict(zip(args[::2], args[1::2]))
-    sc = gate(a0.get('--payload', ''))
+    sc = gate()
     if '--payload' not in a0:
         print('用法: c2-qa.py scan --payload <文件> [--engines clamav,yara,...]')
         return 2
@@ -281,7 +259,7 @@ def functest(p, orig=None):
 
 def cmd_run(args):
     a0 = dict(zip(args[::2], args[1::2]))
-    sc = gate(a0.get('--payload', ''))
+    sc = gate()
     if '--payload' not in a0:  # R32D38-NEW-4: 与 scan 同款用法行
         print('用法: c2-qa.py run --payload <文件> [--engines ...] '
               '[--max-rounds N] [--families mask,decomp,id,struct]')
@@ -318,7 +296,7 @@ def cmd_run(args):
                 json.dump({'rounds': r, 'results': res, 'sha256': sha,
                            'functest_pass': False, 'functest_note': f_note,
                            'target_exercise': sc['exercise'], 'verdict': 'AV-CLEAN-FUNCTEST-FAIL'},
-                          open(os.path.join(pkg, 'report.json'), 'w'), indent=1)
+                          open(os.path.join(pkg, 'report.json'), 'w'), ensure_ascii=False, indent=1)
                 print(f'AV-CLEAN but FUNCTEST FAIL ({f_note}) — 不算通过,如实交付残骸')
                 return 1
             # 伪装令交付门禁(2026-09 用户令):任一裸奔面=REJECT,不交付
@@ -392,7 +370,7 @@ def cmd_run(args):
             json.dump({'rounds': r, 'results': res, 'sha256': sha,
                        'functest_pass': f_ok, 'functest_note': f_note,
                        'binding': brec, 'target_exercise': sc['exercise']},
-                      open(os.path.join(pkg, 'report.json'), 'w'), indent=1)
+                      open(os.path.join(pkg, 'report.json'), 'w'), ensure_ascii=False, indent=1)
             print(f'PASS after {r} rounds (functest OK, bind {brec.get("target","?")}) → {pkg}')
             return 0
         # 迭代:调变体引擎(签名驱动族+多候选,功能门过滤)

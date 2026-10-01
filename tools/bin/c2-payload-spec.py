@@ -121,7 +121,7 @@ def init_builtin():
     for name, spec in BUILTIN.items():
         p = os.path.join(SPEC_DIR, f'{name}.json')
         if not os.path.exists(p):
-            json.dump(spec, open(p, 'w'), indent=1)
+            json.dump(spec, open(p, 'w'), indent=1, ensure_ascii=False)
             print(f'  + {p}')
         else:
             print(f'  = {p} (exists)')

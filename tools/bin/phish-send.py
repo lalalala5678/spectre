@@ -271,7 +271,7 @@ def track_sent(db_path, uid):
                 db.setdefault('events', []).append(
                     {'kind': 'sent', 'uid': uid,
                      'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())})
-                json.dump(db, open(db_path, 'w'), indent=1)
+                json.dump(db, open(db_path, 'w'), indent=1, ensure_ascii=False)
             finally:
                 fcntl.flock(lf, fcntl.LOCK_UN)
     except Exception as e:

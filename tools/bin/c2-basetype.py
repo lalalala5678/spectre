@@ -93,7 +93,7 @@ def cmd_gen(args):
                'server': a.get('--server', 'Tomcat'), 'shell': a.get('--shell', 'Listener'),
                'tool': a.get('--tool', 'Godzilla'), 'format': a.get('--format', 'BASE64'),
                'lane': 'real-lane(class-bytes)', 'info': info.strip().splitlines()[-3:]})
-    json.dump(mf, open(mf_path, 'w'), indent=1)
+    json.dump(mf, open(mf_path, 'w'), indent=1, ensure_ascii=False)
     audit_log(AUDIT, 'BASETYPE', 'gen', sha[:16], f'{name} real-lane')
     print(f'GEN-OK: {cp} ({len(raw)} bytes, sha={sha[:16]}) → manifest 注册,车道=real-lane(class-bytes)')
     print('注意: real-lane 不适用文本 decomp;QA 需字节码变换族(未建)。')

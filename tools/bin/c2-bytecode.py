@@ -151,7 +151,7 @@ def cmd_split(args):
            'residual_structural': sorted({h[0] for h in resid} - rw)}
     mf = os.path.join(outdir, 'manifest.json')
     m = json.load(open(mf)) if os.path.exists(mf) else []
-    m.append(rec); json.dump(m, open(mf, 'w'), indent=1)
+    m.append(rec); json.dump(m, open(mf, 'w'), indent=1, ensure_ascii=False)
     audit_log(AUDIT, 'BYTECODE', 'split', rec['sha256'][:16], f'{os.path.basename(src)} {len(hits)}->{len(resid)}')
     print(json.dumps(rec, ensure_ascii=False))
     return 0

@@ -218,6 +218,9 @@ rl.on('line', line => {
     // MCP 2025-06-18: 工具侧错误以 result.isError 报告(非协议级 error),
     // in-repo 桥接(mcp.mjs details.isError)已接此管线。
     // 回执头部复读请求参数(agent 实测反馈: 审计链不再依赖调用方自记)
+    // CS44-F1: a 先于 reply 定义(此前未挂载路径先调 reply 引用 a——
+    // TDZ ReferenceError, "✗ 工具未挂载"诊断永不可达, 击穿 AGENTS 原则4)。
+    const a = m.params?.arguments ?? {};
     const reply = (text, isError) => process.stdout.write(J({
       jsonrpc: '2.0', id: m.id,
       result: { content: [{ type: 'text', text: `[${name} ${J(a)}]\n${text}` }], isError: Boolean(isError) },
@@ -229,7 +232,6 @@ rl.on('line', line => {
     // R25-F4: 必填参数运行时校验——缺参此前打到 /undefined 等携凭据
     // 垃圾上游请求(配额灼烧)。运行时守卫胜过 schema 复杂度(tooling
     // 先例)。
-    const a = m.params?.arguments ?? {};
     const required = s[0] === 'ipinfo' ? 'ip' : s[0] === 'threatbook' ? 'domain' : 'query';
     if (!a[required]) { reply(`✗ 缺少必填参数 ${required}`, true); return; }
     // async bridge — respond out-of-band is not possible on stdio sync loop;

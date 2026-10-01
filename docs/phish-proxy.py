@@ -30,7 +30,7 @@ def load_db():
     except: return {'events': []}
 
 def save_db(db):
-    json.dump(db, open(DB_FILE, 'w'), indent=1)
+    json.dump(db, open(DB_FILE, 'w'), indent=1, ensure_ascii=False)
 
 def add_event(db, kind, uid, extra=None):
     # R17-F1: V6b 排他锁读改写——proxy 是事件库四写入方中唯一无锁者

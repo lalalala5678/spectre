@@ -193,7 +193,7 @@ export async function autoPwnWorkflow(input) {
 
   await quick.busEmit({
     channel: 'announce', from: 'orchestrator', type: 'context',
-    summary: `公告:全部 ${agents.length} 个智能体任务结束,engagement ${engagementId} 关闭。`,
+    summary: `公告:全部 ${uniqueAgents.length} 个智能体任务结束,engagement ${engagementId} 关闭。`,
     engagement, workSessionId,
   });
 
@@ -220,7 +220,8 @@ export async function autoPwnWorkflow(input) {
       await quick.busEmit({
         channel: 'announce', from: 'orchestrator', type: 'context',
         title: `战役汇总(编排会话投递失败兜底): ${engagementId}`,
-        summary: summaryLines.slice(0, 480), engagement, workSessionId,
+        summary: clipMarked(summaryLines.join('\n'), 480),  // CS44-F15: 打标截断(再 slice 会切掉标记)
+        engagement, workSessionId,
       });
     } catch { /* 战役确已完成: 结果在返回值+先前的关闭公告 */ }
   }

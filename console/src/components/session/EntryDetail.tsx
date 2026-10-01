@@ -8,6 +8,7 @@ import {
 import { Markdown } from './Markdown';
 import { SeverityBadge, StatusBadge } from './VulnPanel';
 import { cn } from '../../utils/cn';
+import { stripEventTitle } from './eventTitle';
 
 const SEVERITIES = ['info', 'low', 'medium', 'high', 'critical'] as const;
 const STATUSES = ['success', 'partial', 'failed', 'no-result'] as const;
@@ -73,7 +74,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   const current = folded.current;
   const severity = current.severity ?? 'info';
   const title = current.title
-    ?? current.summary.replace(/^(情报上报|产出)[:：]?/, '');
+    ?? stripEventTitle(current.summary, Infinity);  // CS44-F9: 单源(详情不截)
   const revisions = useMemo(
     () => chain.filter(e => e.revises === rootSeq)
       .sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0)),

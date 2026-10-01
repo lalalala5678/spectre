@@ -18,7 +18,6 @@ from _common import scope_gate_full, target_matches, audit_log, _data_root
 
 
 _C2 = os.path.join(_data_root(), 'c2')
-SCOPE = os.path.join(_C2, 'scope.json')
 KEYF = os.path.join(_C2, 'bind.key')
 AUDIT = os.path.join(_C2, 'audit.log')
 
@@ -61,7 +60,7 @@ def cmd_bind(args):
     sha = hashlib.sha256(open(p, 'rb').read()).hexdigest()
     rec = {'sha256': sha, 'target': target, 'exercise': sc['exercise'], 'exp': exp,
            'sig': sig_of(sha, target, sc['exercise'], exp)}
-    json.dump(rec, open(side(p), 'w'), indent=1)
+    json.dump(rec, open(side(p), 'w'), ensure_ascii=False, indent=1)
     audit_log(AUDIT, 'BIND', 'bind', sha[:16], f'{os.path.basename(p)} | {target} | exp={exp}')
     print(f'BOUND {p} → target={target} exp={exp} sha={sha[:16]}')
     return 0
@@ -123,7 +122,7 @@ def cmd_expire(args):
         print('EXPIRE-FAIL: bad sidecar shape(缺 sha256/target/exercise/exp)', file=sys.stderr); return 81
     rec['exp'] = '2000-01-01T00:00:00Z'
     rec['sig'] = sig_of(rec['sha256'], rec['target'], rec['exercise'], rec['exp'])
-    json.dump(rec, open(side(p), 'w'), indent=1)
+    json.dump(rec, open(side(p), 'w'), ensure_ascii=False, indent=1)
     audit_log(AUDIT, 'BIND', 'expire', '', os.path.basename(p))
     print(f'EXPIRED (manual): {p}')
     return 0

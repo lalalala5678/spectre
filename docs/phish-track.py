@@ -37,7 +37,7 @@ def save_db(db):
     with open(DB_FILE + '.lock', 'w') as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
-            json.dump(db, open(DB_FILE, 'w'), indent=1)
+            json.dump(db, open(DB_FILE, 'w'), indent=1, ensure_ascii=False)
         finally:
             fcntl.flock(lf, fcntl.LOCK_UN)
 
@@ -56,7 +56,7 @@ def add_event(db, kind, uid, extra=None):
             except Exception:
                 cur = {'events': []}
             cur['events'].append(ev)
-            json.dump(cur, open(DB_FILE, 'w'), indent=1)
+            json.dump(cur, open(DB_FILE, 'w'), indent=1, ensure_ascii=False)
         finally:
             fcntl.flock(lf, fcntl.LOCK_UN)
     print(f'[track] {kind} uid={uid}', flush=True)
@@ -64,12 +64,14 @@ def add_event(db, kind, uid, extra=None):
 
 def _scope_ok():
     """V2: 逐请求 scope 复查——serve() 启动时一次校验后撤权不停服
-    (writer 实证: 撤 scope 后运行中的 serve 仍接受 /submit)。"""
+    (writer 实证: 撤 scope 后运行中的 serve 仍接受 /submit)。
+    CS44-F10: 谓词收口单源门布尔版(此前本地副本丢三必填之 exercise,
+    phish-send 同款劣化副本已删的先例)。"""
     try:
-        sc = json.load(open(os.path.join(_data_root(), 'c2/scope.json')))
-        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        return bool(sc.get('targets') and
-                    sc['window']['start'] <= now <= sc['window']['end'])
+        scope_gate_full()
+        return True
+    except SystemExit:
+        return False
     except Exception:
         return False
 

@@ -96,7 +96,7 @@ def make_handler(phishlet, db_file):
                     except Exception:
                         cur = {'events': []}
                     cur['events'].append(ev)
-                    json.dump(cur, open(db_file, 'w'), indent=1)
+                    json.dump(cur, open(db_file, 'w'), indent=1, ensure_ascii=False)
                 finally:
                     fcntl.flock(lf, fcntl.LOCK_UN)
             self.log(f'{kind} uid={uid} {extra or ""}')
@@ -315,7 +315,7 @@ def write_samples(directory):
     os.makedirs(directory, exist_ok=True)
     for name, pl in SAMPLE_PHISHLETS.items():
         p = os.path.join(directory, f'{name}.json')
-        json.dump(pl, open(p, 'w'), indent=1)
+        json.dump(pl, open(p, 'w'), indent=1, ensure_ascii=False)
         print(f'  {p}')
 
 if __name__ == '__main__':

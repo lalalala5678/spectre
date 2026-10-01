@@ -219,11 +219,15 @@ export function buildIntelTools(record, caps) {
           : entryKind(e) === 'vulnerability'
             ? `[seq=${e.seq}][漏洞|${e.severity ?? '?'}] ${prov}`
             : `[seq=${e.seq}][情报] ${prov}`;
+        const hasDetail = Boolean(e.detail);
         const full = String(e.detail ?? e.summary ?? '');
         const body = full.slice(0, 400);
         // Never cut silently (repo rule): mark per-entry truncation and
-        const mark = full.length > 400
-          ? `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)` : '';
+        // CS44-F2: detail 缺失时 summary 在 emit 已截 500+——seq 取不回
+        // 全文(措辞如实, 不再谎报总数/承诺取全文)。
+        const mark = hasDetail
+          ? (full.length > 400 ? `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)` : '')
+          : (full.length > 400 ? `\n(摘要已截断:显示 ${body.length} 字符——原文仅 detail 通道可取全文)` : '');
         const voidTag = e.void ? '[已作废——本条不再出现在常规查询中]' : '';
         const revTag = e.revisedCount
           ? ` ⟳已修订${e.revisedCount}次(seq=${e.seq} 为原始条目,现行版为修订后的内容)` : '';
@@ -435,14 +439,12 @@ export function buildIntelTools(record, caps) {
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
       }
-      // CS41-B1/CS42-F12: 单条截断打标(clipMarked 单源格式+补全手段,
-      // AGENTS 原则3——此前裸 slice 无标记)。
+      // CS41-B1/CS44-F5: 单条截断直接调 clipMarked 单源(此前手搓标记
+      // 差一前导空格; AGENTS 原则3)。
       const lines = messages.map(m => {
         const raw = m.text || '(无文本)';
         const who = m.role === 'user' ? '用户' : m.role === 'toolResult' ? '工具结果' : '智能体';
-        return raw.length > 300
-          ? `${who}: ${raw.slice(0, 300)} [已截断:原文 ${raw.length} 字符,API GET /api/sessions/:id 取全文]`
-          : `${who}: ${raw}`;
+        return `${who}: ${clipMarked(raw, 300, 'API GET /api/sessions/:id 取全文')}`;
       });
       return { content: [{ type: 'text',
         text: clipMarked(`会话 ${sid} 最近 ${messages.length} 条消息:\n\n${lines.join('\n\n---\n\n')}`,
@@ -870,7 +872,7 @@ export function buildShellTools(record, caps) {
 function markClipped(text, cap, how) {
   const s = String(text ?? '');
   if (s.length <= cap) return s;
-  return s.slice(0, cap) + `\n[已截断 ${cap}/${s.length} 字符——${how}]`;
+  return s.slice(0, cap) + `\n[已截断:${cap}/${s.length} 字符,${how}]`  // CS44-F5: 逗号单源制式;
 }
 
 /** Bus-entry kind normalization. Legacy WAL data carries vulnerability events

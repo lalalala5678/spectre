@@ -433,8 +433,8 @@ def cmd_gen(args):
                          'guard': 'pass', 'note': ';'.join(note)[:180],
                          'mask_keys': mask_keys or None})
     if corpus_path is not None:
-        json.dump(corpus, open(corpus_path, 'w'))
-    json.dump(manifest, open(os.path.join(outdir, 'manifest.json'), 'w'), indent=1)
+        json.dump(corpus, open(corpus_path, 'w'), ensure_ascii=False)
+    json.dump(manifest, open(os.path.join(outdir, 'manifest.json'), 'w'), ensure_ascii=False, indent=1)
     print(json.dumps(manifest, indent=1))
     return 0
 

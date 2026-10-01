@@ -2,6 +2,7 @@
 # 第三方 jar 依赖装载(~51MB 实测, 不入 git, 首次部署下载)
 # 目标: $SPECTRE_DATA_DIR/tools/c2/{libs,generators}(挂载进容器为 /opt/tools/c2/*)
 # 任何一项失败都会在结尾汇总报错并以非零退出(不静默吞)。
+set -u  # CS44-F19: 族旗标对齐(-e 不用: 累积式失败汇总靠显式 exit)
 ROOT=${SPECTRE_DATA_DIR:-/var/lib/spectre}
 # R14-1(十四轮): 生产缺省守卫——同族 tools-sync/skills-seed 已三修, 此为
 # 最后缺位者(漏 env 直跑即静默写 ~51MB jar 进生产路径)。

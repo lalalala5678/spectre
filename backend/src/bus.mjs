@@ -53,7 +53,10 @@ export class Bus {
       from: entry.from,
       to: entry.to || 'all',
       type: entry.type || 'context',
+      // CS44-F2: 静默截断→单源打标(与 detail 的 clipMarked 同纪律; 此前
+      // 裸切 500, query_intel 消费侧据已切文本谎报总数)。
       summary: String(entry.summary || '').slice(0, 500),
+      summaryClipped: String(entry.summary || '').length > 500,
       payloadRef: entry.payloadRef ?? null,
       engagement: entry.engagement ?? null,
       severity: entry.severity ?? null,

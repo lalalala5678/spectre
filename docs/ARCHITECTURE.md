@@ -62,7 +62,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 │   ├── agent-runtime.mjs          # 入口:HTTP 服务装配
 │   ├── worker.mjs                 # 入口:Temporal Worker 装配
 │   ├── workflows.mjs              # autoPwnWorkflow / agentTaskWorkflow
-│   ├── activities.mjs             # 4 个 activity(唯一出站副作用点)
+│   ├── activities.mjs             # 9 个 activity(唯一出站副作用点)
 │   ├── src/
 │   │   ├── config.mjs             # .env 加载 + 冻结常量(唯一配置源)
 │   │   ├── agents.mjs             # 智能体注册表(key/name/role)
@@ -105,7 +105,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 | activities 是 workflow 唯一出站副作用点 | Temporal 可观测性(history 完整记录每次副作用) |
 | `config.mjs` 是后端唯一配置源 | LLM 厂商在平台「设置」页换(R32D44 平台化); 端口等 = 改 `.env` 一处 |
 | 智能体身份(agent impersonation)必须带 INTERNAL_TOKEN | 浏览器会话不能伪造 [DM] 注入 |
-| 单一职责;行数软指引(tools(1055)/pi(1054)/sessions(1006)/routes(839)/agent-settings(766)/sandbox·tooling(784)/sandbox·container(554) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
+| 单一职责;行数软指引(tools(1057)/pi(1054)/sessions(1006)/routes(839)/agent-settings(766)/sandbox·tooling(784)/sandbox·container(554) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
 
 ## 4. 控制面 vs 数据面
 

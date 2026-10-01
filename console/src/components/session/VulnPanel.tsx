@@ -4,6 +4,7 @@ import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
 import { PanelEntryMeta } from './PanelEntryMeta';
 import { cn } from '../../utils/cn';
+import { stripEventTitle } from './eventTitle';
 
 // CS3-N21: 大小写双胞胎删除——severity 在修订/发布入口已归一小写;
 // 显示侧兜底 toLowerCase。
@@ -88,7 +89,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
         {events.map(event => {
           const severity = String(event.current.severity ?? event.severity ?? 'info').toLowerCase();  // CS3-N21
           const title = event.current.title ?? event.title
-            ?? event.summary.replace(/^(情报上报|产出)[:：]?/, '').slice(0, 60);
+            ?? stripEventTitle(event.summary);  // CS44-F9: 单源
           return (
             <button
               key={event.seq}

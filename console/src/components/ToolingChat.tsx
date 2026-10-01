@@ -2,16 +2,12 @@ import { useEffect, useState } from 'react';
 import { Bot, RefreshCw } from 'lucide-react';
 
 import { api } from '../api/client';
+import type { ApiSessionSummary } from '../api/client';
 import { LiveSession } from './session/LiveSession';
 import { cn } from '../utils/cn';
 
-interface ApiSessionSummary {
-  id: string;
-  agentKey: string;
-  workSessionId: string | null;
-  engagementId: string | null;
-  parentSessionId: string | null;
-}
+// CS44-F16: 直接用 api/client 导出接口(此前手抄 5 字段孪生——新增
+// 字段(title/brief/spawnName 等)手抄本全缺, 双胞胎形状漂移温床)。
 
 /**
  * Embedded config-agent chat. Each management page binds to ITS OWN

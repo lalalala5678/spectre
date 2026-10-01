@@ -62,7 +62,8 @@ class SessionPersistence:
                 return
             self._dirty = False
             self._last_write = now
-            payload = json.dumps(sessions)
+            # CS44-F18: ensure_ascii 与 security.py 同制式
+            payload = json.dumps(sessions, ensure_ascii=False)
             tmp = self._path + ".tmp"
             try:
                 os.makedirs(os.path.dirname(self._path), exist_ok=True)
