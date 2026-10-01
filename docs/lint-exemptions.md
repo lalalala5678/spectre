@@ -30,3 +30,14 @@ undefined-identifier 类回归纳入基线。oxlint 版本两侧对齐 ^1.86.0(C
 `gateway/setup.cfg` 配置 pycodestyle; 全量通过基线:
 
     PYTHONPATH=/opt/tools/py python3 -m pycodestyle gateway/
+
+## 事故记载(CS11-1/2: 批次 P 粘贴覆写, 2026-10-01)
+
+批次 P(9c0fa4a)发生两起编辑事故: 把 spectre-arl.py / phishlet-proxy.py
+的内容整体粘贴覆写了 docs/c2-payload-spec.py / docs/phish-proxy.py, 随后
+的 CS10-4/5/6"修复"落在了覆写副本上——提交信息三处失实(硬编码归零/
+TODO 注释/SPEC_DIR 所述对象不存在)。两文件已从 git 历史(9c0fa4a^)
+恢复并在原文件上重做修复; 机锁 v4(twin-parity)新增跨文件内容查重
+(>90% 相似即红)与技能清单运行时枚举集合相等断言, 封堵此类事故的
+公共盲区。教训: 相邻同名族文件批量 sed 后必须按文件头 docstring 抽查
+身份, 不能只看 lint/parity 绿灯。

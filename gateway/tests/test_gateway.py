@@ -85,7 +85,7 @@ class NormalizeContentLength(unittest.TestCase):
 
 
 class ProxyMalformedCL(unittest.TestCase):
-    """R32D38-NEW-7: 有声明但 CL<=0 的 /api 转发前 413 断连."""
+    """R32D38-NEW-7/CS10-3: 仅负值/不可解析 CL 413 断连; CL:0 放行(见下 test)."""
 
     def test_negative_cl_rejected_before_upstream(self):
         from unittest.mock import MagicMock

@@ -354,10 +354,10 @@ if __name__ == '__main__':
             print('serve 需要 --phishlet <json>', file=sys.stderr); sys.exit(1)
         serve(listen, load_phishlet(pl_path), db)
     elif sys.argv[1] == 'list':
-        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or '/opt/tools/phishlets'
+        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or os.path.join(_data_root(), 'phishlets')
         for pl in list_phishlets(d):
             print(f"{pl['name']:>15} → {pl['target']} ({pl['cookies']} session cookies)")
     elif sys.argv[1] == 'init':
-        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or '/opt/tools/phishlets'
+        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or os.path.join(_data_root(), 'phishlets')
         write_samples(d)
         print(f'sample phishlets → {d}')
