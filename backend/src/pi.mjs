@@ -267,11 +267,20 @@ export async function buildPi() {
       // taxing every call with random latency slowed all thinking runs.
       await new Promise(r => setTimeout(r, Math.random() * 1500));
     }
-    return models.streamSimple(modelArg, ctx, {
-      ...opts,
-      maxRetries: CONFIG.llmMaxRetries,
-      timeoutMs: CONFIG.llmTimeoutMs,
-    });
+    try {
+      return await models.streamSimple(modelArg, ctx, {
+        ...opts,
+        maxRetries: CONFIG.llmMaxRetries,
+        timeoutMs: CONFIG.llmTimeoutMs,
+      });
+    } catch (e) {
+      // R32D45-N5: 流错误带供应商指向——'Connection error.'/裸 JSON 对
+      // 用户不可诊断。附 host 与设置页指路(前端横幅已含深链)。
+      let host = '';
+      try { host = new URL(effNow.baseUrl).host; } catch { /* 非法 URL */ }
+      const raw = String(e?.message ?? e).slice(0, 200);
+      throw new Error(`LLM 请求失败(供应商 ${host || effNow.baseUrl || '?'}): ${raw}——请在「设置」页检查配置`);
+    }
   };
   return { models, model, modelForAgent, streamFn };
 }

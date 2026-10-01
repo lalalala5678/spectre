@@ -642,7 +642,7 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
             <TriangleAlert className="h-3 w-3" /> 本轮失败
           </div>
           <div className="font-mono text-[12px] leading-relaxed text-red-300">{errMsg}</div>
-          {/未配置大模型|设置/.test(errMsg) && (
+          {/LLM|大模型|设置|model|stream/i.test(errMsg) && (
             <a href="#settings" className="mt-1.5 inline-block text-[11px] text-orange-400/90 underline underline-offset-2">
               去设置页配置大模型 →
             </a>

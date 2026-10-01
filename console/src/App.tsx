@@ -65,8 +65,10 @@ export default function App() {
       const h = raw.split('?')[0] as RouteKey;
       const valid: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
       if (s && valid.includes(h)) {
+        // R32D45-N2: 不再 replaceState 清洗 ?s=——那会改写历史条目本身,
+        // 首次到达后退/前进永远读不到参数(0/3 复现)。保留参数: 重访
+        // 重新触发本分支, 冷加载走挂载期读取。
         setPendingOpen(h, s);
-        history.replaceState(null, '', `${window.location.pathname}#${h}`);
       }
       const resolved = valid.includes(h) ? h : 'autopwn';
       setRoute(resolved);

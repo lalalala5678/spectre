@@ -257,7 +257,16 @@ export function SettingsPage() {
           <span className="text-[12.5px] font-medium text-zinc-200">{data.schema.common.label}</span>
         </div>
         <div className="divide-y divide-void-800/70">
-          {data.schema.common.fields.map((f) => {
+          {/* R32D45-N1: llm 四字段(格式/URL/Key/模型)走原子编辑器——
+              逐字段保存×合并探测有跨厂商中间态死锁(换供应商先存 URL
+              的瞬间=新 URL+旧 key→401 存不进)。 */}
+          <div className="px-4 py-2.5">
+            <AgentLlmOverride agentId="" mode="default" ov={{
+              format: String(llm.format ?? ''), baseUrl: String(llm.baseUrl ?? ''),
+              apiKey: String(llm.apiKey ?? ''), model: String(llm.model ?? ''),
+            }} onSaved={() => void reload()} />
+          </div>
+          {data.schema.common.fields.filter(f => !['llm.format', 'llm.baseUrl', 'llm.apiKey', 'llm.model'].includes(f.id)).map((f) => {
             const [top, leaf] = f.id.split('.');
             // CS16-P2: webSearch 三字段此前落空 bucket(只认 llm/comp)——
             // 保存后回显恒空, 用户以为没存上。

@@ -90,8 +90,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     if (deepLink) {
       deepLinkRef.current = deepLink;
       setDrillSession(deepLink);
-      const base = window.location.hash.split('?')[0].replace('#', '');
-      history.replaceState(null, '', `${window.location.pathname}#${base}`);
+      // R32D45-N2: 同款不再清洗——挂载期保留 ?s= 使历史条目可重访。
       setDeepLink(null);  // 重入以挂接下方通道监听
     } else {
       consumePending();

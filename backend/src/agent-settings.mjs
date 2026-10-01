@@ -441,6 +441,30 @@ export async function saveSetting({ group, field, value }, wal) {
   const clean = (v) => (typeof v === 'string' ? v.trim() : v);
 
   if (group === 'common') {
+    // R32D45-N1: llm 四字段(格式/URL/Key/模型)原子提交——与 agent-llm
+    // 同协议。此前逐字段保存×合并探测存在同款跨厂商死锁: 换默认供应
+    // 商时先存 baseUrl 的瞬间=新 URL+旧 key→探测 401 存不进(唯一逃生
+    // 是先清 key, UI/文档均无提示)。value 为四字段对象; 其余 common
+    // 字段仍走下方逐字段路径。
+    if (field === 'llm' && typeof value === 'object' && value !== null) {
+      const raw = value;
+      if (['format', 'baseUrl', 'apiKey', 'model'].some(k => typeof raw[k] !== 'string')) {
+        return { ok: false, error: 'value 须为 { format, baseUrl, apiKey, model } 四字符串字段' };
+      }
+      if (raw.format && !Object.keys(LLM_FORMATS).includes(raw.format)) {
+        return { ok: false, error: `格式必须是 ${Object.keys(LLM_FORMATS).join('/')}` };
+      }
+      if (!raw.baseUrl || !raw.apiKey || !raw.model) {
+        return { ok: false, error: '默认供应商三项必填(Base URL/API Key/模型)' };
+      }
+      const r = await llmProbe(raw.baseUrl, raw.apiKey, raw.model, raw.format || 'openai');
+      if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+      const fresh = { ...getPrefs().commonSettings };
+      fresh.llm = { ...fresh.llm, format: raw.format || 'openai',
+        baseUrl: raw.baseUrl, apiKey: raw.apiKey, model: raw.model };
+      setPrefs({ commonSettings: fresh }, wal);
+      return { ok: true };
+    }
     const def = schema.common.fields.find(f => f.id === field);
     if (!def) return { ok: false, error: '未知配置项' };
     const v = clean(value);

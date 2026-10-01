@@ -2,12 +2,16 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { cn } from '../utils/cn';
 
-/** R32D44-llm: agent 供应商覆盖编辑器(设置页与 agent 配置页签共用)。
- * 保存协议(CS16-P1 原子提交): 四字段一个请求整体提交, 后端用覆盖后的
- * 完整生效配置做真实连通探测, 失败零落盘; 留空字段=清除该项回默认。 */
-export function AgentLlmOverride({ agentId, ov, onSaved }: {
+/** R32D44-llm: 供应商四字段原子编辑器(设置页与 agent 配置页签共用)。
+ * 保存协议(CS16-P1/R32D45-N1 原子提交): 四字段一个请求整体提交, 后端
+ * 用完整生效配置做真实连通探测, 失败零落盘。
+ * - mode='override'(默认): agent 覆盖——留空字段=清除该项回默认。
+ * - mode='default': 默认供应商——三项必填(格式默认 openai)。 */
+export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override' }: {
   agentId: string; ov?: Record<string, string>; onSaved: () => void;
+  mode?: 'override' | 'default';
 }) {
+  const isDefault = mode === 'default';
   const [draft, setDraft] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
   const [orig, setOrig] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
   const [state, setState] = useState<'idle' | 'saving' | 'ok' | 'err'>('idle');
@@ -20,14 +24,21 @@ export function AgentLlmOverride({ agentId, ov, onSaved }: {
 
   const save = async () => {
     if (!dirty || state === 'saving') return;
+    if (isDefault && (!draft.baseUrl || !draft.apiKey || !draft.model)) {
+      setState('err'); setMsg('默认供应商三项必填(Base URL/API Key/模型)');
+      return;
+    }
     setState('saving'); setMsg('');
-    // CS16-P1: 原子提交——四字段整体一个请求(空串=清除), 后端用覆盖后
-    // 的完整配置一次探测。此前逐字段保存×整体探测有中间态死锁: 换供应
+    // CS16-P1/R32D45-N1: 原子提交——四字段整体一个请求, 后端用完整
+    // 生效配置一次探测。此前逐字段保存×整体探测有中间态死锁: 换供应
     // 商时先存 URL 的瞬间=新 URL+旧 key→探测 401 永远存不进。
     try {
       await api('/agent-settings/save', { method: 'POST',
-        json: { group: 'agent-llm', field: agentId,
-          value: { format: draft.format, baseUrl: draft.baseUrl, apiKey: draft.apiKey, model: draft.model } } });
+        json: isDefault
+          ? { group: 'common', field: 'llm',
+              value: { format: draft.format || 'openai', baseUrl: draft.baseUrl, apiKey: draft.apiKey, model: draft.model } }
+          : { group: 'agent-llm', field: agentId,
+              value: { format: draft.format, baseUrl: draft.baseUrl, apiKey: draft.apiKey, model: draft.model } } });
     } catch (e) {
       setState('err'); setMsg(e instanceof Error ? e.message : String(e)); return;
     }
@@ -43,7 +54,9 @@ export function AgentLlmOverride({ agentId, ov, onSaved }: {
       {k === 'format' ? (
         <select value={draft.format} onChange={e => setDraft(d => ({ ...d, format: e.target.value }))}
           className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2 py-1 font-mono text-[11px] text-zinc-200 outline-none focus:border-orange-700">
-          <option value="">(继承默认)</option>
+          {isDefault
+            ? <option value="">openai(默认)</option>
+            : <option value="">(继承默认)</option>}
           <option value="openai">OpenAI 兼容</option>
           <option value="anthropic">Anthropic</option>
           <option value="gemini">Gemini</option>
@@ -59,9 +72,9 @@ export function AgentLlmOverride({ agentId, ov, onSaved }: {
     <div className="rounded-sm border border-void-700 bg-void-900/60 p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="text-[11px] font-medium text-zinc-300">
-          本 agent 覆盖
-          {overridden && <span className="ml-1.5 rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9px] text-orange-300">已覆盖</span>}
-          {!overridden && <span className="ml-1.5 font-mono text-[9.5px] text-zinc-600">当前=默认供应商</span>}
+          {isDefault ? '默认大模型供应商' : '本 agent 覆盖'}
+          {!isDefault && overridden && <span className="ml-1.5 rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9px] text-orange-300">已覆盖</span>}
+          {!isDefault && !overridden && <span className="ml-1.5 font-mono text-[9.5px] text-zinc-600">当前=默认供应商</span>}
         </span>
         <button onClick={() => void save()} disabled={!dirty || state === 'saving'}
           className={cn('flex items-center gap-1 rounded-sm border px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40',
@@ -71,12 +84,20 @@ export function AgentLlmOverride({ agentId, ov, onSaved }: {
       </div>
       <div className="space-y-1.5">
         {field('format', '接口格式', '')}
-        {field('baseUrl', 'Base URL', '留空=用默认')}
-        {field('apiKey', 'API Key', '留空=用默认', 'password')}
-        {field('model', '模型名称', '留空=用默认')}
+        {/* R32D45-N3: 三线制 per-format hint 此前后端死元数据——这里
+            按选中格式显示适配说明。 */}
+        <p className="pl-[94px] font-mono text-[9.5px] text-zinc-600">
+          {draft.format === 'anthropic' ? 'Claude 系; key 头 x-api-key + anthropic-version'
+            : draft.format === 'gemini' ? 'Gemini 系; key 走 x-goog-api-key 请求头'
+            : draft.format === '' && !isDefault ? '继承默认供应商的格式'
+            : 'GLM/DeepSeek/Kimi/Qwen/OpenAI 及绝大多数代理网关'}
+        </p>
+        {field('baseUrl', 'Base URL', isDefault ? 'https://open.bigmodel.cn/api/paas/v4' : '留空=用默认')}
+        {field('apiKey', 'API Key', isDefault ? '' : '留空=用默认', 'password')}
+        {field('model', '模型名称', isDefault ? 'glm-4.7' : '留空=用默认')}
       </div>
       <p className={cn('mt-1.5 truncate font-mono text-[10px]', state === 'err' ? 'text-red-400' : 'text-zinc-600')} title={msg}>
-        {state === 'err' ? msg : '保存会用覆盖后的完整配置做真实连通探测; 清除=保存空值回默认'}
+        {state === 'err' ? msg : isDefault ? '四字段一个请求保存+真实连通探测(换供应商一步到位)' : '保存会用覆盖后的完整配置做真实连通探测; 清除=保存空值回默认'}
       </p>
     </div>
   );
