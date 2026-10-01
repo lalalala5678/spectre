@@ -3,6 +3,7 @@ import { api } from '../api/client';
 import { Loader2, Check, AlertTriangle, RotateCw, Radar, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { AgentLlmOverride } from '../components/AgentLlmOverride';
+import { hasCred } from '../utils/hasCred';
 
 /**
  * Agent 设置栏 — 通用配置(全局)+ Agent 特有配置(本轮:资产测绘数据源)。
@@ -35,12 +36,6 @@ interface SettingsPayload {
     agentLlm: { agentKey: string; label: string; hint?: string; fields: FieldDef[] }[];
   };
 }
-
-/** CS17-4: 后端 hasSourceCredential 的前端镜像(单源在
- * backend/src/agent-settings.mjs——改谓词两侧同步)。 */
-const hasCred = (cfg: Record<string, string> | undefined, sid: string) =>
-  Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.password
-    || (sid === 'smtp' && cfg.user)));
 
 const TIER_STYLE: Record<string, { label: string; chip: string; dot: string; groupLabel: string }> = {
   P0: { label: 'P0', chip: 'border-orange-600/60 bg-orange-950/50 text-orange-300', dot: 'bg-orange-400', groupLabel: '必配 · 两大结构性缺口' },

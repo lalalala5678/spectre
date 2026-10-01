@@ -5,6 +5,7 @@ import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Dot } from '../components/ui/Badge';
 import { AgentLlmOverride } from '../components/AgentLlmOverride';
+import { hasCred } from '../utils/hasCred';
 import { Panel } from '../components/ui/Panel';
 import { PanelStack } from '../components/ui/PanelStack';
 import { LiveSession } from '../components/session/LiveSession';
@@ -215,6 +216,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     setDrillSession(null);
     setEntryView(null);
     setSwitcherOpen(false);
+    // R32D46-NEW-4: 应用内切会话同步 ?s=——此前残留旧值, 刷新/复制链接
+    // 打开的是旧会话(URL 与屏显脱钩)。replaceState 不增历史条目,
+    // 后退重访语义不变。
+    const base = window.location.hash.split('?')[0].replace('#', '') || liveKey;
+    history.replaceState(null, '', `${window.location.pathname}#${base}?s=${id}`);
     void setLastSession(workSession!.id, liveKey, id);
   };
 
@@ -700,7 +706,7 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
           : <div className="space-y-1.5">
             {myGroup.sources.map(src => {
               const vals = reconSources[src.id] ?? {};
-              const has = src.fields.some(f => vals[f.id.split('.')[1]]);
+              const has = hasCred(vals, src.id);  // R32D46-NEW-2: 第 7 处收敛
               return (
                 <div key={src.id} className="flex items-center justify-between gap-3 rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
                   <div className="min-w-0">

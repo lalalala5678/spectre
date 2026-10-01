@@ -150,8 +150,11 @@ const RECON_SOURCES = {
     },
   },
   censys: {
-    label: 'Censys',
-    tier: 'P2', why: '海外视角TLS/证书姊妹域',
+    label: 'Censys(v2 已 EOL——暂不可配置)',
+    // R32D46-NEW-7: v2 API 2026-09-30 停服(/v2/* 现返 404+关停告警),
+    // 任何 key 无法过校验。v3 认证形状未定稿(官方迁移文档待出),
+    // 先如实标注; 端点形状确认后改 defaultBase+validate。
+    tier: 'P2', why: '海外视角TLS/证书姊妹域(v2 已停服, 待 v3 适配)',
     defaultBase: 'https://search.censys.io/api',
     fields: { id: 'API ID', secret: 'API Secret' },
     async validate({ id, secret }) {
@@ -576,6 +579,11 @@ export async function saveSetting({ group, field, value }, wal) {
     return { ok: true };
   }
   if (group === 'recon-source') {
+    // R32D46-NEW-5: 畸形 field(无 .leaf)此前 split 得 leaf=undefined
+    // 落盘 {undefined: {...}} 垃圾且返回 ok。
+    if (!field.includes('.')) {
+      return { ok: false, error: 'field 须为 <sourceId>.<leaf> 形状' };
+    }
     const [srcId, leaf] = field.split('.');
     const src = RECON_SOURCES[srcId];
     if (!src) return { ok: false, error: '未知数据源' };
