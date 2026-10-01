@@ -1,6 +1,6 @@
 {
   "name": "spectre-backend",
-  "version": "0.1.0",
+  "version": "0.4.0",
   "main": "index.js",
   "scripts": {
     "test": "node --test tests/*.test.mjs",

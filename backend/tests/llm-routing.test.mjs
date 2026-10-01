@@ -76,7 +76,7 @@ test('P0-1: 每 scope model.provider 指向自己的 provider(鉴权路由)', as
   assert.equal(out.__default.provider, 'spectre-llm');
 });
 
-test('P0-1: 覆盖 key 在 auth resolve 路径可达(resolver 返回覆盖 key)', async () => {
+test('P0-1(组合): 覆盖后 effectiveLlmFor 供 resolver 读取(覆盖 key/模型生效)', async () => {
   const out = runBackend(`
     const { effectiveLlmFor } = await import('./src/agent-settings.mjs');
     console.log(JSON.stringify({

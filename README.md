@@ -54,7 +54,10 @@ cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
   python3 server.py   # env 前缀不穿透 && ——每段都要带 SPECTRE_AUTH_DIR
 ```
 
-打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
+打开 `http://127.0.0.1:8081/spectre/` 用 admin 登录。
+
+> 前台网关占住这个终端——后续 deploy/ 脚本(skills-seed/fetch-jars 等)
+> 开**新终端**执行, 并先 `cd` 回仓库根(步骤 0-4 的路径都在各自目录内)。远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
 
 ⑦ **配置大模型**（登录后, 平台统一接管）: 「设置」页 → 通用配置 → 接口格式
 （OpenAI 兼容/Anthropic/Gemini）+ Base URL + API Key + 模型名, 每字段保存前

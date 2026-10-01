@@ -35,6 +35,12 @@ interface SettingsPayload {
   };
 }
 
+/** CS17-4: 后端 hasSourceCredential 的前端镜像(单源在
+ * backend/src/agent-settings.mjs——改谓词两侧同步)。 */
+const hasCred = (cfg: Record<string, string> | undefined, sid: string) =>
+  Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.password
+    || (sid === 'smtp' && cfg.user)));
+
 const TIER_STYLE: Record<string, { label: string; chip: string; dot: string; groupLabel: string }> = {
   P0: { label: 'P0', chip: 'border-orange-600/60 bg-orange-950/50 text-orange-300', dot: 'bg-orange-400', groupLabel: '必配 · 两大结构性缺口' },
   P1: { label: 'P1', chip: 'border-amber-700/50 bg-amber-950/40 text-amber-300', dot: 'bg-amber-400', groupLabel: '建议 · 免费层够用' },
@@ -131,9 +137,9 @@ function SourceCard({ src, cfg, onSave, verify }: {
   const [open, setOpen] = useState(true);
   const isParams = src.id === 'brute';
   const paramCount = Object.values(cfg ?? {}).filter(v => String(v ?? '').length > 0).length;
-  // R32D44-P2-5: id-only(censys 先存 id 免探测)不算已挂载——与后端
-  // enabledReconSources 同口径, 防绿点虚报。
-  const mounted = isParams ? paramCount > 0 : Boolean(cfg && (cfg.key || cfg.token || cfg.secret || cfg.password));
+  // CS17-4: 谓词镜像后端 hasSourceCredential 单源(key/token/secret/
+  // password + 组特例 smtp.user; id 是参数型字段不算)。
+  const mounted = isParams ? paramCount > 0 : hasCred(cfg, src.id);
   const tier = TIER_STYLE[src.tier ?? 'P2'];
   const verifyState = verify;
   return (
@@ -218,13 +224,7 @@ export function SettingsPage() {
   const reconAgent = groups.find((a) => a.agentKey === 'recon');
   const otherAgents = groups.filter((a) => a.agentKey !== 'recon');
   const sources = reconAgent?.sources ?? [];
-  const mountedCount = sources.filter((s) => {
-    const c = data.reconSources[s.id];
-    // R32D44-P2-5: 与后端 enabledReconSources 同口径——只认真实凭据
-    // 字段; 此前把 censys 的 id-only 也计入, UI 谎报'已挂载 MCP'
-    // (后端 verify configured:false, 实际未挂载)。
-    return Boolean(c && (c.key || c.token || c.secret));
-  }).length;
+  const mountedCount = sources.filter((s) => hasCred(data.reconSources[s.id], s.id)).length;
   const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
   const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
 

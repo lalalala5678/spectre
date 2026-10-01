@@ -22,7 +22,7 @@ import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import { syncSourceKeyFiles } from './keyfiles.mjs';
 import { phishCampaignFunnel } from './phish-funnel.mjs';
 import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
-import { getSettings, saveSetting, effectiveCommon, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { getSettings, saveSetting, effectiveCommon, hasSourceCredential, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
@@ -362,8 +362,7 @@ function realRouter({ store, bus, caps, wal }) {
     }
 
     // ---------- agent settings (user-facing config bar) ----------
-    // Values live in prefs (WAL-durable); saves are per-field, only after a
-    // live probe (network fields) or range check (numeric fields).
+        // live probe (network fields) or range check (numeric fields).
     if (path === '/api/agent-settings' && method === 'GET') {
       return json(res, 200, getSettings());
     }
@@ -782,11 +781,9 @@ function realRouter({ store, bus, caps, wal }) {
         if (sid === 'brute') continue;
         const def = RECON_SOURCES_INTERNAL[sid];
         if (!def || !cfg) continue;
-        // R10-F3: 与 save 侧 hasCred 口径统一(含 smtp.user; censys.id
-        // 降为参数型字段——R10-F1)
-        const hasSecret = cfg.key || cfg.token || cfg.secret || cfg.password
-          || (sid === 'smtp' && cfg.user);
-        if (!hasSecret) { results.push({ id: sid, configured: false }); continue; }
+        // R10-F3/CS17-4: 与 save 侧口径统一——hasSourceCredential 单源
+        // (含 smtp.user; censys.id 降为参数型字段——R10-F1)。
+        if (!hasSourceCredential(cfg, sid)) { results.push({ id: sid, configured: false }); continue; }
         const v = await def.validate(cfg);
         results.push({
           id: sid, configured: true, label: def.label,

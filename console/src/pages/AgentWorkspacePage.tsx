@@ -650,7 +650,7 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
               ['格式', cfg(fmtLabel, 'OpenAI 兼容')],
               ['Base URL', cfg(llm.baseUrl, '(未配置)')],
               ['模型', cfg(llm.model, '(未配置)')],
-              ['Thinking Effort', cfg(llm.thinkingLevel, '(未设置)')],
+              ['Thinking Effort', cfg(llm.thinkingLevel, 'low')],
               ['最大输出 Tokens', cfg(llm.maxTokens, '32768')],
               ['上下文窗口 Tokens', cfg(llm.contextWindow, '786432')],
               ['上下文压缩', cfg(comp.enabled, '开启')],

@@ -2,8 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { cn } from '../utils/cn';
 
-/** R32D44-llm: agent 配置页签内的供应商覆盖编辑器(与设置页同一保存
- * 协议: 逐字段保存+真实连通探测; 留空保存=清除该项回默认)。 */
+/** R32D44-llm: agent 供应商覆盖编辑器(设置页与 agent 配置页签共用)。
+ * 保存协议(CS16-P1 原子提交): 四字段一个请求整体提交, 后端用覆盖后的
+ * 完整生效配置做真实连通探测, 失败零落盘; 留空字段=清除该项回默认。 */
 export function AgentLlmOverride({ agentId, ov, onSaved }: {
   agentId: string; ov?: Record<string, string>; onSaved: () => void;
 }) {

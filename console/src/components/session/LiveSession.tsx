@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, ChevronDown, Loader2, User, X , TriangleAlert } from 'lucide-react';
+import { Bot, Check, ChevronDown, Loader2, User, X, TriangleAlert } from 'lucide-react';
 
 import {
   api,

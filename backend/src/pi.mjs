@@ -136,6 +136,30 @@ export const STAGE_PROMPT = [
  * 某些厂商(如 GLM-4.6) emits `reasoning_content` before `content` (DeepSeek-style wire
  * format), hence the thinkingFormat compat flags below.
  */
+/** CS17-1: 智谱系兼容块——openai 兼容线制且 baseUrl 指向智谱时启用
+ * (DeepSeek 式 reasoning_content 前置 + GLM tier 映射'off'被拒 code
+ * 1210)。构建期与 applyLlmPrefs 热更共用同一谓词: 此前仅构建期求值,
+ * 热切供应商后 live model 的 compat/映射残留或缺失直到重启。
+ * 不满足条件返回空对象——热更时置空即剥离旧块。 */
+function zhipuCompat(eff, wire) {
+  if (wire !== 'openai-completions' || !/bigmodel\.cn|zhipu/i.test(eff.baseUrl || '')) {
+    return {};
+  }
+  return {
+    compat: {
+      supportsStore: false,
+      supportsDeveloperRole: false,
+      maxTokensField: 'max_tokens',
+      requiresReasoningContentOnAssistantMessages: true,
+      thinkingFormat: 'deepseek',
+    },
+    thinkingLevelMap: {
+      minimal: 'low', low: 'low', medium: 'medium',
+      high: 'high', xhigh: 'high', max: 'max',
+    },
+  };
+}
+
 function modelCatalog(eff = {}, providerId = PROVIDER_ID) {
   const wire = (LLM_FORMATS[eff.format] ?? LLM_FORMATS.openai).api;
   return [{
@@ -153,25 +177,8 @@ function modelCatalog(eff = {}, providerId = PROVIDER_ID) {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: Number(eff.contextWindow) || 786_432,
     maxTokens: Math.min(Number(eff.maxTokens) || 32_768, Number(eff.contextWindow) || 786_432),
-    // CS16-P3: DeepSeek 线制兼容(GLM-4.6+/DeepSeek 系 reasoning_content
-    // 前置)与 GLM tier 映射('off' 被拒 code 1210)只对 openai 兼容线制
-    // 且 baseUrl 指向智谱时启用——anthropic/gemini 线制原样传档位
-    // (契约: '按所选档位原样传给厂商, 不维护厂商映射')。
-    ...(wire === 'openai-completions' && /bigmodel\.cn|zhipu/i.test(eff.baseUrl || '')
-      ? {
-        compat: {
-          supportsStore: false,
-          supportsDeveloperRole: false,
-          maxTokensField: 'max_tokens',
-          requiresReasoningContentOnAssistantMessages: true,
-          thinkingFormat: 'deepseek',
-        },
-        thinkingLevelMap: {
-          minimal: 'low', low: 'low', medium: 'medium',
-          high: 'high', xhigh: 'high', max: 'max',
-        },
-      }
-      : {}),
+    // CS16-P3: 智谱系适配见 zhipuCompat(构建与热更共用同一谓词)。
+    ...zhipuCompat(eff, wire),
   }];
 }
 
@@ -286,6 +293,11 @@ export async function applyLlmPrefs() {
     // live model 与 summarizer/sessions 共享引用。
     m.baseUrl = eff.baseUrl;
     m.api = (LLM_FORMATS[eff.format] ?? LLM_FORMATS.openai).api;
+    // CS17-1: 兼容块与档位映射同谓词热更——切进智谱域即挂上, 切出
+    // 即剥离(此前构建期一次性, 热切后残留/缺失直到重启)。
+    const zc = zhipuCompat(eff, m.api);
+    m.compat = zc.compat;
+    m.thinkingLevelMap = zc.thinkingLevelMap;
     m.contextWindow = eff.contextWindow;
     m.maxTokens = Math.min(eff.maxTokens, eff.contextWindow);
   }

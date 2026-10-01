@@ -6,9 +6,11 @@
  *             thinking effort, compaction window…)
  *  - AGENT  — per-agent specialties (this round: recon data-source APIs)
  *
- * Save protocol (user's iron rule): each field saves INDIVIDUALLY and only
- * after a live connectivity test (network fields) or range check (numeric
- * fields). Failed validation → error, nothing persisted.
+ * Save protocol (user's iron rule): common/recon groups save per-field
+ * with a live connectivity test (network fields) or range check (numeric
+ * fields); the agent-llm group is ATOMIC (R32D44/CS16-P1): all four
+ * fields in one request, probed as the merged effective config, failed
+ * validation → error, nothing persisted.
  *
  * Values live in the prefs store (WAL-durable). NOT to be confused with
  * settings.mjs (spawn policy, pre-existing).
@@ -557,8 +559,7 @@ export async function saveSetting({ group, field, value }, wal) {
     // R10-F1: id 不算 secret——censys.id 参数化(同 cse.cx), 先存免探
     // 测落盘; 此前含 cur.id 使 censys 逐字段保存永久死锁(任一先存都
     // 触发双字段整体验证)。
-    const hasSecret = cur.key || cur.token || cur.secret
-      || (srcId === 'smtp' && (cur.user || cur.password));
+    const hasSecret = hasSourceCredential(cur, srcId);
     if (!hasSecret) {
       const all0 = { ...getPrefs().reconApiKeys, [srcId]: cur };
       setPrefs({ reconApiKeys: all0 }, wal);
@@ -622,6 +623,16 @@ export function effectiveCommon() {
   };
 }
 
+/** CS17-4: 凭据谓词单源——凭据型字段=key/token/secret/password(+组特例
+ * smtp.user); id/cx 是参数型字段不算凭据(R10-F1)。save/verify/
+ * enabledReconSources/keyfiles/前端 SourceCard/mountedCount 六处此前
+ * 六种口径(注释还自称'同口径')。 */
+export function hasSourceCredential(cfg, srcId) {
+  if (!cfg) return false;
+  if (cfg.key || cfg.token || cfg.secret || cfg.password) return true;
+  return srcId === 'smtp' && Boolean(cfg.user);
+}
+
 /** R32D44-llm: 某 agent 的生效 LLM 配置=默认之上按字段覆盖。 */
 export function effectiveLlmFor(agentKey) {
   const base = effectiveCommon();
@@ -640,7 +651,7 @@ export function enabledReconSources() {
   const out = [];
   for (const [id, cfg] of Object.entries(keys)) {
     if (id === 'brute' || !RECON_SOURCES[id]) continue;
-    if (cfg.key || cfg.token || cfg.secret) out.push(id);
+    if (hasSourceCredential(cfg, id)) out.push(id);
   }
   return out;
 }

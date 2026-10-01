@@ -13,15 +13,17 @@ import { loadMcpConfig, saveMcpConfig } from './sandbox/mcp.mjs';
 import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import path_mod from 'node:path';
 
-/** F14: 数据源文件只含有凭据的源(零污染)——无凭据残留不进任何注入文件。 */
-const hasCred = cfg => Boolean(cfg && (cfg.key || cfg.token || cfg.secret
-  || cfg.id || cfg.user || cfg.password));
+/** F14: 数据源文件只含有凭据的源(零污染)——无凭据残留不进任何注入文件。
+ * CS17-4: 谓词收敛到 agent-settings.hasSourceCredential 单源(此前本处
+ * 多认 id/user——censys id-only 也会进注入文件)。 */
+import { hasSourceCredential } from './agent-settings.mjs';
+const hasCred = (cfg, sid) => hasSourceCredential(cfg, sid);
 
 /** 按消费组过滤(keys → {sid: cfg}), skip 为排除的伪源。 */
 function byGroup(keys, agents, skip) {
   const out = {};
   for (const [sid, cfg] of Object.entries(keys)) {
-    if (skip.includes(sid) || !hasCred(cfg)) continue;
+    if (skip.includes(sid) || !hasCred(cfg, sid)) continue;
     const def = RECON_SOURCES_INTERNAL[sid];
     if (def && (def.agents ?? ['recon']).includes(agents)) out[sid] = cfg;
   }
@@ -60,7 +62,7 @@ export async function syncSourceKeyFiles() {
   // 但 key 材料不应越组落盘)。
   const withCreds = {};
   for (const [sid, cfg] of Object.entries(keys)) {
-    if (sid === 'brute' || !hasCred(cfg)) continue;
+    if (sid === 'brute' || !hasCred(cfg, sid)) continue;
     const def = RECON_SOURCES_INTERNAL[sid];
     if (def && !(def.agents ?? ['recon']).includes('recon')) continue;
     withCreds[sid] = cfg;

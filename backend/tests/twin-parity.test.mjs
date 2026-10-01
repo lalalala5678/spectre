@@ -141,3 +141,25 @@ test('技能双胞胎清单=磁盘运行时枚举集合相等(CS11-7: 新增对�
   assert.deepEqual(dangling, [],
     `清单悬空(双胞胎被删须同步清单): ${dangling.join(', ')}`);
 });
+
+test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移后上锁)', () => {
+  const rows = [
+    ['tools', 'backend/src/tools.mjs'],
+    ['pi', 'backend/src/pi.mjs'],
+    ['sessions', 'backend/src/sessions.mjs'],
+    ['routes', 'backend/src/routes.mjs'],
+    ['agent-settings', 'backend/src/agent-settings.mjs'],
+    ['sandbox·tooling', 'backend/src/sandbox/tooling.mjs'],
+    ['sandbox·container', 'backend/src/sandbox/container.mjs'],
+  ];
+  const arch = readFileSync(join(ROOT, 'docs', 'ARCHITECTURE.md'), 'utf8');
+  const line = arch.split('\n').find(l => l.includes('行数软指引'));
+  assert.ok(line, 'ARCHITECTURE.md 行数软指引行缺失');
+  for (const [name, rel] of rows) {
+    const content = readFileSync(join(ROOT, rel), 'utf8');
+    // 与 wc -l 同口径(结尾换行不另计一行)
+    const actual = content.split('\n').length - (content.endsWith('\n') ? 1 : 0);
+    assert.ok(line.includes(`${name}(${actual})`),
+      `行数表漂移: ${name} 实际 ${actual} 行, 表内为「${line.slice(0, 120)}」——改文件须同步 docs/ARCHITECTURE.md:105`);
+  }
+});

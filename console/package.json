@@ -1,14 +1,14 @@
 {
   "name": "spectre-console",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.4.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "tsc -b && vite build",
     "lint": "oxlint",
     "preview": "vite preview",
-    "prebuild": "node -e 'const v=process.versions.node.split(/[.]/).map(Number);if(v[0]<22){console.error(\"Node >= 22 required (current \"+process.versions.node+\") — 升级 Node 后重试\");process.exit(1)}'"
+    "prebuild": "node -e 'const v=process.versions.node.split(/[.]/).map(Number);if(v[0]<22){console.error(\"Node >= 22 required (current \"+process.versions.node+\") \u2014 \u5347\u7ea7 Node \u540e\u91cd\u8bd5\");process.exit(1)}'"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.3.3",
