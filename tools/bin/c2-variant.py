@@ -368,7 +368,13 @@ def cmd_gen(args):
     fams = a.get('--families', ','.join(FAMILIES)).split(',')
     raw_ext = (os.path.splitext(a['--src'])[1] or '.txt').lstrip('.')
     ext = {'ps1': 'ps', 'psm1': 'ps', 'hta': 'js', 'jscript': 'js'}.get(raw_ext, raw_ext)
-    fam_pool = [f for f in fams if f in FAMILIES] or FAMILIES
+    # R32D73-NEW2: 未知族名干净 rc=2(此前拼写错被吞静默回退全族池,
+    # 变形族归因失真)。
+    bad_fams = [f for f in fams if f and f not in FAMILIES]
+    if bad_fams:
+        print(f"用法错误: --families 未知族名: {','.join(bad_fams)}(合法: {','.join(FAMILIES)})", file=sys.stderr)
+        return 2
+    fam_pool = [f for f in fams if f in FAMILIES]
     os.makedirs(outdir, exist_ok=True)
     corpus_path = a.get('--corpus')
     corpus = json.load(open(corpus_path)) if corpus_path and os.path.exists(corpus_path) else []
