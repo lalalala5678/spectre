@@ -31,7 +31,7 @@ test('tools/bin ↔ docs: 期望清单内逐字节一致且双侧必须存在', 
   assert.deepEqual(missing, [], `双胞胎缺侧: ${missing.join(', ')}`);
   assert.deepEqual(drifted, [], `双胞胎漂移(docs 为权威): ${drifted.join(', ')}`);
 });
-// 技能双胞胎期望清单(CS10-2: 全量 45 对枚举锁定(8 个 skills-root 全扫)——
+// 技能双胞胎期望清单(CS10-2: 全量 45 对枚举锁定(skills-root 运行时发现)——
 // 新增双胞胎须入表;
 // skills-root 独有件(无顶层双胞胎)不受约, 删侧逃避因双侧存在性断言封死)。
 const EXPECTED_SKILL_TWINS = [
@@ -119,8 +119,10 @@ test('docs/*.py 跨文件内容查重(CS11-1/2 盲区封堵: 粘贴覆写事故)
 
 test('技能双胞胎清单=磁盘运行时枚举集合相等(CS11-7: 新增对逃逸封堵)', async () => {
   const { existsSync, readdirSync } = await import('node:fs');
-  const SKILL_ROOTS = ['nday-skills', 'recon-skills', 'phish-skills',
-    'brute-skills', 'api-skills', 'c2-skills', 'new-skills', 'postex-skills'];
+  // CS12-N3: 运行时发现 docs/*-skills(不硬编码——persist-skills 曾漏列)
+  const SKILL_ROOTS = readdirSync(join(ROOT, 'docs'), { withFileTypes: true })
+    .filter(d => d.isDirectory() && d.name.endsWith('-skills'))
+    .map(d => d.name);
   const onDisk = new Set();
   for (const root of SKILL_ROOTS) {
     const rdir = join(ROOT, 'docs', root);

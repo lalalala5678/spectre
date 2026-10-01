@@ -10,6 +10,7 @@
       [--db <数据根>/tools/phish/track.json] [--strip-csp] [--replace-host]
 """
 import sys, os, json, time, hashlib, re
+from http.server import HTTPServer, BaseHTTPRequestHandler
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
@@ -17,7 +18,6 @@ def _data_root():
     if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
         return '/opt/tools'
     return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
-from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs, unquote
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
@@ -52,6 +52,9 @@ def scope_gate_full():
 # CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
 # tools/phish——此前 /tmp 使经代理的 click/submit 对 campaigns 面板
 # 永久不可见)。容器位 /opt/tools, 宿主位 SPECTRE_DATA_DIR。
+
+DB_FILE = os.path.join(_data_root(), 'phish/track.json')  # CS12-N1: 批次 R 恢复时误删, 补回
+
 def load_db():
     try: return json.load(open(DB_FILE))
     except: return {'events': []}

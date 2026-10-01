@@ -255,7 +255,6 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
 
     if not results:
         return False
-    cond = (matchers[0] if not matchers[0].get('internal') else (matchers[1] if len(matchers) > 1 else {})).get('condition')
     # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
     # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
     # 请求级 or 语义 = 任一非 internal matcher 命中即可。
@@ -268,11 +267,13 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
     # internal word 命中的具体词可在后续请求 {{name}} 引用)
     if final:
         captured = {}
+        # CS12-N2: DNS 情况下无 header/body——hay 取 answers 全文本
+        # (此前从 HTTP 版复制未改名, header_str/body_str 未定义→
+        # NameError 被 main 的 except 静默吞掉, 模板被跳过)。
+        hay = ' '.join(str(a) for a in answers)
         for m, hit in zip(matchers, results):
             if m.get('internal') and hit and m.get('name'):
-                words = m.get('words') or []
-                hay = header_str if m.get('part') == 'header' else body_str
-                for w in words:
+                for w in (m.get('words') or []):
                     if w.lower() in hay.lower():
                         captured[m['name']] = w
                         break
@@ -356,11 +357,13 @@ def run_dns_matchers(matchers, answers):
     # internal word 命中的具体词可在后续请求 {{name}} 引用)
     if final:
         captured = {}
+        # CS12-N2: DNS 情况下无 header/body——hay 取 answers 全文本
+        # (此前从 HTTP 版复制未改名, header_str/body_str 未定义→
+        # NameError 被 main 的 except 静默吞掉, 模板被跳过)。
+        hay = ' '.join(str(a) for a in answers)
         for m, hit in zip(matchers, results):
             if m.get('internal') and hit and m.get('name'):
-                words = m.get('words') or []
-                hay = header_str if m.get('part') == 'header' else body_str
-                for w in words:
+                for w in (m.get('words') or []):
                     if w.lower() in hay.lower():
                         captured[m['name']] = w
                         break
