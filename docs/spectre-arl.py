@@ -18,7 +18,12 @@ def _data_root():
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
     if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
         return '/opt/tools'
-    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+    env = os.environ.get('SPECTRE_DATA_DIR', '')
+    if env:
+        return os.path.join(env, 'tools')
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    return '/var/lib/spectre/tools'
 
 DB_PATH = os.path.join(_data_root(), 'c2/arl-assets.db')  # CS10-4
 

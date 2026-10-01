@@ -130,7 +130,7 @@ def cmd_split(args):
     cn = this_class_name(src) or os.path.splitext(os.path.basename(src))[0]
     dst = os.path.join(outdir, *cn.split('/')) + '.class'
     os.makedirs(os.path.dirname(dst), exist_ok=True)
-    r = subprocess.run(['java', '-cp', f'{LIBS}/asm-9.7.jar:{ART}', 'CpSplitter', src, dst, tf],
+    r = subprocess.run(['java', '-cp', f'{LIBS}/asm-9.7.jar:{ART}', SPLITTER, src, dst, tf],
                        capture_output=True, text=True, timeout=120)
     if r.returncode != 0 or 'CPSPLIT-OK' not in r.stdout:
         print('SPLIT-FAIL: ' + (r.stdout + r.stderr).strip()[:160]); return 1

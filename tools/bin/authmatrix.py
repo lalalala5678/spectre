@@ -39,6 +39,10 @@ def ledger(label, code, dt, body_path):
     return n + 1, n + 1
 
 def main():
+    # R32D41-N2: 此前 --help/无参均裸栈(FileNotFoundError/IndexError)。
+    if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'):
+        print(__doc__)
+        return 2 if len(sys.argv) != 2 else 0
     plan = json.load(open(sys.argv[1]))
     base, ids, eps = plan['base'], plan['identities'], plan['endpoints']
     d = os.environ.get('HTTPQ_DIR', '/tmp/httpq')

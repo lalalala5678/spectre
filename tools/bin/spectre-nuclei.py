@@ -58,7 +58,7 @@ ctx = ssl.create_default_context()
 ctx.check_hostname = False
 ctx.verify_mode = ssl.CERT_NONE
 
-def do_http(req_spec, target):
+def do_http(req_spec, target, timeout=10):
     """执行模板中的一个 HTTP 请求 spec"""
     method = req_spec.get('method', 'GET').upper()
     path = req_spec.get('path', '/')
@@ -139,7 +139,7 @@ def do_http(req_spec, target):
             return super().redirect_request(r2, fp, code, msg, headers, newurl)
     try:
         opener = _ur.build_opener(_FencedRedirect, _ur.HTTPSHandler(context=ctx))
-        resp = opener.open(req, timeout=10)
+        resp = opener.open(req, timeout=timeout)
         return resp.status, dict(resp.headers), resp.read()
     except urllib.error.HTTPError as e:
         return e.code, dict(e.headers), e.read()
@@ -149,6 +149,21 @@ def do_http(req_spec, target):
 # ============================================================
 # 匹配器(nuclei matchers 子集)
 # ============================================================
+
+def _capture_internal_words(matchers, results, hay):
+    """F39: internal matcher 命中值→变量(多请求传递: nuclei 语义
+    internal word 命中的具体词可在后续请求 {{name}} 引用)。
+    hay 为待搜文本(HTTP 版=part 对应的 header/body 串; DNS 版=
+    answers 全文本)。返回捕获 dict 或 None。
+    CS13-6: 此前 HTTP/DNS 两份逐行重复(复制改名事故的温床)。"""
+    captured = {}
+    for m, hit in zip(matchers, results):
+        if hit and m.get('name'):
+            for w in (m.get('words') or []):
+                if w.lower() in hay.lower():
+                    captured[m['name']] = w
+                    break
+    return captured or None
 
 def apply_matchers(matchers, status, headers, body, req_condition=None):
     apply_matchers._req_condition = req_condition or 'and'
@@ -263,22 +278,14 @@ def apply_matchers(matchers, status, headers, body, req_condition=None):
     # status 单独命中即 FP(exposures 复扫 azure 类实锤)。
     req_cond = getattr(apply_matchers, '_req_condition', 'and')
     final = any(results) if req_cond == 'or' and len(matchers) > 1 else all(results)
-    # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
-    # internal word 命中的具体词可在后续请求 {{name}} 引用)
     if final:
-        captured = {}
-        # CS12-N2: DNS 情况下无 header/body——hay 取 answers 全文本
-        # (此前从 HTTP 版复制未改名, header_str/body_str 未定义→
-        # NameError 被 main 的 except 静默吞掉, 模板被跳过)。
-        hay = ' '.join(str(a) for a in answers)
         for m, hit in zip(matchers, results):
-            if m.get('internal') and hit and m.get('name'):
-                for w in (m.get('words') or []):
-                    if w.lower() in hay.lower():
-                        captured[m['name']] = w
-                        break
-        if captured:
-            return {'__vars__': captured}
+            if not (hit and m.get('name')):
+                continue
+            hay = header_str if m.get('part') == 'header' else body_str
+            captured = _capture_internal_words([m], [hit], hay)
+            if captured:
+                return {'__vars__': captured}
     return final
 
 def apply_extractors(extractors, status, headers, body):
@@ -344,7 +351,6 @@ def run_dns_matchers(matchers, answers):
             results.append(matched)
     if not results:
         return False
-    cond = (matchers[0] if not matchers[0].get('internal') else (matchers[1] if len(matchers) > 1 else {})).get('condition')
     # F38: 请求级 condition——matchers 间默认 and,nuclei 请求级 condition: or
     # 被 AND 化是 22% tech 模板漏报根因(自评);matchers 平铺无组结构,
     # 请求级 or 语义 = 任一非 internal matcher 命中即可。
@@ -356,17 +362,11 @@ def run_dns_matchers(matchers, answers):
     # F39: internal matcher 命中值→变量(多请求传递:nuclei 语义
     # internal word 命中的具体词可在后续请求 {{name}} 引用)
     if final:
-        captured = {}
         # CS12-N2: DNS 情况下无 header/body——hay 取 answers 全文本
         # (此前从 HTTP 版复制未改名, header_str/body_str 未定义→
         # NameError 被 main 的 except 静默吞掉, 模板被跳过)。
         hay = ' '.join(str(a) for a in answers)
-        for m, hit in zip(matchers, results):
-            if m.get('internal') and hit and m.get('name'):
-                for w in (m.get('words') or []):
-                    if w.lower() in hay.lower():
-                        captured[m['name']] = w
-                        break
+        captured = _capture_internal_words(matchers, results, hay)
         if captured:
             return {'__vars__': captured}
     return final
@@ -376,7 +376,7 @@ def run_dns_matchers(matchers, answers):
 # ============================================================
 
 def execute_template(tpl, target, timeout=15):
-    """执行单个模板——返回 findings 列表"""
+    """执行单个模板——返回 findings 列表(超时经 do_http 透传)"""
     findings = []
     tpl_id = tpl.get('id', 'unknown')
     info = tpl.get('info', {})
@@ -426,7 +426,7 @@ def execute_template(tpl, target, timeout=15):
         for one_path in path_list:
             sub_spec = dict(req_spec)
             sub_spec['path'] = one_path
-            status, headers, body = do_http(sub_spec, target)
+            status, headers, body = do_http(sub_spec, target, timeout=timeout)
             if body in (b'__OUTBOUND_BLOCKED__', b'__UNRESOLVED_VAR__'):
                 continue  # F29 围栏 / F37 未解析变量——均不算命中
             matchers = req_spec.get('matchers', tpl.get('matchers', []))

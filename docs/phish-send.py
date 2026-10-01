@@ -24,7 +24,15 @@ def _data_root():
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
     if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
         return '/opt/tools'
-    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+    env = os.environ.get('SPECTRE_DATA_DIR', '')
+    if env:
+        return os.path.join(env, 'tools')
+    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
+    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
+    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    return '/var/lib/spectre/tools'
 
 try:
     PYTHONPATH = ['/opt/tools/py/dkim', '/opt/tools/py']
@@ -127,18 +135,6 @@ def render(html, recipient, track_base):
     html = html.replace('{{EMAIL}}', recipient)
     return html, uid
 
-def split_visible_text(text, parts=3):
-    """CSS 拆词: 用零宽 span 拆开关键词,视觉无差但文字指纹不同
-    例如 'verify your account' → 'ver<span></span>ify you<span></span>r acc<span></span>ount'
-    """
-    import re
-    words = text.split(' ')
-    for i, w in enumerate(words):
-        if len(w) > 4 and i % 2 == 0:
-            mid = len(w) // 2
-            words[i] = f'{w[:mid]}<span style="display:inline"></span>{w[mid:]}'
-    return ' '.join(words)
-
 def build_email(from_display, from_addr, to_addr, subject, html_body,
                 reply_to=None, domain=None, text_body=None, attachments=None):
     """构造完整邮件(头部一致性核心)"""
@@ -228,7 +224,7 @@ def _smtp_dialog_send(s, from_addr, to_addr, raw):
     s.sock.settimeout(2)
     for _ in range(n_replies):
         try:
-            c, r = s.getreply()
+            c, _ = s.getreply()
         except (smtplib.SMTPServerDisconnected, OSError):
             break
         if c == 221:

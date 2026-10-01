@@ -15,7 +15,15 @@ def _data_root():
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
     if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
         return '/opt/tools'
-    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+    env = os.environ.get('SPECTRE_DATA_DIR', '')
+    if env:
+        return os.path.join(env, 'tools')
+    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
+    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
+    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    return '/var/lib/spectre/tools'
 
 SCOPE = os.path.join(_data_root(), 'c2/scope.json')
 AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS8-P1-2 统一制式
@@ -339,8 +347,8 @@ def cmd_run(args):
                     cands2 = sorted(f for f in os.listdir(vo2) if f.startswith('variant_'))
                     for c in cands2:
                         cp2 = os.path.join(vo2, c)
-                        g2 = subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
-                                            capture_output=True, text=True)
+                        subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
+                                       capture_output=True, text=True)
                         for c2 in [x for x in os.listdir(vo2 + '-m') if x.startswith('variant_')] if os.path.isdir(vo2 + '-m') else []:
                             cp3 = os.path.join(vo2 + '-m', c2)
                             r3 = scan_all(cp3, engines)
@@ -405,8 +413,8 @@ def cmd_run(args):
         vo = os.path.join(work, f'v{r}')
         if cur.endswith('.class'):
             # real-lane:字节码变换族(cp-ldc-split)
-            g = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'split',
-                                '--class', cur, '--out', vo], capture_output=True, text=True)
+            subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'split',
+                            '--class', cur, '--out', vo], capture_output=True, text=True)
             cands = []
             mfp = os.path.join(vo, 'manifest.json')
             if os.path.exists(mfp):

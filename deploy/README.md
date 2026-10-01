@@ -128,7 +128,7 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 - POST /api/sessions 的 title 字段被忽略——标题由 summarizer 在首轮对话后自动生成(设计)
 - 登录后 UI 会在最近工作会话自动创建 AutoPwn 会话(编排器常驻入口); 切换项目时在 autopwn 页在位则建 AutoPwn 锚点、在其它 agent 页则建该 agent 锚点(agent 页 bootstrap 机制); 首次浏览某 agent 页会在当前项目为该 agent 建一个 0-msg 会话(下次进入直接恢复)——均为锚点行为, 非泄漏
 - 首次打开 Skill 管理/MCP Server/CLI 工具页会各自静默创建对应配置智能体会话(按需惰性单例, 复访不增殖)
-- 登录失败锁定为网关内存态(5 次/15 分钟, 重启即清); 登录成败同为 303, CLI 集成读 Location 的 `?e=` 参数(`e=cred`/`e=lock`)区分
+- 登录失败锁定为网关内存态(**按来源 IP** 计 5 次/15 分钟, 重启即清——同 IP 其它账号会连坐, 换 IP/重启可解); 登录成败同为 303, CLI 集成读 Location 的 `?e=` 参数(`e=cred`/`e=lock`)区分
 
 ## API 认证
 

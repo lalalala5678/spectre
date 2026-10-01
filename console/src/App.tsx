@@ -68,7 +68,13 @@ export default function App() {
         setPendingOpen(h, s);
         history.replaceState(null, '', `${window.location.pathname}#${h}`);
       }
-      setRoute(valid.includes(h) ? h : 'autopwn');
+      const resolved = valid.includes(h) ? h : 'autopwn';
+      setRoute(resolved);
+      // R32D41-N4: 无效 hash 此前渲染回落 autopwn 但地址栏保留垃圾
+      // 路由名——补 replaceState 清洗(与 ?s= 分支同款)。
+      if (!valid.includes(h)) {
+        history.replaceState(null, '', `${window.location.pathname}#${resolved}`);
+      }
     };
     window.addEventListener('hashchange', onHash);
     return () => window.removeEventListener('hashchange', onHash);

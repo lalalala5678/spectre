@@ -47,8 +47,8 @@ def dexec(*args, timeout=120):
     return subprocess.run(cmd, capture_output=True, text=True, timeout=timeout)
 
 
-def scan(path_host, name):
-    """host 路径 → 容器路径(共享挂载), 双引擎。"""
+def scan(_path_host, name):
+    """host 路径 → 容器路径(共享挂载), 双引擎。(path_host 仅作调用侧溯源——扫描走容器位)"""
     cpath = f'/opt/tools/c2/qa-inbox/{name}'
     sigs = []
     # ClamAV

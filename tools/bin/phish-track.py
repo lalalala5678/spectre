@@ -15,7 +15,15 @@ def _data_root():
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。返回 tools 目录。"""
     if os.path.exists('/opt/tools/bootstrap-sandbox.sh'):
         return '/opt/tools'
-    return os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'tools')
+    env = os.environ.get('SPECTRE_DATA_DIR', '')
+    if env:
+        return os.path.join(env, 'tools')
+    # R32D41-N1: 宿主位缺 env 时静默回退生产数据根——曾实测跨实例
+    # 误写(audit 行进生产 audit.log/dkim 目录建到生产)。回退时打一行
+    # stderr 警告(不阻断; 生产 systemd 单元本就设了该 env)。
+    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+          '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
+    return '/var/lib/spectre/tools'
 
 def _phish_dir():
     return os.path.join(_data_root(), 'phish')
