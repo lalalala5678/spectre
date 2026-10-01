@@ -4,6 +4,7 @@ import { Bot } from 'lucide-react';
 import { api, type ApiSessionSummary } from '../../api/client';
 import { Dot } from '../ui/Badge';
 import { cn } from '../../utils/cn';
+import { AGENTS as REGISTRY } from '../../api/agentRegistry';
 
 interface TreeNode {
   session: ApiSessionSummary;
@@ -34,9 +35,7 @@ function buildTree(all: ApiSessionSummary[], rootId: string): TreeNode | null {
   return assemble(root);
 }
 
-// CS41-C3: 类型标签单源 agentRegistry.codename(此前本地 11 键平行
-// 双胞胎——增删 agent 双处漂移, 先例 McpPage CS1-R13)。
-import { AGENTS as REGISTRY } from '../../api/agentRegistry';
+// CS41-C3(CS42-F15 import 移顶): 类型标签单源 agentRegistry.codename。
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(
   REGISTRY.map(a => [a.id, a.codename]));
 

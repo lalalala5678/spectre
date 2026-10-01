@@ -213,6 +213,10 @@ def rt_exec(classfile):
 def cmd_selftest(args):
     sc = gate()
     # R32D57-NEW7: 空套件=假绿封堵(0 fail 但什么都没测)。
+    # CS42-F14: 缺目录 rc=2 对齐 variant(此前缺目录落入空套件 rc=1)。
+    if not os.path.isdir(JMG_DIR):
+        print(f'SELFTEST 用法错误: 基型目录不存在: {JMG_DIR}——检查 SPECTRE_DATA_DIR/tools-sync 交付', file=sys.stderr)
+        return 2
     if not glob.glob(JMG_DIR + '/*.class'):
         print(f'SELFTEST ERROR: 基型目录零 .class({JMG_DIR})——先 c2-basetype gen --engine jmg 生成基型(需 java+fetch-jars 桩)', file=sys.stderr)
         return 1

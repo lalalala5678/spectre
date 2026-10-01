@@ -1,46 +1,6 @@
 import { cn } from '../../utils/cn';
 import type { BadgeTone } from './badgeTones';
-
-/**
- * 朴素标签：统一灰底细边，仅文本着色。
- * 彩色只留给真正需要区分的语义（severity / 审批），其余一律灰。
- */
-const TONE: Record<BadgeTone, string> = {
-  green: 'text-emerald-400/80',
-  cyan: 'text-zinc-300',
-  red: 'text-red-400/90',
-  rose: 'text-red-400',
-  amber: 'text-amber-400/80',
-  blue: 'text-zinc-400',
-  slate: 'text-zinc-500',
-  violet: 'text-zinc-300',
-  orange: 'text-orange-400',
-};
-
-export function Badge({
-  tone = 'slate',
-  children,
-  mono = false,
-  className,
-}: {
-  tone?: BadgeTone;
-  children: React.ReactNode;
-  mono?: boolean;
-  className?: string;
-}) {
-  return (
-    <span
-      className={cn(
-        'inline-flex items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-1.5 py-px text-[10px] leading-4',
-        TONE[tone],
-        mono && 'font-mono',
-        className,
-      )}
-    >
-      {children}
-    </span>
-  );
-}
+// CS42-F1: Badge 彩色标签组件(零消费者)已删——仅保留状态色点 Dot。
 
 /** 状态色点：真实产品里最常用的状态表达方式 */
 const DOT: Record<BadgeTone, string> = {

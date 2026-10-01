@@ -74,7 +74,7 @@ export default function App() {
       const resolved = valid.includes(h) ? h : 'autopwn';
       setRoute(resolved);
       // R32D41-N4: 无效 hash 此前渲染回落 autopwn 但地址栏保留垃圾
-      // 路由名——补 replaceState 清洗(与 ?s= 分支同款)。
+      // 路由名——replaceState 仅清无效段(?s= 参数分支刻意不清, 见上)。
       if (!valid.includes(h)) {
         history.replaceState(null, '', `${window.location.pathname}#${resolved}`);
       }

@@ -160,9 +160,10 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
             streamingThinking: true,
           }));
         } else if (ev.type === 'message' && ev.data?.role) {
-          // CS41-C5: 结构守卫转型(此前双重断言绕过全部检查)
-          const d = ev.data as Partial<ApiMessage>;
-          const msg: ApiMessage = { role: d.role!, ts: d.ts ?? Date.now(), text: d.text ?? '' , ...(d.source && { source: d.source }) };
+          // CS41-C5/CS42-F2: 全字段透传(此前白名单重建丢 thinking/toolCalls/
+          // toolCallId/tokens/stopReason/error——实时视图回归); role 已由
+          // 分支条件守卫, ts/text 兜底。
+          const msg = { ...ev.data, role: ev.data.role!, ts: ev.data.ts ?? Date.now(), text: ev.data.text ?? '' } as ApiMessage;
           setMessages(prev => {
             // Final assistant text replaces its streaming placeholder.
             const next = [...prev];

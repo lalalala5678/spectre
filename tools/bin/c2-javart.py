@@ -106,16 +106,16 @@ def main():
     # -h 永先(家族契约, CS40-4: 引擎预检须在其后)。
     if not args or args[0] in ('-h', '--help'):
         print(__doc__); return 0 if args else 2
-    # R32D62-P3: env-only EDUSRC 门(家族一致; -h 后引擎前)。
+    # R32D62-P3: env-only EDUSRC 门(家族一致; -h 后)。
     edusrc_gate()
+    # CS42-F6: 门序契约=用法(2)→引擎(2)——奇数参先于引擎预检。
+    if len(args) % 2:
+        print(f'[c2-javart] 参数须为键值对(收到奇数个): {args}', file=sys.stderr); return 2
     # R32D61-F5: java 工具链缺失干净 rc=2(此前 FileNotFoundError 裸栈)。
     import shutil
     if not (shutil.which('javac') and shutil.which('java')):
         print('c2-javart 需要 javac+java——容器位内置; 宿主自装 JDK 或容器位运行', file=sys.stderr)
         return 2
-    # R32D42-P1/P2: 奇数参不裸栈(-h/裸已在 main 头处理)
-    if len(args) % 2:
-        print(f'[c2-javart] 参数须为键值对(收到奇数个): {args}', file=sys.stderr); return 2
     a = dict(zip(args[::2], args[1::2]))
     d = tempfile.mkdtemp(prefix='c2javart-')
     try:

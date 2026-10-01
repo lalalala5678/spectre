@@ -415,7 +415,7 @@ function realRouter({ store, bus, caps, wal }) {
       const cfg = sandboxConfig();
       return json(res, 200, {
         ...cfg,
-        driverIsDocker: cfg.driver === 'docker'  // F4(十五轮): 字段名与语义对齐——此前叫 dockerAvailable 但只反映 driver 选择, Docker 在位+local driver 时误导排障,
+        // CS42-F9: driverIsDocker 字段已删(全仓零消费者——console 侧 C7 已先行)
       });
     }
     if (path === '/api/sandbox/config' && method === 'PUT') {

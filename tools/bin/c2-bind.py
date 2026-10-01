@@ -37,15 +37,13 @@ def side(p):
 
 def cmd_bind(args):
     a = dict(zip(args[::2], args[1::2]))
-    # R32D59-N5: 缺参干净 usage rc=2; scope 缺/坏干净 75(此前裸栈 rc=1)。
+    # CS42-F5: 门序契约全对齐——scope 门先于一切用法(此前缺参 rc=2 在
+    # 门前、文件 rc=2 在门后; bind 无 EDUSRC 门, 见 SKILL)。
+    sc = scope_gate_full()
     if '--payload' not in a:
         print('用法: c2-bind.py bind --payload <file> [--target t] [--days N]', file=sys.stderr)
         return 2
     p = a['--payload']
-    # CS41-A4 门序契约: scope 门先于用法(bind 无 EDUSRC 门——目标绑定
-    # 语义另行, 见 SKILL); R32D61-F9 单源门(缺/坏/空/缺 exercise/出窗
-    # 统一 75)。
-    sc = scope_gate_full()
     # R32D60-NEW4: payload 不存在/是目录→干净 rc=2(此前裸栈 rc=1)。
     if not os.path.isfile(p):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2

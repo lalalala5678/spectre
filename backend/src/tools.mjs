@@ -435,12 +435,13 @@ export function buildIntelTools(record, caps) {
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
       }
-      // CS41-B1: 单条截断打标(AGENTS 原则3——此前裸 slice 无标记)。
+      // CS41-B1/CS42-F12: 单条截断打标(clipMarked 单源格式+补全手段,
+      // AGENTS 原则3——此前裸 slice 无标记)。
       const lines = messages.map(m => {
         const raw = m.text || '(无文本)';
         const who = m.role === 'user' ? '用户' : m.role === 'toolResult' ? '工具结果' : '智能体';
         return raw.length > 300
-          ? `${who}: ${raw.slice(0, 300)}(…正文共 ${raw.length} 字符, 已截断)`
+          ? `${who}: ${raw.slice(0, 300)} [已截断:原文 ${raw.length} 字符——API GET /api/sessions/:id 取全文]`
           : `${who}: ${raw}`;
       });
       return { content: [{ type: 'text',
@@ -577,6 +578,9 @@ function buildSpawnAgentTool(record, caps) {
       // Fix-H (A3): codename IS provenance (spawnName feeds authorOf,
       // DMs, tree paths) — enforce the documented ≤20/≤60 contract with
       // an actionable refusal instead of the store's silent slice.
+      // CS42-F4 同步钉注: 本面 20/60 与 sessions.mjs SESSION_NAME_MAX/
+      // SESSION_DESC_MAX 同值(本文件被 sessions.mjs 反向 import, 不能
+      // 引其常量——改任一侧必须同步另一侧, 先例 CS23-N15)。
       if (String(params.name).length > 20) {
         return { content: [{ type: 'text',
           text: `派生被拒绝:代号超长(${String(params.name).length}/20 字符),请精简后重试。` }] };
@@ -684,9 +688,11 @@ export function buildOrchestratorTools(record, caps) {
         : record.activeEngagement?.workflowId;
       if (!engagement) {
         // CS41-B6: 结构化可行动回执(同函数其余失败分支制式——此前裸
-        // throw 产原始异常栈)。
+        // throw 产原始异常栈); CS42-F7: details 对齐(按 details.relayed
+        // 消费的调用方此分支不再漏检)。
         return { content: [{ type: 'text',
-          text: '转发失败:无进行中的 engagement——先调用 dispatch_agents 发起战役再转发。' }] };
+          text: '转发失败:无进行中的 engagement——先调用 dispatch_agents 发起战役再转发。' }],
+          details: { engagement: null, agents: params.agents, relayed: false, reason: 'no-engagement' } };
       }
       // Fix-E (P7): membership validation BEFORE signaling. Implicit path
       // reads the persisted activeEngagement.agents; explicit path derives

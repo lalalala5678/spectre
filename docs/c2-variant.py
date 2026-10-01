@@ -450,8 +450,7 @@ def cmd_selftest(args):
     import shutil
     java_missing = not shutil.which('java')
     # CS41-A1: 套件目录缺/非常规→干净 rc=2+供给指引(此前裸栈 rc=1)。
-    import os.path as _osp
-    if not _osp.isdir(bdir):
+    if not os.path.isdir(bdir):
         print(f'SELFTEST 用法错误: 基型目录不存在或不是目录: {bdir}——检查 SPECTRE_DATA_DIR/tools-sync 交付', file=sys.stderr)
         return 2
     # CS41-A3: 空套件拒假绿(族内统一 c2-bytecode R32D57-NEW7 制式——
@@ -462,9 +461,7 @@ def cmd_selftest(args):
         return 1
     fails = 0
     per_file_fail = []
-    for f in entries:
-        if f.endswith(('.bak',)):
-            continue
+    for f in entries:  # .bak 已在 entries 构造时滤除(CS42-F10: 死分支删)
         p = os.path.join(bdir, f)
         out = tempfile.mkdtemp(prefix='c2selftest-')
         g = subprocess.run([sys.executable, os.path.abspath(__file__), 'gen', '--src', p,
@@ -489,7 +486,7 @@ def cmd_selftest(args):
         shutil.rmtree(out, ignore_errors=True)
     # CS41-A2: 横幅归因与逐项同过滤(仅当确有 .java 车道 fail——此前
     # 纯 php fail 也被归因 java, 误导非回归判断)。
-    java_fail = any(e[0].endswith('.java') for e in per_file_fail)
+    java_fail = any(e[0].endswith('.java') and e[1].startswith('ft=') and e[1] != 'ft=0' for e in per_file_fail)
     print(f'SELFTEST SUMMARY: {fails} fail' + ('  [java 车道受引擎缺失影响——ft=1 项非回归]' if java_missing and java_fail else ''))
     return 1 if fails else 0
 

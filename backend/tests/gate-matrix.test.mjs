@@ -66,8 +66,14 @@ test('无 env: 缺 scope 全族干净 75(非裸栈)', () => {
   const payload = join(noDir, 'p.php');
   writeFileSync(payload, '<?php // SPECTRE-MARK\n');
   try {
+    // CS42-F17: 75 面扩员(scope 门全员——javart/functest/disguise
+    // 按 SKILL 无 scope 门, 仅在 76 面适用)
     for (const [tool, args] of [
       ['c2-qa.py', ['scan', '--engine', 'echo']],
+      ['c2-basetype.py', ['list']],
+      ['c2-bytecode.py', ['selftest']],
+      ['c2-bytecode.py', ['split']],
+      ['c2-bytecode.py', ['verify']],
       ['c2-variant.py', ['gen', '--src', payload, '--out', join(noDir, 'o')]],
       ['c2-bind.py', ['bind', '--payload', payload]],
     ]) {

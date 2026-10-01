@@ -564,7 +564,7 @@ function buildAllToolingTools(caps, sessionRecord) {
     label: '搜索',
     description:
       '[read-only] Tool candidate search. Vertical channels first (MCP '
-      + 'official registry, GitHub API, npm/pip in sandbox — all '
+      + 'official registry, GitHub API, npm in sandbox — all '
       + 'keyless); generic web search as fallback ONLY when a provider '
       + 'is configured. The receipt says which channels answered.',
     executionMode: 'sequential',
