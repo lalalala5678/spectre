@@ -308,7 +308,7 @@ export function settingsSchema() {
         { id: 'llm.baseUrl', label: 'API Base URL', type: 'text', required: true, placeholder: 'https://open.bigmodel.cn/api/paas/v4' },
         { id: 'llm.apiKey', label: 'API Key', type: 'password', required: true },
         { id: 'llm.model', label: '模型名称', type: 'text', required: true, placeholder: 'glm-4.7' },
-        { id: 'llm.thinkingLevel', label: 'Thinking Effort', type: 'select', options: THINKING_LEVELS, hint: '按所选档位原样传给厂商,不维护厂商映射' },
+        { id: 'llm.thinkingLevel', label: 'Thinking Effort', type: 'select', options: THINKING_LEVELS, default: 'low', hint: '按所选档位原样传给厂商,不维护厂商映射' },
         { id: 'llm.maxTokens', label: '最大输出 Tokens', type: 'number', check: num(256, 262144), default: 32768 },
         { id: 'llm.contextWindow', label: '上下文窗口 Tokens', type: 'number', check: num(8192, 4194304), default: 786432 },
         { id: 'compaction.enabled', label: '上下文压缩', type: 'select', options: ['开启', '关闭'], default: '开启' },
@@ -478,24 +478,32 @@ export async function saveSetting({ group, field, value }, wal) {
   }
 
   if (group === 'agent-llm') {
-    // R32D44-llm: 单 agent LLM 覆盖。空值=删覆盖(继承默认, 免探测);
-    // 非空=以"覆盖后生效配置"整体探测(格式/URL/key/模型 四字段合并)。
-    const [agentKey, leaf] = field.split('.');
-    const group2 = schema.agentLlm.find(g => g.agentKey === agentKey);
-    if (!group2 || !['format', 'baseUrl', 'apiKey', 'model'].includes(leaf)) {
-      return { ok: false, error: '未知配置项' };
+    // R32D44-llm/CS16-P1: 原子提交协议——value 必须是四字段整体对象
+    // (format/baseUrl/apiKey/model, 空串=清除该项回默认)。此前逐字段
+    // 保存×整体探测存在中间态死锁: 从 GLM 切 DeepSeek 时先存 baseUrl
+    // 的瞬间=新 URL+旧 key→探测 401→永远存不进去(仅同 key 网关可配)。
+    // 单请求整体探测+整体落盘, 探测失败零落盘(无回滚问题)。
+    // R10-F2 对齐: probe 是 20s 网络窗口, 窗口后重读 prefs 再合并写回,
+    // 并发保存的兄弟 agent 不被陈旧快照覆盖。
+    const agentKey = field;
+    const groupDef = schema.agentLlm.find(g => g.agentKey === agentKey);
+    if (!groupDef) return { ok: false, error: '未知 agent' };
+    const raw = (typeof value === 'object' && value !== null) ? value : null;
+    if (!raw || ['format', 'baseUrl', 'apiKey', 'model'].some(k => typeof raw[k] !== 'string')) {
+      return { ok: false, error: 'value 须为 { format, baseUrl, apiKey, model } 四字符串字段(空串=清除)' };
     }
-    const v = clean(value);
-    if (leaf === 'format' && v && !Object.keys(LLM_FORMATS).includes(v)) {
+    const cur = {
+      format: raw.format.trim(),
+      baseUrl: raw.baseUrl.trim(),
+      apiKey: raw.apiKey.trim(),
+      model: raw.model.trim(),
+    };
+    if (cur.format && !Object.keys(LLM_FORMATS).includes(cur.format)) {
       return { ok: false, error: `格式必须是 ${Object.keys(LLM_FORMATS).join('/')}` };
     }
-    const cur = { ...(getPrefs().agentLlm ?? {})[agentKey] };
-    if (v === '' || v == null) delete cur[leaf];
-    else cur[leaf] = v;
-    if (v !== '' && v != null) {
-      // 探测必须用「覆盖后」的生效配置(cur=旧覆盖+本次新值)——此前误用
-      // effectiveLlmFor(旧 prefs), 坏 key 借真 key 的探测通过后落盘
-      // (浏览器负向实测抓出)。
+    const anySet = cur.format || cur.baseUrl || cur.apiKey || cur.model;
+    if (anySet) {
+      // 探测用「覆盖后」的生效配置(默认之上按字段覆盖)
       const base = effectiveCommon();
       const eff = {
         format: cur.format || base.format,
@@ -504,14 +512,15 @@ export async function saveSetting({ group, field, value }, wal) {
         model: cur.model || base.model,
       };
       if (!eff.baseUrl || !eff.apiKey || !eff.model) {
-        return { ok: false, error: '默认供应商尚未配齐(Base URL/Key/模型)——先在通用配置配好默认, 再做单 agent 覆盖' };
+        return { ok: false, error: '生效配置不完整(Base URL/Key/模型)——先在通用配置配好默认, 或把覆盖四字段填齐' };
       }
       const r = await llmProbe(eff.baseUrl, eff.apiKey, eff.model, eff.format);
       if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
     }
     const freshAll = { ...getPrefs().agentLlm };
-    if (Object.keys(cur).length === 0) delete freshAll[agentKey];
-    else freshAll[agentKey] = cur;
+    const clean = Object.fromEntries(Object.entries(cur).filter(([, v2]) => v2 !== ''));
+    if (Object.keys(clean).length === 0) delete freshAll[agentKey];
+    else freshAll[agentKey] = clean;
     setPrefs({ agentLlm: freshAll }, wal);
     return { ok: true };
   }

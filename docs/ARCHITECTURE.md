@@ -100,9 +100,9 @@ gateway (Python :8081, 仅 127.0.0.1)
 | gateway 不解析业务,只做 认证→静态/反代 | 认证域与业务域隔离 |
 | workflow 代码不 import runtime 内部模块 | worker 与 runtime 只通过 `runtime-client.mjs`(HTTP+令牌)交互,两服务独立部署/重启 |
 | activities 是 workflow 唯一出站副作用点 | Temporal 可观测性(history 完整记录每次副作用) |
-| `config.mjs` 是后端唯一配置源 | 换 LLM 厂商/端口 = 改 `.env` 一处 |
+| `config.mjs` 是后端唯一配置源 | LLM 厂商在平台「设置」页换(R32D44 平台化); 端口等 = 改 `.env` 一处 |
 | 智能体身份(agent impersonation)必须带 INTERNAL_TOKEN | 浏览器会话不能伪造 [DM] 注入 |
-| 单一职责;行数软指引(tools(1036)/sessions(997)/pi(977)/routes(794)/sandbox·tooling(783)/agent-settings(532)/sandbox·container(531) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
+| 单一职责;行数软指引(tools(1036)/pi(1026)/sessions(1001)/routes(809)/agent-settings(666)/sandbox·tooling(783)/sandbox·container(531) 七文件属聚合已知例外, 拆分在 backlog) | 可读性/可维护性 |
 
 ## 4. 控制面 vs 数据面
 

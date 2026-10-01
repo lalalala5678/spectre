@@ -78,7 +78,6 @@ export async function saveSkill(agentKey, { name, description, content }) {
   return `${CONTAINER.skills}/${agentKey}/${name}/SKILL.md`;
 }
 
-/** Remove a skill directory. */
 /** R32D44-feature: 读技能正文(控制台 agent 配置面板点开技能看内容)。
  * agentKey/name 已在 routes 层白名单校验(isAgentKey + [\w-]+), 此处
  * 只处理存在性; 不存在返回 null(404 语义)。 */

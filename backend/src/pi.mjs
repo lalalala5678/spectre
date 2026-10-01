@@ -149,24 +149,25 @@ function modelCatalog(eff = {}) {
     cost: { input: 0, output: 0, cacheRead: 0, cacheWrite: 0 },
     contextWindow: Number(eff.contextWindow) || 786_432,
     maxTokens: Math.min(Number(eff.maxTokens) || 32_768, Number(eff.contextWindow) || 786_432),
-    compat: {
-      supportsStore: false,
-      supportsDeveloperRole: false,
-      maxTokensField: 'max_tokens',
-      requiresReasoningContentOnAssistantMessages: true,
-      thinkingFormat: 'deepseek',
-    },
-    // 智谱 GLM 特例: 'off' 被拒(code 1210)——pi 层级映射到 Zhipu tiers。
-    // 这是本仓默认示例厂商的适配; 其它厂商(该文件 base/参考其它条目)
-    // get the level passed through as-is (user decision: no middle-station).
-    thinkingLevelMap: {
-      minimal: 'low',
-      low: 'low',
-      medium: 'medium',
-      high: 'high',
-      xhigh: 'high',
-      max: 'max',
-    },
+    // CS16-P3: DeepSeek 线制兼容(GLM-4.6+/DeepSeek 系 reasoning_content
+    // 前置)与 GLM tier 映射('off' 被拒 code 1210)只对 openai 兼容线制
+    // 且 baseUrl 指向智谱时启用——anthropic/gemini 线制原样传档位
+    // (契约: '按所选档位原样传给厂商, 不维护厂商映射')。
+    ...(wire === 'openai-completions' && /bigmodel\.cn|zhipu/i.test(eff.baseUrl || '')
+      ? {
+        compat: {
+          supportsStore: false,
+          supportsDeveloperRole: false,
+          maxTokensField: 'max_tokens',
+          requiresReasoningContentOnAssistantMessages: true,
+          thinkingFormat: 'deepseek',
+        },
+        thinkingLevelMap: {
+          minimal: 'low', low: 'low', medium: 'medium',
+          high: 'high', xhigh: 'high', max: 'max',
+        },
+      }
+      : {}),
   }];
 }
 
@@ -232,7 +233,8 @@ export async function buildPi() {
   if (!model) {
     throw new Error('default LLM provider model 未构建');
   }
-  /** agent → 该 agent 的 live model(覆盖未配=默认 model 同一对象) */
+  /** agent → 该 agent 的 live model(每 scope 独立对象, 互不串扰;
+   * 理论上所有 scope 都已注册, ?? model 仅作防御) */
   const modelForAgent = (agentKey) => liveModels.get(agentKey) ?? model;
   // L1 resilience: pi's retryProviderRequest defaults maxRetries to 0 —
   // every call dies on the first 429/5xx. Inject retries + timeout for

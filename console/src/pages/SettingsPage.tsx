@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { Loader2, Check, AlertTriangle, RotateCw, Radar, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '../utils/cn';
+import { AgentLlmOverride } from '../components/AgentLlmOverride';
 
 /**
  * Agent 设置栏 — 通用配置(全局)+ Agent 特有配置(本轮:资产测绘数据源)。
@@ -203,11 +204,6 @@ export function SettingsPage() {
     await api('/agent-settings/save', { method: 'POST', json: { group, field: `${srcId}.${leaf}`, value: v } });
     await reload();
   };
-  // R32D44-llm: 单 agent 供应商覆盖(留空保存=删覆盖回默认)
-  const saveAgentLlm = (agentKey: string) => (leaf: string) => async (v: string) => {
-    await api('/agent-settings/save', { method: 'POST', json: { group: 'agent-llm', field: `${agentKey}.${leaf}`, value: v } });
-    await reload();
-  };
 
   if (err) return <div className="p-6 text-red-400">设置加载失败:{err}</div>;
   if (!data) return <div className="animate-pulse p-6 text-zinc-500">加载中…</div>;
@@ -215,6 +211,7 @@ export function SettingsPage() {
   const cs = data.common ?? {};
   const llm = (cs.llm ?? {}) as Record<string, string>;
   const comp = (cs.compaction ?? {}) as Record<string, string>;
+  const ws = (cs.webSearch ?? {}) as Record<string, string>;
   const groups = data.schema.agents ?? [];
   const reconAgent = groups.find((a) => a.agentKey === 'recon');
   const otherAgents = groups.filter((a) => a.agentKey !== 'recon');
@@ -257,7 +254,9 @@ export function SettingsPage() {
         <div className="divide-y divide-void-800/70">
           {data.schema.common.fields.map((f) => {
             const [top, leaf] = f.id.split('.');
-            const bucket = top === 'llm' ? llm : comp;
+            // CS16-P2: webSearch 三字段此前落空 bucket(只认 llm/comp)——
+            // 保存后回显恒空, 用户以为没存上。
+            const bucket = top === 'llm' ? llm : (top === 'webSearch' ? ws : comp);
             return <FieldRow key={f.id} def={f} value={bucket[leaf]} onSave={saveCommon(f.id)} />;
           })}
         </div>
@@ -284,11 +283,9 @@ export function SettingsPage() {
                     ? <span className="rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9.5px] text-orange-300">已覆盖</span>
                     : <span className="rounded-sm bg-void-800 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-600">用默认</span>}
                 </div>
-                <div className="grid grid-cols-1 gap-x-4 gap-y-1 md:grid-cols-2">
-                  {g.fields.map((f) => (
-                    <FieldRow key={f.id} def={f} value={ov[f.id]} onSave={saveAgentLlm(g.agentKey)(f.id)} />
-                  ))}
-                </div>
+                {/* CS16-P1: 原子四字段编辑器(与 agent 配置页签同款共享组件)——
+                    逐字段保存×整体探测有跨供应商中间态死锁 */}
+                <AgentLlmOverride agentId={g.agentKey} ov={ov} onSaved={() => void reload()} />
               </div>
             );
           })}

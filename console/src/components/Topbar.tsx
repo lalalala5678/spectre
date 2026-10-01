@@ -4,8 +4,8 @@ import { Activity, Bell, LogOut, Search } from 'lucide-react';
 import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
 
-/** F60: /api/health 前端零消费——模型名/会话总量/总线事件总量后端有、
- * 用户无从得知。状态栏 30s 轮询展示(ok 掉线变红)。 */
+/** F60: /api/health 前端消费——状态栏 30s 轮询展示会话/事件总量
+ * (ok 掉线变红)。R32D44: 模型名字样已移除(供应商多态, 见设置页)。 */
 interface HealthInfo { ok: boolean; model: string; sessions: number; bus: number; }
 
 interface TreeSess { id: string; agentKey: string; title: string | null; rawTitle?: string | null; busy?: boolean; workSessionId?: string | null }

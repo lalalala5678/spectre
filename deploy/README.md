@@ -34,7 +34,7 @@
 git clone https://github.com/lalalala5678/spectre /opt/spectre && cd /opt/spectre
 
 # 1) 后端(state.wal 属主——多实例共用数据目录会互相覆写, 测试务必隔离)
-cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN+LLM 三行(BASE_URL/KEY/MODEL——任意 OpenAI 兼容厂商)
+cd backend && cp .env.example .env   # 填 INTERNAL_TOKEN(LLM 登录后在设置页配置——平台化, 见 README ⑦)
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs   # PORT 可覆盖; 生产缺省 /var/lib/spectre
 
@@ -80,7 +80,7 @@ SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同
 
 # 7) 数据源凭据
 #    控制台「Agent 配置」页填入(验证通过才落盘, 未配置不注入);
-#    LLM 凭据在 backend/.env(启动必需)
+#    LLM 凭据登录后在「设置」页配置(平台化; 旧 .env LLM_* 首靴一次性导入)
 ```
 
 ## 账号管理
