@@ -545,7 +545,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     agentKey={liveKey}
                     workSessionId={workSession.id}
                     onOpen={setEntryView}
-                    onOpenSession={id => { setEntryView(null); setDrillSession(id); }}
+                    onOpenSession={id => { setEntryView(null); openDrill(id); }}
                   />
                   <IntelNotesPanel
                     agentKey={liveKey}
