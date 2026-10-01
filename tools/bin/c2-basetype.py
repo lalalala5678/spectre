@@ -16,7 +16,7 @@
 
 
 
-import base64, hashlib, json, os, re, subprocess, sys, time  # CS29-F2 恢复全活集
+import sys, base64, hashlib, json, os, re, subprocess, time  # CS29/F-B: 恢复全活集(sys 起头族例)-F2 恢复全活集
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载

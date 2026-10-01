@@ -55,7 +55,12 @@ def cmd_bind(args):
     p = a['--payload']
     sc = json.load(open(SCOPE))
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')
-    if target not in sc.get('targets', []):
+    # CS30-F8: targets 语义与 SKILL/shells 对齐(精确|'*.domain' 通配——
+    # 此前纯精确成员, 通配 scope 条目下具体主机结构性 BIND-REJECT 70)。
+    def _tm(t, tg):
+        t, tg = str(t).lower(), str(tg).lower()
+        return t == tg or (t.startswith('*.') and tg.endswith(t[1:]))
+    if not any(_tm(t, target) for t in sc.get('targets', [])):
         print(f'BIND-REJECT: target {target!r} not in scope targets'); return 70
     now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
     if not (sc['window']['start'] <= now <= sc['window']['end']):

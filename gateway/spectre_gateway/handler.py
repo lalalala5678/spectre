@@ -300,7 +300,6 @@ class QuietHTTPServer(ThreadingHTTPServer):
 def serve():
     """Entry point: wire state and start the threaded HTTP server."""
     import os
-    from http.server import ThreadingHTTPServer
 
     loopback = ("127.0.0.1", "localhost", "::1")  # CS3-N16 对齐 config.py 判定
     if config.BIND_HOST not in loopback and config.TRUST_PROXY:

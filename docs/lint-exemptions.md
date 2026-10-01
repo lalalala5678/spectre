@@ -59,4 +59,6 @@ TODO 注释/SPEC_DIR 所述对象不存在)。两文件已从 git 历史(9c0fa4a
 - "死 import 16 处清"实删 10, 余 22(点名的 argparse 本身未删)
 - N4"不谎报 ok"未动真正产出 ok:true 的 ensureSandbox 两处
 教训: 编辑脚本必须 write 后回读断言; 提交前 git diff --stat 对账
-提交信息枚举的每个文件。本轮已全数补修。
+提交信息枚举的每个文件。CS30 对账: 本段(AT 轮)所列补修在 AU 轮
+(d910593)才全部落盘——AT 轮自身仍有 CLI 三态虚报(toklab/basetype
+真调用 NameError)与死 import 数字虚报, 连续第四轮。
