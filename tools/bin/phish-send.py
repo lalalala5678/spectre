@@ -9,7 +9,7 @@ v2 新增: DKIM 签名 / Message-ID 域名一致性 / Reply-To 同域 / 路径�
       [--dkim-key key.pem --dkim-selector s1 --dkim-domain example.co] \\
       [--attach file] [--rate 5/min]
 """
-import sys, os, smtplib, time, json, hashlib, argparse, base64, secrets
+import sys, os, smtplib, time, json, hashlib, argparse, secrets
 from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
 from email.mime.application import MIMEApplication

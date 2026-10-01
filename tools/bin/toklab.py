@@ -7,7 +7,7 @@
   toklab brute --pairs p.txt --base school,campus,edu --rules year_suffix      # 语义生成(基词×年份×大小写,免手搓字典)
 captured.txt 每行: <body>\\t<sig>  (离线爆破,零在线请求)
 """
-import sys  # CS28: 死 import 清理时误删(实际 main 消费 sys.exit)
+import base64, hashlib, hmac, sys  # CS29-F3 恢复全活集
 
 def b64d(s):
     s2 = s + '=' * (-len(s) % 4)

@@ -16,7 +16,7 @@
 
 
 
-import os, sys, json  # CS28: 死 import 清理误删 os(_data_root 消费)——恢复
+import base64, hashlib, json, os, re, subprocess, sys, time  # CS29-F2 恢复全活集
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载

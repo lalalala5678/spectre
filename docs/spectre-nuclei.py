@@ -7,7 +7,7 @@
   spectre-nuclei run --target http://x.com --template /path/to/cve.yaml
   spectre-nuclei list --templates /path/to/nuclei-templates/ --search weblogic
 """
-import sys, os, json, re, argparse, hashlib, time
+import sys, os, json, re, argparse, time
 import yaml
 import urllib.request, urllib.error
 import ssl

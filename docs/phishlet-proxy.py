@@ -23,7 +23,7 @@ phishlet 结构(Evilginx 兼容子集):
   phishlet-proxy list  # 列出可用 phishlet
   phishlet-proxy init  # 生成样例 phishlet 到数据根 phishlets/  (CS15-7)
 """
-import sys, os, json, time, hashlib, re, argparse
+import sys, os, json, time, hashlib, re
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
@@ -41,8 +41,8 @@ def _data_root():
     return '/var/lib/spectre/tools'
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from urllib.request import urlopen, Request
-from urllib.error import URLError, HTTPError
+from urllib.request import Request
+from urllib.error import HTTPError
 
 def scope_gate_full():
     """完整授权门(同 c2-qa): targets+window 双校验,exit 75"""

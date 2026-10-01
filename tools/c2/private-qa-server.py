@@ -16,6 +16,7 @@
 """
 
 from http.server import BaseHTTPRequestHandler
+import os, sys, json, glob, subprocess, secrets  # CS29-F1 恢复(误删的活 import)
 
 CONTAINER = os.environ.get('SPECTRE_SANDBOX_CONTAINER', '')
 # CS8-P1-3: 数据根走 SPECTRE_DATA_DIR(镜像 deploy/oob-collector.py 先例)

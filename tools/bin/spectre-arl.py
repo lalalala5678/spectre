@@ -10,7 +10,7 @@
   spectre-arl watch --project mycorp --interval 3600
   spectre-arl assets --project mycorp [--type subdomain|port|service]
 """
-import sys, os, json, sqlite3, time, argparse, hashlib
+import sys, os, json, sqlite3, time, argparse
 
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载

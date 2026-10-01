@@ -154,7 +154,8 @@ export async function ensureSandbox() {
     // 的 'name already in use' 是误报(容器实际健康)。重 inspect 收敛。
     const recheck = await run('docker', ['inspect', '-f', '{{.State.Running}}', cfg.container]);
     if (recheck.code === 0 && recheck.out.trim() === 'true') {
-      return { driver: 'docker', ok: true, started: true, raced: true };
+      const racedBoot = await bootstrapToolchain();
+      return { driver: 'docker', ok: racedBoot.bootstrapped !== false, started: true, raced: true, ...racedBoot };  // CS29-F6: 同款不谎报
     }
     return { driver: 'docker', ok: false, error: create.out.slice(-200) };
   }
@@ -162,7 +163,7 @@ export async function ensureSandbox() {
   // replay the shared-layer install ledger into the fresh container
   // (apt-layer installs would otherwise be silently lost)
   const replayed = await replayInstallLog();
-  return { driver: 'docker', ok: true, created: true, ...boot, replayed };
+  return { driver: 'docker', ok: boot.bootstrapped !== false, created: true, ...boot, replayed };  // CS29-F6
 }
 
 /** install-log: durable record of environment installs; replayed after a

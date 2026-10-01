@@ -8,7 +8,7 @@
   spectre-bloodhound analyze --graph /tmp/ad-graph.json
   spectre-bloodhound paths --graph /tmp/ad-graph.json --from user1 --to "DOMAIN ADMINS@corp"
 """
-import sys, os, json, argparse
+import sys, json, argparse
 from collections import defaultdict, deque
 
 # ============================================================

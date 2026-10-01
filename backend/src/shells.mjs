@@ -101,7 +101,8 @@ export function shellBusAdapter(bus) {
 
 /** CS26-2/CS27-1/7: scope targets 匹配器(模块级单源)——精确串 |
  * '*.domain' 通配; 大小写不敏感(DNS 语义); 网段不参与 shell 匹配
- * (shell.target 是主机名; scope-gate SKILL 'targets' 为 glob 清单)。
+ * (shell.target 是主机名; SKILL 'targets' 原文为 glob/网段清单——网段
+ * 不参与 shell 匹配, 见下行)。
  * gate 标签门与 exec 目的地校验共用; 导出供机锁直接断言。 */
 export function targetMatches(t, target) {
   const tt = String(t).toLowerCase(), dt = String(target).toLowerCase();
