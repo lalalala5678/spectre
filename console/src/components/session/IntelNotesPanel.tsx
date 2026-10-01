@@ -1,8 +1,8 @@
-import { ChevronRight } from 'lucide-react';
 import { cn } from '../../utils/cn';
 
 import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
+import { PanelEntryMeta } from './PanelEntryMeta';
 
 /**
  * INTEL-NOTE list panel: any information that might help the task
@@ -45,7 +45,6 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
         {events.map(event => {
           const title = event.current.title ?? event.title
             ?? event.summary.replace(/^(情报)[:：]?/, '').slice(0, 60);
-          const a = event.author;
           return (
             <button
               key={event.seq}
@@ -60,18 +59,10 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
                   event.current.void ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
                   {title}
                 </span>
-                {event.revisedCount > 0 && (
-                  <span className="shrink-0 rounded-sm border border-sky-800 bg-sky-950/40 px-1 py-0.5 font-mono text-[8.5px] tracking-widest text-sky-300">
-                    ⟳{event.revisedCount}
-                  </span>
-                )}
-                <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />
+                {/* CS41-C2: 收敛 PanelEntryMeta(⟳ 徽标+溯源行——此前
+                    内联逐字双胞胎, 同族三面板两收敛一分叉) */}
+                <PanelEntryMeta event={event} />
               </div>
-              {a && (
-                <p className="truncate pl-1 text-[10px] leading-tight text-zinc-600">
-                  {a.name}（{a.typeLabel}{a.parent ? ` · 父:${a.parent.name}` : ''} · L{a.depth}）
-                </p>
-              )}
             </button>
           );
         })}

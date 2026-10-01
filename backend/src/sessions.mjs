@@ -31,6 +31,8 @@ function safeWalAppend(wal, entry) {
   }
 }
 
+export const SESSION_NAME_MAX = 20;   // CS41-B4: 单源上限(spawn 工具面硬拒同值)
+export const SESSION_DESC_MAX = 60;
 const TOOLS_PROMPTS = {
   'skill-config': SKILL_CONFIG_PROMPT,
   'mcp-config': MCP_CONFIG_PROMPT,
@@ -108,9 +110,9 @@ export class SessionStore {
       activeEngagement: null,
       title: null,
       spawnName: typeof opts.name === 'string' && opts.name.trim()
-        ? opts.name.trim().slice(0, 30) : null,
+        ? opts.name.trim().slice(0, SESSION_NAME_MAX) : null,
       spawnDescription: typeof opts.description === 'string'
-        && opts.description.trim() ? opts.description.trim().slice(0, 80) : null,
+        && opts.description.trim() ? opts.description.trim().slice(0, SESSION_DESC_MAX) : null,
       lastActivityTs: Date.now(),
       summarizeBusy: false,
       events: [],
@@ -829,6 +831,9 @@ export class SessionStore {
       .find(m => m.role === 'assistant' && m.stopReason === 'error' && m.errorMessage);
     record.taskReportCount += 1;
     record.lastReport = {
+      // CS41-B7 同步钉注: 与 workflows.mjs 代拟块双实现(差异: 本侧
+      // spawnName ?? agentKey / CONFIG.reportNudgeMax / broken 分支)——
+      // 改任一侧必须同步另一侧(先例 CS23-N15)。
       title: `[系统代拟] ${record.spawnName ?? record.agentKey} 任务报告`,
       status: broken ? 'failed' : 'no-result',
     };

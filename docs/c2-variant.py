@@ -347,6 +347,10 @@ FAM_FN = {'id': fam_id, 'enc': fam_enc, 'code': fam_code, 'struct': fam_struct}
 
 def cmd_gen(args):
     a = dict(zip(args[::2], args[1::2]))
+    # CS41-A4 门序契约: -h→EDUSRC(76)→scope(75)→用法(2)→引擎(2)——
+    # 授权先于用法校验(族内八工具统一; 此前参验在门前致同态退出码分叉)。
+    edusrc_gate([a.get('--src', ''), a.get('--out', '')])
+    scope_gate_full()
     # R32D58-F3: 必填参缺失干净 usage rc=2(此前 KeyError 裸栈 rc=1)。
     if '--src' not in a or '--out' not in a:
         print('用法: c2-variant.py gen --src <payload> --out <dir> [--rounds N] [--families ...]', file=sys.stderr)
@@ -357,9 +361,6 @@ def cmd_gen(args):
     # R32D60-NEW4: --src 不存在→干净 rc=2(此前裸栈 rc=1)。
     if not os.path.isfile(a['--src']):
         print(f"用法错误: --src 文件不存在或不是常规文件: {a['--src']}", file=sys.stderr); return 2
-    # CS36-Z2: 门序族统一=edusrc 先; Z3: 换 _common 单源门(exercise 必填)
-    edusrc_gate([a['--src'], a.get('--out', '')])
-    scope_gate_full()
     src = open(a['--src']).read()
     srcpath = a['--src']
     outdir = a.get('--out', '/tmp/c2-variants')
@@ -448,8 +449,20 @@ def cmd_selftest(args):
     # R32D61-F6/CS40-1: java 缺失归因标志(此前锚点落错函数致 NameError)。
     import shutil
     java_missing = not shutil.which('java')
+    # CS41-A1: 套件目录缺/非常规→干净 rc=2+供给指引(此前裸栈 rc=1)。
+    import os.path as _osp
+    if not _osp.isdir(bdir):
+        print(f'SELFTEST 用法错误: 基型目录不存在或不是目录: {bdir}——检查 SPECTRE_DATA_DIR/tools-sync 交付', file=sys.stderr)
+        return 2
+    # CS41-A3: 空套件拒假绿(族内统一 c2-bytecode R32D57-NEW7 制式——
+    # 此前 rc=0+SUMMARY 0 fail 但什么都没测)。
+    entries = [f for f in sorted(os.listdir(bdir)) if not f.endswith('.bak')]
+    if not entries:
+        print(f'SELFTEST ERROR: 基型目录零载荷基型({bdir})——skills-seed/tools-sync 应已交付', file=sys.stderr)
+        return 1
     fails = 0
-    for f in sorted(os.listdir(bdir)):
+    per_file_fail = []
+    for f in entries:
         if f.endswith(('.bak',)):
             continue
         p = os.path.join(bdir, f)
@@ -460,7 +473,7 @@ def cmd_selftest(args):
         cands = sorted(x for x in os.listdir(out) if x.startswith('variant_')) if os.path.isdir(out) else []
         if not cands:
             print(f'SELFTEST FAIL {f}: no guarded candidate: {(g.stdout + g.stderr).strip()[:160]}')
-            fails += 1; continue
+            fails += 1; per_file_fail.append((f, 'nocand')); continue
         vp = os.path.join(out, cands[0])
         resid = yara_string_hits(vp)
         dg = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-disguise.py'), 'check', '--payload', vp],
@@ -471,9 +484,13 @@ def cmd_selftest(args):
         ok = (not resid) and ft.returncode == 0 and dgres.get('verdict') != 'REJECT'
         why = ' [java 缺失——引擎供给问题非回归]' if (not ok and ft.returncode != 0 and f.endswith('.java') and java_missing) else ''
         print(f"SELFTEST {'OK  ' if ok else 'FAIL'} {f}: resid={len(resid)} ft={ft.returncode} disguise={dgres.get('verdict')} {str(dgres.get('bare_surfaces'))[:60]}{why}")
-        fails += 0 if ok else 1
+        if not ok:
+            fails += 1; per_file_fail.append((f, f'ft={ft.returncode}'))
         shutil.rmtree(out, ignore_errors=True)
-    print(f'SELFTEST SUMMARY: {fails} fail' + ('  [java 车道受引擎缺失影响——ft=1 项非回归]' if java_missing and fails else ''))
+    # CS41-A2: 横幅归因与逐项同过滤(仅当确有 .java 车道 fail——此前
+    # 纯 php fail 也被归因 java, 误导非回归判断)。
+    java_fail = any(e[0].endswith('.java') for e in per_file_fail)
+    print(f'SELFTEST SUMMARY: {fails} fail' + ('  [java 车道受引擎缺失影响——ft=1 项非回归]' if java_missing and java_fail else ''))
     return 1 if fails else 0
 
 def cmd_fingerprint(args):

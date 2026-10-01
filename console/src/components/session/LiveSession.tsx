@@ -160,7 +160,9 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
             streamingThinking: true,
           }));
         } else if (ev.type === 'message' && ev.data?.role) {
-          const msg = ev.data as unknown as ApiMessage;
+          // CS41-C5: 结构守卫转型(此前双重断言绕过全部检查)
+          const d = ev.data as Partial<ApiMessage>;
+          const msg: ApiMessage = { role: d.role!, ts: d.ts ?? Date.now(), text: d.text ?? '' , ...(d.source && { source: d.source }) };
           setMessages(prev => {
             // Final assistant text replaces its streaming placeholder.
             const next = [...prev];
@@ -175,10 +177,10 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
             // 被整条丢弃, 实时转录缺失, 重载才恢复)。匹配即清除标记。
             if (msg.role === 'user') {
               const i = next.findIndex(m =>
-                m.role === 'user' && m.text === msg.text && (m as any).__optimistic);
+                m.role === 'user' && m.text === msg.text && m.__optimistic);
               if (i >= 0) {
                 const copy = [...next];
-                delete (copy[i] as any).__optimistic;
+                delete copy[i].__optimistic;
                 return copy;
               }
             }
@@ -202,7 +204,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
     setError('');
     const opTs = Date.now();
     if (mode === 'prompt') {
-      setMessages(prev => [...prev, { role: 'user', ts: opTs, text, __optimistic: true } as never]);
+      setMessages(prev => [...prev, { role: 'user', ts: opTs, text, __optimistic: true }]);
     }
     try {
       await api(`/sessions/${sessionId}/${mode === 'prompt' ? 'messages' : 'steer'}`, {

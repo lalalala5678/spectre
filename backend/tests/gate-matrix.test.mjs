@@ -33,11 +33,18 @@ test('门族矩阵: env=1 下缺/空 scope 全族统一 76(无裸栈)', () => {
   // 前置: 供给一个有效 payload 让参数校验先过
   const payload = join(emptyDir, 'p.php');
   writeFileSync(payload, '<?php // SPECTRE-MARK\n');
+  // CS41-A8: 扩员至 SKILL 全员(qa/basetype/bytecode/variant/javart/
+  // functest/disguise)+ bytecode verify/split; 参验在门后(门序契约)。
   const cases = [
     ['c2-qa.py', ['scan', '--engine', 'echo']],
     ['c2-basetype.py', ['list']],
     ['c2-bytecode.py', ['selftest']],
+    ['c2-bytecode.py', ['split']],
+    ['c2-bytecode.py', ['verify']],
     ['c2-variant.py', ['gen', '--src', payload, '--out', join(emptyDir, 'o')]],
+    ['c2-javart.py', ['--src', 'x.java']],
+    ['c2-functest.py', ['whatever.php']],
+    ['c2-disguise.py', ['check']],
   ];
   try {
     for (const [tool, args] of cases) {
@@ -87,7 +94,7 @@ test('门族矩阵: 坏 JSON scope 全族统一干净 75(CS37-F3 形态补位)',
       ['c2-variant.py', ['gen', '--src', payload, '--out', join(badDir, 'o')]],
       ['c2-bind.py', ['bind', '--payload', payload]],
     ]) {
-      // bind 按设计无 EDUSRC 门(SKILL 表'functest/bind 不涉及')——只测无 env 侧
+      // bind 按设计无 EDUSRC 门(目标绑定语义另行, SKILL 门表)——只测无 env 侧
       for (const edusrc of tool === 'c2-bind.py' ? [false] : [true, false]) {
         const r = runTool(tool, args, badDir, edusrc);
         const want = edusrc ? 76 : 75;
@@ -106,16 +113,31 @@ test('门族矩阵: 坏 JSON scope 全族统一干净 75(CS37-F3 形态补位)',
   }
 });
 
-test('variant selftest 空套件干净跑通(CS40-1 NameError 盲区锁)', () => {
+test('variant selftest 空套件拒假绿 rc=1 且无 NameError(CS40-1/CS41-A3 锁)', () => {
   const dir = mkdtempSync(join(tmpdir(), 'gate-st-'));
   mkdirSync(join(dir, 'tools', 'c2', 'basetypes'), { recursive: true });
   writeFileSync(join(dir, 'tools', 'c2', 'scope.json'),
     JSON.stringify({ exercise: 'qa', targets: ['a.local'], window: { start: '2026-01-01T00:00:00Z', end: '2027-01-01T00:00:00Z' } }));
   try {
     const r = runTool('c2-variant.py', ['selftest'], dir, false);
-    assert.equal(r.status, 0, `selftest 空套件应 rc=0, 实得 ${r.status}\nstderr:${r.stderr?.slice(-300)}`);
+    // CS41-A3 裁定: 空套件 rc=1 拒假绿(族内统一 bytecode NEW7 制式)。
+    assert.equal(r.status, 1, `selftest 空套件应 rc=1(拒假绿), 实得 ${r.status}\nstderr:${r.stderr?.slice(-300)}`);
     assert.ok(!r.stderr.includes('Traceback') && !r.stderr.includes('NameError'), '不得 NameError/裸栈');
-    assert.ok(r.stdout.includes('SELFTEST SUMMARY'), '应打印汇总行');
+    assert.ok(r.stderr.includes('零载荷基型'), '应给供给指引');
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});
+
+test('variant selftest 缺目录干净 rc=2(CS41-A1 锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'gate-md-'));
+  mkdirSync(join(dir, 'tools', 'c2'), { recursive: true });
+  writeFileSync(join(dir, 'tools', 'c2', 'scope.json'),
+    JSON.stringify({ exercise: 'qa', targets: ['a.local'], window: { start: '2026-01-01T00:00:00Z', end: '2027-01-01T00:00:00Z' } }));
+  try {
+    const r = runTool('c2-variant.py', ['selftest'], dir, false);
+    assert.equal(r.status, 2, `缺目录应 rc=2, 实得 ${r.status}`);
+    assert.ok(!r.stderr.includes('Traceback'), '不得裸栈');
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }

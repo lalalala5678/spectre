@@ -41,12 +41,13 @@ def cmd_bind(args):
         print('用法: c2-bind.py bind --payload <file> [--target t] [--days N]', file=sys.stderr)
         return 2
     p = a['--payload']
+    # CS41-A4 门序契约: scope 门先于用法(bind 无 EDUSRC 门——目标绑定
+    # 语义另行, 见 SKILL); R32D61-F9 单源门(缺/坏/空/缺 exercise/出窗
+    # 统一 75)。
+    sc = scope_gate_full()
     # R32D60-NEW4: payload 不存在/是目录→干净 rc=2(此前裸栈 rc=1)。
     if not os.path.isfile(p):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
-    # R32D61-F9: 门收敛 _common 单源(此前本地 try/except+结构检查双实现,
-    # 与族消息口径分叉)——缺/坏/空/缺 exercise/出窗统一 75。
-    sc = scope_gate_full()
     if a.get('--days') and not a['--days'].lstrip('-').isdigit():
         print('用法: --days 须为整数天数', file=sys.stderr); return 2
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')

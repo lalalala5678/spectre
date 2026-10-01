@@ -100,7 +100,7 @@ export function buildIntelTools(record, caps) {
         description: 'Pagination cursor: only entries with seq < before (pass the oldest seq of the current page to fetch the next older page)',
       })),
       limit: Type.Optional(Type.Number({
-        description: 'Max entries shown, default 10, cap 20 (total match count is always reported)',
+        description: 'Max entries shown, default 10, cap 50 (F35; total match count is always reported)',
       })),
     }),
     execute: async (_id, params) => {
@@ -435,8 +435,14 @@ export function buildIntelTools(record, caps) {
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
       }
-      const lines = messages.map(m =>
-        `${m.role === 'user' ? '用户' : m.role === 'toolResult' ? '工具结果' : '智能体'}: ${(m.text || '(无文本)').slice(0, 300)}`);
+      // CS41-B1: 单条截断打标(AGENTS 原则3——此前裸 slice 无标记)。
+      const lines = messages.map(m => {
+        const raw = m.text || '(无文本)';
+        const who = m.role === 'user' ? '用户' : m.role === 'toolResult' ? '工具结果' : '智能体';
+        return raw.length > 300
+          ? `${who}: ${raw.slice(0, 300)}(…正文共 ${raw.length} 字符, 已截断)`
+          : `${who}: ${raw}`;
+      });
       return { content: [{ type: 'text',
         text: clipMarked(`会话 ${sid} 最近 ${messages.length} 条消息:\n\n${lines.join('\n\n---\n\n')}`,
           CONFIG.intelDigestChars, '可减小 last 参数') }] };
@@ -677,7 +683,10 @@ export function buildOrchestratorTools(record, caps) {
         ? `autopwn-${params.engagementId.replace(/^autopwn-/, '')}`
         : record.activeEngagement?.workflowId;
       if (!engagement) {
-        throw new Error('no active engagement; dispatch_agents first');
+        // CS41-B6: 结构化可行动回执(同函数其余失败分支制式——此前裸
+        // throw 产原始异常栈)。
+        return { content: [{ type: 'text',
+          text: '转发失败:无进行中的 engagement——先调用 dispatch_agents 发起战役再转发。' }] };
       }
       // Fix-E (P7): membership validation BEFORE signaling. Implicit path
       // reads the persisted activeEngagement.agents; explicit path derives
@@ -795,6 +804,9 @@ export function buildShellTools(record, caps) {
 
       const say = (obj) => ({ content: [{ type: 'text', text: JSON.stringify(obj) }] });
       const R = caps.shells;
+      // CS41-B3: action 入口归一化(AGENTS 原则5——同 execute 的 transport
+      // 归一, 此前大小写敏感裸匹配旁路)。
+      p.action = String(p.action ?? '').toLowerCase();
       try {
         if (p.action === 'list') {
           const list = R.list({ target: p.filterTarget, transport: p.filterTransport,

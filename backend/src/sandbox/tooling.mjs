@@ -415,10 +415,11 @@ function buildAllToolingTools(caps, sessionRecord) {
     // 情报价值为零)——此类意图跳过包管理通道。
     const vulnIntent = /CVE-\d|\bRCE\b|\bSQLi\b|\bXSS\b|\b0day\b|\bnday\b|poc|exploit|漏洞|利用/i.test(p.query);
     const channels = await searchVertical(p.query);
+    // CS41-B8: pip 通道已移除(见上注)——死值出过滤; 漏洞意图仅跳 npm。
     const usable = vulnIntent
-      ? channels.filter(ch => !['npm', 'pip'].includes(ch.channel))
+      ? channels.filter(ch => ch.channel !== 'npm')
       : channels;
-    if (vulnIntent) receipt.push('- 意图路由:漏洞/PoC 查询已跳过 npm/pip 包库通道');
+    if (vulnIntent) receipt.push('- 意图路由:漏洞/PoC 查询已跳过 npm 包库通道');
     for (const ch of usable) {
       if (ch.error) {
         receipt.push(`- ${ch.channel}:0 命中(通道错误:${ch.error})`);

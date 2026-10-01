@@ -305,6 +305,9 @@ export async function agentTaskWorkflow(input) {
     }
     report = await quick.reportState(session.sessionId);
     if (report.count <= base.count) {
+      // CS41-B7 同步钉注: 本块与 src/sessions.mjs synthesizeReport 双实现
+      // (口径差异: 标题 spawnName ?? agentKey / 催办次数 CONFIG.reportNudgeMax
+      // / broken 分支)——改任何一侧必须同步另一侧(先例 CS23-N15)。
       await quick.busEmit({
         channel: 'share', from: agentKey, type: 'task-report',
         author: report.author, status: 'no-result',

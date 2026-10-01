@@ -6,7 +6,7 @@
 引擎适配器:clamav(本地,clamscan)/yara(本地规则集)/threatbook(微步云,需
 THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)。
 输出:JSON 结果矩阵;run 模式联动 c2-variant 迭代(全过=交付包)。
-授权门:读数据根 c2/scope.json(_data_root() 双运行位),targets 空/出窗=拒绝运行。
+授权门:$SPECTRE_DATA_DIR/tools/c2/scope.json(容器位 /opt/tools/c2/, 宿主位数据根 tools/c2/),targets/exercise/窗口三必填。
 """
 import sys, os, json, subprocess, time, glob
 from _common import audit_log, _edusrc_hit, _data_root, sha256f
@@ -24,7 +24,7 @@ def gate(payload=''):
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
         sys.exit(76)
     if not os.path.exists(SCOPE):
-        print('SCOPE-REJECT: no scope file', file=sys.stderr); sys.exit(75)
+        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE})', file=sys.stderr); sys.exit(75)
     # CS37-F3: 坏 JSON 干净 75(此前裸栈 rc=1)。
     try:
         sc = json.load(open(SCOPE))

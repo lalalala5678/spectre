@@ -222,18 +222,25 @@ def main():
     # CS27-9: -h/--help rc=0(家族统一)。
     if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
         print(__doc__); return 0
+    # R32D62-P3/CS41-A4: env-only EDUSRC 门, 序=门先于子命令用法。
+    edusrc_gate()
     if len(sys.argv) < 3:
         print(__doc__); return 2
-    # R32D62-P3: env-only EDUSRC 门(家族一致)。
-    edusrc_gate()
     cmd, args = sys.argv[1], sys.argv[2:]
     a = dict(zip(args[::2], args[1::2]))
     if cmd == 'check':
+        # CS41-A9: 缺参干净 rc=2(此前 KeyError 裸栈)。
+        if '--delivery' not in a and '--payload' not in a:
+            print('用法: c2-disguise.py check --payload <file> | --delivery <dir>', file=sys.stderr); return 2
         res = check_delivery(a['--delivery']) if '--delivery' in a else check_payload(a['--payload'])
         print(json.dumps(res, ensure_ascii=False, indent=1))
         return 1 if res['verdict'] == 'REJECT' else 0
     if cmd == 'normalize':
-        print(normalize(open(a['<file>'] if '<file>' in a else args[0]).read())[:2000])
+        # CS41-A9: 文件参缺/不存在干净 rc=2(此前 KeyError/裸栈)。
+        fn = a.get('<file>') or (args[0] if args else '')
+        if not fn or not os.path.isfile(fn):
+            print(f'用法: c2-disguise.py normalize <file>——文件不存在或未给出: {fn!r}', file=sys.stderr); return 2
+        print(normalize(open(fn).read())[:2000])
         return 0
     print(__doc__); return 2
 

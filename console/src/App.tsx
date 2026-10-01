@@ -22,12 +22,13 @@ const STAGE_ROUTES: RouteKey[] = [
 // 这些会话时 pendingOpen 无人消费, 静默死路到 autopwn 页(README 承诺
 // '任何 agent 的会话均可打开'被证伪)。
 const CONFIG_AGENT_ROUTES: RouteKey[] = ['skill-config', 'mcp-config', 'cli-config'];
+const VALID_ROUTES: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];  // CS41-C6: 挂载期/运行时单源(此前逐字双份)
 
 export default function App() {
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
     const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
-    const valid: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
+    const valid = VALID_ROUTES;
     return valid.includes(h) ? h : 'autopwn';
   });
 
@@ -60,10 +61,10 @@ export default function App() {
       const raw = window.location.hash.replace('#', '');
       // R32D30-E3: 应用已开时地址栏粘贴 #agent?s=id 此前只切路由不
       // drill(?s= 仅挂载时读一次)。这里把参数转发到 pendingOpen 通道
-      // ——与搜索点击同一消费路径, 并 replaceState 清洗地址栏。
+      // 路由名——replaceState 仅清无效 hash(?s= 参数分支刻意不清, 见上 R32D45-N2)。
       const s = new URLSearchParams(raw.split('?')[1] ?? '').get('s');
       const h = raw.split('?')[0] as RouteKey;
-      const valid: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];
+      const valid = VALID_ROUTES;
       if (s && valid.includes(h)) {
         // R32D45-N2: 不再 replaceState 清洗 ?s=——那会改写历史条目本身,
         // 首次到达后退/前进永远读不到参数(0/3 复现)。保留参数: 重访

@@ -113,12 +113,13 @@ def cmd_info(args):
 
 def cmd_split(args):
     a = dict(zip(args[::2], args[1::2]))
+    # CS41-A4 门序契约: 门先于用法(族统一)。
+    sc = gate()
     # R32D60-NEW4: 缺 --class 干净 usage rc=2(此前 KeyError 裸栈)。
     if '--class' not in a:
         print('用法: c2-bytecode.py split --class <file.class> [--out dir] [--rules dir]', file=sys.stderr); return 2
     if not os.path.isfile(a['--class']):
         print(f"用法错误: --class 文件不存在: {a['--class']}", file=sys.stderr); return 2
-    sc = gate()
     rules = a.get('--rules', DEFAULT_RULES)
     # CS40-3: java 工具链预检(Splitter/rt_exec 依赖; yara 已有独立 SKIP)。
     import shutil
@@ -175,12 +176,12 @@ def _load_result(classfile):
 
 def cmd_verify(args):
     a = dict(zip(args[::2], args[1::2]))
+    # CS41-A4 门序契约: 门先于用法; CS40-3: verify 与 split/selftest 同门。
+    gate()
     # R32D61-F2: 缺参/文件缺干净 rc=2(此前 KeyError 裸栈)。
     if not all(k in a and os.path.isfile(a[k]) for k in ('--orig', '--mod')):
         print('用法: c2-bytecode.py verify --orig <a.class> --mod <b.class>', file=sys.stderr); return 2
-    # CS40-3/R32D62-P2: verify 与 split/selftest 同门(授权一致性)+java
-    # 工具链预检(javap_members/rt_exec 均依赖, 此前 FileNotFoundError 裸栈)。
-    gate()
+    # CS40-3: java 工具链预检(javap_members/rt_exec 依赖, 此前裸栈)。
     import shutil
     if not (shutil.which('javap') and shutil.which('java')):
         print('c2-bytecode verify 需要 javap+java——容器位内置; 宿主自装 JDK 或容器位运行', file=sys.stderr); return 2

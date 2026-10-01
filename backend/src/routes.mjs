@@ -13,7 +13,7 @@ import { hasInternalToken, isInternalCaller, json, readJson, readRawBody, parseM
 import * as path_mod from 'node:path';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
-import { injectionOriginOf } from './sessions.mjs';
+import { SESSION_NAME_MAX, SESSION_DESC_MAX, injectionOriginOf } from './sessions.mjs';
 import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools, sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
@@ -106,6 +106,8 @@ function realRouter({ store, bus, caps, wal }) {
     }
     if (path.startsWith('/api/shells/') && path.endsWith('/close') && method === 'POST') {
       const id = path.split('/')[3];
+      // CS41-B5: 与 exec 同 404 语义(F63 只修了 exec——close 此前 200+ok:false)。
+      if (!caps.shells.get(id)) return bad(res, 404, 'shell 不存在');
       return json(res, 200, caps.shells.close(id));
     }
 
@@ -219,10 +221,10 @@ function realRouter({ store, bus, caps, wal }) {
         opts.parentSessionId = String(body.parentSessionId).slice(0, 64);
       }
       if (body.name) {
-        opts.name = String(body.name).slice(0, 30);
+        opts.name = String(body.name).slice(0, SESSION_NAME_MAX);  // CS41-B4: 单源
       }
       if (body.description) {
-        opts.description = String(body.description).slice(0, 80);
+        opts.description = String(body.description).slice(0, SESSION_DESC_MAX);  // CS41-B4: 单源
       }
       const record = store.create(body.agentKey, opts);
       // Full summary: clients merge the response straight into session

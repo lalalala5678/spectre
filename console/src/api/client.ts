@@ -27,6 +27,8 @@ export interface ApiMessage {
   role: 'user' | 'assistant' | 'toolResult';
   ts: number;
   text: string;
+  /** UI-only optimistic marker (never persisted) — CS41-C5 */
+  __optimistic?: boolean;
   /** who injected this turn: 'user' (human) | 'agent' (DM) | 'system';
    *  absent on legacy messages — classified by text-prefix fallback */
   source?: 'user' | 'agent' | 'system';

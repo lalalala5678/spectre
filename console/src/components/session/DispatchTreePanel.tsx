@@ -34,20 +34,11 @@ function buildTree(all: ApiSessionSummary[], rootId: string): TreeNode | null {
   return assemble(root);
 }
 
-/** Fixed stage-type labels shown in the dispatch tree: 名字（类型）. */
-const TYPE_LABELS: Record<string, string> = {
-  autopwn: '编排agent',
-  recon: '资产测绘agent',
-  nday: 'Nday agent',
-  weakcred: '弱口令检测agent',
-  api: 'API渗透agent',
-  exploit: '漏洞挖掘agent',
-  phish: '钓鱼agent',
-  c2: 'C2 agent',
-  persistence: '权限维持agent',
-  postex: '后渗透agent',
-  report: '报告agent',
-};
+// CS41-C3: 类型标签单源 agentRegistry.codename(此前本地 11 键平行
+// 双胞胎——增删 agent 双处漂移, 先例 McpPage CS1-R13)。
+import { AGENTS as REGISTRY } from '../../api/agentRegistry';
+const TYPE_LABELS: Record<string, string> = Object.fromEntries(
+  REGISTRY.map(a => [a.id, a.codename]));
 
 function Node({ node, depth, activeId, onDrill }: {
   node: TreeNode;
