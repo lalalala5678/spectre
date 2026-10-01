@@ -25,10 +25,10 @@ GEN=${GEN_DIR:-$ROOT/tools/c2/generators}
 mkdir -p "$LIBS" "$GEN"
 FAILED=()
 # R32D59 观测项: sha256 清单——首跑落账, 重跑校验(防篡改/半下载静默
-# 留存; HTTP 200 不等于内容完整)。清单恒在 libs 根, 增量维护。
+# 留存; HTTP 200 不等于内容完整)。清单恒在 c2 根, 增量维护。
 MANIFEST="${LIBS%/*}/.sha256"  # R32D69-F3: 置 c2 根+条目相对路径——cd c2 根 sha256sum -c 可用
-# CS48-4: 升级迁移——旧清单(libs/.sha256, 条目 ./x|spring/x|generators/x)
-# 一次性转译为 c2 根相对制(libs/x|libs/spring/x|generators/x), 存量部署
+# CS48-4/CS50-N2: 升级迁移——旧清单(libs/.sha256, 条目=裸文件名,
+# git 全史三代同口径)一次性转译为 c2 根相对制, 存量部署
 # 不再静默全量重下 ~51MB; 迁移后旧清单删除。
 OLD_MANIFEST="$LIBS/.sha256"
 if [ -f "$OLD_MANIFEST" ] && [ ! -f "$MANIFEST" ]; then
