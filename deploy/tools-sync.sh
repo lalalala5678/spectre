@@ -22,6 +22,10 @@ for d in basetypes basetypes-jakarta javastubs javart yara-rules mock; do  # CS2
   [ -d "tools/c2/$d" ] && cp -r "tools/c2/$d" "$DST/tools/c2/"
 done
 cp -v tools/c2/private-qa-server.py tools/c2/mcp-echo.mjs "$DST/tools/c2/"
+# R32D50-F10: 内置 payload spec 样例随交付(此前只在生产手放, fresh
+# clone 须 init 才有; init 仍是权威生成器, 这里只拷样例免一步)
+mkdir -p "$DST/tools/c2/payload-specs"
+cp -v docs/payload-specs/*.json "$DST/tools/c2/payload-specs/" 2>/dev/null || true
 [ -f docs/recon-skills/mcp-recon-datasources.mjs ] && cp -v docs/recon-skills/mcp-recon-datasources.mjs "$DST/"
 [ -f docs/nday-skills/mcp-nday-intel.mjs ] && cp -v docs/nday-skills/mcp-nday-intel.mjs "$DST/"
 # NEW-A(十一轮): 沙箱引导脚本同步——容器内 /opt/tools 即数据根挂载,

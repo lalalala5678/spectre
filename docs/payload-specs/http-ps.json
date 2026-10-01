@@ -1,0 +1,27 @@
+{
+ "name": "http-ps",
+ "language": "ps",
+ "protocol": {
+  "transport": "http",
+  "beacon_interval": [
+   45,
+   180
+  ],
+  "jitter": 0.25
+ },
+ "injection_points": [
+  {
+   "type": "header",
+   "key": "Authorization",
+   "encoding": "b64"
+  }
+ ],
+ "transform_families": [
+  "mask",
+  "decomp",
+  "id"
+ ],
+ "validation": {
+  "edusrc_block": true
+ }
+}

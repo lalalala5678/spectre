@@ -29,7 +29,13 @@ export function ShellPage() {
   const reload = () => api<{ shells: ShellHandle[] }>('/shells')
     .then(d => setShells(d.shells ?? []))
     .catch(e => setErr(e instanceof Error ? e.message : String(e)));
-  useEffect(() => { void reload(); }, []);
+  useEffect(() => {
+    void reload();
+    // R32D50-F7: 10s 轮询——shell 由 agent 侧异步注册/过期, 此前只在
+    // 手动刷新/操作后重拉, 列表常年陈旧。
+    const iv = setInterval(() => void reload(), 10_000);
+    return () => clearInterval(iv);
+  }, []);
   useEffect(() => { if (!active && shells.length) setActive(shells[0].id); }, [shells, active]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: 1e9 }); }, [lines]);
 

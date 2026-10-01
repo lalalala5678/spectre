@@ -110,7 +110,14 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     if (!sc) return { ok: false, error: 'scope 不可读:授权门配置缺失' };
     const now = isoNow();
     const inWindow = sc.window && sc.window.start <= now && now <= sc.window.end;
-    const inTargets = Array.isArray(sc.targets) && sc.targets.includes(shell.target);
+    // R32D50-F8: targets 语义与 scope 文档对齐(glob/清单)——此前精确
+    // 串匹配, 文档写 glob/网段, '*.target-range.example' 永不命中。
+    // 与 :130 exec 目的地的点后缀子域匹配同族; 网段目标对 shell 无
+    // 意义(shell.target 是主机名), 精确串仍直配。
+    const targetMatches = (t, target) => t === target
+      || (t.startsWith('*.') && target.endsWith(t.slice(1)));
+    const inTargets = Array.isArray(sc.targets)
+      && sc.targets.some(t => targetMatches(String(t), shell.target));
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
     if (!inTargets) return { ok: false, error: `授权门:目标 ${shell.target} 不在清单(拒绝)` };
     if (shell.expiresAt && now > shell.expiresAt) {
@@ -221,7 +228,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     if (!sh) return { ok: false, error: 'shell 不存在' };
     if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}` };
     const g = gate(sh);
-    if (!g.ok) return { ok: false, error: g.error };
+    if (!g.ok) {
+      // R32D50-F5: 拒绝也落审计——c2 工具的 SCOPE/EDUSRC 拒绝全落
+      // audit 行, 此前 shell 授权门拒绝静默(证据链纪律不对称)。
+      audit('shell-gate-reject', { id, target: sh.target, reason: g.error });
+      return { ok: false, error: g.error };
+    }
     const t0 = Date.now();
     let stdout = '', stderr = '', code = 0;
     try {

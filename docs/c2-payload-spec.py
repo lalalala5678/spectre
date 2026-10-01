@@ -143,6 +143,16 @@ if __name__ == '__main__':
         spec_path = sys.argv[sys.argv.index('--spec') + 1] if '--spec' in sys.argv else None
         if not spec_path:
             print('validate 需要 --spec'); sys.exit(1)
+        # R32D50-F9: 裸名/缺失驯化(同 gen 分支)
+        import os as _os2
+        if not _os2.path.isfile(spec_path) and '/' not in spec_path:
+            cand = _os2.path.join(SPEC_DIR, spec_path if spec_path.endswith('.json') else spec_path + '.json')
+            if _os2.path.isfile(cand):
+                spec_path = cand
+            elif not _os2.path.isdir(SPEC_DIR):
+                print(f'spec 目录不存在: {SPEC_DIR}——先跑 init 生成内置样例', file=sys.stderr); sys.exit(2)
+        if not _os2.path.isfile(spec_path):
+            print(f'spec 文件不存在: {spec_path}(裸名可用内置名; 先 init)', file=sys.stderr); sys.exit(2)
         spec, errs = load_spec(spec_path)
         if errs:
             print('✗ ' + '; '.join(errs)); sys.exit(1)
@@ -154,6 +164,19 @@ if __name__ == '__main__':
         rounds = int(sys.argv[sys.argv.index('--rounds') + 1]) if '--rounds' in sys.argv else 3
         if not spec_path or not src:
             print('gen 需要 --spec --src'); sys.exit(1)
+        # R32D50-F9: 裸文件名(不带 / 与 .json)解析到 SPEC_DIR——
+        # 'gen --spec http-jsp' 此前 FileNotFoundError 裸栈。
+        import os as _os2
+        if not _os2.path.isfile(spec_path) and '/' not in spec_path:
+            cand = _os2.path.join(SPEC_DIR, spec_path if spec_path.endswith('.json') else spec_path + '.json')
+            if _os2.path.isfile(cand):
+                spec_path = cand
+            elif not _os2.path.isdir(SPEC_DIR):
+                print(f'spec 目录不存在: {SPEC_DIR}——先跑 init 生成内置样例', file=sys.stderr); sys.exit(2)
+        if not _os2.path.isfile(spec_path):
+            print(f'spec 文件不存在: {spec_path}(裸名可用内置名如 http-webshell; 先 init)', file=sys.stderr); sys.exit(2)
+        if not _os2.path.isfile(src):
+            print(f'--src 文件不存在: {src}', file=sys.stderr); sys.exit(2)
         spec, errs = load_spec(spec_path)
         if errs:
             print('spec 非法: ' + '; '.join(errs)); sys.exit(1)

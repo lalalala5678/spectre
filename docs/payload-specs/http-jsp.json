@@ -1,0 +1,33 @@
+{
+ "name": "http-jsp",
+ "language": "java",
+ "protocol": {
+  "transport": "http",
+  "beacon_interval": [
+   60,
+   300
+  ],
+  "jitter": 0.2
+ },
+ "injection_points": [
+  {
+   "type": "header",
+   "key": "X-Trace-Id",
+   "encoding": "b64"
+  },
+  {
+   "type": "body",
+   "key": "log",
+   "encoding": "url"
+  }
+ ],
+ "transform_families": [
+  "mask",
+  "decomp",
+  "id",
+  "struct"
+ ],
+ "validation": {
+  "edusrc_block": true
+ }
+}

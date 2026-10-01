@@ -511,8 +511,19 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                 </button>
                 <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} />
               </div>
-            ) : (
+            ) : sessionId ? (
               <LiveSession agentKey={liveKey} sessionId={sessionId} onGone={handleSessionGone} />
+            ) : (
+              /* R32D50-F6: 冷深链进入后 drill 关闭, 主会话可能尚未建——
+                 此前渲染 LiveSession(null) 即 composer 静默 no-op+永久
+                 loading 的死页。给明确的新建入口。 */
+              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
+                <p className="text-[12.5px] text-zinc-400">本 agent 在当前项目还没有主会话</p>
+                <button onClick={() => void newConversation()}
+                  className="flex items-center gap-1.5 rounded-sm bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-500">
+                  <Plus className="h-3.5 w-3.5" /> 新建会话
+                </button>
+              </div>
             )}
           </section>
 
