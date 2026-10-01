@@ -192,3 +192,16 @@ test('共享函数唯一定义点: _data_root/scope_gate_full/_edusrc_hit/edusrc
   }
   assert.deepEqual(offenders, [], `共享函数私有复制: ${offenders.join(', ')}——应 from _common import`);
 });
+
+// CS55-F1 机锁: FAMILIES 名单唯一定义点=_common.py(第 5/6 份残抄封堵)。
+test('FAMILIES 名单唯一定义点: 仅 _common.py(手抄复发面)', () => {
+  const offenders = [];
+  for (const dir of ['docs', 'tools/bin']) {
+    for (const f of readdirSync(join(ROOT, dir))) {
+      if (!f.endsWith('.py') || f === '_common.py') continue;
+      const src = readFileSync(join(ROOT, dir, f), 'utf8');
+      if (/^FAMILIES = \[|^KNOWN_FAMILIES = \[/m.test(src)) offenders.push(`${dir}/${f}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `FAMILIES/KNOWN_FAMILIES 手抄: ${offenders.join(', ')}——应 from _common import`);
+});

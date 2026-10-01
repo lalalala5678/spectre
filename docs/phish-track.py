@@ -5,7 +5,7 @@
   phish-track.py report              # 同上, --db 可覆盖
 追踪点: /open.gif (打开) / /click/<uid> (点击) / /submit (凭据提交)
 """
-import os, json, time, hashlib, base64, re
+import sys, os, json, time, hashlib, base64, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate
@@ -188,10 +188,12 @@ def report():
         print(f'  [{marks}] {uid}: open={v["open"]} click={v["click"]} submit={v["submit"]}')
 
 if __name__ == '__main__':
-    # R32D74-N1: 门序契约——argparse/子命令用法检查前插门(畸形
-    # 参 rc=2 先于 76 的族间不对称封堵; -h 仍由下方各自入口先行)。
+    # R32D74-N1/CS55-F2: -h 永先(家族最高契约), 门在 -h 后、解析前
+    # (畸形参 rc=2 先于 76 的族间不对称封堵)。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
+        print(__doc__); sys.exit(0)
     edusrc_gate()
-        # V5 修复: 文档用法是 `serve --port N --db F`,旧代码只认 sys.argv[2] 位置参数
+    # V5 修复: 文档用法是 `serve --port N --db F`,旧代码只认 sys.argv[2] 位置参数
     # (--port → int() ValueError 崩溃;--db 被完全忽略,DB_FILE 硬编码)。
     import argparse
     ap = argparse.ArgumentParser(prog='phish-track')

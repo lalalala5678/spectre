@@ -218,3 +218,16 @@ test('phish 族畸形参+EDUSRC→76 门先(R32D74-N1 锁)', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('phish 族 -h+EDUSRC→0 帮助永先(CS55-F2 锁)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'phish-h-'));
+  try {
+    for (const tool of ['phish-send.py', 'phish-track.py', 'phish-proxy.py', 'phishlet-proxy.py']) {
+      const r = runTool(tool, ['-h'], dir, true);
+      assert.equal(r.status, 0, `${tool} -h+EDUSRC 应 0(帮助永先), 实得 ${r.status}`);
+      assert.ok(!r.stderr.includes('EDUSRC'), '不得先拒');
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

@@ -279,14 +279,12 @@ def track_sent(db_path, uid):
 
 
 def main():
-    # R32D74-N1: 门序契约 -h→EDUSRC(76)→…——argparse 用法检查在此前
-    # 会使畸形参 rc=2 先于 76(族间不对称), parse 前插门; -h 家族仍由
-    # 各自入口先行(下方 argparse/dispatch 自带)。
-    try:
-        from _common import edusrc_gate_phish
-        edusrc_gate_phish()
-    except SystemExit:
-        raise
+    # R32D74-N1/CS55-F2: -h 永先(家族最高契约), 门在 -h 后、argparse 前
+    # (畸形参 rc=2 先于 76 的族间不对称封堵)。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
+        p0 = argparse.ArgumentParser(prog='phish-send', add_help=False)
+        p0.print_help(); return 0
+    edusrc_gate()
     p = argparse.ArgumentParser()
     p.add_argument('mode', choices=['send', 'dryrun', 'genkey'])
     p.add_argument('--smtp', help='host:port')

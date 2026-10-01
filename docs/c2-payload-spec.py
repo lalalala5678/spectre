@@ -24,7 +24,7 @@ SPEC_DIR = os.path.join(_data_root(), 'c2/payload-specs')  # CS10-4
 ENGINE = os.path.join(_data_root(), 'bin/c2-variant.py')  # CS10-4
 
 REQUIRED = ['name', 'language', 'protocol', 'injection_points', 'transform_families']
-KNOWN_FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
+from _common import FAMILIES as KNOWN_FAMILIES  # CS55-F1: 单源收口(残抄第 5/6 份)
 KNOWN_LANGS = ['php', 'java', 'js', 'ps', 'aspx', 'jsp']
 
 

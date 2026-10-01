@@ -330,8 +330,12 @@ def cmd_run(args):
                     cands2 = sorted(f for f in os.listdir(vo2) if f.startswith('variant_'))
                     for c in cands2:
                         cp2 = os.path.join(vo2, c)
-                        subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
+                        # CS55-F5: 子失败透传(此前裸 run 丢弃)。
+                        _rm = subprocess.run([os.path.join(_data_root(), 'bin/c2-variant.py'), 'gen', '--src', cp2, '--out', vo2 + '-m', '--rounds', '2', '--families', 'mask,decomp'],
                                        capture_output=True, text=True)
+                        if _rm.returncode != 0:
+                            print(f'c2-variant gen 失败 rc={_rm.returncode}: {(_rm.stderr or _rm.stdout).strip()[:160]}', file=sys.stderr)
+                            return 1
                         for c2 in [x for x in os.listdir(vo2 + '-m') if x.startswith('variant_')] if os.path.isdir(vo2 + '-m') else []:
                             cp3 = os.path.join(vo2 + '-m', c2)
                             r3 = scan_all(cp3, engines)
@@ -371,8 +375,12 @@ def cmd_run(args):
                       open(os.path.join(pkg, 'connect-info.json'), 'w'), ensure_ascii=False, indent=1)
             cur = dstf
             # 一次性绑定:目标×窗口×指纹,交付前 verify(过期/越界=拒)
+            # CS55-F5: bind 子失败透传(此前死赋值)。
             b = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bind.py'), 'bind', '--payload', cur],
                                capture_output=True, text=True)
+            if b.returncode not in (0, 70):
+                print(f'BIND FAIL rc={b.returncode}: {(b.stderr or b.stdout).strip()[:160]}', file=sys.stderr)
+                return 1
             v = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bind.py'), 'verify', '--payload', cur],
                                capture_output=True, text=True)
             brec = {}
@@ -396,8 +404,12 @@ def cmd_run(args):
         vo = os.path.join(work, f'v{r}')
         if cur.endswith('.class'):
             # real-lane:字节码变换族(cp-ldc-split)
-            subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'split',
+            # CS55-F5: 子失败透传(此前裸 run 丢弃)。
+            _rb = subprocess.run(['python3', os.path.join(_data_root(), 'bin/c2-bytecode.py'), 'split',
                             '--class', cur, '--out', vo], capture_output=True, text=True)
+            if _rb.returncode != 0:
+                print(f'c2-bytecode split 失败 rc={_rb.returncode}: {(_rb.stderr or _rb.stdout).strip()[:160]}', file=sys.stderr)
+                return 1
             cands = []
             mfp = os.path.join(vo, 'manifest.json')
             if os.path.exists(mfp):

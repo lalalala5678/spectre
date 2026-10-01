@@ -319,10 +319,12 @@ def write_samples(directory):
         print(f'  {p}')
 
 if __name__ == '__main__':
-    # R32D74-N1: 门序契约——argparse/子命令用法检查前插门(畸形
-    # 参 rc=2 先于 76 的族间不对称封堵; -h 仍由下方各自入口先行)。
+    # R32D74-N1/CS55-F2: -h 永先(家族最高契约), 门在 -h 后、解析前
+    # (畸形参 rc=2 先于 76 的族间不对称封堵)。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
+        print(__doc__); sys.exit(0)
     edusrc_gate()
-        # R32D42-P1: 子命令归一(同 phish-proxy)——已知子命令以外一律用法;
+    # R32D42-P1: 子命令归一(同 phish-proxy)——已知子命令以外一律用法;
     # 帮助 rc=0, 未知/缺失 rc=2。
     if len(sys.argv) < 2 or sys.argv[1] not in ('serve', 'list', 'init'):
         print(__doc__)
