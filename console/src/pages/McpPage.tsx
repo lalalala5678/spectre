@@ -55,7 +55,7 @@ export function McpPage({ wsId }: { wsId: string }) {
     let headers: Record<string, string> = {};
     if (form.transport === 'http') {
       try {
-        headers = JSON.parse(form.headersJson || '{}');
+
         // R11-F3: JSON.parse 只验'是 JSON'——'x'/[1]/5 标量数组穿透
         // 到后端持久化(R5-F3 未覆盖 headers 类型)。
         const parsed: unknown = JSON.parse(form.headersJson || '{}');

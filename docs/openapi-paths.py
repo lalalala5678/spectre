@@ -7,8 +7,9 @@
 import sys, json, argparse, urllib.request
 
 def fetch_spec(url):
-    ctx = __import__('ssl').create_default_context()
-    ctx.check_hostname = False; ctx.verify_mode = __import__('ssl').CERT_NONE
+    import ssl  # CS20-9: 静态直导入(PEP 8; 此前 __import__() 动态导入无理由)
+    ctx = ssl.create_default_context()
+    ctx.check_hostname = False; ctx.verify_mode = ssl.CERT_NONE
     req = urllib.request.Request(url, headers={'User-Agent': 'Mozilla/5.0', 'Accept': 'application/json'})
     return json.load(urllib.request.urlopen(req, timeout=15, context=ctx))
 

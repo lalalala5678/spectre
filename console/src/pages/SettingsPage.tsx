@@ -30,7 +30,7 @@ interface SettingsPayload {
   agentLlm: Record<string, Record<string, string>>;
   reconSources: Record<string, Record<string, string>>;
   schema: {
-    llmFormats?: { id: string; label: string; hint: string }[];
+    llmFormats: { id: string; label: string; hint: string }[];
     common: { label: string; fields: FieldDef[] };
     agents: { agentKey: string; label: string; hint?: string; sources: SourceDef[] }[];
     agentLlm: { agentKey: string; label: string; hint?: string; fields: FieldDef[] }[];
@@ -233,7 +233,7 @@ export function SettingsPage() {
             <Sparkles className="h-4 w-4 text-orange-400" />Agent 配置
           </h1>
           <p className="mt-1 text-[11.5px] text-zinc-500">
-            每条配置独立保存:点击保存后先用所填值做真实连通检测/范围校验,失败不落盘。
+            大多数字段独立保存(逐字段探测/范围校验,失败不落盘);大模型供应商为四字段整体保存+整体探测。
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -257,12 +257,12 @@ export function SettingsPage() {
               逐字段保存×合并探测有跨厂商中间态死锁(换供应商先存 URL
               的瞬间=新 URL+旧 key→401 存不进)。 */}
           <div className="px-4 py-2.5">
-            <AgentLlmOverride agentId="" mode="default" formats={data.schema.llmFormats} ov={{
+            <AgentLlmOverride agentId="" mode="default" formats={data.schema.llmFormats ?? []} ov={{
               format: String(llm.format ?? ''), baseUrl: String(llm.baseUrl ?? ''),
               apiKey: String(llm.apiKey ?? ''), model: String(llm.model ?? ''),
             }} onSaved={() => void reload()} />
           </div>
-          {data.schema.common.fields.filter(f => !['llm.format', 'llm.baseUrl', 'llm.apiKey', 'llm.model'].includes(f.id)).map((f) => {
+          {data.schema.common.fields.map((f) => {
             const [top, leaf] = f.id.split('.');
             // CS16-P2: webSearch 三字段此前落空 bucket(只认 llm/comp)——
             // 保存后回显恒空, 用户以为没存上。
@@ -295,7 +295,7 @@ export function SettingsPage() {
                 </div>
                 {/* CS16-P1: 原子四字段编辑器(与 agent 配置页签同款共享组件)——
                     逐字段保存×整体探测有跨供应商中间态死锁 */}
-                <AgentLlmOverride agentId={g.agentKey} formats={data.schema.llmFormats} ov={ov} onSaved={() => void reload()} />
+                <AgentLlmOverride agentId={g.agentKey} formats={data.schema.llmFormats ?? []} ov={ov} onSaved={() => void reload()} />
               </div>
             );
           })}

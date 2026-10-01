@@ -18,6 +18,7 @@
  * the same interface.
  */
 import { randomUUID } from 'node:crypto';
+import { sandboxConfig } from './sandbox/container.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname as pdirname, join as pathJoin } from 'node:path';
 import { execFile } from 'node:child_process';
@@ -81,7 +82,7 @@ function boundedExecResult(err, so, se, timeoutNote) {
   return { stdout, stderr, code };
 }
 
-export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
+export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 死参数删(仅 persistShells 快照持久化)
   const audit = (kind, data) => {
     try { bus?.emit?.('shell-event', { kind, at: new Date().toISOString(), ...data }); } catch { /* bus optional */ }
   };
@@ -269,7 +270,9 @@ export function createShellRegistry({ bus, wal: _wal, listScope } = {}) {
         // transportRef binds the shell to ONE exec box — commands land in
         // the compromised box, never the runtime host. Format "container"
         // (default user) or "container:user" (low-priv web compromise).
-        const ref = sh.transportRef || 'spectre-sandbox';
+        // CS20-2: 容器名单源(同 mcp.mjs)——字面量回退仅 legacy 持久化
+        // 数据可达, 但同样绕过命名空间契约。
+        const ref = sh.transportRef || sandboxConfig().container;
         const [cbox, cuser] = ref.includes(':') ? ref.split(':') : [ref, null];
         // F18: 容器侧 timeout(1) 包裹——node 杀 docker CLI 不杀容器进程
         // (泄漏 bash+sleep),且 docker CLI 被 SIGTERM 后 err 为空导致超时

@@ -21,6 +21,7 @@ import path from 'node:path';
 import { Type } from '@earendil-works/pi-ai';
 
 import { SANDBOX_ROOT } from './exec-env.mjs';
+import { sandboxConfig } from './container.mjs';
 
 const CONFIG_PATH = path.join(SANDBOX_ROOT, 'mcp-servers.json');
 
@@ -191,11 +192,15 @@ async function connectStdio(server) {
     // R5-F1: attached docker exec 不转发信号——杀宿主客户端只产生
     // stdin EOF, 容器内进程存活(实测 sleep 600 残留)。sh -c 先回显
     // 容器侧 PID(首行), close() 时 docker exec kill 该 PID。
+    // CS20-2: 容器名单源——此前硬编码 'spectre-sandbox'(绕过 P0-B 数据根
+    // 命名空间契约, 隔离实例的 stdio MCP 全落向生产容器)。server.container
+    // 全仓无写入点, 回退恒为字面量; 改用 sandboxConfig().container。
+    const cname = server.container ?? sandboxConfig().container;
     const argv = ['docker', 'exec', '-i',
-      server.container ?? 'spectre-sandbox', 'sh', '-c',
+      cname, 'sh', '-c',
       'echo $$; exec "$@"', '--', ...server.command];
     const rpc = new StdioRpc(argv, server.env, {
-      container: server.container ?? 'spectre-sandbox' });
+      container: cname });
     const conn = await rpc.start();
     tieToParentExit(conn);
     return conn;

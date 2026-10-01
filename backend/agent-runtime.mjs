@@ -133,7 +133,10 @@ const shellScope = () => {
   catch { return null; }
 };
 
-const shellRegistry = createShellRegistry({ bus: { emit: (entry) => bus.emit({ type: 'shell-event', ...entry }) }, wal, listScope: shellScope });
+// CS20-3: 签名对齐——shells.audit 调 emit(type, payload) 双参, 此前
+// 适配器只收首参(字符串), 载荷整体丢失→总线只收到空壳(shell 审计
+// '每条命令进证据链'承诺 19 轮未兑现, 静默失败无测试覆盖)。
+const shellRegistry = createShellRegistry({ bus: { emit: (type, payload) => bus.emit({ type, ...payload }) }, listScope: shellScope });  // CS20-11: wal 死参数删
 
 /**
  * CS1-R5: reportWriter/revisionWriter/wakeAgent 三连的机械骨架——

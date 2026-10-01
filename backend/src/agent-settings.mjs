@@ -548,9 +548,9 @@ export async function saveSetting({ group, field, value }, wal) {
       if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
     }
     const freshAll = { ...getPrefs().agentLlm };
-    const clean = Object.fromEntries(Object.entries(cur).filter(([, v2]) => v2 !== ''));
-    if (Object.keys(clean).length === 0) delete freshAll[agentKey];
-    else freshAll[agentKey] = clean;
+    const cleaned = Object.fromEntries(Object.entries(cur).filter(([, v2]) => v2 !== ''));
+    if (Object.keys(cleaned).length === 0) delete freshAll[agentKey];
+    else freshAll[agentKey] = cleaned;
     setPrefs({ agentLlm: freshAll }, wal);
     return { ok: true };
   }
@@ -579,10 +579,10 @@ export async function saveSetting({ group, field, value }, wal) {
     return { ok: true };
   }
   if (group === 'recon-source') {
-    // R32D46-NEW-5: 畸形 field(无 .leaf)此前 split 得 leaf=undefined
-    // 落盘 {undefined: {...}} 垃圾且返回 ok。
-    if (!field.includes('.')) {
-      return { ok: false, error: 'field 须为 <sourceId>.<leaf> 形状' };
+    // R32D46-NEW-5/CS20: 畸形 field 守卫——无点(leaf=undefined 垃圾)、
+    // 尾点(leaf='')、多点(a.b.c 静默截断落错字段)全拒。
+    if (!/^[^.\s]+\.[^.\s]+$/.test(field)) {
+      return { ok: false, error: 'field 须为 <sourceId>.<leaf> 形状(单点两侧非空)' };
     }
     const [srcId, leaf] = field.split('.');
     const src = RECON_SOURCES[srcId];

@@ -654,7 +654,7 @@ function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean 
         <div className="space-y-2">
           <div className="space-y-1.5">
             {[
-              ['格式', cfg(fmtLabel, 'OpenAI 兼容')],
+              ['格式', fmtLabel],
               ['Base URL', cfg(llm.baseUrl, '(未配置)')],
               ['模型', cfg(llm.model, '(未配置)')],
               ['Thinking Effort', cfg(llm.thinkingLevel, 'low')],

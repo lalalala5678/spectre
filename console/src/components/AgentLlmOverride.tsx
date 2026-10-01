@@ -12,13 +12,12 @@ export interface LlmFormatMeta { id: string; label: string; hint: string; }
 export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', formats }: {
   agentId: string; ov?: Record<string, string>; onSaved: () => void;
   mode?: 'override' | 'default';
-  formats?: LlmFormatMeta[];  // CS19-4: schema.llmFormats 单源下发
+  formats: LlmFormatMeta[];  // CS19-4/CS20-7: schema.llmFormats 单源必传
 }) {
-  const fmts = formats ?? [
-    { id: 'openai', label: 'OpenAI 兼容', hint: 'GLM/DeepSeek/Kimi/Qwen/OpenAI 及绝大多数代理网关' },
-    { id: 'anthropic', label: 'Anthropic', hint: 'Claude 系;key 头 x-api-key + anthropic-version' },
-    { id: 'gemini', label: 'Gemini', hint: 'Gemini 系;key 走 x-goog-api-key 请求头' },
-  ];
+  // CS20-7: 第 4 份硬编码兜底已删——兜底曾与后端单源漂移(label 不一致),
+  // 且两消费方缺省策略相反(一处走兜底一处空下拉)。缺 schema 即空列表,
+  // 与 AgentWorkspacePage 归一口径一致。
+  const fmts = formats ?? [];
   const isDefault = mode === 'default';
   const [draft, setDraft] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });
   const [orig, setOrig] = useState({ format: '', baseUrl: '', apiKey: '', model: '' });

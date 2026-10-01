@@ -34,7 +34,7 @@ def dir_bytes():
 
 _rate = defaultdict(deque)           # ip -> deque[timestamps]
 _rate_lock = threading.Lock()
-_quota_lock = threading.Lock()      # R17-F4: 配额 check-写原子化
+_quota_lock = threading.Lock()      # R17-F4/CS20-1: 配额 check-写原子化(锁含落盘)
 
 def rate_ok(ip):
     now = time.monotonic()
@@ -68,16 +68,17 @@ def handle(c, addr):
         c.close()
     if not data:
         return
-    # R17-F4: check-写 TOCTOU——并发线程同读快照集体绕过。锁包住
-    # 检查到落盘(仿 _rate_lock; 单写者串行化)。
+    # R17-F4/CS20-1: check-写 TOCTOU——锁必须包住检查到落盘全程。
+    # 此前落盘三行在锁外(R17 注释即宣称'检查到落盘原子化', CS20 实
+    # 锤注释与代码相反——并发线程同过检查后同写仍可超配额)。
     with _quota_lock:
         if dir_bytes() + len(data) > QUOTA_BYTES:
             print(f'[oob][QUOTA] 目录超限 {QUOTA_BYTES//(1024*1024)}MB,丢弃 {addr[0]} 的 {len(data)}B', flush=True)
             return
-    ts = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
-    path = f'{OUT}/{ts}-{addr[0]}.txt'
-    with open(path, 'ab') as f:
-        f.write(data)
+        ts = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+        path = f'{OUT}/{ts}-{addr[0]}.txt'
+        with open(path, 'ab') as f:
+            f.write(data)
     print(f'[oob] {addr[0]} → {path} ({len(data)}B)', flush=True)
 
 s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)

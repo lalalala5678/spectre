@@ -63,8 +63,8 @@ cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
 远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
 
 **配置大模型**（登录后, 平台统一接管）: 「设置」页 → 通用配置 → 接口格式
-（OpenAI 兼容/Anthropic/Gemini）+ Base URL + API Key + 模型名, 每字段保存前
-做真实连通探测。默认供应商之上可对单个 agent 覆盖（如默认 GLM、报告 agent
+（OpenAI 兼容/Anthropic/Gemini）+ Base URL + API Key + 模型名——四字段一个
+请求整体保存, 保存前用所填完整配置做真实连通探测。默认供应商之上可对单个 agent 覆盖（如默认 GLM、报告 agent
 换 DeepSeek）——设置页「单 Agent 大模型覆盖」区或各 agent 页「配置」页签内
 均可修改。旧装机 .env 的 `LLM_*` 首次启动会一次性导入, 之后 env 通道失效。
 
