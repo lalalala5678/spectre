@@ -22,11 +22,16 @@ AUDIT = os.path.join(_C2, 'audit.log')
 JMG_JAR = os.path.join(_C2, 'generators/jmg-cli-1.0.9.jar')
 DEFAULT_DIR = os.path.join(_C2, 'basetypes-jmg')
 
+def _edusrc_pre_gate():
+    # CS71-3: EDUSRC 门提为 main 派发前(对齐 c2-qa/phish 族——此前未知/
+    # 缺子命令落用法 rc=2, 门不可达, SKILL 门序表同述三员两种实现)。
+    if _edusrc_hit():
+        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr); sys.exit(76)
+
 def gate():
     # CS37-F2/F3: 收敛 _common 单源门——此前本地副本不查 exercise(SKILL
     # 三必填契约分叉)且坏 JSON 裸栈 rc=1(单源门干净 75)。
-    if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr); sys.exit(76)
+    _edusrc_pre_gate()
     return scope_gate_full()
 
 def jmg_run(cmds):
@@ -117,6 +122,7 @@ def main():
     # CS27-9: -h/--help rc=0(与 javart/functest/payload-spec 家族统一)。
     if any(x in sys.argv[1:] for x in ('-h', '--help')):  # R32D76-N3: 任意位(对齐 phish 族)
         print(__doc__); return 0
+    _edusrc_pre_gate()  # CS71-3: 缺/未知子命令也在门前(缺参+EDUSRC→76)
     if len(sys.argv) < 2:
         print(__doc__); return 2
     cmd, args = sys.argv[1], sys.argv[2:]

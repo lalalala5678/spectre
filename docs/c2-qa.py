@@ -457,9 +457,9 @@ def main():
     # R32D53: -h rc=0(家族统一)。
     if any(x in sys.argv[1:] for x in ('-h', '--help')):  # R32D76-N3: 任意位(对齐 phish 族)
         print(__doc__); return 0
+    _edusrc_gate_audit()  # R32D87-D/CS71-3: 缺/未知子命令也在门前(对齐 phish 族)
     if len(sys.argv) < 2:
         print(__doc__); return 2
-    _edusrc_gate_audit()  # R32D87-D: 派发前对齐 phish 族(未知子命令+EDUSRC→76)
     cmd, args = sys.argv[1], sys.argv[2:]
     if cmd == 'scan': return cmd_scan(args)
     if cmd == 'run': return cmd_run(args)

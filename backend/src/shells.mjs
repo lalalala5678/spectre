@@ -70,16 +70,17 @@ const isoNow = () => new Date().toISOString().slice(0, 19) + 'Z';
  * (CS1-R7: ssh/local 两分支逐字后处理收敛)。timeout/截断注记由
  * `timeoutNote` 区分远端/容器措辞。
  */
-function boundedExecResult(err, so, se, timeoutNote) {
+function boundedExecResult(err, so, se, timeoutNote, runtimeTool) {
   const stdout = String(so ?? '');
   let stderr = String(se ?? '');
   const code = err ? (err.code ?? 1) : 0;
   if (code === 124 || code === 137) stderr += `\n${timeoutNote}`;
   if (err?.killed) stderr += '\n[timeout]';
-  // R32D87-A: docker 二进制缺失(ENOENT)具名根因——local 传输即
-  // docker exec 沙箱容器, 此前仅 [exit ENOENT] 用户须读源码。
-  if (err?.code === 'ENOENT') {
-    stderr += '\n[根因: docker 不可用——local/web/ssh 传输均经沙箱容器执行, 需容器运行时; 纯宿主无容器时请用宿主 CLI 工具面]';
+  // R32D87-A/CS71-2: ENOENT 具名根因按分支传入的 runtimeTool(local
+  // 分支='docker 容器', ssh 分支='sshpass')——此前共用提示把 sshpass
+  // 缺失误报为 docker, 且"均经沙箱容器"与本文件头注相反。
+  if (err?.code === 'ENOENT' && runtimeTool) {
+    stderr += `\n[根因: ${runtimeTool} 不可用——该传输依赖其在宿主 PATH; 未装时换可用传输或用宿主 CLI 工具面]`;
   }
   if (err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
     stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
@@ -231,7 +232,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
    * configured exec box (docker container) — benchmark-grade fidelity.
    * Returns { ok, stdout, stderr, code, ms }.
    */
-  async function exec(id, command, { timeoutMs = 30_000, box: _box = null } = {}) {
+  async function exec(id, command, { timeoutMs = 30_000 } = {}) {  // CS71-5: box 死参删(零调用方, 同类 wal 已按 CS20-11 删)
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
     if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}` };
@@ -260,7 +261,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
             resolve({ err, so: String(so ?? ''), se: String(se ?? ''), code: err ? (err.code ?? 1) : 0 }));
         });
         ({ stdout, stderr, code } = boundedExecResult(
-          r.err, r.so, r.se, '[timeout: 远端进程已被 timeout(1) 终止]'));
+          r.err, r.so, r.se, '[timeout: 远端进程已被 timeout(1) 终止]', 'sshpass(ssh 传输宿主侧依赖)'));
       } else if (sh.transport === 'web') {
         // transportRef: full URL template with {CMD} placeholder, e.g.
         //   http://h/p.php?c={CMD}        (GET; CMD urlencoded)
@@ -324,7 +325,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
             resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
         });
         ({ stdout, stderr, code } = boundedExecResult(
-          res.err, res.so, res.se, '[timeout: 容器内进程已被 timeout(1) 终止]'));
+          res.err, res.so, res.se, '[timeout: 容器内进程已被 timeout(1) 终止]', 'docker(local 传输经沙箱容器执行)'));
       } else {
         return { ok: false, error: `transport ${sh.transport} 未接入(真实植入通道后续挂)` };
       }

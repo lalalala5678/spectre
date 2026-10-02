@@ -222,14 +222,15 @@ def make_handler(phishlet, db_file):
             self.wfile.write(body)
 
         def do_POST(self):
-            # CS70-2: V3/R17-F2 同款守卫(此前裸 int()——非数字
-            # ValueError/负值 read(-n) 读 EOF 永久 wedge; 同族两有一无)。
+            # CS70-2/CS71-1: 族先例两段式(phish-track/proxy 同款——
+            # 400 畸形/413 过大分报, 1 MiB 界, 空头 or 0 容空体)。
             try:
-                length = int(self.headers.get('Content-Length', 0))
-                if length < 0 or length > 10 * 1024 * 1024:
-                    raise ValueError
-            except ValueError:
-                self.send_error(411, 'Content-Length 非法')
+                length = int(self.headers.get('Content-Length', 0) or 0)
+            except (ValueError, TypeError):
+                self.send_response(400); self.end_headers()
+                return
+            if length < 0 or length > 1_048_576:
+                self.send_response(413); self.end_headers()
                 return
             body = self.rfile.read(length) if length else b''
             qs = parse_qs(body.decode('utf-8', errors='replace'))
