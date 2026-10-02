@@ -232,7 +232,8 @@ def make_handler(phishlet, db_file):
             # 键名含 passwd/pass/pwd,自定义字段(u/p/user)全部漏拦截
             if captured_creds:
                 # 哈希即毁
-                fp = hashlib.sha256(json.dumps(captured_creds, sort_keys=True).encode()).hexdigest()[:16]
+                from _common import cred_hash as _cred_hash  # CS67-2/R32D86-N3: 第 5 份内联收口单源
+                fp = _cred_hash(captured_creds)
                 email = next((v for k, v in captured_creds.items() if '@' in v), '')
                 self.track('submit', 'proxy', {
                     'cred_hash': fp,
