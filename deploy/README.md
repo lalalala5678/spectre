@@ -127,6 +127,12 @@ temporal server start-dev --port 7233    # 前台; systemd 部署用 deploy/syst
 
 步骤 5 systemd 全家桶: `sudo systemctl enable --now spectre-agent-runtime spectre-console temporal-dev spectre-worker spectre-oob`。
 
+## 网关测试(可选)
+
+```bash
+python3 -m unittest discover -s gateway/tests   # 7 例(纯 stdlib, 无需装 pytest)
+```
+
 ## 手工运行 oob-collector
 
 ```bash

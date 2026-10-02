@@ -26,7 +26,7 @@
 - **MCP**：recon-datasources(fofa/quake/hunter/zoomeye/censys/shodan/github/cse/ipinfo/threatbook)、nday-intel(nvd_cve)、自定义 server 热挂载
 - **共享工具独立实例**：每智能体各持 search_web / fetch_url(垂直通道零 key + 可选 provider 兜底)
 - **沙箱 CLI**：c2-qa(多引擎面杀矩阵+私架端点)、c2-variant/functest/bind(载荷流水线)、nuclei/hydra/nmap 等(安装账本化，容器重建自动重放)
-- **技能**：agentskills.io 格式（SKILL.md），按智能体分组挂载于 docs/*-skills/
+- **技能**：agentskills.io 格式（SKILL.md），按智能体分组挂载于 docs/ 各技能目录(单源 deploy/skills-seed.map)
 
 ## 环境要求
 

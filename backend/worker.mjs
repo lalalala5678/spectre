@@ -1,4 +1,5 @@
 import { Worker } from '@temporalio/worker';
+import { Connection } from '@temporalio/client';  // R32D105-F1
 import net from 'node:net';
 
 import * as activities from './activities.mjs';
@@ -21,14 +22,30 @@ await new Promise(resolve => {
   });
 });
 
-const worker = await Worker.create({
-  workflowsPath: new URL('./workflows.mjs', import.meta.url).pathname,
-  activities,
-  taskQueue: CONFIG.temporalTaskQueue,
-});
-
-console.log(
-  `[worker] polling task queue "${CONFIG.temporalTaskQueue}" @ ${CONFIG.temporalAddress}`,
-  `activities: ${Object.keys(activities).join(', ')}`,
-);
-await worker.run();
+// R32D105-F2(P3): 文档/横幅均称"静默重试"——此前 Worker.create 的
+// TransportError 未捕获, 实际立即 rc=1 崩溃(systemd 下 2s 循环)。包
+// 退避重试兑现承诺(5s→60s 封顶, 每次打一行不刷屏)。
+const bootWorker = async () => {
+  for (let attempt = 1; ; attempt += 1) {
+    try {
+      const conn = await Connection.connect({ address: CONFIG.temporalAddress });  // R32D105-F1
+      const w = await Worker.create({
+        workflowsPath: new URL('./workflows.mjs', import.meta.url).pathname,
+        activities,
+        taskQueue: CONFIG.temporalTaskQueue,
+        connection: conn,
+      });
+      console.log(
+        `[worker] polling task queue "${CONFIG.temporalTaskQueue}" @ ${CONFIG.temporalAddress}`,
+        `activities: ${Object.keys(activities).join(', ')}`,
+      );
+      await w.run();
+      return;
+    } catch (err) {
+      const delay = Math.min(5000 * attempt, 60_000);
+      console.warn(`[worker] Temporal ${CONFIG.temporalAddress} 连接失败(第 ${attempt} 次, ${delay / 1000}s 后重试): ${err?.message ?? err}`);
+      await new Promise(r => setTimeout(r, delay));
+    }
+  }
+};
+await bootWorker();
