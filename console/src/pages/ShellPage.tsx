@@ -52,9 +52,13 @@ export function ShellPage() {
     }
   }
 
+  const [hist, setHist] = useState<string[]>([]);
+  const [histIdx, setHistIdx] = useState(-1);  // R32D84-N3: ↑/↓ 命令历史
   async function run() {
     if (!cur || !cmd.trim() || busy) return;
     const c = cmd; setCmd(''); setBusy(true);
+    setHist(h => (h[h.length - 1] === c ? h : [...h, c]));  // 去连续重复
+    setHistIdx(-1);
     setLines(l => [...l, { dir: 'in', text: `${cur.user || '?'}@${cur.target}:~$ ${c}` }]);
     try {
       const r = await api<ExecResult>(`/shells/${cur.id}/exec`, { method: 'POST', json: { command: c, timeoutMs: 60000 } });
@@ -140,8 +144,20 @@ export function ShellPage() {
           </div>
           <div className="flex items-center gap-2 border-t border-void-800 px-3 py-2">
             <span className="font-mono text-[12px] text-orange-300">$</span>
-            <input value={cmd} onChange={e => setCmd(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void run(); }}  // R11-F5: IME 同款(R8-F1)
+            <input value={cmd} onChange={e => { setCmd(e.target.value); setHistIdx(-1); }}
+              onKeyDown={e => {
+                if (e.key === 'ArrowUp' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  const n = histIdx < 0 ? hist.length - 1 : Math.max(0, histIdx - 1);
+                  if (hist.length) { setHistIdx(n); setCmd(hist[n]); }
+                } else if (e.key === 'ArrowDown' && !e.nativeEvent.isComposing) {
+                  e.preventDefault();
+                  const n = histIdx + 1;
+                  if (histIdx < 0) setCmd('');
+                  else if (n >= hist.length) { setHistIdx(-1); setCmd(''); }
+                  else { setHistIdx(n); setCmd(hist[n]); }
+                } else if (e.key === 'Enter' && !e.nativeEvent.isComposing) void run();  // R11-F5: IME 同款(R8-F1)
+              }}
               placeholder="command…"
               className="flex-1 bg-transparent font-mono text-[12.5px] text-zinc-200 outline-none placeholder:text-zinc-700" />
             <button onClick={() => void run()} disabled={busy || !cmd.trim()}

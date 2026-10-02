@@ -123,6 +123,13 @@ def main():
         print(__doc__)
         sys.exit(2)
     cmd = argv[0]
+    # R32D84-N2: 首装缺省路径无凭据文件时提示隔离(与 fetch 家族
+    # SPECTRE_DATA_DIR 守卫对称——此前静默落 /var/lib/spectre)。
+    if (cmd in ("add", "del") and not os.environ.get("SPECTRE_AUTH_DIR")
+            and not os.path.exists(PASSWD)):
+        print("[spectre-passwd] 提示: 未设 SPECTRE_AUTH_DIR, 凭据将落"
+              f"缺省生产路径 {PASSWD}(测试请设 SPECTRE_AUTH_DIR 隔离)",
+              file=sys.stderr)
     if cmd == "list":
         for line in read_lines():
             print(line.split(":", 1)[0])
