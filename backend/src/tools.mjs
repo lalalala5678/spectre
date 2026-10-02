@@ -556,12 +556,11 @@ function buildSpawnAgentTool(record, caps) {
     name: 'spawn_agent',
     label: '派生子智能体',
     description:
-      'Spawn a sub-agent under YOU in the dispatch tree. Any stage agent or ' +
+      '[spawns agent] Spawn a sub-agent under YOU in the dispatch tree. Any stage agent or ' +
       'a sub-orchestrator (agentKey "autopwn" gets full scheduling powers ' +
       'and works for you). The spawned agent runs the instruction and ' +
       'reports back to you via [DM] when finished. Depth and total-agent ' +
-      'limits are enforced; explain failures to the user if blocked. ' +
-      '[side-effects: spawns agent]',
+      'limits are enforced; explain failures to the user if blocked.',
     executionMode: 'sequential',
     parameters: Type.Object({
       agentKey: Type.Union([

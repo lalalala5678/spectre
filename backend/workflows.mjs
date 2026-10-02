@@ -82,7 +82,7 @@ export async function autoPwnWorkflow(input) {
           workSessionId } = input;
   const engagement = `autopwn-${engagementId}`;
   const children = new Map();     // agentKey -> child handle
-  const inbox = [];               // {kind, from, to, text, summary, payloadRef}
+  const inbox = [];               // {kind, from, to, text}(CS62-#1: share/result 已删, 形状收窄)
   let open = true;
 
   setHandler(signals.orchestratorRelay, (msg) => {

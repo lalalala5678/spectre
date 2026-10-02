@@ -6,6 +6,8 @@ RTHarness/RTHarnessJakarta 于 $C2/javart; CS27-11 双车道化表述)。
   c2-javart.py --class x.class --name fqcn    # real-lane:class 文件 → load/注册模式
 判定:exit 0=RT OK;1=编译失败;3=RT 失败(注册/触发/标记缺失/5xx)
 模式探测(基于 \\uXXXX 解转义后的源码):
+  catalina.Valve       → valve(前置两档, 专属标记)
+  HttpUpgradeHandler   → upgrade(前置两档, 专属标记)
   implements ServletRequestListener → listener(真事件触发)
   implements Filter                 → filter(真过滤链)
   extends HttpServlet               → servlet(真映射+POST)

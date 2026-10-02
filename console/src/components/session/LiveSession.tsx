@@ -31,7 +31,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   // freezes the start index when the user leaves the bottom.
   const [startIdx, setStartIdx] = useState<number | null>(null);
   const messagesLenRef = useRef(0);
-  messagesLenRef.current = messages.length;
+  messagesLenRef.current = messages.length;  // react/refs 豁免: 渲染期写 ref 服务 SSE 闭包最新值(lint-exemptions 记档)
   // Follow intent: the USER decides. At the bottom → stick; scrolled up
   // to read → release; scrolled back down → re-stick. Scroll events are
   // the only source of truth — never a distance probe at event-arrival
@@ -253,9 +253,9 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
 
   const sentinelRef = useRef<HTMLDivElement>(null);
   const olderCountRef = useRef(0);
-  olderCountRef.current = olderCount;
+  olderCountRef.current = olderCount;  // react/refs 豁免: 渲染期写 ref 服务 SSE 闭包最新值
   const effectiveStartRef = useRef(0);
-  effectiveStartRef.current = effectiveStart;
+  effectiveStartRef.current = effectiveStart;  // react/refs 豁免: 渲染期写 ref 服务 SSE 闭包最新值
 
   // Prepend older history: freeze the viewport via the height-anchor so
   // the content the user is looking at does not move, then fill-check —
@@ -276,7 +276,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
     });
   }, []);
   const loadOlderRef = useRef(loadOlder);
-  loadOlderRef.current = loadOlder;
+  loadOlderRef.current = loadOlder;  // react/refs 豁免: 渲染期写 ref 服务 SSE 闭包最新值
 
   // Sentinel: fires ~600px BEFORE the top edge is reached — the load is
   // done by the time the user gets there (imperceptible).

@@ -107,12 +107,17 @@ export function ShellPage() {
             {(s.tasks?.length ?? 0) > 0 && (
               <div className="mt-0.5 truncate font-mono text-[9.5px] text-sky-400/70" title={s.tasks!.map(t => t.command).join(', ')}>任务: {s.tasks!.map(t => t.command).join(', ')}</div>
             )}
+            {/* CS62-#4: 外层是 button, HTML 禁 interactive 嵌套——用
+                span role=button(同 VulnPanel 先例)替代内层 button。 */}
             {s.status === 'active' && (
-              <button
+              <span
+                role="button"
+                tabIndex={0}
                 onClick={e => { e.stopPropagation(); closeShell(s); }}
-                className="mt-1 rounded-sm border border-red-900/60 px-1.5 py-0.5 text-[9.5px] text-red-400/80 hover:border-red-700 hover:text-red-300"
+                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); closeShell(s); } }}
+                className="mt-1 inline-block cursor-pointer rounded-sm border border-red-900/60 px-1.5 py-0.5 text-[9.5px] text-red-400/80 hover:border-red-700 hover:text-red-300"
                 title="关闭通道(一次性纪律下的即时终止)"
-              >关闭</button>
+              >关闭</span>
             )}
           </button>
         ))}
