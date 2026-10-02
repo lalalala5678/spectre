@@ -30,7 +30,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from urllib.request import Request
 from urllib.error import HTTPError
-from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate
+from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash  # CS69-2: 导入归顶
 
 
 # ============================================================
@@ -208,13 +208,11 @@ def make_handler(phishlet, db_file):
                 fp = {k: hashlib.sha256(v.encode()).hexdigest()[:12] for k, v in captured.items()}
                 self.track('session-captured', 'proxy', {'cookies': list(captured.keys()), 'fingerprints': fp})
             status, headers, body = self.rewrite(status, headers, body)
-            self.send_response(status)
-            for k, v in headers.items():
-                if k.lower() not in ('transfer-encoding', 'content-length'):
-                    self.send_header(k, v)
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._respond(status, headers, body)
+
+        def _respond(self, status, headers, body):
+            # CS69-5: respond 诗节 ×3 逐字抄收口(跳过逐跳头+重算长度)。
+            self._respond(status, headers, body)
 
         def do_POST(self):
             length = int(self.headers.get('Content-Length', 0))
@@ -232,7 +230,6 @@ def make_handler(phishlet, db_file):
             # 键名含 passwd/pass/pwd,自定义字段(u/p/user)全部漏拦截
             if captured_creds:
                 # 哈希即毁
-                from _common import cred_hash as _cred_hash  # CS67-2/R32D86-N3: 第 5 份内联收口单源
                 fp = _cred_hash(captured_creds)
                 email = next((v for k, v in captured_creds.items() if '@' in v), '')
                 self.track('submit', 'proxy', {
@@ -246,13 +243,7 @@ def make_handler(phishlet, db_file):
                     fp2 = {k: hashlib.sha256(v.encode()).hexdigest()[:12] for k, v in captured.items()}
                     self.track('session-captured', 'proxy', {'cookies': list(captured.keys()), 'fingerprints': fp2})
                 status, headers, body = self.rewrite(status, headers, body)
-                self.send_response(status)
-                for k, v in headers.items():
-                    if k.lower() not in ('transfer-encoding', 'content-length'):
-                        self.send_header(k, v)
-                self.send_header('Content-Length', str(len(body)))
-                self.end_headers()
-                self.wfile.write(body)
+                self._respond(status, headers, body)
                 return
 
             # 非凭据 POST(SSO 握手/CSRF/MFA)——直接转发
@@ -262,13 +253,7 @@ def make_handler(phishlet, db_file):
                 fp = {k: hashlib.sha256(v.encode()).hexdigest()[:12] for k, v in captured.items()}
                 self.track('session-captured', 'proxy', {'cookies': list(captured.keys()), 'fingerprints': fp})
             status, headers, body = self.rewrite(status, headers, body)
-            self.send_response(status)
-            for k, v in headers.items():
-                if k.lower() not in ('transfer-encoding', 'content-length'):
-                    self.send_header(k, v)
-            self.send_header('Content-Length', str(len(body)))
-            self.end_headers()
-            self.wfile.write(body)
+            self._respond(status, headers, body)
 
         def log_message(self, *a):
             pass

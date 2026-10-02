@@ -170,10 +170,11 @@ export async function autoPwnWorkflow(input) {
       if (value.report) {
         return `- ${key}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
       }
-      // CS68-F4: summary 在 child 侧已单层截断(:305), 此处再 clip 会
-      // 切掉首层标记且总长谎报(5000→标记'2000/2018')——原样用, 仅
-      // error 分支需本层截断。
-      if (value.error) return `- ${key}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, 'read_session 取全文')}`;
+      // CS68-F4: summary 在 child 侧已单层截断(agentTaskWorkflow 返回
+      // 处), 此处再 clip 会切掉首层标记且总长谎报(5000→'2000/2018')
+      // ——原样用。CS69-3: 去行号引用(自引必漂); CS69-4: error 非
+      // 会话消息且无 sessionId, 补全手段不得指 read_session。
+      if (value.error) return `- ${key}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}`;
       return `- ${key}: ${value.summary ?? ''}`;
     })
     .join('\n');
