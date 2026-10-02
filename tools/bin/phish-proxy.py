@@ -244,6 +244,10 @@ def serve(listen, target, db_file=None):
     host, _, port = listen.rpartition(':')
     ProxyHandler.target_base = target.rstrip('/')
 
+    # R32D94-OBS1: 端口守卫先于任何横幅(此前先打 :abc 再拒)。
+    port_s = listen.rpartition(':')[2] or '8080'
+    if not (port_s.isascii() and port_s.isdigit()):
+        print(f'--listen/--port 端口须数字: {port_s}(如 :8080)', file=sys.stderr); sys.exit(2)
     print(f'[phish-proxy] {listen} → {target}', flush=True)
     # R32D88-F1: 静态'Credentials intercepted'横幅改启动自检——凭据路
     # 径此前可崩(缺 makedirs)而横幅照打, 失实。
@@ -258,9 +262,6 @@ def serve(listen, target, db_file=None):
     except OSError as e:
         print(f'[phish-proxy] FATAL: 事件库不可写 {DB_FILE} — {e}', flush=True)
         sys.exit(1)
-    port_s = listen.rpartition(':')[2] or '8080'
-    if not (port_s.isascii() and port_s.isdigit()):  # CS77-2: isdigit 放行上标数字
-        print(f'--listen/--port 端口须数字: {port_s}(如 :8080)', file=sys.stderr); sys.exit(2)  # CS76-4
     server = HTTPServer((host or '0.0.0.0', int(port or 8080)), ProxyHandler)
     server.serve_forever()
 

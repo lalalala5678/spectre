@@ -502,9 +502,11 @@ def cmd_selftest(args):
     return 1 if fails else 0
 
 def cmd_fingerprint(args):
-    # R32D61-F1: 缺参干净 usage rc=2(此前 IndexError 裸栈)。
-    if not args:
-        print('用法: c2-variant.py fingerprint <payload>', file=sys.stderr); return 2
+    # R32D61-F1: 缺参干净 usage rc=2(此前 IndexError 裸栈);
+    # R32D94-N3: 文件存在性同守卫(此前 FileNotFoundError 裸栈 rc=1,
+    # 误旗标 --payload x 把 x 当路径同栈; 族内 mask --src 先例)。
+    if not args or not os.path.isfile(args[0]):
+        print('用法: c2-variant.py fingerprint <存在的载荷文件>', file=sys.stderr); return 2
     print(sha256f(args[0]))
     return 0
 
