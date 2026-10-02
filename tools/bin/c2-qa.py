@@ -4,7 +4,8 @@
   c2-qa.py run --payload p.java --engines clamav,yara [--max-rounds 8]
   c2-qa.py scan --payload p.java            # 单次引擎矩阵
 引擎适配器:clamav(本地,clamscan)/yara(本地规则集)/threatbook(微步云,需
-THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/private(私架端点 PRIVATE_QA_URL)。
+THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/metadefender(需 METADEFENDER_API_KEY)/
+hybridanalysis(需 HYBRIDANALYSIS_API_KEY)/private(私架端点 PRIVATE_QA_URL)。
 输出:JSON 结果矩阵;run 模式联动 c2-variant 迭代(全过=交付包)。
 授权门:$SPECTRE_DATA_DIR/tools/c2/scope.json(容器位 /opt/tools/c2/, 宿主位数据根 tools/c2/),targets/exercise/窗口三必填。
 """

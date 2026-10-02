@@ -459,8 +459,10 @@ export class SessionStore {
     if (msgs.length < 8) return;
     // last assistant usage = live context size (pi calculateContextTokens)
     const lastA = [...msgs].reverse().find(m => m.role === 'assistant' && m.usage);
-    const ctx = lastA?.usage?.totalTokens
-      ?? lastA ? (lastA.usage.input + lastA.usage.output + (lastA.usage.cacheRead || 0) + (lastA.usage.cacheWrite || 0)) : 0;
+    // CS66-F2: ?? 优先级高于三目——此前实为 (totalTokens ?? lastA)?
+    // 和:0, totalTokens 恒不做 ctx(仅真值测试); 括号恢复优先语义。
+    const ctx = (lastA?.usage?.totalTokens
+      ?? (lastA ? (lastA.usage.input + lastA.usage.output + (lastA.usage.cacheRead || 0) + (lastA.usage.cacheWrite || 0)) : 0));
     const threshold = eff.contextWindow - eff.compaction.reserveTokens;
     if (!ctx || ctx <= threshold) return;
     // split: keep the recent tail (approx by tokens: ~1 token ≈ 4 chars)

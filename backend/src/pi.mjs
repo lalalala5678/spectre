@@ -387,7 +387,8 @@ export function clipMarked(value, max, note = '') {
   const text = String(value ?? '');
   if (text.length <= max) return text;
   const pointer = note ? `,${note}` : '';
-  return `${text.slice(0, max)}[已截断:原文 ${text.length} 字符${pointer}]`;
+  // CS66-F3: 已显示/总长并列(AGENTS.md:43 制式, 对齐 markClipped)。
+  return `${text.slice(0, max)}[已截断:${max}/${text.length} 字符${pointer}]`;
 }
 
 /** pi tool-protocol envelope: plain-text success (CS1-R12 单源)。 */

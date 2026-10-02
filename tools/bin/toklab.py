@@ -59,7 +59,7 @@ def cmd_decode(tok):
     n = len(sig)
     fp = 'md5' if n == 32 else 'sha1' if n == 40 else 'sha256' if n == 64 else f'len={n}(截断?)'
     print(f'sig 长度: {n} → {fp}')
-    if n in (16, 20, 48):
+    if n in (16, 20, 32):  # CS66-F8: 48 是 64 的 3/4 非"一半"——32 才是
         print("  ↳ 截断指纹(标准 hex 32/40/64 的一半)——brute 时 --trunc 匹配此长度")
     return 0
 

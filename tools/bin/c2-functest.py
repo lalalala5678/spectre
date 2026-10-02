@@ -143,7 +143,7 @@ def main():
         lines = r.stdout.strip().splitlines()
         print(f'OK: {lines[0] if lines else "javart ok"} ({p})')
         return 0
-    ok, note = {'php': php_check, '.php': php_check}.get(ext, (lambda x: (True, 'no-lang-check')))(p)
+    ok, note = {'.php': php_check}.get(ext, (lambda x: (True, 'no-lang-check')))(p)  # CS66-F13: ext 必以 . 开头, 裸键不可达删
     if ext in ('.js', '.hta', '.jse'):
         ok, note = node_check(p)
     elif ext in ('.ps1', '.psm1', '.ps'):

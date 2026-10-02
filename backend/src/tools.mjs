@@ -435,6 +435,9 @@ export function buildIntelTools(record, caps) {
       last: Type.Optional(Type.Number({
         description: 'Number of recent messages to read, default 10, cap 30',
       })),
+      full: Type.Optional(Type.Boolean({
+        description: 'Raise per-message cap 300→8000 chars (still marked if clipped)',
+      })),
     }),
     execute: async (_id, params) => {
       const sid = String(params.sessionId).replace(/^sess:/, '');
@@ -450,10 +453,13 @@ export function buildIntelTools(record, caps) {
       }
       // CS41-B1/CS44-F5: 单条截断直接调 clipMarked 单源(此前手搓标记
       // 差一前导空格; AGENTS 原则3)。
+      // CS66-F1: 补全手段改工具内可行动 full 参数——此前指针指向
+      // agent 不可达的内部令牌 API(且该端点同样 2000 截断, 双失实)。
+      const cap = params.full ? 8000 : 300;
       const lines = messages.map(m => {
         const raw = m.text || '(无文本)';
         const who = m.role === 'user' ? '用户' : m.role === 'toolResult' ? '工具结果' : '智能体';
-        return `${who}: ${clipMarked(raw, 300, 'API GET /api/sessions/:id 取全文')}`;
+        return `${who}: ${clipMarked(raw, cap, '传 full: true 提高单条上限')}`;
       });
       return { content: [{ type: 'text',
         text: clipMarked(`会话 ${sid} 最近 ${messages.length} 条消息:\n\n${lines.join('\n\n---\n\n')}`,

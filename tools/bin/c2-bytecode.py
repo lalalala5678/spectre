@@ -88,12 +88,6 @@ def this_class_off(b, cps, i):
     off = int.from_bytes(b[i + acc_len:i + acc_len + 2], 'big')
     return off
 
-def javap_sigs(path):
-    r = subprocess.run(['javap', '-p', path], capture_output=True, text=True, timeout=60)
-    return sorted(l.strip() for l in r.stdout.splitlines()
-                  if l.strip() and not l.startswith(('Compiled from', 'public class', 'class '))
-                  or l.startswith(('public class', 'class')) and ';' in l)
-
 def javap_members(path):
     """成员签名集(构造器/方法/字段声明行,与常量池地址无关)。"""
     r = subprocess.run(['javap', '-p', path], capture_output=True, text=True, timeout=60)

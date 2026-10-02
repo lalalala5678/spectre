@@ -78,8 +78,8 @@ def _confirm_default_write():
 
 def _atomic_write(lines):
     """R32D83-N1: 临时文件+rename 原子写(直接 w 全量重写在并发下
-    互相覆盖丢号)。"""
-    _write_guard()
+    互相覆盖丢号)。CS66-A3: 守卫由唯一调用方 _locked_update 前置,
+    此处不再双探针。"""
     existed = os.path.exists(PASSWD)
     fd, tmp = tempfile.mkstemp(dir=os.path.dirname(PASSWD) or ".",
                                prefix=".passwd-", suffix=".tmp")

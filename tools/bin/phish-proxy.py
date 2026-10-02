@@ -7,7 +7,7 @@
   4. 支持 SSO 多步流(用户名→密码→MFA),每步都拦截
 用法:
   phish-proxy.py serve --listen :8080 --target https://login.target.com \
-      [--db <数据根>/tools/phish/track.json] [--strip-csp] [--replace-host]
+      [--db <数据根>/tools/phish/track.json]
 """
 import sys, os, json, time, hashlib
 from http.server import HTTPServer, BaseHTTPRequestHandler
@@ -52,7 +52,6 @@ def add_event(db, kind, uid, extra=None):
 class ProxyHandler(BaseHTTPRequestHandler):
     # Class-level config (set by serve())
     target_base = 'https://login.microsoft.com'
-    strip_csp = True
 
     def proxy_request(self, method='GET', body=None):
         """Forward request to target, return response"""
@@ -64,9 +63,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
                 val = self.headers[key]
                 if key == 'Referer':
                     val = val.replace(self.headers.get('Host', ''), urlparse(self.target_base).netloc)
-                if key == 'Cookie':
-                    # Forward session cookies from target
-                    val = val
+                # (CS66-F12: 此前 Cookie 分支 val=val 无操作+注释失实已删)
                 headers[key] = val
 
         # Don't send Accept-Encoding gzip (we need to read/modify the response)
@@ -186,7 +183,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if captured_password:
             # Hash immediately (NEVER store plaintext)
             db = load_db()
-            cred_hash = hashlib.sha256(f'{captured_email}:{captured_password}'.encode()).hexdigest()[:16]
+            # CS66-F5: 与 phish-track 同口径——只哈希凭据字段 JSON
+            # (此前 email:password 拼串公式跨工具不可比对)。
+            cred_only = {'email': captured_email, 'password': captured_password}
+            cred_hash = hashlib.sha256(json.dumps(cred_only, sort_keys=True).encode()).hexdigest()[:16]
             add_event(db, 'submit', 'proxy', {
                 'cred_hash': cred_hash,
                 'email_domain': captured_email.split('@')[1] if '@' in (captured_email or '') else '',
@@ -213,7 +213,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
     def log_message(self, *a):
         pass
 
-def serve(listen, target, db_file=None, strip_csp=True):
+def serve(listen, target, db_file=None):
     edusrc_gate((target,))
     scope_gate_full()  # F10: 完整授权门(targets+exercise+window 三必填, CS37-F5)
     global DB_FILE
@@ -222,7 +222,6 @@ def serve(listen, target, db_file=None, strip_csp=True):
 
     host, _, port = listen.rpartition(':')
     ProxyHandler.target_base = target.rstrip('/')
-    ProxyHandler.strip_csp = strip_csp
 
     print(f'[phish-proxy] {listen} → {target}', flush=True)
     print(f'[phish-proxy] Credentials intercepted → hashed (plaintext destroyed)', flush=True)

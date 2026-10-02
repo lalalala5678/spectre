@@ -60,7 +60,8 @@ const quick = proxyActivities({
 function clipMarked(value, max) {
   const text = String(value ?? '');
   if (text.length <= max) return text;
-  return `${text.slice(0, max)}[已截断:原文 ${text.length} 字符]`;
+  // CS66-F3: 已显示/总长并列(pi.mjs 单源同制式)。
+  return `${text.slice(0, max)}[已截断:${max}/${text.length} 字符]`;
 }
 
 /**

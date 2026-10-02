@@ -11,7 +11,7 @@
                适用 decomp 文本变换族 + c2-qa/c2-functest 全流水线
   real-lane  : jMG 真实生成 class 字节(BASE64 解码),功能核=内存马本身;标记走
                manifest(sha256/jmg info);文本 decomp 不适用,需字节码变换族(未建,如实)
-纪律: 授权门(scope.json)+EDUSRC 隔离+审计,与 c2-qa 同源。
+纪律: 授权门(scope.json)+EDUSRC 隔离+审计,与 c2-qa 同源(list/gen 过门; CS66-F9: verify 属只读校验不门——scope-gate SKILL 成文契约, 语义同 bytecode info)。
 """
 
 import sys, base64, hashlib, json, os, re, subprocess

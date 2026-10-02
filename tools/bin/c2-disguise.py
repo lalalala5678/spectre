@@ -219,7 +219,9 @@ def check_delivery(d):
                               ('check-deploy.sh', out['check_deploy_script'])) if not ok]
     bare14 = [f'{"+".join(miss14)}(⑭)'] if miss14 else []
     out['verdict'] = 'REJECT' if (bare or out['mtime']['verdict'] == 'FAIL' or bare14) else 'ACCEPT'
-    out['bare_surfaces'] = (out.get('bare_surfaces') or []) + bare14
+    # CS66-F6: 裸奔面归因=⑭缺件+per-payload REJECT(此前恒空 get 死
+    # 防御且 bare 载荷清单不进归因——名不符实)。
+    out['bare_surfaces'] = bare14 + [f'{b}(payload)' for b in bare]
     out['note'] = ('密钥材料须随 connect-info.json' if not out['connect_info'] else '')
     return out
 

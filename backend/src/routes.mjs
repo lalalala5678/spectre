@@ -379,25 +379,25 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, { deleted: true, id: pid });
     }
 
-/** CS44-R32D67-B: prefs 凭据掩码视图(GET/PUT 回显共用; 掩码哨兵
- * 写面在 agent-settings save 路径, 本端点只读)。 */
+// CS44-R32D67-B/CS66-F4: prefs 凭据掩码视图(GET/PUT 回显共用; 掩码
+// 哨兵写面在 agent-settings save 路径, 本端点只读)。原嵌 realRouter
+// 中段列 0 缩进伪模块级——提至模块层+缩进归位。
 function maskPrefs(raw) {
-        const masked = {
-          ...raw,
-          commonSettings: raw.commonSettings ? {
-            ...raw.commonSettings,
-            llm: raw.commonSettings.llm ? { ...raw.commonSettings.llm,
-              apiKey: raw.commonSettings.llm.apiKey ? maskSecret(raw.commonSettings.llm.apiKey) : raw.commonSettings.llm.apiKey } : raw.commonSettings.llm,
-            webSearch: raw.commonSettings.webSearch ? { ...raw.commonSettings.webSearch,
-              apiKey: raw.commonSettings.webSearch.apiKey ? maskSecret(raw.commonSettings.webSearch.apiKey) : raw.commonSettings.webSearch.apiKey } : raw.commonSettings.webSearch,
-          } : raw.commonSettings,
-          agentLlm: Object.fromEntries(Object.entries(raw.agentLlm ?? {}).map(([k, v]) =>
-            [k, v?.apiKey ? { ...v, apiKey: maskSecret(v.apiKey) } : v])),
-          reconApiKeys: Object.fromEntries(Object.entries(raw.reconApiKeys ?? {}).map(([src, o]) =>
-            [src, Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
-              [fk, isSecretLeaf(src, fk) ? maskSecret(fv) : fv]))])),
-        };
-  return masked;
+  return {
+    ...raw,
+    commonSettings: raw.commonSettings ? {
+      ...raw.commonSettings,
+      llm: raw.commonSettings.llm ? { ...raw.commonSettings.llm,
+        apiKey: raw.commonSettings.llm.apiKey ? maskSecret(raw.commonSettings.llm.apiKey) : raw.commonSettings.llm.apiKey } : raw.commonSettings.llm,
+      webSearch: raw.commonSettings.webSearch ? { ...raw.commonSettings.webSearch,
+        apiKey: raw.commonSettings.webSearch.apiKey ? maskSecret(raw.commonSettings.webSearch.apiKey) : raw.commonSettings.webSearch.apiKey } : raw.commonSettings.webSearch,
+    } : raw.commonSettings,
+    agentLlm: Object.fromEntries(Object.entries(raw.agentLlm ?? {}).map(([k, v]) =>
+      [k, v?.apiKey ? { ...v, apiKey: maskSecret(v.apiKey) } : v])),
+    reconApiKeys: Object.fromEntries(Object.entries(raw.reconApiKeys ?? {}).map(([src, o]) =>
+      [src, Object.fromEntries(Object.entries(o ?? {}).map(([fk, fv]) =>
+        [fk, isSecretLeaf(src, fk) ? maskSecret(fv) : fv]))])),
+  };
 }
 
     if (path === '/api/prefs' && method === 'GET') {
