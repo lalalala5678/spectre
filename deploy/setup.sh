@@ -19,6 +19,7 @@ die() { echo "[setup] FATAL: $*" >&2; exit 1; }
 
 # ---------- 1) 基础依赖: python3 必在; Node ≥22(缺则 NodeSource 装; 装后复核) ----------
 command -v python3 >/dev/null || die 'python3 缺失(apt install python3)'
+command -v openssl >/dev/null || die 'openssl 缺失(apt install openssl)——令牌/密码生成依赖它'
 NODE_MAJOR="$(node -v 2>/dev/null | grep -oP '\d+' | head -1 || echo 0)"
 if [ "${NODE_MAJOR:-0}" -lt 22 ]; then
   say '安装 Node 22(NodeSource)...'
@@ -54,7 +55,19 @@ npm install --no-audit --no-fund --silent
 npm run build --silent
 [ -f "$REPO/console/dist/index.html" ] || die '前端构建产物缺失'
 
-# ---------- 4) admin 账号(已存在则跳过) ----------
+# ---------- 4) 整机归属裁决(R32D101-N2: 先裁决再改系统态——共享机防误改) ----------
+# 本脚本整机独占: 目标端口已被"非 spectre 单元"占用即停, 此时尚未写
+# /etc/spectre、未动账号。共享机/已部署机请走手工路径(deploy/README)。
+port_owner() { ss -ltnp 2>/dev/null | grep -P ":$1\b" | grep -oP 'users:\(\(.*' | head -1 || true; }
+OWNED_ALREADY=no
+if systemctl is-active --quiet spectre-agent-runtime && systemctl is-active --quiet spectre-console; then
+  OWNED_ALREADY=yes
+else
+  O="$(port_owner 8090)"; [ -z "$O" ] || die "8090 被非 spectre-agent-runtime 进程占用: $O ——本机已有别的部署? 共享机请走手工路径(deploy/README)"
+  O="$(port_owner 8081)"; [ -z "$O" ] || die "8081 被非 spectre-console 进程占用: $O ——本机已有别的部署? 共享机请走手工路径(deploy/README)"
+fi
+
+# ---------- 5) admin 账号(已存在则跳过) ----------
 install -d -m 750 "$AUTH_DIR"
 if [ ! -f "$AUTH_DIR/passwd" ]; then
   PW="Spectre-$(openssl rand -hex 4)-Admin"
@@ -74,25 +87,16 @@ upsert NODE_BIN "$NODE_BIN"
 upsert INTERNAL_TOKEN "$TOK"
 upsert GATEWAY_DIST_DIR "$REPO/console/dist"
 chmod 600 "$ENVF"
-# R32D100-F1: console 单元 ReadWritePaths 硬编码此目录——无人建则 226/NAMESPACE 拒启。
-install -d -m 755 "$LOG_DIR" "$DATA_DIR"
+# R32D100-F1: console 单元 ReadWritePaths 硬编码此目录——无人建则 226/NAMESPACE 拒启;
+# R32D101-N1: 同族缺口——oob 单元 ReadWritePaths=$DATA_DIR/oob(全家桶可选启用, 一并预建)。
+install -d -m 755 "$LOG_DIR" "$DATA_DIR" "$DATA_DIR/oob"
 cp "$REPO"/deploy/systemd/spectre-*.service /etc/systemd/system/
 systemctl daemon-reload
-
-# 端口占用预检(不 pkill——避免误杀同机其他实例, F4):
-#   8090/8081 空闲→启动; 已由本单元占用→restart; 被其他进程占→给出持有者并停。
-port_owner() { ss -ltnp 2>/dev/null | grep -oP ".*:$1\b.*users:\(\(\"[^\"]+\",pid=\d+" | grep -oP 'users:.*' || true; }
-for U in spectre-agent-runtime spectre-console; do
-  systemctl is-active --quiet "$U" && { systemctl restart "$U"; continue; }
-done
-if ! systemctl is-active --quiet spectre-agent-runtime; then
-  O="$(port_owner 8090)"; [ -z "$O" ] || die "8090 被非 spectre-agent-runtime 进程占用: $O ——先停它或改 PORT"
-  systemctl enable spectre-agent-runtime >/dev/null 2>&1
+if [ "$OWNED_ALREADY" = yes ]; then
+  systemctl restart spectre-agent-runtime spectre-console
+else
+  systemctl enable spectre-agent-runtime spectre-console >/dev/null 2>&1
   systemctl start spectre-agent-runtime || die 'runtime 启动失败: journalctl -u spectre-agent-runtime -n 20'
-fi
-if ! systemctl is-active --quiet spectre-console; then
-  O="$(port_owner 8081)"; [ -z "$O" ] || die "8081 被非 spectre-console 进程占用: $O ——先停它或改 GATEWAY_PORT"
-  systemctl enable spectre-console >/dev/null 2>&1
   systemctl start spectre-console || die 'console 启动失败: journalctl -u spectre-console -n 20'
 fi
 sleep 2
@@ -117,7 +121,7 @@ fi
 cat <<EOF
 
 ============================================================
- SPECTRE ${TLS_OK:+}$([ "$TLS_OK" = yes ] && echo '就绪' || echo '核心就绪(TLS 未通)')
+ SPECTRE $([ "$TLS_OK" = yes ] && echo '就绪' || echo '核心就绪(TLS 未通)')
    入口   : $ENTRY
    账号   : admin  (密码: cat /root/spectre-admin-cred.txt)
    TLS    : $TLS_NOTE

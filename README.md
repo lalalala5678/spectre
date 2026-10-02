@@ -42,6 +42,10 @@ sudo bash deploy/setup.sh                 # 或带域名: sudo bash deploy/setup
 ```
 
 一键含: 依赖构建/admin 建号/systemd 三单元/对外 TLS(Caddy)——结束打印入口与账号。
+
+> ⚠ 一键脚本**整机独占**(直接占用 8090/8081/443 并写 /etc/spectre)——共享机或
+> 已部署过 SPECTRE 的机器请走下方手工路径。无域名模式用内部 CA 证书: 浏览器
+> 首访「高级→继续访问」即可。
 以下为手工逐步等价(排障/自定义用):
 
 # ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串; 占位行删除而非追加——

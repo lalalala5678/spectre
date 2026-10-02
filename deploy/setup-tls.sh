@@ -120,4 +120,4 @@ else
   echo '[setup-tls] FATAL: 自检未通——journalctl -u spectre-caddy -n 20; 常见: 80/443 防火墙或安全组未放行' >&2
   exit 1
 fi
-echo "[setup-tls] 浏览器访问 https://${DOMAIN}/spectre/ 并用 admin 登录(密码=spectre-passwd.py add 所设)"
+echo "[setup-tls] 浏览器访问 https://${DOMAIN}/spectre/ 并用 admin 登录(一键: 密码 cat /root/spectre-admin-cred.txt; 手工: spectre-passwd.py add 所设)"
