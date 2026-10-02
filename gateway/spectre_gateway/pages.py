@@ -1,4 +1,9 @@
-"""Login page template (self-contained HTML, no external assets)."""
+"""Login page template (self-contained HTML, no external assets).
+
+FEVERIFY-D(8-1): 与控制台设计系统对齐——双主题 token 化(跟随系统+内联
+防闪烁)、sans 字体栈、13px 标签、Indigo 主按钮(#4f46e5 白字 6.29:1)、
+文案去黑客风(账号/口令/登录)。自包含无外链, 网关无静态依赖面不变。
+"""
 
 from . import config
 
@@ -9,59 +14,84 @@ _TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>SPECTRE · 登录</title>
+<script>
+  /* 与 console index.html 同款防首帧闪烁 */
+  (function () {
+    var t = localStorage.getItem('spectre-theme');
+    if (t !== 'light' && t !== 'dark')
+      t = matchMedia('(prefers-color-scheme: dark)')
+        .matches ? 'dark' : 'light';
+    document.documentElement.dataset.theme = t;
+  })();
+</script>
 <style>
-  :root { color-scheme: dark; }
+  :root {
+    color-scheme: light;
+    --bg: #f8f9fb; --surface: #ffffff; --line: #e2e5ea;
+    --text-primary: #1a1f28; --text-secondary: #4b5563;
+    --text-tertiary: #616b7a; --accent: #4f46e5; --accent-hover: #4338ca;
+    --danger: #b91c1c;
+    --shadow: 0 1px 3px rgb(16 24 40 / 0.10), 0 1px 2px rgb(16 24 40 / 0.06);
+  }
+  [data-theme="dark"] {
+    color-scheme: dark;
+    --bg: #0f1115; --surface: #161a22; --line: #272d38;
+    --text-primary: #e6e9ef; --text-secondary: #a8b0bd;
+    --text-tertiary: #8791a0; --accent: #4f46e5; --accent-hover: #4338ca;
+    --danger: #f87171;
+    --shadow: none;
+  }
   * { box-sizing: border-box; margin: 0; }
   body {
-    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
-    background: #0b0d12; color: #a1a1aa;
+    font-family: 'Inter', system-ui, -apple-system, 'Segoe UI',
+      'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Noto Sans SC',
+      'Microsoft YaHei', sans-serif;
+    background: var(--bg); color: var(--text-secondary);
     min-height: 100vh; display: flex;
     align-items: center; justify-content: center;
   }
   .card {
-    width: 340px; padding: 28px 26px;
-    background: #10131b; border: 1px solid #272b38; border-radius: 6px;
+    width: 360px; padding: 32px 28px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 8px; box-shadow: var(--shadow);
   }
-  h1 { font-size: 15px; letter-spacing: 4px; color: #e4e4e7; }
-  .sub { font-size: 10px; color: #52525b;
-    margin: 4px 0 22px; letter-spacing: 1px; }
-  label { display: block; font-size: 10px;
-    text-transform: uppercase; letter-spacing: 1.5px;
-    color: #52525b; margin: 14px 0 5px; }
+  h1 { font-size: 20px; font-weight: 600; color: var(--text-primary); }
+  .sub { font-size: 13px; color: var(--text-tertiary); margin: 6px 0 28px; }
+  label { display: block; font-size: 13px; font-weight: 500;
+    color: var(--text-secondary); margin: 16px 0 6px; }
   input {
-    width: 100%; padding: 8px 10px; font: inherit; font-size: 13px;
-    background: #0b0d12; border: 1px solid #272b38;
-    border-radius: 3px; color: #e4e4e7;
-    outline: none; letter-spacing: 1px;
+    width: 100%; padding: 8px 10px; font: inherit; font-size: 14px;
+    background: var(--surface); border: 1px solid var(--line);
+    border-radius: 6px; color: var(--text-primary); outline: none;
   }
-  input:focus { border-color: #ea580c; }
+  input:focus { border-color: var(--accent);
+    box-shadow: 0 0 0 2px rgb(79 70 229 / 0.25); }
   button {
-    width: 100%; margin-top: 22px; padding: 9px;
-    font: inherit; font-size: 12px;
-    letter-spacing: 3px; background: #ea580c; color: #fff; border: 0;
-    border-radius: 3px; cursor: pointer;
+    width: 100%; margin-top: 24px; padding: 9px;
+    font: inherit; font-size: 14px; font-weight: 500;
+    background: var(--accent); color: #fff; border: 0;
+    border-radius: 6px; cursor: pointer;
   }
-  button:hover { background: #f97316; }
-  .err { margin-top: 14px; font-size: 11px; color: #ef4444;
-    text-align: center; min-height: 14px; }
-  .foot { margin-top: 18px; font-size: 9px; color: #3f3f46;
-    text-align: center; letter-spacing: 1px; }
+  button:hover { background: var(--accent-hover); }
+  .err { margin-top: 14px; font-size: 13px; color: var(--danger);
+    text-align: center; min-height: 16px; }
+  .foot { margin-top: 20px; font-size: 12px; color: var(--text-tertiary);
+    text-align: center; }
 </style>
 </head>
 <body>
   <form class="card" method="POST" action="__ACTION__" autocomplete="off">
     <h1>SPECTRE</h1>
-    <div class="sub">SPECTRE · AGENT CONSOLE — RESTRICTED</div>
-    <label for="user">Operator</label>
+    <div class="sub">多智能体渗透测试平台 · 授权访问</div>
+    <label for="user">账号</label>
     <input id="user" name="user" type="text" required autofocus
       autocomplete="username">
-    <label for="pw">Passphrase</label>
+    <label for="pw">口令</label>
     <input id="pw" name="pw" type="password" required
       autocomplete="current-password">
-    <button type="submit">AUTHENTICATE</button>
+    <button type="submit">登录</button>
     <div class="err">__MSG__</div>
-    <div class="foot">authorized pentest operations only
-      · all access is audited</div>
+    <div class="foot">仅限授权渗透测试作业 · 全部访问留痕审计</div>
   </form>
 </body>
 </html>
