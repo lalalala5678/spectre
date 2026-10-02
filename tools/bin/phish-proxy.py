@@ -39,6 +39,10 @@ def add_event(db, kind, uid, extra=None):
     ev = {'kind': kind, 'uid': uid, 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
     if extra: ev.update(extra)
     import fcntl
+    # R32D88-F1(P0): 父目录预建(对齐 phish-track:17)——全新安装未先跑
+    # phish-track 时 open(lock) 直接 FileNotFoundError, 凭据/追踪全
+    # 写路径开箱即崩。
+    os.makedirs(os.path.dirname(DB_FILE) or '.', exist_ok=True)
     with open(DB_FILE + '.lock', 'w') as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
@@ -134,7 +138,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         # Everything else: proxy to target
         status, headers, body = self.proxy_request('GET')
-        ct = headers.get('Content-Type', headers.get('content-type', ''))
+        ct = next((v for k, v in headers.items() if k.lower() == 'content-type'), '')  # R32D88-F2: 大小写不敏感
         status, headers, body = self.process_response(status, headers, body, ct)
 
         self._respond(status, headers, body)
@@ -143,8 +147,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # CS69-5/CS70-1: respond 诗节×2 收口(跳过逐跳头+重算长度)——
         # DI 批次替换误把本函数体也换成自调用(RecursionError), 此为真身。
         self.send_response(status)
+        # R32D88-F4: 剥 origin Server/Date(send_response 自注入, 此前
+        # 转发全头致双份 Server/Date 畸形应答+泄漏代理栈)。
         for k, v in headers.items():
-            if k.lower() not in ('transfer-encoding', 'content-length'):
+            if k.lower() not in ('transfer-encoding', 'content-length', 'server', 'date'):
                 self.send_header(k, v)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
@@ -204,7 +210,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         # Non-credential POST: forward to target (e.g., CSRF token fetch, SSO handshake)
         status, headers, body = self.proxy_request('POST', body)
-        ct = headers.get('Content-Type', headers.get('content-type', ''))
+        ct = next((v for k, v in headers.items() if k.lower() == 'content-type'), '')  # R32D88-F2: 大小写不敏感
         status, headers, body = self.process_response(status, headers, body, ct)
         self._respond(status, headers, body)
 
@@ -222,7 +228,16 @@ def serve(listen, target, db_file=None):
     ProxyHandler.target_base = target.rstrip('/')
 
     print(f'[phish-proxy] {listen} → {target}', flush=True)
-    print(f'[phish-proxy] Credentials intercepted → hashed (plaintext destroyed)', flush=True)
+    # R32D88-F1: 静态'Credentials intercepted'横幅改启动自检——凭据路
+    # 径此前可崩(缺 makedirs)而横幅照打, 失实。
+    try:
+        os.makedirs(os.path.dirname(DB_FILE) or '.', exist_ok=True)
+        with open(DB_FILE + '.lock', 'w') as lf:
+            pass
+        print(f'[phish-proxy] 事件库可写: {DB_FILE}(凭据落库即哈希, 明文即毁)', flush=True)
+    except OSError as e:
+        print(f'[phish-proxy] FATAL: 事件库不可写 {DB_FILE} — {e}', flush=True)
+        sys.exit(1)
     server = HTTPServer((host or '0.0.0.0', int(port or 8080)), ProxyHandler)
     server.serve_forever()
 
