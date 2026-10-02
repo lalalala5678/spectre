@@ -13,7 +13,7 @@ interface BusEvt { seq: number; ts?: string; type: string | null; title: string 
 
 /** F69: 顶栏搜索此前是空壳(placeholder 承诺"会话/资产/发现/CVE"但无任何
  * 逻辑)。实现: ≥2 字符防抖搜索会话(/sessions/tree 轻投影)+总线条目
- * (intel/vulnerability/task-report 的 title/summary, CVE 正则加权)。 */
+ * (intel/vulnerability/task-report 的 title/summary, CVE 正则匹配)。 */
 const SEARCHABLE = new Set(['intel', 'intel-note', 'vulnerability', 'task-report']);
 
 /** F70: 通知铃铛此前是纯装饰(硬编码红点+无逻辑)。实装:

@@ -48,10 +48,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const [uiReady, setUiReady] = useState(false);
   useEffect(() => {
     let cancelled = false;
-    // CS27-2: 每轮 boot 复位——bootDoneRef 此前只在首挂载置 true 后
-    // 永不复位, 原地 re-boot(项目切换/重试)期间空态分支误放行可点
-    // '新建会话'(与自动建会话竞争产重复空会话)。
-    bootDoneRef.current = false;
     Promise.all([ensureWorkSession(), getPrefs()]).then(async ([ws, prefs]) => {
       if (cancelled) return;
       uiPrefsRef.current = prefs.ui ?? {};
@@ -154,6 +150,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     // Race guard: rapid project switches fire overlapping bootstraps;
     // the stale response must never overwrite the newer one.
     let cancelled = false;
+    // CS27-2/CS77-4: 每轮 boot(含原地 re-boot: 项目切换/重试)复位——
+    // 此前复位只在 deps[] 挂载期 effect, 原地 re-boot 期间空态分支
+    // 误放行可点'新建会话'(与自动建会话竞争)。
+    bootDoneRef.current = false;
     (async () => {
       const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(ws.id)}`);
       if (cancelled) return;

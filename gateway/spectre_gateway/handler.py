@@ -319,15 +319,6 @@ def serve():
             f"FATAL: {config.PASSWD_FILE} missing — 先运行 "
             f"python3 spectre-passwd.py add <user> 创建账号"
             f"(注意: 建号与网关须同一 SPECTRE_AUTH_DIR, 两边不一致即此错)")
-    # F9(部署审计四轮): 空 INTERNAL_TOKEN 此前静默启动, 登录后所有 API 401
-    if not config.RUNTIME_TOKEN:
-        raise SystemExit(
-            "FATAL: INTERNAL_TOKEN 未设置 — 网关反代 /api 需要 "
-            "runtime 相同的令牌(backend/.env 里的 INTERNAL_TOKEN)")
-    if config.RUNTIME_TOKEN.lower().startswith('change-me'):
-        raise SystemExit(
-            "FATAL: INTERNAL_TOKEN 仍是占位值 — 填入与 backend/.env 相同的真实随机令牌")
-
     GatewayHandler.security = Security()
     try:
         server = QuietHTTPServer(

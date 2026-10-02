@@ -39,7 +39,7 @@ interface SettingsPayload {
 }
 
 const TIER_STYLE: Record<string, { label: string; chip: string; dot: string; groupLabel: string }> = {
-  P0: { label: 'P0', chip: 'border-orange-600/60 bg-orange-950/50 text-orange-300', dot: 'bg-orange-400', groupLabel: '必配 · 两大结构性缺口' },
+  P0: { label: 'P0', chip: 'border-orange-600/60 bg-orange-950/50 text-orange-300', dot: 'bg-orange-400', groupLabel: '必配 · 三大结构性缺口(fofa/github/cse)' },
   P1: { label: 'P1', chip: 'border-amber-700/50 bg-amber-950/40 text-amber-300', dot: 'bg-amber-400', groupLabel: '建议 · 免费层够用' },
   P2: { label: 'P2', chip: 'border-zinc-600/60 bg-zinc-800/60 text-zinc-400', dot: 'bg-zinc-500', groupLabel: '增益 · 多源并集提覆盖' },
 };
