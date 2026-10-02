@@ -10,8 +10,9 @@
  * never a hard reject when a sensible default exists; CS2-#4 按 14924dc
  * 漏洞撰写收权后的现行实况重写——publish_vulnerability 仅 report 会话持有):
  *   基础面(全会话, 配置三键除外——其仅持 buildToolingTools, 不含
- *                   intel 三工具; CS81-F3/CS82-1 收窄): bash/read/write/
- *                   edit 官方四件 + query_intel/read_session/revise_entry
+ *                   intel 四工具; CS81-F3/CS82-1/CS83-F1 收窄):
+ *                   bash/read/write/edit 官方四件 + query_intel/
+ *                   read_session/revise_entry/submit_task_report
  *                   + search_web/fetch_url(各持独立实例)——逐项以
  *                   buildToolingTools/装配代码为准。
  *   差异面: 编排器另持 dispatch_agents/relay_to_agents(+buildChildTools
