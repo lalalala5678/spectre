@@ -403,10 +403,15 @@ def main():
                 'allow_plaintext': bool(getattr(args, 'allow_plaintext', False))
                     or bool(dflt.get('allow_plaintext'))}
 
-    # R32D76-NEW2: --to 形如路径但不存在→拒(此前静默当单地址假成功)。
-    if args.to and not os.path.isfile(args.to) \
-            and (args.to.endswith('.txt') or '/' in args.to or not('@' in args.to)):
-        print(f'--to 路径不存在: {args.to}(单地址须含 @)', file=sys.stderr)
+    # R32D76-NEW2/R32D77-P3: --to 形如路径但不存在→拒(此前静默当单
+    # 地址假成功); 两情形分支输出(去复合句)。
+    if args.to and not os.path.isfile(args.to) and '@' in args.to:
+        pass  # 合法单地址, 走下方回退
+    elif args.to and not os.path.isfile(args.to):
+        if args.to.endswith('.txt') or '/' in args.to:
+            print(f'--to 路径不存在: {args.to}', file=sys.stderr)
+        else:
+            print(f'--to 非地址非文件(缺 @): {args.to}', file=sys.stderr)
         return 2
     # R32D76-NEW1: 非 UTF-8 容错读取。
     targets = [l.strip() for l in open(args.to, errors='replace')
