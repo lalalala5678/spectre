@@ -430,8 +430,7 @@ export function buildIntelTools(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       sessionId: Type.String({
-        description: 'Session ID, either raw (sess-abc123) or with the payloadRef prefix (sess:abc123 — both accepted)',
-        examples: ['sess-abc123', 'sess:abc123'],
+        description: 'Session ID exactly as given: raw spawned id (sess-abc123) or a payloadRef (sess:sess-abc123) — the tool strips only the "sess:" payloadRef prefix, never the id body',
       }),
       last: Type.Optional(Type.Number({
         description: 'Number of recent messages to read, default 10, cap 30',
@@ -441,15 +440,16 @@ export function buildIntelTools(record, caps) {
       })),
     }),
     execute: async (_id, params) => {
-      // R32D96-N1: 前缀双收——payloadRef 用 "sess:", 会话 ID 本体用
-      // "sess-", LLM 混传三次误判(编排器曾广播'子会话已死')。
-      const sid = String(params.sessionId).replace(/^sess[:-]/, '');
+      // R32D96-N1/CS80-1: 只剥 payloadRef 的 "sess:" 前缀——会话 ID
+      // 本体即 "sess-..." 开头, 此前 EB 双收版连裸 ID 前缀一起吞致
+      // 查找必败(P1 回归); 裸 ID 原样直传。
+      const sid = String(params.sessionId).replace(/^sess:/, '');
       const last = Math.min(Math.max(Number(params.last) || 10, 1), 30);
       // Access the session store via caps — injected by the composition root
       const messages = caps.readSessionMessages?.(sid, last, record.workSessionId ?? null);
       if (!messages) {
         return { content: [{ type: 'text',
-          text: `会话 ${sid} 不存在或不可读。payloadRef 格式为 "sess:xxx",传 sessionId 时可带或不带前缀。` }] };
+          text: `会话 ${sid} 不存在或不可读。payloadRef 形如 "sess:sess-xxx"——直接传或传整个 payloadRef 均可(仅剥 sess: 段, ID 本体 sess- 段保留)。` }] };
       }
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
