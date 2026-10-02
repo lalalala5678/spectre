@@ -5,6 +5,10 @@ import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
 import { getTheme, setTheme, type Theme } from '../utils/theme';
 
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { EmptyState } from './ui/EmptyState';
+import { Input } from './ui/Input';
 /** F60: /api/health 前端消费——状态栏 30s 轮询展示会话/事件总量
  * (ok 掉线变红)。R32D44: 模型名字样已移除(供应商多态, 见设置页)。 */
 interface HealthInfo { ok: boolean; sessions: number; bus: number; }
@@ -161,33 +165,33 @@ export function Topbar() {
 
   const fmt = (d: Date) => d.toLocaleString('sv-SE', { hour12: false }).replace('T', ' ');
   return (
-    <header className="flex h-11 shrink-0 items-center gap-3 border-b border-void-700 bg-void-900 px-3.5">
-      {/* 全局搜索 (F69: 实装) */}
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+      {/* 全局搜索 (F69: 实装; §6.1-2 + §5.4/§5.8) */}
       <div ref={boxRef} className="relative w-80">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-zinc-600" />
-        <input
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+        <Input
           value={q}
           onChange={e => setQ(e.target.value)}
           onFocus={() => { if (q.trim().length >= 2) setOpen(true); }}
           onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQ(''); } }}
           placeholder="搜索会话 / 资产 / 发现 / CVE…"
-          className="w-full rounded-sm border border-void-600 bg-void-800 py-1.5 pl-8 pr-3 text-xs text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-void-500"
+          className="pl-8"
         />
         {open && sessHits.length === 0 && busHits.length === 0 && (
-          <div className="absolute left-1/2 top-full z-40 mt-2 w-[560px] -translate-x-1/2 rounded-md border border-void-700 bg-void-900/95 p-3 text-center text-[11px] text-zinc-500 shadow-lg">
+          <div className="absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-line bg-surface p-4 text-center text-[13px] text-tertiary shadow-lg">
             无结果——输入 ≥2 字搜索会话与总线条目
           </div>
         )}
         {open && (sessHits.length > 0 || busHits.length > 0) && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-sm border border-void-600 bg-void-900 p-1 shadow-lg">
+          <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-line bg-surface p-1 shadow-lg">
             {sessHits.length > 0 && (
-              <div className="mb-1 px-2 py-0.5 text-[9px] uppercase tracking-widest text-zinc-600">会话</div>
+              <div className="px-2.5 py-1 text-xs font-medium text-tertiary">会话</div>
             )}
             {sessHits.length === 0 && busHits.length > 0 && (
-              <p className="px-3 pb-1 pt-0.5 text-[10.5px] text-zinc-500">无会话命中——以下为总线条目</p>
+              <p className="px-2.5 pb-1 pt-0.5 text-xs text-tertiary">无会话命中——以下为总线条目</p>
             )}
             {sessTotal > sessHits.length && (
-              <p className="px-3 pb-1 text-[10px] text-zinc-500">会话命中 {sessTotal} 条, 仅显示前 {sessHits.length}(换更精确关键词)</p>
+              <p className="px-2.5 pb-1 text-xs text-tertiary">会话命中 {sessTotal} 条, 仅显示前 {sessHits.length}(换更精确关键词)</p>
             )}
             {sessHits.map(s => (
               <button key={s.id} onClick={() => {
@@ -201,90 +205,96 @@ export function Topbar() {
                 go(key);
                 setPendingOpen(key, s.id);
               }}
-                className="block w-full truncate rounded-sm px-2 py-1 text-left text-[11.5px] text-zinc-300 hover:bg-void-800">
-                <span className="font-mono text-[9.5px] text-zinc-600">{s.agentKey}</span>
-                {' '}{s.title ?? s.id}
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-secondary hover:bg-surface-2 hover:text-primary">
+                <span className="shrink-0 font-mono text-xs text-tertiary">{s.agentKey}</span>
+                <span className="min-w-0 truncate">{s.title ?? s.id}</span>
               </button>
             ))}
             {busHits.length > 0 && (
-              <div className="mt-1 mb-1 px-2 py-0.5 text-[9px] uppercase tracking-widest text-zinc-600">总线条目</div>
+              <div className="mt-1 px-2.5 py-1 text-xs font-medium text-tertiary">总线条目</div>
             )}
             {busHits.map(e => (
               <button key={e.seq} onClick={() => go(e.type === 'task-report' ? 'reports' : 'audit')}
-                className="block w-full truncate rounded-sm px-2 py-1 text-left text-[11.5px] text-zinc-300 hover:bg-void-800">
-                <span className="font-mono text-[9.5px] text-zinc-600">#{e.seq}</span>
-                {' '}{e.title ?? e.summary ?? ''}
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-secondary hover:bg-surface-2 hover:text-primary">
+                <span className="shrink-0 font-mono text-xs text-tertiary">#{e.seq}</span>
+                <span className="min-w-0 truncate">{e.title ?? e.summary ?? ''}</span>
               </button>
             ))}
           </div>
         )}
       </div>
 
-      <div className="font-mono text-[11px] text-zinc-600">{fmt(now)} 本地</div>
-
-      {/* F60: 运行时状态(会话·事件)。R32D44: 模型名字样移除——供应商
-          已平台化(默认+单 agent 覆盖), 单一模型名不再能代表全平台,
-          且避免绑定观感; 模型信息在设置页与各 agent 配置页签可见。 */}
-      <div
-        title={health
-          ? `会话 ${health.sessions} · 总线事件 ${health.bus}`
-          : 'runtime 不可达'}
-        className="flex items-center gap-1.5 font-mono text-[10.5px] text-zinc-500"
-      >
-        <Activity className={health ? 'h-3 w-3 text-emerald-500' : 'h-3 w-3 text-red-500'} />
-        {health
-          ? <span>{health.sessions} 会话 · {health.bus} 事件</span>
-          : <span className="text-red-400">runtime 不可达</span>}
+      {/* F60: 时钟+运行状态(§6.1-2: sans 12px tertiary, · 分隔分组)。
+          R32D44: 模型名字样移除——供应商已平台化(默认+单 agent 覆盖),
+          单一模型名不再能代表全平台, 模型信息在设置页与各 agent 配置页签可见。 */}
+      <div className="flex items-center gap-2 text-xs tabular-nums text-tertiary">
+        <span>{fmt(now)} 本地</span>
+        <span aria-hidden="true">·</span>
+        <div
+          title={health
+            ? `会话 ${health.sessions} · 总线事件 ${health.bus}`
+            : 'runtime 不可达'}
+          className="flex items-center gap-1.5"
+        >
+          <Activity className={health ? 'h-3.5 w-3.5 text-success-text' : 'h-3.5 w-3.5 text-danger-text'} />
+          {health
+            ? <span>{health.sessions} 会话 · {health.bus} 事件</span>
+            : <span className="text-danger-text">runtime 不可达</span>}
+        </div>
       </div>
 
       <div className="flex-1" />
 
       {/* §4.1 主题切换(浅/深), 手动选择持久化覆盖系统偏好 */}
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={() => {
           const next = theme === 'dark' ? 'light' : 'dark';
           setTheme(next);
           setThemeState(next);
         }}
         title={theme === 'dark' ? '切换浅色' : '切换深色'}
-        className="rounded-sm p-1.5 text-zinc-500 hover:bg-void-800 hover:text-zinc-300"
       >
-        {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
-      </button>
+        {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+      </Button>
 
-      <button
+      <Button
+        variant="ghost"
+        size="icon"
         onClick={() => { window.location.href = '/spectre/logout'; }}
         title="登出"
-        className="rounded-sm p-1.5 text-zinc-500 hover:bg-void-800 hover:text-zinc-300"
       >
-        <LogOut className="h-3.5 w-3.5" />
-      </button>
+        <LogOut className="h-4 w-4" />
+      </Button>
 
       {/* F70: 通知(实装) */}
       <div ref={bellRef} className="relative">
-        <button
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={() => { setBellOpen(v => !v); setUnread(0); }}
           title={unread > 0 ? `通知 · ${unread} 条未读` : '通知(漏洞/失败报告)'}
-          className="relative rounded-sm p-1.5 text-zinc-500 hover:bg-void-800 hover:text-zinc-300"
+          className="relative"
         >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-3.5 min-w-3.5 items-center justify-center rounded-full bg-orange-600 px-1 font-mono text-[8px] font-bold text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold text-white">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
-        </button>
+        </Button>
         {bellOpen && (
-          <div className="absolute right-0 top-full z-30 mt-1 w-80 rounded-sm border border-void-600 bg-void-900 p-1 shadow-lg">
+          <div className="absolute right-0 top-full z-30 mt-1 w-80 rounded-lg border border-line bg-surface p-1 shadow-lg">
             {notices.length === 0 ? (
-              <p className="px-2 py-3 text-center text-[11px] text-zinc-600">暂无通知——漏洞发布与失败报告将推送至此</p>
+              <EmptyState icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
             ) : notices.slice(0, 20).map(n => (
               <button key={n.seq} onClick={() => { setBellOpen(false); window.location.hash = n.hash; }}
-                className="block w-full truncate rounded-sm px-2 py-1.5 text-left text-[11.5px] hover:bg-void-800">
-                <span className={'mr-1 font-mono text-[9px] ' + (n.kind === 'vulnerability' ? 'text-red-400' : 'text-orange-400')}>
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-surface-2">
+                <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className="shrink-0">
                   {n.kind === 'vulnerability' ? '漏洞' : '失败'}
-                </span>
-                <span className="text-zinc-300">{n.text}</span>
+                </Badge>
+                <span className="min-w-0 truncate text-sm text-secondary">{n.text}</span>
               </button>
             ))}
           </div>

@@ -214,6 +214,7 @@ export function subscribeSse(
   path: string,
   onEvent: (eventName: string, data: unknown) => void,
   since: () => number,
+  onReconnect?: () => void,
 ): Unsubscribe {
   let source: EventSource | null = null;
   let cursor = since();
@@ -221,8 +222,9 @@ export function subscribeSse(
 
   let failures = 0;
 
-  const connect = () => {
+  const connect = (isReconnect = false) => {
     if (closed) return;
+    if (isReconnect && typeof onReconnect === 'function') onReconnect();
     source = new EventSource(`${API_BASE}${path}?since=${cursor}`);
     source.onmessage = () => { /* named events only */ };
     source.addEventListener('session', () => { failures = 0; });
@@ -237,7 +239,9 @@ export function subscribeSse(
       }
       // progressive backoff: 2s → 15s cap, reset on any live event
       const delay = Math.min(2000 * failures, 15_000);
-      setTimeout(connect, delay);
+      // FEBUGS-P1-2: 黑洞断流(EventSource 半开: onerror 不触发, 事件
+      // 停更)无自愈——重连时经 onReconnect 让调用方拉全量对账补尾。
+      setTimeout(() => connect(true), delay);
     };
     const forward = (event: MessageEvent) => {
       const payload = JSON.parse(event.data as string);

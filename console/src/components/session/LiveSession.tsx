@@ -76,12 +76,20 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const inner = el.firstElementChild as HTMLElement | null;
-    if (!inner) return;
+    // FEBUGS-P2-1: 观察对象=当前尾子(流式泡/时间线), 挂载期 loading div
+    // 卸载后旧观察即死码——每次触发后重挂当前尾子。
+    let last = el.lastElementChild as HTMLElement | null;
+    if (!last) return;
     const ro = new ResizeObserver(() => {
       if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+      const cur = el.lastElementChild as HTMLElement | null;
+      if (cur && cur !== last) {
+        if (last) ro.unobserve(last);
+        ro.observe(cur);
+        last = cur;
+      }
     });
-    ro.observe(inner);
+    ro.observe(last);
     return () => ro.disconnect();
   }, []);
 
@@ -137,6 +145,22 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
 
   useEffect(() => {
     if (!sessionId || !loaded) return;
+    const reconcile = async () => {
+      // FEBUGS-P1-2: 断流重连后拉详情对账——SSE 可能永久漏尾(半开
+      // 连接), 以服务端真值覆盖本地(含 busy 真值), 消息按 seq 去重合并。
+      try {
+        const d = await api<ApiSessionDetail>(`/sessions/${sessionId}`);
+        setMessages(prev => {
+          const seen = new Set(prev.map(x => x.ts));
+          const merged = [...prev];
+          for (const m2 of d.messages) if (!seen.has(m2.ts)) merged.push(m2);
+          return merged;
+        });
+        setBusy(d.busy);
+        lastSeq.current = Math.max(lastSeq.current, d.lastSeq ?? 0);
+        scrollToBottom();
+      } catch { /* 对账失败: 下次重连再试 */ }
+    };
     const off = subscribeSse(
       `/sessions/${sessionId}/events`,
       (name, raw) => {
@@ -212,9 +236,10 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
         }
       },
       () => lastSeq.current,
+      reconcile,
     );
     return off;
-  }, [sessionId, loaded]);
+  }, [sessionId, loaded, scrollToBottom]);
 
   const send = async (text: string, mode: 'prompt' | 'steer') => {
     if (!sessionId) return;

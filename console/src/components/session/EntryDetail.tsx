@@ -81,7 +81,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
     [chain, rootSeq]);
 
   const submitDialog = async () => {
-    if (!dialogText.trim()) return;
+    if (!dialogText.trim() || dialogBusy) return;  // FEBUGS-P2-3: Enter 绕过 busy 守卫可重复提交
     setDialogBusy(true); setDialogDone('');
     try {
       const r = await reviseEntryViaAgent(event.seq, dialogText.trim());

@@ -25,6 +25,8 @@ export function ShellPage() {
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
+  const activeRef = useRef<string | null>(null);  // FEBUGS-P2-2: await 后读现值(闭包 active 是旧值)
+  activeRef.current = active;
 
   const reload = () => api<{ shells: ShellHandle[] }>('/shells')
     .then(d => setShells(d.shells ?? []))
@@ -56,12 +58,15 @@ export function ShellPage() {
   const [histIdx, setHistIdx] = useState(-1);  // R32D84-N3: ↑/↓ 命令历史
   async function run() {
     if (!cur || !cmd.trim() || busy) return;
+    const shellId = cur.id;  // FEBUGS-P2-2: 捕获执行时 shell——await 后
+    // 切换 shell 时在途输出不得串台到新 shell(此前无条件 setLines)。
     const c = cmd; setCmd(''); setBusy(true);
     setHist(h => (h[h.length - 1] === c ? h : [...h, c]));  // 去连续重复
     setHistIdx(-1);
     setLines(l => [...l, { dir: 'in', text: `${cur.user || '?'}@${cur.target}:~$ ${c}` }]);
     try {
-      const r = await api<ExecResult>(`/shells/${cur.id}/exec`, { method: 'POST', json: { command: c, timeoutMs: 60000 } });
+      const r = await api<ExecResult>(`/shells/${shellId}/exec`, { method: 'POST', json: { command: c, timeoutMs: 60000 } });
+      if (activeRef.current !== shellId) return void reload();  // 已切换: 输出弃置
       if (r.error) setLines(l => [...l, { dir: 'err', text: r.error! }]);
       else {
         if (r.stdout) setLines(l => [...l, { dir: 'out', text: String(r.stdout) }]);
@@ -69,9 +74,9 @@ export function ShellPage() {
         setLines(l => [...l, { dir: 'sys', text: `[exit ${r.code ?? '?'} · ${r.ms ?? '?'}ms]` }]);
       }
     } catch (e) {
-      setLines(l => [...l, { dir: 'err', text: e instanceof Error ? e.message : String(e) }]);
+      if (activeRef.current === shellId) setLines(l => [...l, { dir: 'err', text: e instanceof Error ? e.message : String(e) }]);
     }
-    setBusy(false);
+    if (activeRef.current === shellId) setBusy(false);
     void reload();
   }
 

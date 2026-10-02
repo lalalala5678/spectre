@@ -118,11 +118,11 @@ export default function App() {
   }, [route]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-void-950 font-sans text-slate-200">
+    <div className="flex h-screen w-screen overflow-hidden bg-bg font-sans text-primary">
       <Sidebar route={route} onRoute={nav} runningCount={runningCount} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="min-h-0 flex-1 overflow-hidden bg-void-950">
+        <main className="min-h-0 flex-1 overflow-hidden bg-bg">
           {[...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES].includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(route)} />
           ) : ['skills', 'mcp', 'cli'].includes(route) ? (
