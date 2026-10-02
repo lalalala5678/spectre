@@ -14,6 +14,7 @@ import { ShellPage } from './pages/ShellPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
 import type { RouteKey } from './types';
 import { setPendingOpen } from './api/openSessionChannel';
+import { initTheme } from './utils/theme';
 
 const STAGE_ROUTES: RouteKey[] = [
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
@@ -25,6 +26,8 @@ const CONFIG_AGENT_ROUTES: RouteKey[] = ['skill-config', 'mcp-config', 'cli-conf
 const VALID_ROUTES: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];  // CS41-C6: 挂载期/运行时单源(此前逐字双份)
 
 export default function App() {
+  // §4.1: 断言 data-theme(与 index.html 防闪烁脚本一致)+无手工偏好时跟随系统
+  useEffect(() => initTheme(), []);
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
     const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;

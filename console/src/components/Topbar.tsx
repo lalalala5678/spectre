@@ -1,8 +1,9 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, Bell, LogOut, Search } from 'lucide-react';
+import { Activity, Bell, LogOut, Moon, Search, Sun } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
+import { getTheme, setTheme, type Theme } from '../utils/theme';
 
 /** F60: /api/health 前端消费——状态栏 30s 轮询展示会话/事件总量
  * (ok 掉线变红)。R32D44: 模型名字样已移除(供应商多态, 见设置页)。 */
@@ -48,6 +49,7 @@ function noticeOf(e: BusEvt): Notice | null {
 export function Topbar() {
   const [now, setNow] = useState(() => new Date());
   const [health, setHealth] = useState<HealthInfo | null>(null);
+  const [theme, setThemeState] = useState<Theme>(() => getTheme());
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [sessHits, setSessHits] = useState<TreeSess[]>([]);
@@ -236,6 +238,19 @@ export function Topbar() {
       </div>
 
       <div className="flex-1" />
+
+      {/* §4.1 主题切换(浅/深), 手动选择持久化覆盖系统偏好 */}
+      <button
+        onClick={() => {
+          const next = theme === 'dark' ? 'light' : 'dark';
+          setTheme(next);
+          setThemeState(next);
+        }}
+        title={theme === 'dark' ? '切换浅色' : '切换深色'}
+        className="rounded-sm p-1.5 text-zinc-500 hover:bg-void-800 hover:text-zinc-300"
+      >
+        {theme === 'dark' ? <Sun className="h-3.5 w-3.5" /> : <Moon className="h-3.5 w-3.5" />}
+      </button>
 
       <button
         onClick={() => { window.location.href = '/spectre/logout'; }}
