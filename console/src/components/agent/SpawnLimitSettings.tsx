@@ -23,15 +23,20 @@ export function SpawnLimitSettings() {
 
   const save = async () => {
     if (!settings) return;
-    await api<SpawnSettings>('/settings', {
-      method: 'PUT',
-      json: {
-        spawnMaxDepth: settings.spawnMaxDepth,
-        spawnMaxAgents: settings.spawnMaxAgents,
-      },
-    });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1500);
+    try {
+      await api<SpawnSettings>('/settings', {
+        method: 'PUT',
+        json: {
+          spawnMaxDepth: settings.spawnMaxDepth,
+          spawnMaxAgents: settings.spawnMaxAgents,
+        },
+      });
+      setSaved(true);
+      setTimeout(() => setSaved(false), 1500);
+    } catch (e) {  // FEVERIFY-P3-10: 保存失败此前裸抛(无提示)
+      setSaved(false);
+      alert(`保存失败: ${e instanceof Error ? e.message : String(e)}`);
+    }
   };
 
   return (

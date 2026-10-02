@@ -74,6 +74,8 @@ export function PanelStack({ storageKey, children }: {
               onPointerDown={e => dividerDown(e, i - 1)}
               onPointerMove={dividerMove}
               onPointerUp={dividerUp}
+          onPointerCancel={dividerUp}
+          onLostPointerCapture={dividerUp}
               onDoubleClick={evenSplit}
               title="拖动调整高度 · 双击均分"
               className="relative z-10 h-1.5 shrink-0 cursor-row-resize after:absolute after:left-0 after:top-1/2 after:h-px after:w-full after:-translate-y-1/2 after:bg-line after:transition-colors hover:after:bg-accent"

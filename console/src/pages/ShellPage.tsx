@@ -59,12 +59,13 @@ export function ShellPage() {
   }
 
   const [hist, setHist] = useState<string[]>([]);
-  const [histIdx, setHistIdx] = useState(-1);  // R32D84-N3: ↑/↓ 命令历史
+  const [histIdx, setHistIdx] = useState(-1);
+  const draftRef = useRef('');  // FEVERIFY-P3-9: ↑前进时丢草稿  // R32D84-N3: ↑/↓ 命令历史
   async function run() {
     if (!cur || !cmd.trim() || busy) return;
     const shellId = cur.id;  // FEBUGS-P2-2: 捕获执行时 shell——await 后
     // 切换 shell 时在途输出不得串台到新 shell(此前无条件 setLines)。
-    const c = cmd; setCmd(''); setBusy(true);
+    const c = cmd; setCmd(''); setErr(''); setBusy(true);  // FEVERIFY-P3-9
     setHist(h => (h[h.length - 1] === c ? h : [...h, c]));  // 去连续重复
     setHistIdx(-1);
     setLines(l => [...l, { dir: 'in', text: `${cur.user || '?'}@${cur.target}:~$ ${c}` }]);
@@ -163,7 +164,7 @@ export function ShellPage() {
                 } else if (e.key === 'ArrowDown' && !e.nativeEvent.isComposing) {
                   e.preventDefault();
                   const n = histIdx + 1;
-                  if (histIdx < 0) setCmd('');
+                  if (histIdx < 0) { setCmd(draftRef.current); draftRef.current = ''; }
                   else if (n >= hist.length) { setHistIdx(-1); setCmd(''); }
                   else { setHistIdx(n); setCmd(hist[n]); }
                 } else if (e.key === 'Enter' && !e.nativeEvent.isComposing) void run();  // R11-F5: IME 同款(R8-F1)

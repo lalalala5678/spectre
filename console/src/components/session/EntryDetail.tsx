@@ -218,6 +218,21 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             onSave={async fields => {
               setEditBusy(true);
               try {
+                // FEVERIFY-C3(P2-4): 直接编辑基于打开时快照——并发修订后
+                // 旧快照整包保存会静默覆盖他人版本。保存前拉链比对基线
+                // revision.n, 落后即阻断提示。
+                const baseN = current.revision?.n ?? 0;
+                const fresh = await api<ApiBusEvent[]>('/bus'
+                  + (event.workSessionId ? `?ws=${event.workSessionId}` : ''));
+                const freshChain = fresh.filter((e: ApiBusEvent) =>
+                  e.seq === rootSeq || e.revises === rootSeq);
+                const latest = freshChain.reduce((m: number, e: ApiBusEvent) =>
+                  Math.max(m, e.revision?.n ?? 0), 0);
+                if (latest > baseN) {
+                  alert(`该条目已被并发修订(当前 v${latest}, 你基于 v${baseN})——关闭编辑重新打开后再改`);
+                  setEditing(false);
+                  return;
+                }
                 await reviseEntryDirect(event.seq, fields,
                   '用户直接编辑', current.workSessionId ?? null);
                 setEditing(false);

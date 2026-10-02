@@ -78,21 +78,29 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   useEffect(() => {
     const el = scrollRef.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    // FEBUGS-P2-1: 观察对象=当前尾子(流式泡/时间线), 挂载期 loading div
-    // 卸载后旧观察即死码——每次触发后重挂当前尾子。
-    let last = el.lastElementChild as HTMLElement | null;
-    if (!last) return;
+    // FEVERIFY-C2: 旧重挂链在尾子被 React 替换(而非追加)时断裂
+    // (verify 实测 +300px 不回钉)——改 MutationObserver 跟 childList
+    // 变化重挂尾子, 与 RO 组合。
     const ro = new ResizeObserver(() => {
       if (stickToBottom.current) el.scrollTop = el.scrollHeight;
-      const cur = el.lastElementChild as HTMLElement | null;
-      if (cur && cur !== last) {
-        if (last) ro.unobserve(last);
-        ro.observe(cur);
-        last = cur;
-      }
     });
-    ro.observe(last);
-    return () => ro.disconnect();
+    const observeTail = () => {
+      const cur = el.lastElementChild as HTMLElement | null;
+      if (cur) ro.observe(cur);
+    };
+    observeTail();
+    const mo = typeof MutationObserver !== 'undefined'
+      ? new MutationObserver(() => {
+          // 子集变化: 全量重挂(observe 幂等, 断链不可能)。
+          ro.disconnect();
+          observeTail();
+        })
+      : null;
+    mo?.observe(el, { childList: true, subtree: false });
+    return () => {
+      ro.disconnect();
+      mo?.disconnect();
+    };
   }, []);
 
   const scrollToBottom = useCallback(() => {

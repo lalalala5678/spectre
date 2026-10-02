@@ -221,14 +221,28 @@ export function subscribeSse(
   let closed = false;
 
   let failures = 0;
+  // FEVERIFY-C1 看门狗: 半开 TCP(onerror 不触发/事件停更)30s 无事件
+  // 即主动 close 强制走重连+对账路径(此前 EventSource 构造计数=0,
+  // reconcile 从未被锻炼)。
+  let watchdog: ReturnType<typeof setInterval> | null = null;
+  const armWatchdog = () => {
+    if (watchdog !== null) clearInterval(watchdog);
+    watchdog = setInterval(() => {
+      if (source && source.readyState === 1) {
+        source.close();
+        source.onerror?.(new Event('error') as never);
+      }
+    }, 30_000);
+  };
 
   const connect = (isReconnect = false) => {
     if (closed) return;
     if (isReconnect && typeof onReconnect === 'function') onReconnect();
     source = new EventSource(`${API_BASE}${path}?since=${cursor}`);
+    armWatchdog();
     source.onmessage = () => { /* named events only */ };
-    source.addEventListener('session', () => { failures = 0; });
-    source.addEventListener('bus', () => { failures = 0; });
+    source.addEventListener('session', () => { failures = 0; armWatchdog(); });
+    source.addEventListener('bus', () => { failures = 0; armWatchdog(); });
     source.onerror = async () => {
       source?.close();
       if (closed) return;
@@ -255,6 +269,7 @@ export function subscribeSse(
   connect();
   return () => {
     closed = true;
+    if (watchdog !== null) clearInterval(watchdog);
     source?.close();
   };
 }

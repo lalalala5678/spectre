@@ -50,6 +50,13 @@ export function ChatInput({
     if (!text) return;
     onSend(text, busy || steer ? 'steer' : 'prompt');
     setValue('');
+    // FEVERIFY-P3-3: 高度经 onChange 自管, 清值不经 onChange→残留, 显式复位。
+    requestAnimationFrame(() => {
+      const ta = document.activeElement as HTMLTextAreaElement | null;
+      if (ta && ta.tagName === 'TEXTAREA') {
+        ta.style.height = 'auto';
+      }
+    });
   };
 
   return (
@@ -71,6 +78,7 @@ export function ChatInput({
           disabled={uploading}
           title="上传文件到沙箱 /opt/uploads(所有智能体可读)"
           className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint hover:text-secondary disabled:opacity-40"
+          aria-label="上传文件"
         >
           <FileUp className="h-3.5 w-3.5" />
         </button>

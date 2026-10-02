@@ -81,12 +81,14 @@ function FieldRow({ def, value, onSave }: {
   return (
     <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 py-2.5 transition-colors hover:bg-surface-2/40">
       <div className="min-w-0 pl-1">
-        <div className="text-[13px] font-medium text-secondary">{def.label}</div>
+        <label htmlFor={`fld-${def.id}`} className="block text-[13px] font-medium text-secondary">{def.label}</label>
         {def.hint && <div className="mt-0.5 text-xs leading-tight text-tertiary">{def.hint}</div>}
       </div>
       <div className="min-w-0">
         {def.type === 'select' ? (
           <Select
+            id={`fld-${def.id}`}
+            aria-label={def.label}
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             className="max-w-md"
@@ -95,6 +97,7 @@ function FieldRow({ def, value, onSave }: {
           </Select>
         ) : (
           <Input
+            id={`fld-${def.id}`}
             type={def.type === 'password' ? 'password' : def.type === 'number' ? 'number' : 'text'}
             value={draft}
             placeholder={def.placeholder}
@@ -207,8 +210,8 @@ export function SettingsPage() {
   };
 
   const reload = () => api<SettingsPayload>('/agent-settings')
-    .then(setData)
-    .catch((e) => setErr(e instanceof Error ? e.message : String(e)));
+    .then(d => { setData(d); setErr(''); })  // FEVERIFY-P3-5: 成功清旧错(加载错不得滞留成保存错)
+    .catch((e) => setErr(`加载失败: ${e instanceof Error ? e.message : String(e)}`));
 
   useEffect(() => { void reload(); }, []);
 
