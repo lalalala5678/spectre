@@ -92,7 +92,7 @@ export function ChatInput({
             el.style.height = Math.min(el.scrollHeight, 160) + 'px';
           }}
           placeholder={busy ? `${placeholder}(智能体忙碌,将以 steering 插入)` : placeholder}
-          className="min-h-[20px] min-w-0 flex-1 resize-none bg-transparent text-sm leading-5 text-primary placeholder:text-faint outline-none"
+          className="min-h-8 min-w-0 flex-1 resize-none bg-transparent py-1.5 text-sm leading-5 text-primary placeholder:text-faint outline-none"
           rows={1}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;  // R8-F1: IME 组合期 Enter 是确认候选, 不是提交

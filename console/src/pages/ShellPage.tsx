@@ -159,6 +159,7 @@ export function ShellPage() {
               onKeyDown={e => {
                 if (e.key === 'ArrowUp' && !e.nativeEvent.isComposing) {
                   e.preventDefault();
+                  if (histIdx < 0) draftRef.current = cmd;  // FEVERIFY2-N2-1(真修): 进历史前存草稿
                   const n = histIdx < 0 ? hist.length - 1 : Math.max(0, histIdx - 1);
                   if (hist.length) { setHistIdx(n); setCmd(hist[n]); }
                 } else if (e.key === 'ArrowDown' && !e.nativeEvent.isComposing) {

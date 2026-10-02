@@ -61,7 +61,7 @@ function Node({ node, depth, activeId, onDrill }: {
           'mb-0.5 flex min-h-11 w-[calc(100%-8px)] flex-col rounded-md border px-1.5 py-1 text-left',
           session.id === activeId
             ? 'border-accent bg-accent-subtle'
-            : 'border-line bg-surface hover:bg-surface-2',
+            : 'border-line-strong bg-surface hover:bg-surface-2',
         )}
       >
         <div className="flex w-full items-center gap-1.5">

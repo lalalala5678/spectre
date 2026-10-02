@@ -31,9 +31,11 @@ export function AuditPage() {
     const text = JSON.stringify(events ?? [], null, 1);
     const blob = new Blob([text], { type: 'application/json' });
     const a = document.createElement('a');
-    a.href = URL.createObjectURL(blob);
+    const url = URL.createObjectURL(blob);
+    a.href = url;
     a.download = `spectre-audit-${Date.now()}.json`;
     a.click();
+    setTimeout(() => URL.revokeObjectURL(url), 10_000);  // FEVERIFY2-N2-2(真修)
   // 导出动作读当时的 events 快照, 不需要在 events 变化时重触发
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [exportTick]);
