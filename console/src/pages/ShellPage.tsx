@@ -31,7 +31,7 @@ export function ShellPage() {
   activeRef.current = active;
 
   const reload = () => api<{ shells: ShellHandle[] }>('/shells')
-    .then(d => setShells(d.shells ?? []))
+    .then(d => { setShells(d.shells ?? []); setErr(''); })  // P3-9: 成功即清除陈旧错误
     .catch(e => setErr(e instanceof Error ? e.message : String(e)));
   useEffect(() => {
     void reload();
@@ -93,9 +93,9 @@ export function ShellPage() {
             C2 植入通道的运维终端——授权窗口内经服务端授权门执行;亦可把 shellId 交给 权限维持/后渗透 agent 代操作。
           </p>
         </div>
-        <button onClick={() => void reload()} className="mb-1 text-tertiary transition-colors hover:text-primary">
-          <RefreshCw className="h-3.5 w-3.5" />
-        </button>
+        <Button onClick={() => void reload()} variant="ghost" size="icon" aria-label="刷新 shell 列表" title="刷新" className="mb-1">
+          <RefreshCw className="h-4 w-4" />
+        </Button>
       </div>
 
       {err && <div className="mb-3 rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[13px] text-danger-text">{err}</div>}
@@ -108,30 +108,30 @@ export function ShellPage() {
           </div>
         )}
         {shells.map(s => (
-          <button key={s.id} onClick={() => { setActive(s.id); setLines([]); }}
+          <div key={s.id}
             className={cn('min-h-20 rounded-lg border px-3 py-2 text-left transition-colors',
-              s.id === active ? 'border-accent bg-accent-subtle' : 'border-line bg-surface hover:border-line-strong')}>
-            <div className="flex items-center gap-1.5">
-              <Radio className={cn('h-3 w-3', s.status === 'active' ? 'text-success-text' : 'text-faint')} />
-              <span className="text-sm font-medium text-primary">{s.name || s.id}</span>
-            </div>
-            <div className="mt-0.5 font-mono text-xs text-tertiary">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · 活跃 ${s.lastActiveAt.slice(5, 16)}` : ''}</div>
-            {(s.tasks?.length ?? 0) > 0 && (
-              <div className="mt-0.5 truncate font-mono text-xs text-info-text/70" title={s.tasks!.map(t => t.command).join(', ')}>任务: {s.tasks!.map(t => t.command).join(', ')}</div>
-            )}
-            {/* CS62-#4: 外层是 button, HTML 禁 interactive 嵌套——用
-                span role=button(同 VulnPanel 先例)替代内层 button。 */}
+              s.id === active ? 'border-accent-text bg-accent-subtle' : 'border-line-strong bg-surface hover:bg-surface-2')}>
+            {/* P3-12/nested-interactive: 卡片改 div, 主点击区与关闭钮为兄弟 */}
+            <button onClick={() => { setActive(s.id); setLines([]); }}
+              className="flex w-full flex-col text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
+              <div className="flex items-center gap-1.5">
+                <Radio className={cn('h-3 w-3', s.status === 'active' ? 'text-success-text' : 'text-faint')} />
+                <span className="text-sm font-medium text-primary">{s.name || s.id}</span>
+              </div>
+              <div className="mt-0.5 font-mono text-xs text-tertiary">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · 活跃 ${s.lastActiveAt.slice(5, 16)}` : ''}</div>
+              {(s.tasks?.length ?? 0) > 0 && (
+                <div className="mt-0.5 truncate font-mono text-[13px] text-info-text" title={s.tasks!.map(t => t.command).join(', ')}>任务: {s.tasks!.map(t => t.command).join(', ')}</div>
+              )}
+            </button>
             {s.status === 'active' && (
-              <span
-                role="button"
-                tabIndex={0}
-                onClick={e => { e.stopPropagation(); closeShell(s); }}
-                onKeyDown={e => { if (e.key === 'Enter' || e.key === ' ') { e.stopPropagation(); e.preventDefault(); closeShell(s); } }}
-                className="mt-1 inline-block cursor-pointer rounded-md border border-danger-line px-1.5 py-0.5 text-xs text-danger-text hover:border-danger-line/70"
+              <button
+                type="button"
+                onClick={() => closeShell(s)}
+                className="mt-1 inline-flex min-h-8 items-center rounded-md border border-danger-line px-2.5 text-xs text-danger-text hover:border-danger-line/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 title="关闭通道(一次性纪律下的即时终止)"
-              >关闭</span>
+              >关闭</button>
             )}
-          </button>
+          </div>
         ))}
       </div>
 
@@ -143,14 +143,14 @@ export function ShellPage() {
             <span className="truncate text-tertiary">{(cur.os || '').slice(0, 60)}</span>
             <span className="ml-auto text-tertiary tabular-nums">{cur.transport} · 到期 {cur.expiresAt.slice(5, 16)}{cur.lastActiveAt ? ` · 活跃 ${cur.lastActiveAt.slice(11, 16)}` : ''}</span>
           </div>
-          <div ref={scrollRef} className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[13px] leading-6">
+          <div ref={scrollRef} tabIndex={0} aria-label="终端输出" className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[13px] leading-6">
             {lines.map((l, i) => (
               <pre key={i} className={cn('whitespace-pre-wrap break-all',
                 l.dir === 'in' ? 'text-accent-text' : l.dir === 'err' ? 'text-danger-text' : l.dir === 'sys' ? 'text-tertiary' : 'text-primary')}>{l.text}</pre>
             ))}
             {lines.length === 0 && <div className="text-tertiary">— 在下方输入命令(经服务端授权门) —</div>}
           </div>
-          <div className="flex h-10 items-center gap-2 border-t border-line px-3">
+          <div className="flex h-12 items-center gap-2 border-t border-line px-3">
             <span className="font-mono text-[13px] text-accent-text">$</span>
             <input value={cmd} onChange={e => { setCmd(e.target.value); setHistIdx(-1); }}
               onKeyDown={e => {
@@ -167,7 +167,7 @@ export function ShellPage() {
                 } else if (e.key === 'Enter' && !e.nativeEvent.isComposing) void run();  // R11-F5: IME 同款(R8-F1)
               }}
               placeholder="command…"
-              className="flex-1 bg-transparent font-mono text-[13px] text-primary outline-none placeholder:text-faint" />
+              className="h-8 flex-1 rounded-md bg-transparent px-1 font-mono text-[13px] text-primary outline-none placeholder:text-faint focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring" />
             <Button onClick={() => void run()} disabled={busy || !cmd.trim()} variant="primary" size="sm">
               {busy ? <Loader2 className="h-3 w-3 animate-spin" /> : '执行'}
             </Button>

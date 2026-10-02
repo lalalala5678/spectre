@@ -36,7 +36,7 @@ export function McpPage({ wsId }: { wsId: string }) {
     url: '', headersJson: '', commandStr: '',
     where: 'host' as 'host' | 'sandbox', agents: ['recon'] as string[],
   });
-  const [testing, setTesting] = useState('');
+  const [testing, setTesting] = useState<Record<string, boolean>>({});  // P3-8: 并发计数(单槽失真)
   const [results, setResults] = useState<Record<string, string>>({});
   const [msg, setMsg] = useState('');
 
@@ -88,7 +88,7 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   const test = async (name: string) => {
-    setTesting(name);
+    setTesting(t => ({ ...t, [name]: true }));
     setResults(r => ({ ...r, [name]: '…' }));
     try {
       const res = await api<{ ok: boolean; serverName?: string;
@@ -98,7 +98,7 @@ export function McpPage({ wsId }: { wsId: string }) {
         ? `✓ ${res.serverName} — 工具: ${(res.tools ?? []).join(', ') || '无'}`
         : `✗ ${res.error}` }));
     } catch (e) { setResults(r => ({ ...r, [name]: `✗ ${String(e)}` })); }
-    finally { setTesting(''); }
+    finally { setTesting(t => { const n = { ...t }; delete n[name]; return n; }); }
   };
 
   const remove = async (name: string) => {
@@ -149,14 +149,14 @@ export function McpPage({ wsId }: { wsId: string }) {
                 <td className="px-3 py-2.5">
                   <Button
                     onClick={() => void test(s.name)}
-                    disabled={testing === s.name}
+                    disabled={testing[s.name]}
                     variant="secondary"
                     size="sm"
                   >
-                    <PlugZap className="h-3 w-3" /> {testing === s.name ? '测试中' : '连通测试'}
+                    <PlugZap className="h-3 w-3" /> {testing[s.name] ? '测试中' : '连通测试'}
                   </Button>
                   {results[s.name] && (
-                    <div className={cn('mt-1 font-mono text-xs',
+                    <div className={cn('mt-1 text-[13px]',
                       results[s.name].startsWith('✓') ? 'text-success-text' : 'text-danger-text')}>
                       {results[s.name]}
                     </div>
@@ -165,9 +165,11 @@ export function McpPage({ wsId }: { wsId: string }) {
                 <td className="px-3 py-2.5 text-right">
                   <button
                     onClick={() => void remove(s.name)}
-                    className="rounded-md p-1 text-tertiary hover:bg-surface-2 hover:text-danger-text"
+                    aria-label={`注销 ${s.name}`}
+                    title={`注销 ${s.name}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary hover:bg-surface-2 hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
+                    <Trash2 className="h-4 w-4" />
                   </button>
                 </td>
               </tr>
@@ -191,8 +193,8 @@ export function McpPage({ wsId }: { wsId: string }) {
         <div className="flex gap-2">
           {(['http', 'stdio'] as const).map(t => (
             <button key={t} onClick={() => setForm({ ...form, transport: t })}
-              className={cn('flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
-                form.transport === t ? 'border-accent bg-accent-subtle text-accent-text' : 'border-line-strong bg-surface text-secondary hover:bg-surface-2')}>
+              className={cn('flex-1 rounded-md border px-3 py-1.5 min-h-8 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                form.transport === t ? 'border-accent-text bg-accent-subtle text-accent-text' : 'border-line-strong bg-surface text-secondary hover:bg-surface-2')}>
               {t === 'http' ? '远程 HTTP' : '本地 stdio'}
             </button>
           ))}
@@ -219,8 +221,8 @@ export function McpPage({ wsId }: { wsId: string }) {
             <div className="flex gap-2">
               {(['host', 'sandbox'] as const).map(w => (
                 <button key={w} onClick={() => setForm({ ...form, where: w })}
-                  className={cn('flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
-                    form.where === w ? 'border-accent bg-accent-subtle text-accent-text' : 'border-line-strong bg-surface text-secondary hover:bg-surface-2')}>
+                  className={cn('flex-1 rounded-md border px-3 py-1.5 min-h-8 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                    form.where === w ? 'border-accent-text bg-accent-subtle text-accent-text' : 'border-line-strong bg-surface text-secondary hover:bg-surface-2')}>
                   {w === 'host' ? '宿主进程' : '沙箱内进程'}
                 </button>
               ))}
@@ -232,8 +234,9 @@ export function McpPage({ wsId }: { wsId: string }) {
           <div className="flex flex-wrap gap-1">
             {AGENTS.map(a => (
               <button key={a} onClick={() => toggleAgent(a)}
-                className={cn('rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors',
-                  form.agents.includes(a) ? 'bg-accent-subtle text-accent-text border border-accent' : 'bg-surface-2 text-secondary border border-line')}>
+                aria-pressed={form.agents.includes(a)}
+                className={cn('rounded-md px-2.5 min-h-8 text-xs font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                  form.agents.includes(a) ? 'bg-accent-subtle text-accent-text border border-accent-text' : 'bg-surface-2 text-secondary border border-line-strong hover:bg-surface-3')}>
                 {a}
               </button>
             ))}

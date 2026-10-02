@@ -27,12 +27,12 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
       <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
-        <h3 className="text-xs font-semibold text-secondary">
+        <h3 className="text-[13px] font-semibold text-secondary">
           任务报告
         </h3>
         <span className="text-xs tabular-nums text-tertiary">{events.length}</span>
       </header>
-      <div className="flex-1 space-y-1 overflow-y-auto p-2">
+      <div className="flex-1 space-y-1 overflow-y-auto p-2" tabIndex={0} aria-label="任务报告列表">
         {events.length === 0 && (!loaded
           ? <Skeleton className="mx-1 my-2 h-11" />
           : <EmptyState icon={ClipboardList} title="本项目暂无任务报告" />
@@ -46,7 +46,7 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
             <button
               key={event.seq}
               onClick={() => onOpen(event)}
-              className="flex min-h-11 w-full flex-col gap-px rounded-md border border-line bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
+              className="flex min-h-11 w-full flex-col gap-px rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
               <div className="flex w-full items-center gap-2">
                 <StatusBadge status={cur.status ?? 'no-result'} />

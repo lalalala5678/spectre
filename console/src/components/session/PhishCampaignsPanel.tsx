@@ -40,12 +40,12 @@ export function PhishCampaignsPanel() {
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
       <header className="flex items-center justify-between gap-2 border-b border-line px-3 py-1.5">
-        <h3 className="flex items-center gap-1.5 text-xs font-semibold text-secondary">
-          <Fish className="h-3 w-3 text-tertiary" />钓鱼漏斗
+        <h3 className="flex items-center gap-1.5 text-[13px] font-semibold text-secondary">
+          <Fish className="h-3.5 w-3.5 text-tertiary" />钓鱼漏斗
         </h3>
         <span className="text-xs tabular-nums text-tertiary">{campaigns?.length ?? '…'}</span>
       </header>
-      <div className="flex-1 space-y-1 overflow-y-auto p-2">
+      <div className="flex-1 space-y-1 overflow-y-auto p-2" tabIndex={0} aria-label="钓鱼活动列表">
         {err && <p className="p-2 text-sm text-danger-text">加载失败:{err}</p>}
         {!err && campaigns === null && (
           <Skeleton className="mx-1 my-2 h-11" />

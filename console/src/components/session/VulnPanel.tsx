@@ -73,12 +73,12 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
       <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
-        <h3 className="text-xs font-semibold text-secondary">
-          漏洞 VULNS
+        <h3 className="text-[13px] font-semibold text-secondary">
+          漏洞
         </h3>
         <span className="text-xs tabular-nums text-tertiary">{events.length}</span>
       </header>
-      <div className="flex-1 space-y-1 overflow-y-auto p-2">
+      <div className="flex-1 space-y-1 overflow-y-auto p-2" tabIndex={0} aria-label="漏洞列表">
         {events.length === 0 && (!loaded
           ? <Skeleton className="mx-1 my-2 h-11" />
           : <EmptyState icon={ShieldAlert} title="暂无漏洞" />
@@ -88,32 +88,35 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
           const title = event.current.title ?? event.title
             ?? stripEventTitle(event.summary);  // CS44-F9: 单源
           return (
-            <button
+            <div
               key={event.seq}
-              onClick={() => onOpen(event)}
-              className="flex min-h-11 w-full flex-col gap-px rounded-md border border-line bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
+              className="flex min-h-11 w-full items-center gap-1 rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
             >
-              <div className="flex w-full items-center gap-2">
+              {/* P3-12/nested-interactive: 行内不再嵌 interactive——主点击区
+                  与"查看撰写对话"为兄弟节点(外层改 div)。 */}
+              <button
+                onClick={() => onOpen(event)}
+                className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+              >
                 <SeverityBadge severity={severity} />
                 <span className={cn('min-w-0 flex-1 truncate text-sm font-medium',
                   event.current.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {title}
                 </span>
-                {event.payloadRef?.startsWith('sess:') && onOpenSession && (
-                  <span
-                    role="button"
-                    tabIndex={0}
-                    title="查看撰写对话（思考 · 工具调用 · 验证过程）"
-                    onClick={e => { e.stopPropagation(); onOpenSession(event.payloadRef!.slice(5)); }}
-                    onKeyDown={e => { if (e.key === 'Enter') { e.stopPropagation(); onOpenSession(event.payloadRef!.slice(5)); } }}
-                    className="shrink-0 rounded-md p-0.5 text-accent-text/70 hover:text-accent-text"
-                  >
-                    <MessageSquareText className="h-3 w-3" />
-                  </span>
-                )}
-                <PanelEntryMeta event={event} />
-              </div>
-            </button>
+              </button>
+              {event.payloadRef?.startsWith('sess:') && onOpenSession && (
+                <button
+                  type="button"
+                  aria-label="查看撰写对话（思考 · 工具调用 · 验证过程）"
+                  title="查看撰写对话（思考 · 工具调用 · 验证过程）"
+                  onClick={e => { e.stopPropagation(); onOpenSession(event.payloadRef!.slice(5)); }}
+                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-accent-text hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                >
+                  <MessageSquareText className="h-4 w-4" />
+                </button>
+              )}
+              <PanelEntryMeta event={event} />
+            </div>
           );
         })}
       </div>

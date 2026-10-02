@@ -21,14 +21,14 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
       <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
-        <h3 className="text-xs font-semibold text-secondary">
+        <h3 className="text-[13px] font-semibold text-secondary">
           会话
         </h3>
         <Button onClick={onNew} variant="primary" size="sm">
           <Plus className="h-3 w-3" /> 新对话
         </Button>
       </header>
-      <div className="flex-1 space-y-1 overflow-y-auto p-2">
+      <div className="flex-1 space-y-1 overflow-y-auto p-2" tabIndex={0} aria-label="会话列表">
         {sessions.length === 0 && (
           <EmptyState icon={MessageSquare} title="暂无会话" />
         )}
@@ -37,10 +37,10 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
             key={session.id}
             onClick={() => onSelect(session.id)}
             className={cn(
-              'flex min-h-11 w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left',
+              'flex min-h-11 w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
               session.id === currentId
-                ? 'border-accent bg-accent-subtle'
-                : 'border-line bg-surface hover:bg-surface-2',
+                ? 'border-accent-text bg-accent-subtle'
+                : 'border-line-strong bg-surface hover:bg-surface-2',
             )}
           >
             <Dot tone={session.busy ? 'orange' : 'slate'} pulse={session.busy} />
@@ -54,7 +54,7 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
                 </span>
               </div>
               {(session.brief || session.title) && (
-                <p className="mt-px truncate text-xs leading-tight text-tertiary">
+                <p className="mt-px truncate text-[13px] leading-tight text-tertiary">
                   {session.brief ?? session.title}
                 </p>
               )}

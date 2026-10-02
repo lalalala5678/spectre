@@ -82,23 +82,24 @@ export function CliPage({ wsId }: { wsId: string }) {
         className="min-h-0 xl:col-span-2"
         bodyClassName="p-0"
       >
-        <div className="max-h-[60vh] overflow-y-auto p-3">
-          <p className="mb-1 text-xs font-semibold text-tertiary">
+        <div className="max-h-[60vh] overflow-y-auto p-3" tabIndex={0} aria-label="已安装 CLI 列表">
+          <p className="mb-1 text-[13px] font-semibold text-tertiary">
             共享层已安装（{installed.length}，可卸载）
           </p>
           <div className="mb-3 flex flex-wrap gap-1">
             {installed.map(t => (
               <span key={t.layer + t.name}
-                className="group inline-flex items-center gap-1 rounded-full border border-line bg-accent-subtle px-2 py-0.5 text-[13px] font-medium text-accent-text"
+                className="group inline-flex items-center gap-1 rounded-full border border-line bg-accent-subtle px-2 py-1 text-[13px] font-medium text-accent-text"
                 title={t.note ? `layer=${t.layer}\n${t.note}` : `layer=${t.layer}`}>
                 {t.name}
                 <span className="text-xs text-tertiary">{t.layer}</span>
                 <button
                   onClick={() => void uninstall(t.name)}
+                  aria-label={`卸载 ${t.name}`}
                   title={`卸载 ${t.name}`}
-                  className="text-tertiary hover:text-danger-text"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
-                  <Trash2 className="h-3 w-3" />
+                  <Trash2 className="h-3.5 w-3.5" />
                 </button>
               </span>
             ))}
@@ -106,7 +107,7 @@ export function CliPage({ wsId }: { wsId: string }) {
               <span className="py-1 text-[13px] text-tertiary">未安装 — 用下方安装框或对话安装</span>
             )}
           </div>
-          <p className="mb-1 text-xs font-semibold text-tertiary">
+          <p className="mb-1 text-[13px] font-semibold text-tertiary">
             沙箱可用命令（PATH，系统级）
           </p>
           <div className="flex flex-wrap gap-1">
@@ -124,7 +125,7 @@ export function CliPage({ wsId }: { wsId: string }) {
       <div className="flex min-h-0 flex-col gap-3">
       <Panel title="安装到沙箱" bodyClassName="p-3 space-y-2">
         {status && (
-          <p className="flex items-center gap-1.5 font-mono text-xs text-tertiary">
+          <p className="flex items-center gap-1.5 text-xs text-tertiary">
             <Package className="h-3.5 w-3.5 text-accent-text/80" />
             driver={status.driver}
             {status.driver === 'docker' && ` container=${status.container} image=${status.image}`}
@@ -146,7 +147,7 @@ export function CliPage({ wsId }: { wsId: string }) {
         >
           <Terminal className="h-3 w-3" /> {busy ? '执行中…' : '执行安装'}
         </Button>
-        {msg && <p className={cn('text-xs', msg.includes('完成') ? 'text-success-text' : 'text-warning-text')}>{msg}</p>}
+        {msg && <p className={cn('text-[13px]', msg.includes('完成') ? 'text-success-text' : 'text-warning-text')}>{msg}</p>}
         {output && (
           <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md border border-line bg-bg p-2 font-mono text-[13px] leading-6 text-secondary">
             {output}
