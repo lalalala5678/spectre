@@ -4,7 +4,7 @@ description: AD 权限图收集+分析——提权路径自动发现(BloodHound 
 ---
 
 # spectre-bloodhound(BloodHound 借鉴)
-[side-effects: LDAP queries] 轻量实现:无需 neo4j。
+[LDAP queries] 轻量实现:无需 neo4j。
 
 ## 用法
 ```bash

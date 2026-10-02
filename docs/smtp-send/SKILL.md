@@ -4,7 +4,7 @@ description: SMTP 发送 v2——DKIM 签名/域名预热/多通道/批量纪律
 ---
 
 # 发送(线二) v2
-[side-effects: sends emails] phish-send.py(v2)
+[sends emails] phish-send.py(v2)
 
 ## DKIM 必配(无 DKIM = 进垃圾箱)
 ```bash

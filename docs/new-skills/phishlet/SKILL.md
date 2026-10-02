@@ -4,7 +4,7 @@ description: 声明式反向代理规则(Evilginx 借鉴)——新目标=写 phi
 ---
 
 # phishlet-proxy(Evilginx2 借鉴)
-[side-effects: proxy+credential capture] 声明式 MITM 代理+会话捕获。
+[proxy+credential capture] 声明式 MITM 代理+会话捕获。
 
 ## 用法
 ```bash

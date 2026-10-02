@@ -4,7 +4,7 @@ description: 痕迹清理与反取证——零残留证明
 ---
 
 # 痕迹清理
-[side-effects] 目标主机操作痕迹清理;平台 bus 审计是证据链永不动。
+[target ops] 目标主机操作痕迹清理;平台 bus 审计是证据链永不动。
 
 ## 清单
 - shell 历史:history -c;unset HISTFILE;清理 ~/.bash_history 等价物

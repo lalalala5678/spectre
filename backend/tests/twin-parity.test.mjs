@@ -36,6 +36,10 @@ test('tools/bin ↔ docs: 期望清单内逐字节一致且双侧必须存在', 
 // 新增双胞胎须入表;
 // skills-root 独有件(无顶层双胞胎)不受约, 删侧逃避因双侧存在性断言封死)。
 const EXPECTED_SKILL_TWINS = [
+  'exploit/poc-verify',
+  'exploit/source-acquire',
+  'exploit/surface-map',
+  'exploit/taint-audit',
   'api-skills/api-inject',
   'api-skills/api-logic',
   'api-skills/api-mapping',
@@ -120,9 +124,10 @@ test('docs/*.py 跨文件内容查重(CS11-1/2 盲区封堵: 粘贴覆写事故)
 
 test('技能双胞胎清单=磁盘运行时枚举集合相等(CS11-7: 新增对逃逸封堵)', async () => {
   const { existsSync, readdirSync } = await import('node:fs');
-  // CS12-N3: 运行时发现 docs/*-skills(不硬编码——persist-skills 曾漏列)
+  // CS12-N3: 运行时发现 docs/*-skills(不硬编码——persist-skills 曾漏列);
+  // CS65-F2: exploit/ 家族(无 -skills 后缀)曾逃逸枚举——4 对孪生零登记。
   const SKILL_ROOTS = readdirSync(join(ROOT, 'docs'), { withFileTypes: true })
-    .filter(d => d.isDirectory() && d.name.endsWith('-skills'))
+    .filter(d => d.isDirectory() && (d.name.endsWith('-skills') || d.name === 'exploit'))
     .map(d => d.name);
   const onDisk = new Set();
   for (const root of SKILL_ROOTS) {

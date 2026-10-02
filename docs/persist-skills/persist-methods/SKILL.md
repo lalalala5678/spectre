@@ -4,7 +4,7 @@ description: 隐蔽权限维持方法库(Linux/Java/Windows)——部署·验证
 ---
 
 # 权限维持方法库
-[side-effects on target] 全部经 shell 工具执行;三令继承(伪装/授权门/审计)。
+[target ops] 全部经 shell 工具执行;三令继承(伪装/授权门/审计)。
 
 ## Linux
 - cron:伪装系统维护名(/etc/cron.d/sys-maint-sync 型);内容指向伪装路径
