@@ -15,11 +15,13 @@ if [ "${1:-}" = '-h' ] || [ "${1:-}" = '--help' ]; then sed -n '2,9p' "$0"; exit
 export PATH="/opt/tools/bin:$PATH"
 # CS9-N5: 双运行位——容器内 /opt/tools(dicts 在挂载内), 宿主侧
 # SPECTRE_DATA_DIR(与 py 工具 _data_root() 同语义; 此前不认 env)。
+FP_ENV_WARN=0
 if [ -d /opt/tools/dicts ]; then FP_DIR=/opt/tools/dicts
 else
   FP_DIR="${SPECTRE_DATA_DIR:-/var/lib/spectre}/tools/dicts"
-  # R32D41-N1(对齐 py 工具守卫): 缺 env 静默回退生产数据根即警。
-  [ -z "${SPECTRE_DATA_DIR:-}" ] && echo '[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre(如非本意请先设置 SPECTRE_DATA_DIR)' >&2
+  # R32D41-N1(对齐 py 工具守卫): 缺 env 静默回退生产数据根即警;
+  # R32D81-N1: 先记账, 参数循环若 -h(任意位)则免发——与首参位零噪声对齐。
+  [ -z "${SPECTRE_DATA_DIR:-}" ] && FP_ENV_WARN=1
 fi
 CFF=$FP_DIR/webappanalyzer.json
 NT_DIR=$FP_DIR/../fingerprints
@@ -33,6 +35,7 @@ while [ $# -gt 0 ]; do case "$1" in
   -h|--help) sed -n '2,9p' "$0"; exit 0;;  # CS62-#5: 与首参位同界(头注块止于第 9 行)
   *) echo "[fp-scan] 未知参数: $1(用法: -h)" >&2; exit 2;;
 esac; done
+[ "$FP_ENV_WARN" = 1 ] && echo '[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre(如非本意请先设置 SPECTRE_DATA_DIR)' >&2
 
 # R32D55-N1: 供给守卫——缺件给可行动错误(此前 FileNotFoundError 裸栈)。
 if [ ! -f "$CFF" ]; then
