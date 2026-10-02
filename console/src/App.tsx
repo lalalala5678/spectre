@@ -129,12 +129,12 @@ export default function App() {
             // CS1-R9: 三配置页同构外壳收敛(页面组件查表)
             <div className="h-full overflow-hidden p-4">
               {wsId === null
-                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
+                ? <p className="py-10 text-center text-[13px] text-tertiary">正在加载项目信息…</p>
                 : wsId
                   ? (route === 'skills' ? <SkillsPage wsId={wsId} />
                     : route === 'mcp' ? <McpPage wsId={wsId} />
                     : <CliPage wsId={wsId} />)
-                  : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
+                  : <p className="py-10 text-center text-[13px] text-tertiary">无当前项目,请先在顶栏选择</p>}
             </div>
           ) : route === 'shells' ? (
             <ShellPage />

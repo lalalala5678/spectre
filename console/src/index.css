@@ -108,58 +108,6 @@
   --shadow-lg: 0 12px 32px -8px rgb(var(--shadow-color) / 0.24);
 }
 
-/* ---------- 过渡期旧调色板别名(§4.1/§6.3-1 安全网) ----------
- * 暗色 = 字面原值(零视觉变化); 浅色在 [data-theme="light"] 逐 shade 覆写为
- * 语义 token, 保证未迁移页面在浅色下无裸底/裸白字。全部页面迁移完删除。 */
-@theme {
-  --color-void-950: #101011;
-  --color-void-900: #141415;
-  --color-void-850: #181819;
-  --color-void-800: #1d1d1f;
-  --color-void-750: #222224;
-  --color-void-700: #28282b;
-  --color-void-600: #313134;
-  --color-void-500: #3d3d41;
-}
-[data-theme="light"] {
-  /* 背景层次: 950 页底 / 900 卡片 / 850·800 次级 / 700·600·500 分隔与控件边界 */
-  --color-void-950: var(--bg);
-  --color-void-900: var(--surface);
-  --color-void-850: var(--surface-2);
-  --color-void-800: var(--surface-2);
-  --color-void-750: var(--surface-3);
-  --color-void-700: var(--line);
-  --color-void-600: var(--line-strong);
-  --color-void-500: var(--line-strong);
-  /* 亮灰文字(暗底正文) → 可读层级 */
-  --color-zinc-100: var(--text-primary);
-  --color-zinc-200: var(--text-primary);
-  --color-zinc-300: var(--text-secondary);
-  --color-zinc-400: var(--text-tertiary);
-  /* 旧主色橙(§4.2 禁用) → indigo 主色族 */
-  --color-orange-200: var(--accent-text);
-  --color-orange-300: var(--accent-text);
-  --color-orange-400: var(--accent-text);
-  --color-orange-500: var(--accent);
-  --color-orange-600: var(--accent);
-  --color-orange-700: var(--ring);
-  --color-orange-800: var(--accent-hover);
-  --color-orange-900: var(--accent-hover);
-  --color-orange-950: var(--accent);
-  /* 亮色语义色(暗底用的 300-500 档) → 各语义 token */
-  --color-red-300: var(--danger-text);
-  --color-red-400: var(--danger-text);
-  --color-red-500: var(--danger-text);
-  --color-emerald-300: var(--success-text);
-  --color-emerald-400: var(--success-text);
-  --color-emerald-500: var(--success-text);
-  --color-amber-300: var(--warning-text);
-  --color-amber-400: var(--warning-text);
-  --color-amber-500: var(--warning-text);
-  --color-sky-300: var(--info-text);
-  --color-sky-400: var(--info-text);
-  --color-sky-500: var(--info-text);
-}
 
 /* ---------- 滚动条标准化(§6.1-0): 默认可见细条, 随主题着色 ---------- */
 * {
