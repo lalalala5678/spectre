@@ -11,6 +11,8 @@ import {
 import { ChatInput } from './ChatInput';
 import { Markdown } from './Markdown';
 import { cn } from '../../utils/cn';
+import { EmptyState } from '../ui/EmptyState';
+import { Skeleton } from '../ui/Skeleton';
 
 /**
  * Live pi session view (controlled): the workspace owns which session is
@@ -335,16 +337,16 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between px-1">
-        <span className="truncate font-mono text-[10px] text-zinc-600">
+        <span className="truncate font-mono text-xs text-tertiary">
           {sessionId ?? 'no session'}
         </span>
         <span className={cn(
-          'flex items-center gap-1.5 text-[10px]',
-          busy ? 'text-orange-400' : 'text-zinc-600',
+          'flex items-center gap-1.5 text-xs',
+          busy ? 'text-warning-text' : 'text-tertiary',
         )}>
           <span className={cn(
             'h-1.5 w-1.5 rounded-full',
-            busy ? 'animate-pulse bg-orange-400' : 'bg-zinc-700',
+            busy ? 'animate-pulse bg-warning-text' : 'bg-faint',
           )} />
           {busy ? '运行中' : '空闲'}
         </span>
@@ -353,30 +355,32 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-void-700 bg-void-950 p-3 [overflow-anchor:none]"
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-lg border border-line bg-bg p-3 [overflow-anchor:none]"
       >
         {!loaded && !error && (
           <div className="flex flex-col items-center gap-2 py-10">
-            <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" />
-            <p className="animate-pulse text-[11.5px] text-zinc-500">正在载入项目内容…</p>
+            <Skeleton className="h-4 w-40" />
+            <p className="text-[13px] text-tertiary">正在载入项目内容…</p>
           </div>
         )}
         <div ref={sentinelRef} className="py-0.5 text-center">
           {olderCount > 0 ? (
             <button
               onClick={() => loadOlderRef.current()}
-              className="w-full rounded-sm px-2 py-1 text-[10.5px] text-zinc-600 hover:text-zinc-400"
+              className="w-full rounded-md px-2 py-1 text-xs text-tertiary hover:text-tertiary"
             >
               ↑ 还有 {olderCount} 条更早消息（滚动自动加载）
             </button>
           ) : loaded && messages.length > 30 ? (
-            <span className="text-[10px] text-zinc-700">已到最早消息</span>
+            <span className="text-xs text-tertiary">已到最早消息</span>
           ) : null}
         </div>
         {loaded && messages.length === 0 && (
-          <p className="py-8 text-center text-[11px] text-zinc-700">
-            会话已就绪 — 向该智能体下达指令
-          </p>
+          <EmptyState
+            icon={Bot}
+            title="会话已就绪"
+            hint="向该智能体下达指令"
+          />
         )}
         {items.map((item, i) => item.kind === 'bubble' ? (
           <MessageBubble key={`b-${item.message.ts}-${i}`} message={item.message} />
@@ -384,8 +388,8 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
           <ToolTimeline key={`t-${item.steps[0]?.key}-${i}`} steps={item.steps} />
         ))}
         {busy && (
-          <div className="flex items-center gap-2 px-1 text-[11px] text-zinc-600">
-            <Bot className="h-3 w-3 animate-pulse" />
+          <div className="flex items-center gap-2 px-1 text-[13px] text-tertiary">
+            <Bot className="h-4 w-4 animate-pulse" />
             {/* FE-B2(用户报): 多工具并行期恒显"思考中"像卡死——按尾块
                 分相: 尾块为含在途步骤的活动块时显示工具进度 n/m(步骤
                 行内已有各自 spinner), 否则才是思考中。 */}
@@ -403,7 +407,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
           </div>
         )}
         {error && (
-          <p className="rounded-sm border border-red-900 bg-red-950/30 px-2 py-1 text-[11px] text-red-400">
+          <p className="rounded-md border border-danger-line bg-danger-bg px-2 py-1 text-[13px] text-danger-text">
             {error}
           </p>
         )}
@@ -504,28 +508,28 @@ const ToolTimeline = memo(function ToolTimeline({ steps }: { steps: ToolStep[] }
         className={cn(
           'flex w-full items-center gap-2 rounded-md border px-3 py-1.5 text-left transition-colors',
           errorSteps.length
-            ? 'border-red-900/60 bg-red-950/15 hover:border-red-700'
-            : 'border-void-700 bg-void-900/60 hover:border-void-500',
+            ? 'border-danger-line bg-danger-bg hover:brightness-95'
+            : 'border-line bg-surface hover:border-line-strong',
         )}
       >
         {anyRunning
-          ? <Loader2 className="h-3 w-3 shrink-0 animate-spin text-orange-400" />
+          ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-warning-text" />
           : errorSteps.length
-            ? <X className="h-3 w-3 shrink-0 text-red-400" />
-            : <Check className="h-3 w-3 shrink-0 text-emerald-500/90" />}
-        <span className="shrink-0 font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">
+            ? <X className="h-4 w-4 shrink-0 text-danger-text" />
+            : <Check className="h-4 w-4 shrink-0 text-success-text" />}
+        <span className="shrink-0 text-[13px] text-secondary">
           工具执行 · {steps.length} 步
         </span>
-        <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-zinc-400">
+        <span className="min-w-0 flex-1 truncate font-mono text-xs text-secondary">
           {summary}
         </span>
         {errorSteps.length > 0 && (
-          <span className="shrink-0 rounded-sm border border-red-800 px-1 font-mono text-[9px] text-red-300">
+          <span className="shrink-0 rounded-md border border-danger-line bg-danger-bg px-1 text-xs text-danger-text">
             {errorSteps.length} 错误
           </span>
         )}
         <ChevronDown className={cn(
-          'h-3.5 w-3.5 shrink-0 text-zinc-600 transition-transform',
+          'h-4 w-4 shrink-0 text-faint transition-transform',
           open && 'rotate-180',
         )} />
       </button>
@@ -534,7 +538,7 @@ const ToolTimeline = memo(function ToolTimeline({ steps }: { steps: ToolStep[] }
         style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          <div className="relative ml-2.5 mt-1 flex flex-col gap-0.5 border-l border-void-700 pl-4">
+          <div className="relative ml-2.5 mt-1 flex flex-col gap-0.5 border-l border-line pl-4">
             {steps.map(s => (
               <ToolStepRow
                 key={s.key}
@@ -566,34 +570,34 @@ function ToolStepRow({ step, open, onToggle }: {
   return (
     <div className="relative">
       <span className={cn(
-        'absolute -left-[21px] top-[9px] h-1.5 w-1.5 rounded-full ring-2 ring-void-950',
-        pending ? 'animate-pulse bg-orange-400' : err ? 'bg-red-500' : 'bg-emerald-500/80',
+        'absolute -left-[21px] top-[9px] h-1.5 w-1.5 rounded-full ring-2 ring-bg',
+        pending ? 'animate-pulse bg-warning-text' : err ? 'bg-danger-text' : 'bg-success-text',
       )} />
       <button
         onClick={onToggle}
-        className="flex w-full items-center gap-2 rounded-sm px-1.5 py-1 text-left hover:bg-void-800/60"
+        className="flex min-h-8 w-full items-center gap-2 rounded-md px-1.5 py-1 text-left hover:bg-surface-2"
       >
         {pending
-          ? <Loader2 className="h-3 w-3 shrink-0 animate-spin text-orange-400/80" />
+          ? <Loader2 className="h-4 w-4 shrink-0 animate-spin text-warning-text" />
           : err
-            ? <X className="h-3 w-3 shrink-0 text-red-400/90" />
-            : <Check className="h-3 w-3 shrink-0 text-emerald-500/70" />}
+            ? <X className="h-4 w-4 shrink-0 text-danger-text" />
+            : <Check className="h-4 w-4 shrink-0 text-success-text" />}
         <span className={cn(
-          'shrink-0 font-mono text-[11px]',
-          err ? 'text-red-300' : 'text-zinc-300',
+          'shrink-0 font-mono text-xs',
+          err ? 'text-danger-text' : 'text-primary',
         )}>
           {step.name}
         </span>
         {pending && (
-          <span className="shrink-0 font-mono text-[9.5px] text-orange-400/80">运行中…</span>
+          <span className="shrink-0 text-xs text-warning-text">运行中…</span>
         )}
         {!open && firstLine && (
-          <span className="min-w-0 flex-1 truncate text-[11px] text-zinc-600">
+          <span className="min-w-0 flex-1 truncate text-[13px] text-tertiary">
             {firstLine}
           </span>
         )}
         <ChevronDown className={cn(
-          'ml-auto h-3 w-3 shrink-0 text-zinc-700 transition-transform',
+          'ml-auto h-4 w-4 shrink-0 text-faint transition-transform',
           open && 'rotate-180',
         )} />
       </button>
@@ -602,16 +606,16 @@ function ToolStepRow({ step, open, onToggle }: {
         style={{ gridTemplateRows: open ? '1fr' : '0fr' }}
       >
         <div className="overflow-hidden">
-          <div className="mb-1 ml-1 rounded-sm border border-void-800 bg-void-950/70 p-2">
+          <div className="mb-1 ml-1 rounded-md border border-line bg-bg p-2">
             {argsJson && (
-              <pre className="mb-1.5 overflow-x-auto whitespace-pre-wrap break-all border-b border-void-800 pb-1.5 font-mono text-[10.5px] leading-relaxed text-orange-200/50">
+              <pre className="mb-1.5 overflow-x-auto whitespace-pre-wrap break-all border-b border-line pb-1.5 font-mono text-xs leading-relaxed text-tertiary">
                 {argsJson.slice(0, 600)}
               </pre>
             )}
-            <div className="max-h-64 overflow-y-auto text-[12px] leading-relaxed text-zinc-400">
+            <div className="max-h-64 overflow-y-auto text-sm leading-relaxed text-secondary">
               {step.result
                 ? <Markdown>{step.result.text || '(空)'}</Markdown>
-                : <span className="font-mono text-[11px] text-zinc-600">等待结果…</span>}
+                : <span className="text-xs text-tertiary">等待结果…</span>}
             </div>
           </div>
         </div>
@@ -655,12 +659,12 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
   if (kind === 'user') {
     return (
       <div className="flex justify-end">
-        <div className="max-w-[85%] rounded-sm border border-void-500 bg-void-800 px-3 py-2">
-          <div className="mb-0.5 flex items-center justify-end gap-1 text-[9.5px] text-zinc-600">
-            <span className="font-mono uppercase tracking-widest">you</span>
-            <User className="h-2.5 w-2.5" />
+        <div className="max-w-[85%] rounded-lg border border-line bg-accent-subtle px-3 py-2">
+          <div className="mb-0.5 flex items-center justify-end gap-1 text-xs text-tertiary">
+            <span>you</span>
+            <User className="h-3 w-3" />
           </div>
-          <div className="text-[13px] text-zinc-200">
+          <div className="text-sm text-primary">
             <Markdown>{message.text}</Markdown>
           </div>
         </div>
@@ -668,18 +672,18 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
     );
   }
 
-  // agent ⇄ agent DM: left side, sky accent
+  // agent ⇄ agent DM: left side, info accent
   if (kind === 'dm') {
     const from = message.text.match(DM_PREFIX_RE)?.[1] ?? 'agent';
     const body = message.text.replace(DM_PREFIX_RE, '');
     return (
       <div className="max-w-[92%]">
-        <div className="rounded-sm border border-sky-800/70 bg-sky-950/20 px-3 py-2">
-          <div className="mb-0.5 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-widest text-sky-400/80">
-            <span className="h-1 w-1 rounded-full bg-sky-500" />
+        <div className="rounded-lg border border-info-line bg-info-bg px-3 py-2">
+          <div className="mb-0.5 flex items-center gap-1.5 text-xs text-info-text">
+            <span className="h-1 w-1 rounded-full bg-info-text" />
             {from} ⇄ 本智能体
           </div>
-          <div className="text-[13px] text-zinc-300">
+          <div className="text-sm text-primary">
             <Markdown>{body}</Markdown>
           </div>
         </div>
@@ -694,15 +698,15 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
     const errMsg = message.error;
     return (
       <div className="max-w-[92%]">
-        <div className="rounded-sm border border-red-900 bg-red-950/30 px-3 py-2">
-          <div className="mb-1 flex items-center gap-1.5 font-mono text-[9.5px] uppercase tracking-widest text-red-400/80">
-            <TriangleAlert className="h-3 w-3" /> 本轮失败
+        <div className="rounded-lg border border-danger-line bg-danger-bg px-3 py-2">
+          <div className="mb-1 flex items-center gap-1.5 text-xs text-danger-text">
+            <TriangleAlert className="h-4 w-4" /> 本轮失败
           </div>
-          <div className="font-mono text-[12px] leading-relaxed text-red-300">{errMsg}</div>
+          <div className="text-[13px] leading-relaxed text-danger-text">{errMsg}</div>
           {/* R32D46-NEW-1: 入口无条件——pi-ai 把连接错/HTTP 5xx 转成流
               error 事件而非异常, 后端 thrown 注解对这些通道不可达(断供应
               商场景此前零入口); 任何失败回合都给设置页指路。 */}
-          <a href="#settings" className="mt-1.5 inline-block text-[11px] text-orange-400/90 underline underline-offset-2">
+          <a href="#settings" className="mt-1.5 inline-block text-[13px] text-accent-text underline underline-offset-2">
             检查大模型配置(设置页) →
           </a>
         </div>
@@ -715,11 +719,11 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
   if (kind === 'system') {
     return (
       <div className="max-w-[92%]">
-        <div className="rounded-sm border border-dashed border-zinc-700 bg-void-900/60 px-3 py-2">
-          <div className="mb-0.5 font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">
+        <div className="rounded-lg border border-dashed border-line bg-surface px-3 py-2">
+          <div className="mb-0.5 text-xs text-tertiary">
             系统
           </div>
-          <div className="text-[12.5px] text-zinc-400">
+          <div className="text-[13px] text-secondary">
             <Markdown>{message.text}</Markdown>
           </div>
         </div>
@@ -746,14 +750,14 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
          thinking={message.thinking}
          active={message.streamingThinking === true}
        />
-       <div className="rounded-sm border border-void-600 bg-void-900 px-3 py-2">
-        <div className="mb-0.5 flex items-center gap-1 text-[9.5px] text-zinc-600">
-          <Bot className="h-2.5 w-2.5" /> agent
+       <div className="rounded-lg border border-line bg-surface px-3 py-2">
+        <div className="mb-0.5 flex items-center gap-1 text-xs text-tertiary">
+          <Bot className="h-3 w-3" /> agent
           {message.tokens !== undefined && !message.streaming && (
-            <span className="ml-1 font-mono">{message.tokens} tok</span>
+            <span className="ml-1 font-mono tabular-nums">{message.tokens} tok</span>
           )}
           {message.streaming && (
-            <span className="ml-1 animate-pulse font-mono text-orange-400/70">
+            <span className="ml-1 animate-pulse font-mono text-accent-text/70">
               ▍streaming
             </span>
           )}
@@ -782,12 +786,13 @@ function ThinkingBlock({ thinking, active }: { thinking?: string; active: boolea
     <details
       open={open || active}
       onToggle={e => setOpen((e as React.SyntheticEvent<HTMLDetailsElement>).currentTarget.open)}
-      className="mb-1 rounded-sm border border-orange-900/40 bg-orange-950/10"
+      className="mb-1 rounded-md border border-line bg-surface-2"
     >
-      <summary className="cursor-pointer select-none px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-widest text-orange-400/70">
+      <summary className="flex cursor-pointer list-none select-none items-center gap-1 px-2.5 py-1 text-xs text-tertiary">
+        <ChevronDown className={cn('h-4 w-4 transition-transform', (open || active) && 'rotate-180')} />
         思考过程 {active ? '· streaming' : ''}
       </summary>
-      <div className="whitespace-pre-wrap border-t border-orange-900/30 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-orange-200/40">
+      <div className="whitespace-pre-wrap border-t border-line px-2.5 py-1.5 text-[13px] leading-relaxed text-secondary">
         {thinking}
       </div>
     </details>

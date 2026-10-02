@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { FileUp, SendHorizonal } from 'lucide-react';
+import { Button } from '../ui/Button';
+import { Kbd } from '../ui/Kbd';
 
 /** CLI-style chat input used by live sessions. */
 export function ChatInput({
@@ -51,9 +53,9 @@ export function ChatInput({
   };
 
   return (
-    <div className="rounded-sm border border-void-600 bg-void-950 focus-within:border-void-500">
-      <div className="flex items-center gap-2 px-3 py-2">
-        <span className="shrink-0 font-mono text-[13px] text-orange-400">
+    <div className="rounded-lg border border-line bg-bg py-1.5 focus-within:border-line-strong">
+      <div className="flex items-center gap-2 px-3">
+        <span className="shrink-0 text-sm text-accent-text">
           {busy ? '⇢' : '›'}
         </span>
         <input
@@ -68,7 +70,7 @@ export function ChatInput({
           onClick={() => fileRef.current?.click()}
           disabled={uploading}
           title="上传文件到沙箱 /opt/uploads(所有智能体可读)"
-          className="shrink-0 text-zinc-600 hover:text-zinc-300 disabled:opacity-40"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint hover:text-secondary disabled:opacity-40"
         >
           <FileUp className="h-3.5 w-3.5" />
         </button>
@@ -82,7 +84,7 @@ export function ChatInput({
             el.style.height = Math.min(el.scrollHeight, 160) + 'px';
           }}
           placeholder={busy ? `${placeholder}(智能体忙碌,将以 steering 插入)` : placeholder}
-          className="min-h-[20px] min-w-0 flex-1 resize-none bg-transparent font-mono text-[13px] leading-5 text-zinc-200 placeholder:text-zinc-700 outline-none"
+          className="min-h-[20px] min-w-0 flex-1 resize-none bg-transparent text-sm leading-5 text-primary placeholder:text-faint outline-none"
           rows={1}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;  // R8-F1: IME 组合期 Enter 是确认候选, 不是提交
@@ -98,16 +100,20 @@ export function ChatInput({
             }
           }}
         />
-        <span className="shrink-0 font-mono text-[9.5px] text-zinc-700">
-          {busy ? 'ALT+ENTER=插话' : 'ENTER=发送 · SHIFT+ENTER=换行'}
+        <span className="flex shrink-0 items-center gap-1 text-[13px] text-tertiary">
+          {busy
+            ? <><Kbd>Alt+Enter</Kbd> 插话</>
+            : <><Kbd>Enter</Kbd> 发送 · <Kbd>Shift+Enter</Kbd> 换行</>}
         </span>
-        <button
+        <Button
+          variant="primary"
+          size="icon"
           onClick={() => submit(false)}
           disabled={!value.trim()}
-          className="shrink-0 rounded-sm p-1 text-zinc-500 hover:text-zinc-200 disabled:opacity-30"
+          className="shrink-0"
         >
-          <SendHorizonal className="h-3.5 w-3.5" />
-        </button>
+          <SendHorizonal className="h-4 w-4" />
+        </Button>
       </div>
     </div>
   );

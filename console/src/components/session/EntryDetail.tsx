@@ -7,6 +7,9 @@ import {
 } from '../../api/client';
 import { Markdown } from './Markdown';
 import { SeverityBadge, StatusBadge } from './VulnPanel';
+import { Badge } from '../ui/Badge';
+import { Button } from '../ui/Button';
+import { Input, Textarea, Select, Label } from '../ui/Input';
 import { cn } from '../../utils/cn';
 import { stripEventTitle } from './eventTitle';
 
@@ -113,39 +116,29 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
       setDialogBusy(false);
     }
   };
-
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
-      <button
-        onClick={onBack}
-        className="flex w-fit items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[10px] text-zinc-400 hover:text-zinc-200"
-      >
+      <Button onClick={onBack} variant="secondary" size="sm" className="w-fit">
         <CornerUpLeft className="h-3 w-3" /> 返回对话
-      </button>
-      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded border border-void-700 bg-void-950 p-4">
-        <div className="mb-1 flex items-center gap-2">
+      </Button>
+      <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-line bg-bg p-4">
+        <div className="mb-1 flex flex-wrap items-center gap-2">
           {isReport && <StatusBadge status={current.status ?? 'no-result'} />}
           {isNote && (
-            <span className="rounded-sm border border-teal-700 bg-teal-950/60 px-1.5 py-0.5 font-mono text-[9.5px] uppercase tracking-widest text-teal-300">
-              情报
-            </span>
+            <Badge tone="info">情报</Badge>
           )}
           {isVuln && <SeverityBadge severity={severity} />}
-          <h2 className={cn('text-[15px] font-semibold text-zinc-100', folded.current.void && 'text-zinc-500 line-through')}>
+          <h2 className={cn('text-[15px] font-semibold text-primary', folded.current.void && 'text-tertiary line-through')}>
             {isReport ? `任务报告 · ${title}` : isNote ? `情报 · ${title}` : title}
           </h2>
           {Boolean(folded.current.void) && (
-            <span className="rounded-sm border border-zinc-600 bg-void-800 px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-zinc-500 line-through">
-              已作废
-            </span>
+            <Badge tone="neutral" className="line-through">已作废</Badge>
           )}
           {folded.revisedCount > 0 && (
-            <span className="rounded-sm border border-sky-800 bg-sky-950/40 px-1.5 py-0.5 font-mono text-[9px] tracking-widest text-sky-300">
-              ⟳ 已修订 {folded.revisedCount} 次
-            </span>
+            <Badge tone="info" className="tabular-nums">⟳ 已修订 {folded.revisedCount} 次</Badge>
           )}
         </div>
-        <div className="mb-2 flex flex-wrap items-center gap-3 border-b border-void-700 pb-2 font-mono text-[10.5px] text-zinc-600">
+        <div className="mb-2 flex flex-wrap items-center gap-3 border-b border-line pb-2 font-mono text-xs tabular-nums text-tertiary">
           <span>seq={event.seq}</span>
           <span>{current.ts.replace('T', ' ').slice(0, 19)}</span>
           <span>from: {current.from}</span>
@@ -164,24 +157,26 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
         </div>
 
         {isVuln && current.payloadRef?.startsWith('sess:') && onOpenSession && (
-          <button
+          <Button
             onClick={() => onOpenSession(current.payloadRef!.slice(5))}
-            className="flex w-fit items-center gap-1.5 rounded-sm border border-orange-800/70 bg-orange-950/20 px-2.5 py-1 text-[11px] text-orange-300/90 hover:border-orange-600"
+            variant="secondary"
+            size="sm"
+            className="w-fit"
           >
             查看撰写对话（思考 · 工具调用 · 验证过程）
-          </button>
+          </Button>
         )}
 
         {/* revision history */}
         {revisions.length > 0 && (
-          <details className="rounded-sm border border-sky-900/40 bg-sky-950/10">
-            <summary className="flex cursor-pointer select-none items-center gap-1.5 px-2.5 py-1 font-mono text-[9.5px] uppercase tracking-widest text-sky-400/80">
+          <details className="rounded-lg border border-info-line bg-info-bg">
+            <summary className="flex cursor-pointer select-none items-center gap-1.5 px-2.5 py-1 text-xs font-medium text-info-text">
               <History className="h-3 w-3" /> 修订历史（{revisions.length}）
             </summary>
-            <div className="space-y-2 border-t border-sky-900/30 px-3 py-2">
+            <div className="space-y-2 border-t border-info-line px-3 py-2">
               {revisions.map(r => (
-                <div key={r.seq} className="rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
-                  <div className="flex flex-wrap items-center gap-2 font-mono text-[9.5px] text-zinc-500">
+                <div key={r.seq} className="rounded-md border border-line bg-surface px-2.5 py-1.5">
+                  <div className="flex flex-wrap items-center gap-2 font-mono text-xs tabular-nums text-tertiary">
                     <span>第 {r.revision?.n ?? '?'} 次 · {r.ts.replace('T', ' ').slice(5, 16)}</span>
                     {r.revision?.requestedBy && (
                       <span>申请: {r.revision.requestedBy.name}</span>
@@ -191,21 +186,21 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
                     )}
                   </div>
                   {r.revision?.reason && (
-                    <p className="mt-0.5 text-[11px] text-zinc-500">
+                    <p className="mt-0.5 text-xs text-tertiary">
                       理由:{r.revision.reason}
                     </p>
                   )}
-                  <p className="mt-0.5 truncate text-[11.5px] text-zinc-400">
+                  <p className="mt-0.5 truncate text-[13px] text-secondary">
                     现行标题:《{r.title ?? ''}》
                     {r.severity ? ` · ${r.severity}` : r.status ? ` · ${r.status}` : ''}
                   </p>
                 </div>
               ))}
               <details className="px-1">
-                <summary className="cursor-pointer font-mono text-[9.5px] uppercase tracking-widest text-zinc-600">
+                <summary className="cursor-pointer text-xs text-tertiary">
                   原始版本（seq={event.seq}）
                 </summary>
-                <div className="mt-1 whitespace-pre-wrap rounded-sm border border-void-800 bg-void-900/60 px-2.5 py-1.5 text-[11.5px] leading-relaxed text-zinc-500">
+                <div className="mt-1 whitespace-pre-wrap rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] leading-relaxed text-tertiary">
                   《{event.title ?? event.summary}》
                   {event.detail ? `\n\n${event.detail}` : ''}
                 </div>
@@ -238,22 +233,19 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             {current.detail
               ? <Markdown>{current.detail}</Markdown>
               : (
-                <p className="whitespace-pre-wrap text-[12px] leading-relaxed text-zinc-400">
+                <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary">
                   {current.summary}
                 </p>
               )}
             {!isOrphan && (
-              <button
-                onClick={() => setEditing(true)}
-                className="mt-1 flex w-fit items-center gap-1.5 rounded-sm border border-void-600 bg-void-800 px-2.5 py-1 text-[11px] text-zinc-400 hover:border-void-400 hover:text-zinc-200"
-              >
+              <Button onClick={() => setEditing(true)} variant="secondary" size="sm" className="mt-1 w-fit">
                 <PencilLine className="h-3 w-3" /> 直接编辑
-              </button>
+              </Button>
             )}
             {isOrphan && (
               // R16-F2: 孤儿(原始已被裁剪)的后端 revise 恒 404——不渲染
               // 死按钮, 给一行诊断(拒则短痛)。
-              <p className="mt-1 text-[10.5px] text-zinc-600">
+              <p className="mt-1 text-xs text-tertiary">
                 原始条目已随消息日志裁剪, 修订链已封存(仅存档审计)
               </p>
             )}
@@ -262,45 +254,47 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
 
         {/* dialog revision */}
         {isOrphan ? (
-          <div className="mt-2 rounded-sm border border-void-700 bg-void-900/60 p-2.5">
-            <p className="text-[10.5px] text-zinc-600">修订对话框不可用——原始条目已裁剪, 修订链封存(仅存档审计)</p>
+          <div className="mt-2 rounded-lg border border-line bg-surface p-3">
+            <p className="text-xs text-tertiary">修订对话框不可用——原始条目已裁剪, 修订链封存(仅存档审计)</p>
           </div>
         ) : (
-        <div className="mt-2 rounded-sm border border-void-700 bg-void-900/60 p-2.5">
-          <p className="mb-1.5 font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">
+        <div className="mt-2 rounded-lg border border-line bg-surface p-3">
+          <p className="mb-1.5 text-xs font-medium text-secondary">
             修订对话框 → 报告智能体{isVuln ? '（原撰写者审核）' : ''}
           </p>
           <div className="flex gap-2">
-            <input
+            <Input
               value={dialogText}
               onChange={e => setDialogText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void submitDialog(); }}
               placeholder="描述如何更改,如:severity 改为 high,补充 PoC 步骤…"
-              className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2.5 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-700 focus:border-orange-700 focus:outline-none"
+              className="min-w-0 flex-1"
             />
-            <button
+            <Button
               onClick={() => void submitDialog()}
               disabled={dialogBusy || !dialogText.trim()}
-              className="flex items-center gap-1.5 rounded-sm border border-orange-800/70 bg-orange-950/30 px-3 py-1.5 text-[11px] text-orange-300/90 hover:border-orange-600 disabled:opacity-40"
+              variant="primary"
+              size="sm"
             >
               {dialogBusy
                 ? <Loader2 className="h-3 w-3 animate-spin" />
                 : <SendHorizontal className="h-3 w-3" />}
               {dialogBusy ? '撰写中' : '提交'}
-            </button>
+            </Button>
           </div>
           {dialogDone && (
-            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-[11px]">
-              <p className={cn(dialogDone.includes('失败') ? 'text-red-400' : 'text-sky-400')}>
+            <div className="mt-1.5 flex flex-wrap items-center gap-2 text-sm">
+              <p className={cn(dialogDone.includes('失败') ? 'text-danger-text' : 'text-info-text')}>
                 {dialogDone}
               </p>
               {writerSessionId && onOpenSession && (
-                <button
+                <Button
                   onClick={() => onOpenSession(writerSessionId)}
-                  className="rounded-sm border border-orange-800/70 bg-orange-950/20 px-2 py-0.5 text-[10px] text-orange-300/90 hover:border-orange-600"
+                  variant="secondary"
+                  size="sm"
                 >
                   打开撰写对话
-                </button>
+                </Button>
               )}
             </div>
           )}
@@ -323,52 +317,49 @@ function EditForm({ kind, current, busy, onCancel, onSave }: {
   const [status, setStatus] = useState(String(current.status ?? 'success'));
   const [text, setText] = useState(current.detail ?? current.summary ?? '');
   return (
-    <div className="space-y-2 rounded-sm border border-void-600 bg-void-900 p-3">
+    <div className="space-y-3 rounded-lg border border-line bg-surface p-4">
       <label className="block">
-        <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">标题</span>
-        <input
+        <Label className="mb-1 block">标题</Label>
+        <Input
           value={title}
           onChange={e => setTitle(e.target.value)}
-          className="w-full rounded-sm border border-void-600 bg-void-950 px-2.5 py-1.5 text-[13px] text-zinc-100 focus:border-orange-700 focus:outline-none"
         />
       </label>
       <div className="flex gap-3">
         {kind === 'vuln' && (
           <label className="block">
-            <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">severity</span>
-            <select
+            <Label className="mb-1 block">severity</Label>
+            <Select
               value={severity}
               onChange={e => setSeverity(e.target.value)}
-              className="rounded-sm border border-void-600 bg-void-950 px-2 py-1.5 text-[12px] text-zinc-200 focus:outline-none"
             >
               {SEVERITIES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </Select>
           </label>
         )}
         {kind === 'report' && (
           <label className="block">
-            <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">status</span>
-            <select
+            <Label className="mb-1 block">status</Label>
+            <Select
               value={status}
               onChange={e => setStatus(e.target.value)}
-              className="rounded-sm border border-void-600 bg-void-950 px-2 py-1.5 text-[12px] text-zinc-200 focus:outline-none"
             >
               {STATUSES.map(s => <option key={s} value={s}>{s}</option>)}
-            </select>
+            </Select>
           </label>
         )}
       </div>
       <label className="block">
-        <span className="mb-1 block font-mono text-[9.5px] uppercase tracking-widest text-zinc-500">正文（markdown）</span>
-        <textarea
+        <Label className="mb-1 block">正文（markdown）</Label>
+        <Textarea
           value={text}
           onChange={e => setText(e.target.value)}
           rows={12}
-          className="w-full resize-y rounded-sm border border-void-600 bg-void-950 px-2.5 py-1.5 font-mono text-[12px] leading-relaxed text-zinc-200 focus:border-orange-700 focus:outline-none"
+          className="font-mono"
         />
       </label>
       <div className="flex gap-2">
-        <button
+        <Button
           onClick={() => onSave({
             // R2-F4: 原样透传——`|| undefined` 把刻意清空(空串)静默
             // 转成'保持原值', 终审路径无法清空字段(redact 场景尤甚)。
@@ -378,17 +369,19 @@ function EditForm({ kind, current, busy, onCancel, onSave }: {
             text,
           })}
           disabled={busy}
-          className="rounded-sm border border-emerald-800/70 bg-emerald-950/30 px-3 py-1 text-[11px] text-emerald-300 hover:border-emerald-600 disabled:opacity-40"
+          variant="primary"
+          size="sm"
         >
           {busy ? '保存中…' : '保存修订'}
-        </button>
-        <button
+        </Button>
+        <Button
           onClick={onCancel}
           disabled={busy}
-          className="rounded-sm border border-void-600 bg-void-800 px-3 py-1 text-[11px] text-zinc-400 hover:text-zinc-200 disabled:opacity-40"
+          variant="secondary"
+          size="sm"
         >
           取消
-        </button>
+        </Button>
       </div>
     </div>
   );

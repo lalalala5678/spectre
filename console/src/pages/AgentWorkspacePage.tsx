@@ -3,7 +3,11 @@ import {
   ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2 } from 'lucide-react';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
-import { Dot } from '../components/ui/Badge';
+import { Badge, Dot } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Skeleton } from '../components/ui/Skeleton';
+import { Input } from '../components/ui/Input';
 
 import { Panel } from '../components/ui/Panel';
 import { PanelStack } from '../components/ui/PanelStack';
@@ -359,10 +363,13 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
   if (!workSession || !uiReady) {
     return (
-      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2">
-        <span className="h-1.5 w-1.5 animate-pulse rounded-full bg-orange-400" />
-        <p className="animate-pulse text-[11.5px] text-zinc-500">正在载入项目…（服务端）</p>
-        {wsError && <p className="text-[11px] text-red-400">{wsError}</p>}
+      <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6">
+        <div className="flex flex-col items-center gap-2">
+          <Skeleton className="h-4 w-32" />
+          <Skeleton className="h-3 w-56" />
+          <p className="text-[13px] text-tertiary">正在载入项目…（服务端）</p>
+        </div>
+        {wsError && <p className="text-[13px] text-danger-text">{wsError}</p>}
       </div>
     );
   }
@@ -370,14 +377,14 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 页头：agent 信息 + 会话控制 */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-void-700 bg-void-900 px-3.5 py-2">
+      <div className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-6 h-12">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-sm font-semibold text-zinc-100">{agent.name}</h1>
-            <span className="text-[11px] text-zinc-500">{agent.codename}</span>
+            <h1 className="text-[15px] font-semibold text-primary">{agent.name}</h1>
+            <Badge tone="neutral">{agent.codename}</Badge>
             {/* F24: 删假 status/version(mock 硬编码,与真实会话态无关) */}
           </div>
-          <p className="mt-px truncate text-[11px] text-zinc-600">{agent.desc}</p>
+          <p className="mt-px truncate text-[13px] text-secondary">{agent.desc}</p>
         </div>
 
         <div className="flex-1" />
@@ -386,17 +393,17 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         <div className="relative">
           <button
             onClick={() => setSwitcherOpen(v => !v)}
-            className="flex items-center gap-2 rounded-sm border border-void-600 bg-void-800 px-2.5 py-1.5 text-[11px] text-zinc-300 hover:bg-void-700"
+            className="flex h-8 items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-sm text-secondary hover:bg-surface-2 hover:text-primary"
           >
             <Dot tone={current?.busy ? 'orange' : 'slate'} pulse={current?.busy} />
             <span className="max-w-56 truncate font-medium">{workSession.label}</span>
-            <ChevronDown className="h-3.5 w-3.5 text-zinc-600" />
+            <ChevronDown className="h-4 w-4 text-faint" />
           </button>
           {switcherOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 w-64 rounded-sm border border-void-600 bg-void-900 p-1 shadow-lg">
+            <div className="absolute right-0 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
               {naming ? (
                 <div className="mb-1 flex gap-1">
-                  <input
+                  <Input
                     autoFocus
                     value={projectName}
                     onChange={e => setProjectName(e.target.value)}
@@ -405,22 +412,24 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                       if (e.key === 'Escape') setNaming(false);
                     }}
                     placeholder="项目名称…"
-                    className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2 py-1 text-[11px] text-zinc-200 outline-none focus:border-orange-700"
+                    className="min-w-0 flex-1"
                   />
-                  <button
+                  <Button
                     onClick={startNewProject}
                     disabled={!projectName.trim()}
-                    className="shrink-0 rounded-sm bg-orange-600 px-2 py-1 text-[10px] text-white disabled:opacity-40"
+                    variant="primary"
+                    size="sm"
+                    className="shrink-0"
                   >
                     创建
-                  </button>
+                  </Button>
                 </div>
               ) : (
                 <button
                   onClick={() => setNaming(true)}
-                  className="mb-1 flex w-full items-center gap-1.5 rounded-sm bg-orange-600/90 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-500"
+                  className="mb-1 flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-sm font-medium text-secondary hover:bg-surface-2 hover:text-primary"
                 >
-                  <Plus className="h-3.5 w-3.5" /> 新项目
+                  <Plus className="h-4 w-4" /> 新项目
                 </button>
               )}
               <div className="max-h-64 overflow-y-auto">
@@ -429,21 +438,21 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     <button
                       onClick={() => pickWorkSession(ws.id)}
                       className={cn(
-                        'flex min-w-0 flex-1 items-center justify-between gap-2 rounded-sm px-2 py-1.5 text-left text-[11px] hover:bg-void-800',
-                        ws.id === workSession.id ? 'text-zinc-100' : 'text-zinc-500',
+                        'flex min-h-9 min-w-0 flex-1 items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm hover:bg-surface-2 hover:text-primary',
+                        ws.id === workSession.id ? 'text-primary' : 'text-secondary',
                       )}
                     >
                       <span className="truncate">{ws.label}</span>
-                      <span className="shrink-0 font-mono text-[9px] text-zinc-600">
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-tertiary">
                         {ws.createdAt.slice(5, 10)}
                       </span>
                     </button>
                     <button
                       title="删除项目"
                       onClick={e => { e.stopPropagation(); removeProject(ws.id, ws.label); }}
-                      className="shrink-0 rounded-sm p-1 text-zinc-700 opacity-0 hover:bg-red-950 hover:text-red-400 group-hover:opacity-100"
+                      className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-faint opacity-0 hover:bg-danger-bg hover:text-danger-text group-hover:opacity-100"
                     >
-                      <Trash2 className="h-3 w-3" />
+                      <Trash2 className="h-4 w-4" />
                     </button>
                   </div>
                 ))}
@@ -451,32 +460,34 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             </div>
           )}
         </div>
-        <button
-          className="flex items-center gap-1 rounded-sm bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-500"
+        <Button
+          variant="primary"
           onClick={() => { setSwitcherOpen(true); setNaming(true); }}
         >
-          <Plus className="h-3.5 w-3.5" /> 新项目
-        </button>
+          <Plus className="h-4 w-4" /> 新项目
+        </Button>
       </div>
 
       {wsError && (
-        <div className="flex shrink-0 items-center gap-2 border-b border-red-900 bg-red-950/40 px-3.5 py-1.5">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-red-400/80">
+        <div className="flex shrink-0 items-center gap-2 border-b border-danger-line bg-danger-bg px-6 py-1.5">
+          <span className="shrink-0 text-[13px] font-medium text-danger-text">
             操作失败
           </span>
-          <span className="min-w-0 flex-1 truncate font-mono text-[11px] text-red-300">
+          <span className="min-w-0 flex-1 truncate text-[13px] text-danger-text">
             {wsError}
           </span>
-          <button
+          <Button
+            variant="danger"
+            size="sm"
             onClick={() => setWsError('')}
-            className="shrink-0 rounded-sm border border-red-800 px-1.5 text-[10px] text-red-300 hover:bg-red-900/40"
+            className="shrink-0"
           >
             关闭
-          </button>
+          </Button>
         </div>
       )}
       {/* Tab */}
-      <div className="flex shrink-0 items-center gap-0.5 border-b border-void-700 bg-void-900 px-3.5 pt-1.5">
+      <div className="flex shrink-0 items-stretch border-b border-line bg-surface px-4 h-10">
         {([
           ['session', '会话', Play],
           ...(isAuto ? [['bus', '消息总线', ArrowRightLeft] as const] : []),
@@ -487,32 +498,29 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             key={k}
             onClick={() => setTab(k)}
             className={cn(
-              'flex items-center gap-1.5 rounded-t-sm border-b-2 px-3 py-1.5 text-[12px] transition-colors',
+              'flex items-center gap-1.5 border-b-2 px-3 text-sm transition-colors',
               tab === k
-                ? 'border-orange-500 text-zinc-100'
-                : 'border-transparent text-zinc-500 hover:text-zinc-300',
+                ? 'border-accent text-primary'
+                : 'border-transparent text-secondary hover:text-primary',
             )}
           >
-            <Icon className="h-3.5 w-3.5" /> {label}
+            <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
       </div>
 
       {/* 内容：session tab 用固定骨架（运行流独立滚动 + 右栏固定），config/history 外层滚动 */}
       {tab === 'session' && (
-        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden p-3.5 pb-0">
+        <div className="flex min-h-0 flex-1 gap-3 overflow-hidden px-6 pt-5 pb-0">
           {/* 左：运行流（仅此处滚动） */}
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded border border-void-700 bg-void-850 p-2.5">
+          <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5">
             {entryView ? (
               <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id)} />
             ) : drillSession ? (
-              <div className="flex min-h-0 flex-1 flex-col gap-2">
-                <button
-                  onClick={closeDrill}
-                  className="flex w-fit items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[10px] text-zinc-400 hover:text-zinc-200"
-                >
-                  <CornerUpLeft className="h-3 w-3" /> 返回主控会话
-                </button>
+              <div className="flex min-h-0 flex-1 flex-col gap-3">
+                <Button variant="secondary" size="sm" onClick={closeDrill} className="w-fit">
+                  <CornerUpLeft className="h-3.5 w-3.5" /> 返回主控会话
+                </Button>
                 <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} />
               </div>
             ) : sessionId ? (
@@ -520,18 +528,20 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             ) : !bootDoneRef.current ? (
               /* CS26-7: boot 在途(拉锚点/建会话中)——闪现'还没有主会话'
                  可点按钮会与 :180 自动建会话竞争产重复空会话。 */
-              <div className="flex flex-1 items-center justify-center text-[12px] text-zinc-600 animate-pulse">正在准备会话…</div>
+              <div className="flex flex-1 items-center justify-center">
+                <Skeleton className="h-4 w-40" />
+              </div>
             ) : (
               /* R32D50-F6: 冷深链进入后 drill 关闭, 主会话可能尚未建——
                  此前渲染 LiveSession(null) 即 composer 静默 no-op+永久
                  loading 的死页。给明确的新建入口。 */
-              <div className="flex flex-1 flex-col items-center justify-center gap-3 text-center">
-                <p className="text-[12.5px] text-zinc-400">本 agent 在当前项目还没有主会话</p>
-                <button onClick={() => void newConversation()}
-                  className="flex items-center gap-1.5 rounded-sm bg-orange-600 px-3 py-1.5 text-xs font-medium text-white hover:bg-orange-500">
-                  <Plus className="h-3.5 w-3.5" /> 新建会话
-                </button>
-              </div>
+              <EmptyState
+                icon={Plus}
+                title="本 agent 在当前项目还没有主会话"
+                action={<Button variant="primary" onClick={() => void newConversation()}>
+                  <Plus className="h-4 w-4" /> 新建会话
+                </Button>}
+              />
             )}
           </section>
 
@@ -546,7 +556,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               onPointerUp={onResizeUp}
               onDoubleClick={resetRightW}
               title="拖动调整宽度 · 双击恢复默认"
-              className="absolute -left-2 top-0 z-10 h-full w-4 cursor-col-resize after:absolute after:left-1/2 after:h-full after:w-px after:-translate-x-1/2 after:bg-void-700 after:transition-colors hover:after:bg-orange-600"
+              className="absolute -left-2 top-0 z-10 h-full w-4 cursor-col-resize after:absolute after:left-1/2 after:h-full after:w-px after:-translate-x-1/2 after:bg-line after:transition-colors hover:after:bg-accent"
             />
             <div className="h-full pb-3.5">
               {isAuto ? (
@@ -584,7 +594,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       )}
 
       {tab !== 'session' && (
-        <div className="min-h-0 flex-1 overflow-y-auto p-3.5">
+        <div className="min-h-0 flex-1 overflow-y-auto px-6 py-5">
           {tab === 'bus' && isAuto && <BusView workSessionId={workSession.id} />}
           {tab === 'config' && (
             <AgentConfigTab agentId={agent.id} isAuto={isAuto} />
@@ -592,25 +602,25 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
           {tab === 'history' && (
             <Panel title="历史会话" bodyClassName="p-0" className="w-full">
-              <div className="divide-y divide-void-700">
+              <div className="divide-y divide-line">
                 {/* F22: 原为硬编码 mock(死链无 onClick)。接 mySessions 真数据,
                     点击下钻该会话只读详情(drill 机制已有)。 */}
                 {mySessions.length === 0 ? (
-                  <div className="px-3 py-4 text-[11.5px] text-zinc-500">本项目该 agent 暂无历史会话。</div>
+                  <EmptyState icon={History} title="暂无历史会话" hint="本项目该 agent 还没有会话记录。" />
                 ) : [...mySessions].reverse().slice(0, 30).map(s => (
                   <button key={s.id}
                     onClick={() => { setTab('session'); openDrill(s.id); }}
-                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-void-800/60">
+                    className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2">
                     <Dot tone={s.busy ? 'orange' : 'cyan'} />
                     <div className="min-w-0 flex-1">
-                      <div className="truncate text-[12px] font-medium text-zinc-200">
+                      <div className="truncate text-[13px] font-medium text-primary">
                         {s.title || '(未命名会话)'}
                       </div>
-                      <div className="font-mono text-[10px] text-zinc-600">
+                      <div className="font-mono text-xs tabular-nums text-tertiary">
                         {s.id} · {new Date(s.createdAt).toLocaleString('zh-CN', { month: '2-digit', day: '2-digit', hour: '2-digit', minute: '2-digit' })}
                       </div>
                     </div>
-                    <span className={cn('shrink-0 text-[10px]', s.busy ? 'text-orange-400' : 'text-zinc-500')}>
+                    <span className={cn('shrink-0 text-xs', s.busy ? 'text-warning-text' : 'text-tertiary')}>
                       {s.busy ? 'busy' : 'done'}
                     </span>
                   </button>

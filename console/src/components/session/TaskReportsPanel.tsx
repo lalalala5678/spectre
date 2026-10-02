@@ -1,9 +1,12 @@
-import { cn } from '../../utils/cn';
+import { ClipboardList } from 'lucide-react';
 
 import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
+import { EmptyState } from '../ui/EmptyState';
+import { Skeleton } from '../ui/Skeleton';
 import { PanelEntryMeta } from './PanelEntryMeta';
 import { StatusBadge } from './VulnPanel';
+import { cn } from '../../utils/cn';
 
 /**
  * 任务报告 panel: the process record of every finished task (mandatory,
@@ -22,17 +25,17 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
   const { events, loaded } = useBusPanelEntries(accept, { ws: workSessionId });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">
-      <header className="flex items-center justify-between border-b border-void-700 px-3 py-1.5">
-        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
+      <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
+        <h3 className="text-xs font-semibold text-secondary">
           任务报告
         </h3>
-        <span className="font-mono text-[10px] text-zinc-600">{events.length}</span>
+        <span className="text-xs tabular-nums text-tertiary">{events.length}</span>
       </header>
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {events.length === 0 && (!loaded
-          ? <p className="animate-pulse py-3 text-center text-[11px] text-zinc-600">载入中…</p>
-          : <p className="py-3 text-center text-[11px] text-zinc-700">本项目暂无任务报告</p>
+          ? <Skeleton className="mx-1 my-2 h-11" />
+          : <EmptyState icon={ClipboardList} title="本项目暂无任务报告" />
         )}
         {events.map(event => {
           // F56: render the CURRENT version (current = latest revision) —
@@ -43,12 +46,12 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
             <button
               key={event.seq}
               onClick={() => onOpen(event)}
-              className="flex w-full flex-col gap-px rounded-sm border border-void-700 bg-void-900 px-2 py-1.5 text-left hover:border-void-500"
+              className="flex min-h-11 w-full flex-col gap-px rounded-md border border-line bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
             >
               <div className="flex w-full items-center gap-2">
                 <StatusBadge status={cur.status ?? 'no-result'} />
-                <span className={cn('min-w-0 flex-1 truncate text-[12.5px]',
-                  cur.void ? 'text-zinc-500 line-through' : 'text-zinc-300')}>
+                <span className={cn('min-w-0 flex-1 truncate text-sm font-medium',
+                  cur.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {cur.title ?? cur.summary}
                 </span>
                 <PanelEntryMeta event={event} voidable />
