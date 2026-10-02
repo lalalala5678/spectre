@@ -16,7 +16,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from urllib.request import urlopen, Request
 from urllib.error import URLError, HTTPError
-from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash  # CS69-2: 导入归顶
+from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash, RESP_STRIP_HEADERS  # CS69-2/CS72-3: 导入归顶
 
 
 # CS8-P1-4: 缺省与链路同源(phish-send/phish-track/漏斗都指向数据根
@@ -32,17 +32,15 @@ def load_db():
 def save_db(db):
     json.dump(db, open(DB_FILE, 'w'), indent=1, ensure_ascii=False)
 
-def add_event(db, kind, uid, extra=None):
+def add_event(kind, uid, extra=None):  # CS72-4: db 死参删(锁内重读, 调用方 load_db 为死读)
     # R17-F1: V6b 排他锁读改写——proxy 是事件库四写入方中唯一无锁者
     # (track V6 只修了自己侧; phishlet-proxy F36 不变性: 同库并发方
     # 必须持同一把锁, PoC 丢 599/600)。
     ev = {'kind': kind, 'uid': uid, 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
     if extra: ev.update(extra)
     import fcntl
-    # R32D88-F1(P0): 父目录预建(对齐 phish-track:17)——全新安装未先跑
-    # phish-track 时 open(lock) 直接 FileNotFoundError, 凭据/追踪全
-    # 写路径开箱即崩。
-    os.makedirs(os.path.dirname(DB_FILE) or '.', exist_ok=True)
+    # R32D88-F1(P0): 父目录由 serve 启动自检预建(CS72-6: 每事件重复
+    # makedirs 删, 单点保证; 此前全新安装 open(lock) 即崩)。
     with open(DB_FILE + '.lock', 'w') as lf:
         fcntl.flock(lf, fcntl.LOCK_EX)
         try:
@@ -87,8 +85,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # Remove security headers that prevent embedding/interaction
         # R17-F5: 大小写不敏感——dict(resp.headers) 保留线上原样, 真实
         # 目标常发小写头, 字面 pop 静默未命中使核心功能失效。
-        STRIP = {'content-security-policy', 'x-frame-options', 'strict-transport-security',
-                 'x-content-type-options', 'public-key-pins'}
+        STRIP = RESP_STRIP_HEADERS  # CS72-3: 单源 _common(两代理同集)
         for h in [k for k in headers if k.lower() in STRIP]:
             headers.pop(h, None)
 
@@ -114,9 +111,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         # Tracking pixel
         if u.path.startswith('/o/') and u.path.endswith('.gif'):
-            db = load_db()
             uid = u.path.split('/')[2].replace('.gif', '')
-            add_event(db, 'open', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
+            add_event('open', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
             import base64
             gif = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
             self.send_response(200)
@@ -129,8 +125,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # Click tracking (redirect to proxied target)
         if u.path.startswith('/r/'):
             uid = u.path.split('/')[2]
-            db = load_db()
-            add_event(db, 'click', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
+            add_event('click', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
             self.send_response(302)
             self.send_header('Location', '/')
             self.end_headers()
@@ -193,11 +188,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
 
         if captured_password:
             # Hash immediately (NEVER store plaintext)
-            db = load_db()
             # CS66-F5/CS67-2: cred_hash 单源 _common.cred_hash(此前
             # 本地 JSON 公式与 track 的 parse_qs 列表值口径仍分裂)。
             cred_hash = _cred_hash({'email': captured_email, 'password': captured_password})
-            add_event(db, 'submit', 'proxy', {
+            add_event('submit', 'proxy', {
                 'cred_hash': cred_hash,
                 'email_domain': captured_email.split('@')[1] if '@' in (captured_email or '') else '',
                 'ip': self.client_address[0],
@@ -232,6 +226,9 @@ def serve(listen, target, db_file=None):
     # 径此前可崩(缺 makedirs)而横幅照打, 失实。
     try:
         os.makedirs(os.path.dirname(DB_FILE) or '.', exist_ok=True)
+        # CS72-5: 探库本体(append 试开)——此前只探 .lock 过报。
+        with open(DB_FILE, 'a'):
+            pass
         with open(DB_FILE + '.lock', 'w') as lf:
             pass
         print(f'[phish-proxy] 事件库可写: {DB_FILE}(凭据落库即哈希, 明文即毁)', flush=True)

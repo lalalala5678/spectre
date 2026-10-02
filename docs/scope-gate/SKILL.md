@@ -36,7 +36,7 @@ description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC
 | 检查 | 工具/位置 | 违规行为 |
 |---|---|---|
 | scope 空/出窗 | c2-qa.py gate() / c2-variant.py gen / c2-basetype.py gate() / c2-bytecode.py gate() / c2-bind.py bind·verify·expire | exit 75 拒绝 |
-| EDUSRC 硬隔离 | 全员 env-only, 门序=-h→EDUSRC(76)→scope(75)→用法(2)→引擎(2): qa/basetype/bytecode 主入口派发前 \_edusrc 预门+子命令内 gate() 收 scope(CS71-3: 缺/未知子命令+EDUSRC 亦 76); variant/javart/functest/disguise=\_common.edusrc\_gate; phish 族四工具=edusrc\_gate\_phish; bind 无 EDUSRC(目标门 70); 只读校验子命令不门(basetype verify/bytecode info/variant fingerprint) | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
+| EDUSRC 硬隔离 | 全员 env-only, 门序=-h→EDUSRC(76)→scope(75)→用法(2)→引擎(2): qa/basetype/bytecode 主入口派发前 \_edusrc 预门+子命令内 gate() 收 scope(CS71-3: 缺/未知子命令+EDUSRC 亦 76); variant/javart/functest/disguise=\_common.edusrc\_gate; phish 族四工具=edusrc\_gate\_phish; bind 无 EDUSRC(目标门 70); 只读校验子命令免 scope 门(basetype verify/bytecode info/variant fingerprint——CS72-2: EDUSRC 预门为全员硬隔离仍拦, 此前'不门'表述过宽) | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
 | 目标不在清单 | c2-bind.py bind | exit 70 |
 | 审计 | /opt/tools/c2/audit.log | 正常操作落行: qa scan/round、bind/expire、basetype gen、bytecode split、qa 的 EDUSRC 拒绝(target=EDUSRC); 其余拒绝(scope 75 等)与 variant/basetype/bytecode/javart/functest/disguise 的 EDUSRC 76 不落行(内联门与 \_common 门均无 audit 调用) |
 

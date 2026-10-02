@@ -244,3 +244,17 @@ test('-h 任意位=0 家族契约(CS59-F2/CS60-N2 锁: 六探针含 authmatrix)'
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('EDUSRC 预门拦缺/未知子命令(CS72-8 锁: 三员×两态全 76)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'edusrc-pre-'));
+  try {
+    for (const tool of ['c2-qa.py', 'c2-basetype.py', 'c2-bytecode.py']) {
+      for (const argv of [[], ['bogusmode']]) {
+        const r = runTool(tool, argv, dir, true);
+        assert.equal(r.status, 76, `${tool} [${argv.join(' ')}]+EDUSRC 应 76(预门先于用法), 实得 ${r.status}`);
+      }
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

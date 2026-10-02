@@ -104,3 +104,7 @@ def cred_hash(cred_only):
     旧事件哈希不与新公式可比(只影响跨工具比对, 不影响单工具内)。"""
     norm = {k: (v[0] if isinstance(v, list) else v) for k, v in cred_only.items()}
     return hashlib.sha256(json.dumps(norm, sort_keys=True).encode()).hexdigest()[:16]
+
+RESP_STRIP_HEADERS = frozenset({'content-security-policy', 'x-frame-options',
+                                'strict-transport-security', 'x-content-type-options',
+                                'public-key-pins'})  # CS72-3: 两代理单源(phishlet 此前缺 public-key-pins)

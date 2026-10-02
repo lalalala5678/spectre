@@ -41,7 +41,7 @@ def save_db(db):
         finally:
             fcntl.flock(lf, fcntl.LOCK_UN)
 
-def add_event(db, kind, uid, extra=None):
+def add_event(kind, uid, extra=None):  # CS72-4: db 死参删(锁内重读, 调用方 load_db 为死读)
     # V6b: 整个 read-modify-write 持排他锁——此前锁只在 save 段,
     # 两进程(如 track+proxy)各自 load 旧快照后互覆盖(实测丢 12/200)。
     ev = {'kind': kind, 'uid': uid, 'ts': time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())}
@@ -83,7 +83,6 @@ class TrackHandler(BaseHTTPRequestHandler):
             self.wfile.write(b'scope revoked')
             return
         u = urlparse(self.path)
-        db = load_db()
         if u.path.endswith('.gif') or u.path == '/open':
             # Tracking pixel (1x1 transparent GIF)
             qs = parse_qs(u.query)
@@ -94,7 +93,7 @@ class TrackHandler(BaseHTTPRequestHandler):
             m = re.match(r'^/(?:o|open)/([A-Za-z0-9_-]+?)\.gif$', u.path)
             if m:
                 uid = m.group(1)
-            add_event(db, 'open', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
+            add_event('open', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
             gif = base64.b64decode('R0lGODlhAQABAIAAAAAAAP///yH5BAEAAAAALAAAAAABAAEAAAIBRAA7')
             self.send_response(200)
             self.send_header('Content-Type', 'image/gif')
@@ -106,7 +105,7 @@ class TrackHandler(BaseHTTPRequestHandler):
             # (https://域/r/<uid>),此前只认 /click/<uid> →
             # 真实邮件按钮点击落到默认分支(200 Service Portal),全部漏记。
             uid = u.path.split('/')[2]
-            add_event(db, 'click', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
+            add_event('click', uid, {'ua': self.headers.get('User-Agent', ''), 'ip': self.client_address[0]})
             self.send_response(302)
             self.send_header('Location', '/')  # Redirect to landing page
             self.end_headers()
@@ -134,7 +133,6 @@ class TrackHandler(BaseHTTPRequestHandler):
             self.send_response(413); self.end_headers()
             return
         body = self.rfile.read(length).decode(errors='replace') if length else ''
-        db = load_db()
         if u.path == '/submit':
             qs = parse_qs(body)
             uid = qs.get('uid', ['unknown'])[0]
@@ -143,7 +141,7 @@ class TrackHandler(BaseHTTPRequestHandler):
             # 同凭据不同收件人哈希不同,不可比对
             cred_only = {k: v for k, v in qs.items() if k.lower() != 'uid'}
             cred_hash = _cred_hash(cred_only)
-            add_event(db, 'submit', uid, {'cred_hash': cred_hash, 'ip': self.client_address[0]})
+            add_event('submit', uid, {'cred_hash': cred_hash, 'ip': self.client_address[0]})
             self.send_response(302)
             self.send_header('Location', '/success')
             self.end_headers()
@@ -162,7 +160,6 @@ def serve(port):
 
 def report():
     edusrc_gate()
-    db = load_db()
     events = db['events']
     by_uid = {}
     for ev in events:
