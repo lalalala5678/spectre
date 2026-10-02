@@ -430,7 +430,8 @@ export function buildIntelTools(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       sessionId: Type.String({
-        description: 'Session ID (e.g. from payloadRef "sess:xxx" — strip the prefix)',
+        description: 'Session ID, either raw (sess-abc123) or with the payloadRef prefix (sess:abc123 — both accepted)',
+        examples: ['sess-abc123', 'sess:abc123'],
       }),
       last: Type.Optional(Type.Number({
         description: 'Number of recent messages to read, default 10, cap 30',
@@ -440,7 +441,9 @@ export function buildIntelTools(record, caps) {
       })),
     }),
     execute: async (_id, params) => {
-      const sid = String(params.sessionId).replace(/^sess:/, '');
+      // R32D96-N1: 前缀双收——payloadRef 用 "sess:", 会话 ID 本体用
+      // "sess-", LLM 混传三次误判(编排器曾广播'子会话已死')。
+      const sid = String(params.sessionId).replace(/^sess[:-]/, '');
       const last = Math.min(Math.max(Number(params.last) || 10, 1), 30);
       // Access the session store via caps — injected by the composition root
       const messages = caps.readSessionMessages?.(sid, last, record.workSessionId ?? null);
