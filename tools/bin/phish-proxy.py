@@ -90,7 +90,7 @@ class ProxyHandler(BaseHTTPRequestHandler):
             headers.pop(h, None)
 
         # Rewrite absolute URLs pointing to target → our proxy
-        if content_type and ('text/html' in content_type or 'javascript' in content_type):
+        if content_type and ('text/html' in content_type.lower() or 'javascript' in content_type.lower()):  # R32D89: 值大小写不敏感
             body_str = body.decode('utf-8', errors='replace')
             target_host = urlparse(self.target_base).netloc
             our_host = self.headers.get('Host', 'localhost')
