@@ -63,8 +63,8 @@ OWNED_ALREADY=no
 if systemctl is-active --quiet spectre-agent-runtime && systemctl is-active --quiet spectre-console; then
   OWNED_ALREADY=yes
 else
-  O="$(port_owner 8090)"; [ -z "$O" ] || die "8090 被非 spectre-agent-runtime 进程占用: $O ——本机已有别的部署? 共享机请走手工路径(deploy/README)"
-  O="$(port_owner 8081)"; [ -z "$O" ] || die "8081 被非 spectre-console 进程占用: $O ——本机已有别的部署? 共享机请走手工路径(deploy/README)"
+  O="$(port_owner 8090)"; [ -z "$O" ] || die "8090 被非 spectre-agent-runtime 进程占用: $O——本机已有别的部署? 共享机请走手工路径(deploy/README)"
+  O="$(port_owner 8081)"; [ -z "$O" ] || die "8081 被非 spectre-console 进程占用: $O——本机已有别的部署? 共享机请走手工路径(deploy/README)"
 fi
 
 # ---------- 5) admin 账号(已存在则跳过) ----------

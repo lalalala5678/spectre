@@ -14,6 +14,8 @@ setup.sh 幂等地完成: Node≥22 检装 → 依赖安装/前端构建 → `IN
 admin 建号(密码存 `/root/spectre-admin-cred.txt`, 600) → systemd 三单元
 (`spectre-agent-runtime`/`spectre-console`/`spectre-caddy`)→ 对外 TLS
 (Caddy :443→网关 127.0.0.1:8081, 网关保持环回)。结束时打印入口与账号。
+⚠ **整机独占**: 直接占用 8090/8081/443 并写 `/etc/spectre`——共享机或已部署过
+SPECTRE 的机器请用下方手工路径(可换端口/路径)。
 以下是各步骤的手工等价拆解（排障/自定义时用）。
 
 ## 环境要求
@@ -95,7 +97,7 @@ docker exec "$SBX" bash /opt/tools/bootstrap-sandbox.sh \
   || { echo "容器 $SBX 不存在(runtime 未起?)——docker ps 查实际名; 缺省数据根为 spectre-sandbox" >&2; exit 1; }
 bash deploy/fetch-jars.sh             # 第三方 jar(~51MB 实测, 不入 git; 落 $SPECTRE_DATA_DIR/tools/c2)
 bash deploy/fetch-fingerprints.sh   # 指纹库 nt-technologies+plugins-0x727(FingerprintHub, ~20MB 实测, R32D55-N1 供给面; 生产守卫同族)
-bash deploy/fetch-wordlists.sh      # 爆破字典 seclists+rockyou+jwt_tool(~705MB 实测, R32D57-NEW6; 落 $SPECTRE_DATA_DIR/tools, 容器内挂载为 /opt/tools)
+bash deploy/fetch-wordlists.sh      # 爆破字典 seclists+rockyou+jwt_tool(约 0.7GB, 实测 705-706MB; R32D57-NEW6; 落 $SPECTRE_DATA_DIR/tools, 容器内挂载为 /opt/tools)
 SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 55 技能; 三变量与 runtime 同源
 
 # 7) 数据源凭据
