@@ -93,9 +93,9 @@
 | `dispatch_agents` | 编排器 | [starts engagement] | Temporal 批量调度 |
 | `relay_to_agents` | 编排器 | [sends DM] | 定向转发情报 |
 | `shell` | c2/persistence/postex/autopwn | [runs commands; side-effects] | C2 植入通道操作(注册/移交/执行/读文件/指纹) |
-| `configure_skill` | 仅 skill-config | [writes config] | 给指定智能体挂载自定义技能 |
+| `configure_skill` | 仅 skill-config | [creates event] | 给指定智能体挂载自定义技能(写配置即产生事件, CS64-2 与代码首词同形) |
 | `delete_skill` | 仅 skill-config | [destructive] | 卸载指定智能体的技能 |
-| `configure_mcp` | 仅 mcp-config | [writes config] | 注册 MCP 服务器(http/stdio) |
+| `configure_mcp` | 仅 mcp-config | [creates event] | 注册 MCP 服务器(http/stdio; CS64-2 同上) |
 | `remove_mcp_server` | 仅 mcp-config | [destructive] | 删除 MCP 服务器注册 |
 | `test_mcp_server` | 仅 mcp-config | [read-only] | MCP 连通性探测 |
 | `uninstall_cli` | 仅 cli-config | [destructive] | 卸载 CLI 工具 |

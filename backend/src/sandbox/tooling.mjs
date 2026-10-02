@@ -727,8 +727,8 @@ function buildAllToolingTools(caps, sessionRecord) {
     name: 'wake_agent',
     label: '唤醒验证',
     description:
-      '[side-effects: runs a detached target-agent session; synchronous '
-      + '— may take a minute] Wake ONE business agent and ask it to '
+      '[spawns turn; synchronous — may take a minute] '
+      + 'Wake ONE business agent and ask it to '
       + 'confirm its tooling state (a just-mounted skill/MCP, or a '
       + 'shared CLI command). It answers from its OWN toolface — the '
       + 'authoritative confirmation that a mount actually landed. Use '

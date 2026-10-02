@@ -470,14 +470,14 @@ export function buildIntelTools(record, caps) {
  * transcript, cross-validates, then publishes or declines). Registered
  * for child + non-report direct sessions; NOT for the writer itself
  * (no recursion). Synchronous: the receipt lands when the writer ends.
- * [side-effects: runs writer session] [synchronous: may take minutes]
+ * [runs writer; synchronous] [idempotent: no]  CS64-1: 简式对齐 AGENTS.md 表
  */
 function buildReportVulnerabilityTool(record, caps) {
   return {
     name: 'report_vulnerability',
     label: '上报漏洞线索',
     description:
-      '[side-effects: runs writer agent; synchronous — may take minutes] ' +
+      '[runs writer; synchronous — may take minutes] ' +
       'Report a suspected submittable vulnerability in ONE sentence. A ' +
       'dedicated report-writer agent will read YOUR conversation context ' +
       '(and any other sessions / intel it needs), verify the claim, and ' +
@@ -517,7 +517,7 @@ function buildRequestRevisionTool(record, caps) {
     name: 'request_vulnerability_revision',
     label: '申请漏洞修订',
     description:
-      '[side-effects: runs writer agent; synchronous — may take minutes] ' +
+      '[runs writer; synchronous — may take minutes] ' +
       'Request a revision of a PUBLISHED vulnerability. A writer agent ' +
       'reviews the original report plus your request, verifies necessity ' +
       'AND correctness, then either lands the revision (it decides the ' +
@@ -630,7 +630,7 @@ export function buildOrchestratorTools(record, caps) {
     name: 'dispatch_agents',
     label: '调度子智能体',
     description:
-      '[side-effects: starts engagement] Dispatch a pentest objective to stage agents. They run in parallel ' +
+      '[starts engagement] Dispatch a pentest objective to stage agents. They run in parallel ' +
       'inside a durable Temporal engagement and share results over the bus.',
     executionMode: 'sequential',
     parameters: Type.Object({
@@ -677,7 +677,7 @@ export function buildOrchestratorTools(record, caps) {
     name: 'relay_to_agents',
     label: '转发情报',
     description:
-      '[side-effects: sends DM] Relay a message to specific stage agents of your active engagement ' +
+      '[sends DM] Relay a message to specific stage agents of your active engagement ' +
       '(or an explicit engagementId). Use when a child report warrants it.',
     executionMode: 'sequential',
     parameters: Type.Object({
@@ -790,7 +790,7 @@ export function buildShellTools(record, caps) {
     name: 'shell',
     label: 'Shell 通道',
     description:
-      '[side-effects: executes on compromised host] 操作 C2 植入产生的 shell 通道(经授权门)。' +
+      '[runs commands; side-effects] 操作 C2 植入产生的 shell 通道(经授权门)。' +
       'action=list 列出可用 shell(含 id/目标/系统指纹/任务数);action=exec 执行命令并返回' +
       ' stdout/stderr/退出码;action=read_file 读文件;action=status 看 shell 元数据+最近任务;' +
       'action=close 关闭。每条命令进平台审计(证据链)。shell 可由 c2 agent 交付或运营注册,' +
