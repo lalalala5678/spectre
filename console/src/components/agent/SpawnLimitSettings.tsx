@@ -2,6 +2,8 @@
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Panel } from '../ui/Panel';
+import { Button } from '../ui/Button';
+import { Input, Label } from '../ui/Input';
 
 interface SpawnSettings {
   spawnMaxDepth: number;
@@ -36,40 +38,34 @@ export function SpawnLimitSettings() {
     <Panel title="调度限制">
       <div className="space-y-3">
         <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+          <Label className="mb-1 block">
             派生深度上限(主控=0 层)
-          </span>
-          <input
+          </Label>
+          <Input
             type="number" min={1} max={10}
             value={settings?.spawnMaxDepth ?? ''}
             onChange={e => setSettings(s => s && ({
               ...s, spawnMaxDepth: Number(e.target.value) || 1,
             }))}
-            className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[12px] text-zinc-200 outline-none focus:border-orange-700"
           />
         </label>
         <label className="block">
-          <span className="mb-1 block text-[10px] font-semibold uppercase tracking-wider text-zinc-600">
+          <Label className="mb-1 block">
             单树智能体总数上限
-          </span>
-          <input
+          </Label>
+          <Input
             type="number" min={1} max={64}
             value={settings?.spawnMaxAgents ?? ''}
             onChange={e => setSettings(s => s && ({
               ...s, spawnMaxAgents: Number(e.target.value) || 1,
             }))}
-            className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[12px] text-zinc-200 outline-none focus:border-orange-700"
           />
         </label>
         <div className="flex items-center gap-2">
-          <button
-            onClick={save}
-            disabled={!settings}
-            className="rounded-sm bg-orange-600 px-3 py-1.5 text-[11px] font-medium text-white hover:bg-orange-500 disabled:opacity-30"
-          >
+          <Button onClick={save} disabled={!settings} variant="primary" size="sm">
             保存
-          </button>
-          {saved && <span className="text-[10px] text-emerald-400">已生效</span>}
+          </Button>
+          {saved && <span className="text-xs text-success-text">已生效</span>}
         </div>
       </div>
     </Panel>

@@ -2,19 +2,20 @@ import { useEffect, useRef, useState } from 'react';
 import { ArrowRight, Megaphone } from 'lucide-react';
 import { api, subscribeBus, type ApiBusEvent } from '../api/client';
 import type { MessageChannel } from '../types';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 
-const CH_META: Record<string, { label: string; cls: string }> = {
-  announce: { label: '公告', cls: 'border-red-900 text-red-400' },
-  dm: { label: '私信', cls: 'border-void-500 text-zinc-500' },
-  share: { label: '共享', cls: 'border-orange-900 text-orange-400' },
+const CH_META: Record<string, { label: string; tone: BadgeTone }> = {
+  announce: { label: '公告', tone: 'danger' },
+  dm: { label: '私信', tone: 'neutral' },
+  share: { label: '共享', tone: 'warning' },
 };
 
 /** R3-6: 未映射频道此前 chMeta(m.channel).cls 直接 TypeError——整个
  * 应用白屏(实测: journal 一条 channel='r2t' 测试事件即触发)。
  * 未知频道回退中性样式, 任何频道值都必须可渲染。 */
-const chMeta = (c: string) => CH_META[c] ?? { label: c, cls: 'border-void-600 text-zinc-400' };
+const chMeta = (c: string) => CH_META[c] ?? { label: c, tone: 'neutral' as BadgeTone };
 
 const fmtTime = (iso: string) => {
   const d = new Date(iso);
@@ -101,14 +102,14 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
               key={k}
               onClick={() => setFilter(k)}
               className={cn(
-                'rounded-sm px-2 py-0.5 text-[10px] transition-colors',
+                'rounded-md px-2 py-0.5 text-xs transition-colors',
                 filter === k
-                  ? 'bg-void-700 text-zinc-200'
-                  : 'text-zinc-600 hover:text-zinc-400',
+                  ? 'bg-surface-2 text-primary'
+                  : 'text-tertiary hover:text-secondary',
               )}
             >
               {k === 'all' ? '全部' : CH_META[k].label}
-              <span className="ml-1 font-mono text-[9px] text-zinc-600">{counts[k]}</span>
+              <span className="ml-1 font-mono text-xs tabular-nums text-faint">{counts[k]}</span>
             </button>
           ))}
         </div>
@@ -118,53 +119,50 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
     >
       <table className="w-full text-left">
         <thead>
-          <tr className="border-b border-void-700 text-[10px] uppercase tracking-wider text-zinc-600">
-            <th className="px-3 py-2 font-semibold">时间</th>
-            <th className="px-3 py-2 font-semibold">频道</th>
-            <th className="px-3 py-2 font-semibold">传递</th>
-            <th className="px-3 py-2 font-semibold">类型</th>
-            <th className="px-3 py-2 font-semibold">内容摘要</th>
-            <th className="px-3 py-2 font-semibold">引用</th>
+          <tr className="border-b border-line text-xs font-medium text-tertiary">
+            <th className="px-3 py-2.5">时间</th>
+            <th className="px-3 py-2.5">频道</th>
+            <th className="px-3 py-2.5">传递</th>
+            <th className="px-3 py-2.5">类型</th>
+            <th className="px-3 py-2.5">内容摘要</th>
+            <th className="px-3 py-2.5">引用</th>
           </tr>
         </thead>
-        <tbody className="divide-y divide-void-700">
+        <tbody className="divide-y divide-line">
           {list.map((m) => (
-            <tr key={m.seq} className={cn('hover:bg-void-800/60', m.channel === 'announce' && 'bg-red-950/5')}>
-              <td className="px-3 py-2.5 font-mono text-[11px] text-zinc-600">{fmtTime(m.ts)}</td>
+            <tr key={m.seq} className={cn('hover:bg-surface-2/60', m.channel === 'announce' && 'bg-danger-bg/40')}>
+              <td className="px-3 py-2.5 font-mono text-xs tabular-nums text-tertiary">{fmtTime(m.ts)}</td>
               <td className="px-3 py-2.5">
-                <span className={cn('inline-flex items-center gap-1 rounded-sm border px-1.5 py-0.5 text-[10px]', chMeta(m.channel).cls)}>
+                <Badge tone={chMeta(m.channel).tone}>
                   {m.channel === 'announce' && <Megaphone className="h-2.5 w-2.5" />}
                   {chMeta(m.channel).label}
+                </Badge>
+              </td>
+              <td className="px-3 py-2.5">
+                <span className="flex items-center gap-1.5 font-mono text-[13px]">
+                  <span className="text-secondary">{m.from}</span>
+                  <ArrowRight className="h-3 w-3 text-tertiary" />
+                  <span className="text-secondary">{m.to}</span>
                 </span>
               </td>
               <td className="px-3 py-2.5">
-                <span className="flex items-center gap-1.5 font-mono text-[11.5px]">
-                  <span className="text-zinc-300">{m.from}</span>
-                  <ArrowRight className="h-3 w-3 text-zinc-600" />
-                  <span className="text-zinc-300">{m.to}</span>
-                </span>
-              </td>
-              <td className="px-3 py-2.5">
-                <span className={cn(
-                  'rounded-sm px-1.5 py-0.5 font-mono text-[10px]',
-                  m.type === 'handoff' ? 'bg-orange-950/50 text-orange-400' : 'bg-void-700 text-zinc-400',
-                )}>
+                <Badge tone={m.type === 'handoff' ? 'accent' : 'neutral'} className="font-mono">
                   {m.type}
-                </span>
+                </Badge>
               </td>
               <td className="px-3 py-2.5">
-                <span className="text-[11.5px] text-zinc-400">{m.summary}</span>
+                <span className="text-[13px] text-secondary">{m.summary}</span>
               </td>
               <td className="px-3 py-2.5">
                 {m.payloadRef
-                  ? <code className="rounded-sm bg-void-950 px-1.5 py-0.5 font-mono text-[10px] text-zinc-400">{m.payloadRef}</code>
-                  : <span className="text-[10px] text-zinc-700">—</span>}
+                  ? <code className="rounded-md bg-surface-2 px-1.5 py-0.5 font-mono text-xs text-secondary">{m.payloadRef}</code>
+                  : <span className="text-xs text-faint">—</span>}
               </td>
             </tr>
           ))}
         </tbody>
       </table>
-      <div className="border-t border-void-700 px-3 py-2 text-[10.5px] leading-relaxed text-zinc-600">
+      <div className="border-t border-line px-3 py-2.5 text-xs leading-relaxed text-tertiary">
         公告 = 主控 → 全员(范围/约束变更);私信 = 点对点调度与回报;共享 = 情报广播(凭据/攻击面)。
         事件源:Temporal 编排信号 → 消息总线 journal · SSE 实时推送。
       </div>

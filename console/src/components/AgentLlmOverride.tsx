@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { cn } from '../utils/cn';
 import type { LlmFormatMeta } from '../api/llmFormats';
+import { Badge } from './ui/Badge';
+import { Button } from './ui/Button';
+import { Input, Select } from './ui/Input';
 
 /** R32D44-llm: 供应商四字段原子编辑器(设置页与 agent 配置页签共用)。
  * 保存协议(CS16-P1/R32D45-N1 原子提交): 四字段一个请求整体提交, 后端
@@ -57,41 +60,39 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
   // 字段行渲染(非组件——oxlint react/static-components)
   const field = (k: 'format' | 'baseUrl' | 'apiKey' | 'model', label: string, ph: string, type = 'text') => (
     <label key={k} className="flex items-center gap-2">
-      <span className="w-[86px] shrink-0 text-[10.5px] text-zinc-500">{label}</span>
+      <span className="w-[86px] shrink-0 text-[13px] text-secondary">{label}</span>
       {k === 'format' ? (
-        <select value={draft.format} onChange={e => setDraft(d => ({ ...d, format: e.target.value }))}
-          className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2 py-1 font-mono text-[11px] text-zinc-200 outline-none focus:border-orange-700">
+        <Select value={draft.format} onChange={e => setDraft(d => ({ ...d, format: e.target.value }))}
+          className="min-w-0 flex-1">
           {isDefault
             ? <option value="">openai(默认)</option>
             : <option value="">(继承默认)</option>}
           {formats.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
-        </select>
+        </Select>
       ) : (
-        <input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
-          className="min-w-0 flex-1 rounded-sm border border-void-600 bg-void-950 px-2 py-1 font-mono text-[11px] text-zinc-200 outline-none placeholder:text-zinc-700 focus:border-orange-700" />
+        <Input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
+          className="min-w-0 flex-1 font-mono text-[13px]" />
       )}
     </label>
   );
 
   return (
-    <div className="rounded-sm border border-void-700 bg-void-900/60 p-2.5">
+    <div className="rounded-md border border-line bg-surface p-2.5">
       <div className="mb-2 flex items-center justify-between gap-2">
-        <span className="text-[11px] font-medium text-zinc-300">
+        <span className="flex items-center gap-1.5 text-[13px] font-medium text-secondary">
           {isDefault ? '默认大模型供应商' : '本 agent 覆盖'}
-          {!isDefault && overridden && <span className="ml-1.5 rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9px] text-orange-300">已覆盖</span>}
-          {!isDefault && !overridden && <span className="ml-1.5 font-mono text-[9.5px] text-zinc-600">当前=默认供应商</span>}
+          {!isDefault && overridden && <Badge tone="accent">已覆盖</Badge>}
+          {!isDefault && !overridden && <span className="text-xs text-tertiary">当前=默认供应商</span>}
         </span>
-        <button onClick={() => void save()} disabled={!dirty || state === 'saving'}
-          className={cn('flex items-center gap-1 rounded-sm border px-2.5 py-1 font-mono text-[10.5px] transition-colors disabled:opacity-40',
-            dirty ? 'border-orange-600 bg-orange-600/20 text-orange-300 hover:bg-orange-600/30' : 'border-void-600 text-zinc-500')}>
+        <Button onClick={() => void save()} disabled={!dirty || state === 'saving'} variant="primary" size="sm">
           {state === 'saving' ? '探测中…' : state === 'ok' ? '✓ 已保存' : '保存并探测'}
-        </button>
+        </Button>
       </div>
       <div className="space-y-1.5">
         {field('format', '接口格式', '')}
         {/* R32D45-N3/CS19-4: 适配说明按选中格式从 schema 下发的
             单源数据渲染。 */}
-        <p className="pl-[94px] font-mono text-[9.5px] text-zinc-600">
+        <p className="pl-[94px] text-xs text-tertiary">
           {draft.format === '' && !isDefault ? '继承默认供应商的格式'
             : (formats.find(f => f.id === (draft.format || 'openai'))?.hint ?? '')}
         </p>
@@ -99,7 +100,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
         {field('apiKey', 'API Key', isDefault ? '' : '留空=用默认', 'password')}
         {field('model', '模型名称', isDefault ? 'glm-4.7' : '留空=用默认')}
       </div>
-      <p className={cn('mt-1.5 truncate font-mono text-[10px]', state === 'err' ? 'text-red-400' : 'text-zinc-600')} title={msg}>
+      <p className={cn('mt-1.5 truncate text-xs', state === 'err' ? 'text-danger-text' : 'text-tertiary')} title={msg}>
         {state === 'err' ? msg : isDefault ? '四字段一个请求保存+真实连通探测(换供应商一步到位)' : '保存会用覆盖后的完整配置做真实连通探测; 清除=保存空值回默认'}
       </p>
     </div>
