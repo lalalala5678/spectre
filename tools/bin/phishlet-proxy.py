@@ -211,11 +211,26 @@ def make_handler(phishlet, db_file):
             self._respond(status, headers, body)
 
         def _respond(self, status, headers, body):
-            # CS69-5: respond 诗节 ×3 逐字抄收口(跳过逐跳头+重算长度)。
-            self._respond(status, headers, body)
+            # CS69-5/CS70-1: respond 诗节×3 收口(跳过逐跳头+重算长度)——
+            # DI 批次替换误把本函数体也换成自调用(RecursionError), 此为真身。
+            self.send_response(status)
+            for k, v in headers.items():
+                if k.lower() not in ('transfer-encoding', 'content-length'):
+                    self.send_header(k, v)
+            self.send_header('Content-Length', str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
 
         def do_POST(self):
-            length = int(self.headers.get('Content-Length', 0))
+            # CS70-2: V3/R17-F2 同款守卫(此前裸 int()——非数字
+            # ValueError/负值 read(-n) 读 EOF 永久 wedge; 同族两有一无)。
+            try:
+                length = int(self.headers.get('Content-Length', 0))
+                if length < 0 or length > 10 * 1024 * 1024:
+                    raise ValueError
+            except ValueError:
+                self.send_error(411, 'Content-Length 非法')
+                return
             body = self.rfile.read(length) if length else b''
             qs = parse_qs(body.decode('utf-8', errors='replace'))
 

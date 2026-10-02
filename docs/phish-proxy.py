@@ -140,8 +140,15 @@ class ProxyHandler(BaseHTTPRequestHandler):
         self._respond(status, headers, body)
 
     def _respond(self, status, headers, body):
-        # CS69-5: respond 诗节 ×N 逐字抄收口(跳过逐跳头+重算长度)。
-        self._respond(status, headers, body)
+        # CS69-5/CS70-1: respond 诗节×2 收口(跳过逐跳头+重算长度)——
+        # DI 批次替换误把本函数体也换成自调用(RecursionError), 此为真身。
+        self.send_response(status)
+        for k, v in headers.items():
+            if k.lower() not in ('transfer-encoding', 'content-length'):
+                self.send_header(k, v)
+        self.send_header('Content-Length', str(len(body)))
+        self.end_headers()
+        self.wfile.write(body)
 
     def do_POST(self):
         u = urlparse(self.path)

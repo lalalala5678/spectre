@@ -10,7 +10,7 @@ hybridanalysis(需 HYBRIDANALYSIS_API_KEY)/private(私架端点 PRIVATE_QA_URL)�
 授权门:$SPECTRE_DATA_DIR/tools/c2/scope.json(容器位 /opt/tools/c2/, 宿主位数据根 tools/c2/),targets/exercise/窗口三必填。
 """
 import sys, os, json, subprocess, time, glob
-from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f, FAMILIES as _KNOWN  # CS69-2: 导入归顶(CS54-P2 单源)
+from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f, FAMILIES  # CS69-2/CS70-3: 归顶+裸名(c2-variant 先例)
 
 
 AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS36-Z4: 五列制式单源(_common.audit_log)
@@ -284,9 +284,9 @@ def cmd_run(args):
     # CS53-NEW-B: 转发面前置校验(此前拼写错在子进程 rc=2 被吞, 8 轮
     # 空转+假 manifest 指针)。
     _toks = fams.split(',')
-    _bad = [x for x in _toks if x and x not in _KNOWN]
+    _bad = [x for x in _toks if x and x not in FAMILIES]
     if _bad or not any(_toks):
-        print(f"用法错误: --families 未知/空族名: {fams}(合法: {','.join(_KNOWN)})", file=sys.stderr)
+        print(f"用法错误: --families 未知/空族名: {fams}(合法: {','.join(FAMILIES)})", file=sys.stderr)
         return 2
     base = os.path.splitext(os.path.basename(p))[0]
     work = f'/tmp/c2-qa-{base}-{int(time.time())}'
