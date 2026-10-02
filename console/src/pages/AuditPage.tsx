@@ -1,9 +1,12 @@
 import { useEffect, useState } from 'react';
-import { Download, Loader2 } from 'lucide-react';
+import { Download } from 'lucide-react';
 import { api } from '../api/client';
 import type { ApiBusEvent } from '../api/client';
-import { Dot } from '../components/ui/Badge';
+import { Badge, Dot } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Panel } from '../components/ui/Panel';
+import { Skeleton } from '../components/ui/Skeleton';
 
 /** 审计与证据链页 —— F23: 原为 mock 假数据,接真实 bus 事件流(WAL 持久审计源) */
 // CS67-5: 类型复用 ApiBusEvent 单源(此前手抄窄版且 to?/engagement?
@@ -42,58 +45,61 @@ export function AuditPage() {
         className="xl:col-span-2"
         bodyClassName="p-0"
       >
-        <div className="mb-2 flex justify-end">
-          <button
-            onClick={() => setExportTick(t => t + 1)}
-            className="flex items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[11px] text-zinc-400 hover:bg-void-700">
+        <div className="mb-2 flex justify-end px-3 pt-1">
+          <Button variant="secondary" size="sm" onClick={() => setExportTick(t => t + 1)}>
             <Download className="h-3 w-3" /> 导出 JSON
-          </button>
+          </Button>
 </div>
-        {err ? <div className="px-3 py-4 text-[11.5px] text-red-400">加载失败:{err}</div>
-          : !events ? <div className="flex items-center gap-2 px-3 py-4 text-[11.5px] text-zinc-500"><Loader2 className="h-3.5 w-3.5 animate-spin" />载入中…</div>
+        {err ? <div className="px-3 py-4 text-[13px] text-danger-text">加载失败:{err}</div>
+          : !events ? <div className="space-y-2 p-3">
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-full" />
+            <Skeleton className="h-6 w-2/3" />
+          </div>
+          : events.length === 0 ? <EmptyState icon={Download} title="暂无审计事件" hint="总线事件将在此实时列出" />
           : <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-void-700 text-[10px] uppercase tracking-wider text-zinc-600">
-              <th className="px-3 py-2 font-semibold">Seq</th>
-              <th className="px-3 py-2 font-semibold">时间</th>
-              <th className="px-3 py-2 font-semibold">Actor</th>
-              <th className="px-3 py-2 font-semibold">通道</th>
-              <th className="px-3 py-2 font-semibold">摘要</th>
+            <tr className="border-b border-line text-xs font-medium text-tertiary">
+              <th className="px-3 py-2.5">Seq</th>
+              <th className="px-3 py-2.5">时间</th>
+              <th className="px-3 py-2.5">Actor</th>
+              <th className="px-3 py-2.5">通道</th>
+              <th className="px-3 py-2.5">摘要</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-void-700">
+          <tbody className="divide-y divide-line">
             {shown.map((r) => (
-              <tr key={r.seq} className="hover:bg-void-800/60">
-                <td className="px-3 py-2 font-mono text-[11px] text-zinc-600">#{r.seq}</td>
-                <td className="px-3 py-2 font-mono text-[11px] text-zinc-600">{r.ts?.slice(5, 19).replace('T', ' ')}</td>
-                <td className="px-3 py-2">
-                  <span className={`font-mono text-[11px] ${r.from === 'user' || r.from === 'orchestrator' ? 'text-orange-300' : 'text-zinc-400'}`}>{r.from}</span>
+              <tr key={r.seq} className="hover:bg-surface-2/60">
+                <td className="px-3 py-2.5 font-mono text-xs tabular-nums text-tertiary">#{r.seq}</td>
+                <td className="px-3 py-2.5 font-mono text-xs tabular-nums text-tertiary">{r.ts?.slice(5, 19).replace('T', ' ')}</td>
+                <td className="px-3 py-2.5">
+                  <span className={`font-mono text-xs tabular-nums ${r.from === 'user' || r.from === 'orchestrator' ? 'text-accent-text' : 'text-secondary'}`}>{r.from}</span>
                 </td>
-                <td className="px-3 py-2 font-mono text-[11px] text-zinc-300">{r.channel}{r.type ? `:${r.type}` : ''}</td>
-                <td className="max-w-[420px] truncate px-3 py-2 text-[11.5px] text-zinc-500" title={r.summary}>{r.summary}</td>
+                <td className="px-3 py-2.5"><Badge tone="neutral">{r.channel}{r.type ? `:${r.type}` : ''}</Badge></td>
+                <td className="max-w-[420px] truncate px-3 py-2.5 text-[13px] text-secondary" title={r.summary}>{r.summary}</td>
               </tr>
             ))}
           </tbody>
         </table>}
         {events && events.length > limit && (
-          <button onClick={() => setLimit(l => l + 100)}
-            className="w-full border-t border-void-700 py-2 text-[11px] text-zinc-500 hover:text-zinc-300">
+          <Button variant="secondary" size="sm" className="m-3" onClick={() => setLimit(l => l + 100)}>
             加载更多({shown.length}/{events.length})
-          </button>
+          </Button>
         )}
       </Panel>
 
       <div className="space-y-3">
         <Panel title="审计链完整性">
-          <div className="space-y-2 text-[11.5px] text-zinc-500">
-            <div className="flex justify-between"><span>总线事件总量</span><span className="font-mono text-zinc-300">{events?.length ?? '…'}</span></div>
-            <div className="flex justify-between"><span>WAL 持久化</span><span className="flex items-center gap-1 font-mono text-zinc-300"><Dot tone="cyan" />state.wal</span></div>
-            <div className="flex justify-between"><span>journal 上限</span><span className="font-mono text-zinc-300">5000 事件(滚动)</span></div>
-            <div className="flex justify-between"><span>数据来源</span><span className="font-mono text-zinc-300">GET /api/bus(实时)</span></div>
+          <div className="space-y-2 text-[13px] text-secondary">
+            <div className="flex justify-between"><span>总线事件总量</span><span className="font-mono text-xs tabular-nums text-primary">{events?.length ?? '…'}</span></div>
+            <div className="flex justify-between"><span>WAL 持久化</span><span className="flex items-center gap-1 font-mono text-xs text-primary"><Dot tone="cyan" />state.wal</span></div>
+            <div className="flex justify-between"><span>journal 上限</span><span className="font-mono text-xs text-primary">5000 事件(滚动)</span></div>
+            <div className="flex justify-between"><span>数据来源</span><span className="font-mono text-xs text-primary">GET /api/bus(实时)</span></div>
           </div>
         </Panel>
         <Panel title="导出说明">
-          <div className="space-y-2 text-[11.5px] leading-relaxed text-zinc-500">
+          <div className="space-y-2 text-[13px] leading-relaxed text-tertiary">
             审计导出为内存 journal 最近 5000 条(滚动上限,seq 单调);修订链(revises/revision)
             与审批流(origin/requestedBy)字段均在事件内。签名/Merkle 属后续
             增强,当前以 WAL 追加语义保证不可改写历史。

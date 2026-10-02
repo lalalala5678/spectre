@@ -14,6 +14,7 @@ import { ShellPage } from './pages/ShellPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
 import type { RouteKey } from './types';
 import { setPendingOpen } from './api/openSessionChannel';
+import { initTheme } from './utils/theme';
 
 const STAGE_ROUTES: RouteKey[] = [
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
@@ -25,6 +26,8 @@ const CONFIG_AGENT_ROUTES: RouteKey[] = ['skill-config', 'mcp-config', 'cli-conf
 const VALID_ROUTES: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'reports', 'skills', 'mcp', 'cli', 'audit', 'shells', 'settings'];  // CS41-C6: 挂载期/运行时单源(此前逐字双份)
 
 export default function App() {
+  // §4.1: 断言 data-theme(与 index.html 防闪烁脚本一致)+无手工偏好时跟随系统
+  useEffect(() => initTheme(), []);
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
     const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
@@ -115,23 +118,23 @@ export default function App() {
   }, [route]);
 
   return (
-    <div className="flex h-screen w-screen overflow-hidden bg-void-950 font-sans text-slate-200">
+    <div className="flex h-screen w-screen overflow-hidden bg-bg font-sans text-primary">
       <Sidebar route={route} onRoute={nav} runningCount={runningCount} />
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar />
-        <main className="min-h-0 flex-1 overflow-hidden bg-void-950">
+        <main className="min-h-0 flex-1 overflow-hidden bg-bg">
           {[...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES].includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(route)} />
           ) : ['skills', 'mcp', 'cli'].includes(route) ? (
             // CS1-R9: 三配置页同构外壳收敛(页面组件查表)
             <div className="h-full overflow-hidden p-4">
               {wsId === null
-                ? <p className="animate-pulse py-10 text-center text-[11px] text-zinc-600">正在加载项目信息…</p>
+                ? <p className="py-10 text-center text-[13px] text-tertiary">正在加载项目信息…</p>
                 : wsId
                   ? (route === 'skills' ? <SkillsPage wsId={wsId} />
                     : route === 'mcp' ? <McpPage wsId={wsId} />
                     : <CliPage wsId={wsId} />)
-                  : <p className="py-10 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>}
+                  : <p className="py-10 text-center text-[13px] text-tertiary">无当前项目,请先在顶栏选择</p>}
             </div>
           ) : route === 'shells' ? (
             <ShellPage />

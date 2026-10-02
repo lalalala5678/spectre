@@ -4,6 +4,8 @@ import { api } from '../../api/client';
 import type { LlmFormatMeta } from '../../api/llmFormats';
 import { AgentLlmOverride } from '../AgentLlmOverride';
 import { Panel } from '../ui/Panel';
+import { EmptyState } from '../ui/EmptyState';
+import { Skeleton } from '../ui/Skeleton';
 import { Dot } from '../ui/Badge';
 import { SpawnLimitSettings } from './SpawnLimitSettings';
 import { RealSkillsPanel } from './RealSkillsPanel';
@@ -82,9 +84,9 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
               ['上下文压缩', cfg(comp.enabled, '开启')],
               ['API Key', llm.apiKey ? '已配置' : '(未配置)'],
             ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between gap-3 rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
-                <span className="shrink-0 text-[11px] text-zinc-500">{k}</span>
-                <span className="min-w-0 truncate font-mono text-[11.5px] text-zinc-300" title={v}>{v}</span>
+              <div key={k} className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-2.5 py-1.5">
+                <span className="shrink-0 text-xs text-tertiary">{k}</span>
+                <span className="min-w-0 truncate font-mono text-[13px] text-secondary" title={v}>{v}</span>
               </div>
             ))}
           </div>
@@ -94,21 +96,21 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
 
       {/* 挂载的 MCP */}
       <Panel title={`挂载的 MCP(${mine.length})`}>
-        {mcps === null ? <div className="text-[11.5px] text-zinc-500">载入中…</div>
-          : mine.length === 0 ? <div className="text-[11.5px] text-zinc-500">该 agent 暂无挂载的 MCP 服务器。</div>
+        {mcps === null ? <div className="space-y-1.5"><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div>
+          : mine.length === 0 ? <EmptyState icon={ShieldCheck} title="该 agent 暂无挂载的 MCP 服务器" />
           : <div className="space-y-1.5">
             {mine.map(m => (
-              <div key={m.name} className="rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
+              <div key={m.name} className="rounded-md border border-line bg-surface px-2.5 py-1.5">
                 <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-mono text-[11.5px] text-zinc-300">{m.name}</span>
+                  <span className="min-w-0 truncate font-mono text-[13px] text-secondary">{m.name}</span>
                   <Dot tone="cyan" />
                 </div>
-                <div className="mt-0.5 truncate font-mono text-[10px] text-zinc-600" title={m.url ?? m.command}>
+                <div className="mt-0.5 truncate font-mono text-xs text-tertiary" title={m.url ?? m.command}>
                   {m.transport === 'stdio' ? (Array.isArray(m.command) ? m.command.join(' ') : String(m.command ?? 'stdio')) : (m.url ?? m.transport ?? '')}
                 </div>
               </div>
             ))}
-            <a href="#mcp" className="block pt-1 text-[10.5px] text-orange-400/80 underline-offset-2 hover:underline">
+            <a href="#mcp" className="block pt-1 text-xs text-accent-text underline-offset-2 hover:underline">
               在「MCP Server」页管理挂载 →
             </a>
           </div>}
@@ -121,24 +123,24 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
 
       {/* 专属数据源 / 参数(编辑在设置页) */}
       <Panel title="专属配置(数据源 / 参数)">
-        {!myGroup ? <div className="text-[11.5px] text-zinc-500">该 agent 无专属数据源配置组(仅用全局通用配置)。</div>
+        {!myGroup ? <div className="text-[13px] text-tertiary">该 agent 无专属数据源配置组(仅用全局通用配置)。</div>
           : <div className="space-y-1.5">
             {myGroup.sources.map(src => {
               const vals = reconSources[src.id] ?? {};
               const has = hasCred(vals, src.id);  // R32D46-NEW-2: 第 7 处收敛
               return (
-                <div key={src.id} className="flex items-center justify-between gap-3 rounded-sm border border-void-700 bg-void-900 px-2.5 py-1.5">
+                <div key={src.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-2.5 py-1.5">
                   <div className="min-w-0">
-                    <div className="truncate text-[11.5px] text-zinc-300">{src.label}</div>
-                    <div className="truncate font-mono text-[9.5px] text-zinc-600">{src.fields.map(f => f.label).join(' / ')}</div>
+                    <div className="truncate text-[13px] text-secondary">{src.label}</div>
+                    <div className="truncate text-xs text-tertiary">{src.fields.map(f => f.label).join(' / ')}</div>
                   </div>
-                  {has ? <span className="flex shrink-0 items-center gap-1 font-mono text-[10px] text-emerald-400"><ShieldCheck className="h-3 w-3" />已配置</span>
-                    : <span className="shrink-0 font-mono text-[10px] text-zinc-600">未配置</span>}
+                  {has ? <span className="flex shrink-0 items-center gap-1 text-xs text-success-text"><ShieldCheck className="h-3 w-3" />已配置</span>
+                    : <span className="shrink-0 text-xs text-tertiary">未配置</span>}
                 </div>
               );
             })}
-            <div className="pt-1 text-[10.5px] text-zinc-600">{myGroup.hint}</div>
-            <a href="#settings" className="block text-[10.5px] text-orange-400/80 underline-offset-2 hover:underline">
+            <div className="pt-1 text-xs text-tertiary">{myGroup.hint}</div>
+            <a href="#settings" className="block text-xs text-accent-text underline-offset-2 hover:underline">
               在「设置」页配置(保存前真实连通校验) →
             </a>
           </div>}

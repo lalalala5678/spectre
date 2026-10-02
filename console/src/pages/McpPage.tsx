@@ -3,6 +3,10 @@ import { Globe, PlugZap, Plus, Terminal, Trash2 } from 'lucide-react';
 
 import { api } from '../api/client';
 import { ToolingChat } from '../components/ToolingChat';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Input, Label, Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
@@ -111,49 +115,49 @@ export function McpPage({ wsId }: { wsId: string }) {
       <Panel title="已注册 MCP Servers" className="min-h-0 xl:col-span-2" bodyClassName="p-0">
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-void-700 text-[10px] uppercase tracking-wider text-zinc-600">
-              <th className="px-3 py-2 font-semibold">名称</th>
-              <th className="px-3 py-2 font-semibold">传输</th>
-              <th className="px-3 py-2 font-semibold">挂载 Agent</th>
-              <th className="px-3 py-2 font-semibold">连接</th>
+            <tr className="border-b border-line text-xs font-medium text-tertiary">
+              <th className="px-3 py-2 font-medium">名称</th>
+              <th className="px-3 py-2 font-medium">传输</th>
+              <th className="px-3 py-2 font-medium">挂载 Agent</th>
+              <th className="px-3 py-2 font-medium">连接</th>
               <th className="px-3 py-2" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-void-700">
+          <tbody className="divide-y divide-line">
             {servers.map(s => (
-              <tr key={s.name} className="hover:bg-void-800/60">
+              <tr key={s.name} className="hover:bg-surface-2">
                 <td className="px-3 py-2.5">
-                  <div className="font-mono text-[12px] text-zinc-200">{s.name}</div>
-                  <div className="mt-0.5 flex items-center gap-1 font-mono text-[10px] text-zinc-600">
+                  <div className="font-mono text-[13px] text-primary">{s.name}</div>
+                  <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-tertiary">
                     {s.transport === 'http'
                       ? <><Globe className="h-3 w-3" />{s.url}</>
                       : <><Terminal className="h-3 w-3" />{(s.command ?? []).join(' ')} @{s.where}</>}
                   </div>
                 </td>
                 <td className="px-3 py-2.5">
-                  <span className={cn('rounded-sm px-1.5 py-0.5 font-mono text-[10px]',
-                    s.transport === 'http' ? 'bg-sky-950/60 text-sky-300' : 'bg-void-700 text-zinc-400')}>
+                  <Badge tone={s.transport === 'http' ? 'info' : 'neutral'}>
                     {s.transport}
-                  </span>
+                  </Badge>
                 </td>
                 <td className="px-3 py-2.5">
                   <div className="flex flex-wrap gap-1">
                     {(s.agents ?? []).map(a => (
-                      <span key={a} className="rounded-sm bg-void-700 px-1.5 py-0.5 font-mono text-[10px] text-orange-300/90">{a}</span>
+                      <Badge key={a} tone="accent">{a}</Badge>
                     ))}
                   </div>
                 </td>
                 <td className="px-3 py-2.5">
-                  <button
+                  <Button
                     onClick={() => void test(s.name)}
                     disabled={testing === s.name}
-                    className="flex items-center gap-1 rounded-sm border border-void-600 px-2 py-1 text-[10px] text-zinc-300 hover:border-void-400 disabled:opacity-50"
+                    variant="secondary"
+                    size="sm"
                   >
                     <PlugZap className="h-3 w-3" /> {testing === s.name ? '测试中' : '连通测试'}
-                  </button>
+                  </Button>
                   {results[s.name] && (
-                    <div className={cn('mt-1 font-mono text-[9.5px]',
-                      results[s.name].startsWith('✓') ? 'text-emerald-400' : 'text-red-400')}>
+                    <div className={cn('mt-1 font-mono text-xs',
+                      results[s.name].startsWith('✓') ? 'text-success-text' : 'text-danger-text')}>
                       {results[s.name]}
                     </div>
                   )}
@@ -161,7 +165,7 @@ export function McpPage({ wsId }: { wsId: string }) {
                 <td className="px-3 py-2.5 text-right">
                   <button
                     onClick={() => void remove(s.name)}
-                    className="rounded-sm p-1 text-zinc-600 hover:bg-void-700 hover:text-red-400"
+                    className="rounded-md p-1 text-tertiary hover:bg-surface-2 hover:text-danger-text"
                   >
                     <Trash2 className="h-3.5 w-3.5" />
                   </button>
@@ -169,8 +173,9 @@ export function McpPage({ wsId }: { wsId: string }) {
               </tr>
             ))}
             {servers.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-8 text-center text-[11px] text-zinc-600">
-                暂无注册 — 远程 server 填 URL 直连；本地 server 填启动命令
+              <tr><td colSpan={5} className="px-3 py-8">
+                <EmptyState icon={PlugZap} title="暂无注册"
+                  hint="远程 server 填 URL 直连；本地 server 填启动命令" />
               </td></tr>
             )}
           </tbody>
@@ -179,45 +184,43 @@ export function McpPage({ wsId }: { wsId: string }) {
 
       <div className="flex min-h-0 flex-col gap-3">
       <Panel title="注册新 Server" bodyClassName="p-3 space-y-2">
-        <input
+        <Input
           value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
           placeholder="名称（如 shodan）"
-          className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
         />
         <div className="flex gap-2">
           {(['http', 'stdio'] as const).map(t => (
             <button key={t} onClick={() => setForm({ ...form, transport: t })}
-              className={cn('flex-1 rounded-sm border px-2 py-1 font-mono text-[11px]',
-                form.transport === t ? 'border-orange-600 bg-orange-950/30 text-orange-300' : 'border-void-600 text-zinc-500')}>
+              className={cn('flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
+                form.transport === t ? 'border-accent bg-accent-subtle text-accent-text' : 'border-line-strong bg-surface text-secondary hover:bg-surface-2')}>
               {t === 'http' ? '远程 HTTP' : '本地 stdio'}
             </button>
           ))}
         </div>
         {form.transport === 'http' ? (
           <>
-            <input
+            <Input
               value={form.url} onChange={e => setForm({ ...form, url: e.target.value })}
               placeholder="https://your-host/mcp（用户自建机器）"
-              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
             />
-            <textarea
+            <Textarea
               value={form.headersJson} onChange={e => setForm({ ...form, headersJson: e.target.value })}
               rows={2} placeholder='{"Authorization":"Bearer …"}'
-              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[11px] text-zinc-200 placeholder:text-zinc-600"
+              className="font-mono"
             />
           </>
         ) : (
           <>
-            <input
+            <Input
               value={form.commandStr} onChange={e => setForm({ ...form, commandStr: e.target.value })}
               placeholder="启动命令（如 node /opt/mcp-shodan.mjs）"
-              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
+              className="font-mono"
             />
             <div className="flex gap-2">
               {(['host', 'sandbox'] as const).map(w => (
                 <button key={w} onClick={() => setForm({ ...form, where: w })}
-                  className={cn('flex-1 rounded-sm border px-2 py-1 font-mono text-[10px]',
-                    form.where === w ? 'border-orange-600 bg-orange-950/30 text-orange-300' : 'border-void-600 text-zinc-500')}>
+                  className={cn('flex-1 rounded-md border px-2 py-1 text-xs font-medium transition-colors',
+                    form.where === w ? 'border-accent bg-accent-subtle text-accent-text' : 'border-line-strong bg-surface text-secondary hover:bg-surface-2')}>
                   {w === 'host' ? '宿主进程' : '沙箱内进程'}
                 </button>
               ))}
@@ -225,25 +228,27 @@ export function McpPage({ wsId }: { wsId: string }) {
           </>
         )}
         <div>
-          <p className="mb-1 text-[10px] uppercase tracking-wider text-zinc-600">挂载 Agent</p>
+          <Label className="mb-1 block text-xs">挂载 Agent</Label>
           <div className="flex flex-wrap gap-1">
             {AGENTS.map(a => (
               <button key={a} onClick={() => toggleAgent(a)}
-                className={cn('rounded-sm px-1.5 py-0.5 font-mono text-[10px]',
-                  form.agents.includes(a) ? 'bg-orange-950/60 text-orange-300 border border-orange-800' : 'bg-void-800 text-zinc-500 border border-void-700')}>
+                className={cn('rounded-md px-1.5 py-0.5 text-xs font-medium transition-colors',
+                  form.agents.includes(a) ? 'bg-accent-subtle text-accent-text border border-accent' : 'bg-surface-2 text-secondary border border-line')}>
                 {a}
               </button>
             ))}
           </div>
         </div>
-        <button
+        <Button
           onClick={() => void create()}
-            disabled={busy}
-          className="flex w-full items-center justify-center gap-1 rounded-sm bg-orange-600 px-2 py-1.5 text-[11px] font-medium text-white hover:bg-orange-500"
+          disabled={busy}
+          variant="primary"
+          size="sm"
+          className="w-full"
         >
           <Plus className="h-3 w-3" /> 注册并挂载
-        </button>
-        {msg && <p className="font-mono text-[10.5px] text-amber-400">{msg}</p>}
+        </Button>
+        {msg && <p className="text-xs text-warning-text">{msg}</p>}
       </Panel>
       <ToolingChat agentKey="mcp-config" workSessionId={wsId} />
       </div>

@@ -2,8 +2,10 @@
 import { useEffect, useState } from 'react';
 import { cn } from '../../utils/cn';
 import { api } from '../../api/client';
-import { ChevronDown, ChevronRight } from 'lucide-react';
+import { ChevronDown, ChevronRight, FileText } from 'lucide-react';
 import { Dot } from '../ui/Badge';
+import { Skeleton } from '../ui/Skeleton';
+import { EmptyState } from '../ui/EmptyState';
 
 /** F24: 真实技能只读面板(原 mock 假技能名列表) */
 export function RealSkillsPanel({ agentKey, expandable = false }: { agentKey: string; expandable?: boolean }) {
@@ -38,30 +40,33 @@ export function RealSkillsPanel({ agentKey, expandable = false }: { agentKey: st
     }
   };
 
-  if (err) return <div className="text-[11.5px] text-red-400">加载失败:{err}</div>;
-  if (!names) return <div className="text-[11.5px] text-zinc-500">载入中…</div>;
-  if (!names.length) return <div className="text-[11.5px] text-zinc-500">该 agent 暂无挂载技能。</div>;
+  if (err) return <div className="text-[13px] text-danger-text">加载失败:{err}</div>;
+  if (!names) return <div className="space-y-1.5">
+    <Skeleton className="h-8 w-full" />
+    <Skeleton className="h-8 w-full" />
+  </div>;
+  if (!names.length) return <EmptyState icon={FileText} title="该 agent 暂无挂载技能" />;
   return (
     <div className="space-y-1.5">
       {names.map(n => (
-        <div key={n} className="min-w-0 rounded-sm border border-void-700 bg-void-900">
+        <div key={n} className="min-w-0 rounded-md border border-line bg-surface">
           <button
             onClick={expandable ? () => void toggle(n) : undefined}
-            className={cn('flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left', expandable && 'hover:bg-void-800/60')}
+            className={cn('flex w-full items-center justify-between gap-2 px-2.5 py-1.5 text-left', expandable && 'hover:bg-surface-2/60')}
           >
             <span className="flex min-w-0 items-center gap-1.5">
               {expandable && (open === n
-                ? <ChevronDown className="h-3 w-3 shrink-0 text-zinc-600" />
-                : <ChevronRight className="h-3 w-3 shrink-0 text-zinc-600" />)}
-              <span className="truncate font-mono text-[11.5px] text-zinc-300">#{n}</span>
+                ? <ChevronDown className="h-3 w-3 shrink-0 text-tertiary" />
+                : <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />)}
+              <span className="truncate font-mono text-[13px] text-secondary">#{n}</span>
             </span>
             <Dot tone="cyan" />
           </button>
           {expandable && open === n && (
-            <div className="border-t border-void-700 px-2.5 py-2">
+            <div className="border-t border-line px-2.5 py-2">
               {loading === n && content[n] === undefined
-                ? <div className="text-[11px] text-zinc-500">载入中…</div>
-                : <pre className="max-h-80 w-full min-w-0 overflow-auto whitespace-pre-wrap break-words rounded-sm bg-void-950 p-2 font-mono text-[10.5px] leading-relaxed text-zinc-400">{content[n]}</pre>}
+                ? <Skeleton className="h-16 w-full" />
+                : <pre className="max-h-80 w-full min-w-0 overflow-auto whitespace-pre-wrap break-words rounded-md bg-bg p-2 font-mono text-[13px] leading-relaxed text-secondary">{content[n]}</pre>}
             </div>
           )}
         </div>

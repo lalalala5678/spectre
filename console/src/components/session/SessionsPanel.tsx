@@ -1,7 +1,9 @@
-import { Plus } from 'lucide-react';
+import { Plus, MessageSquare } from 'lucide-react';
 
 import type { ApiSessionSummary } from '../../api/client';
+import { Button } from '../ui/Button';
 import { Dot } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
 import { cn } from '../../utils/cn';
 
 /**
@@ -17,45 +19,42 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
   onNew: () => void;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">
-      <header className="flex items-center justify-between border-b border-void-700 px-3 py-1.5">
-        <h3 className="text-[11px] font-semibold uppercase tracking-widest text-zinc-500">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
+      <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
+        <h3 className="text-xs font-semibold text-secondary">
           会话
         </h3>
-        <button
-          onClick={onNew}
-          className="flex items-center gap-1 rounded-sm bg-orange-600 px-2 py-0.5 text-[10px] font-medium text-white hover:bg-orange-500"
-        >
+        <Button onClick={onNew} variant="primary" size="sm">
           <Plus className="h-3 w-3" /> 新对话
-        </button>
+        </Button>
       </header>
       <div className="flex-1 space-y-1 overflow-y-auto p-2">
         {sessions.length === 0 && (
-          <p className="py-3 text-center text-[11px] text-zinc-700">暂无会话</p>
+          <EmptyState icon={MessageSquare} title="暂无会话" />
         )}
         {sessions.map(session => (
           <button
             key={session.id}
             onClick={() => onSelect(session.id)}
             className={cn(
-              'flex w-full items-center gap-2 rounded-sm border px-2 py-1.5 text-left',
+              'flex min-h-11 w-full items-center gap-2 rounded-md border px-2 py-1.5 text-left',
               session.id === currentId
-                ? 'border-orange-800 bg-orange-950/20'
-                : 'border-void-700 bg-void-900 hover:border-void-500',
+                ? 'border-accent bg-accent-subtle'
+                : 'border-line bg-surface hover:bg-surface-2',
             )}
           >
             <Dot tone={session.busy ? 'orange' : 'slate'} pulse={session.busy} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-[12.5px] text-zinc-300">
+                <span className="truncate text-sm font-medium text-primary">
                   {session.name ?? session.id}
                 </span>
-                <span className="shrink-0 font-mono text-[10px] text-zinc-600">
+                <span className="shrink-0 text-xs tabular-nums text-tertiary">
                   {session.messages} msgs
                 </span>
               </div>
               {(session.brief || session.title) && (
-                <p className="mt-px truncate text-[10.5px] leading-tight text-zinc-500">
+                <p className="mt-px truncate text-xs leading-tight text-tertiary">
                   {session.brief ?? session.title}
                 </p>
               )}

@@ -5,6 +5,10 @@ import { cn } from '../utils/cn';
 import { AgentLlmOverride } from '../components/AgentLlmOverride';
 import { hasCred } from '../utils/hasCred';
 import type { LlmFormatMeta } from '../api/llmFormats';
+import { Badge, type BadgeTone } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { Input, Select } from '../components/ui/Input';
+import { Skeleton } from '../components/ui/Skeleton';
 
 /**
  * 设置页 — 通用配置(全局)+ Agent 特有配置(数据源/LLM 覆盖)。
@@ -38,10 +42,10 @@ interface SettingsPayload {
   };
 }
 
-const TIER_STYLE: Record<string, { label: string; chip: string; dot: string; groupLabel: string }> = {
-  P0: { label: 'P0', chip: 'border-orange-600/60 bg-orange-950/50 text-orange-300', dot: 'bg-orange-400', groupLabel: '必配 · 三大结构性缺口(fofa/github/cse)' },
-  P1: { label: 'P1', chip: 'border-amber-700/50 bg-amber-950/40 text-amber-300', dot: 'bg-amber-400', groupLabel: '建议 · 免费层够用' },
-  P2: { label: 'P2', chip: 'border-zinc-600/60 bg-zinc-800/60 text-zinc-400', dot: 'bg-zinc-500', groupLabel: '增益 · 多源并集提覆盖' },
+const TIER_STYLE: Record<string, { label: string; tone: BadgeTone; dot: string; groupLabel: string }> = {
+  P0: { label: 'P0', tone: 'danger', dot: 'bg-danger-text', groupLabel: '必配 · 三大结构性缺口(fofa/github/cse)' },
+  P1: { label: 'P1', tone: 'warning', dot: 'bg-warning-text', groupLabel: '建议 · 免费层够用' },
+  P2: { label: 'P2', tone: 'neutral', dot: 'bg-faint', groupLabel: '增益 · 多源并集提覆盖' },
 };
 
 /** 单字段行:label + input/select + 保存按钮(未保存高亮/转圈/成功/失败态) */
@@ -74,52 +78,52 @@ function FieldRow({ def, value, onSave }: {
   }
 
   return (
-    <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 py-2.5 transition-colors hover:bg-void-800/30">
+    <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 py-2.5 transition-colors hover:bg-surface-2/40">
       <div className="min-w-0 pl-1">
-        <div className="text-[12.5px] text-zinc-300">{def.label}</div>
-        {def.hint && <div className="mt-0.5 text-[10.5px] leading-tight text-zinc-600">{def.hint}</div>}
+        <div className="text-[13px] font-medium text-secondary">{def.label}</div>
+        {def.hint && <div className="mt-0.5 text-xs leading-tight text-tertiary">{def.hint}</div>}
       </div>
       <div className="min-w-0">
         {def.type === 'select' ? (
-          <select
+          <Select
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
-            className="w-full max-w-md cursor-pointer rounded-sm border border-void-600 bg-void-950 px-2.5 py-1.5 font-mono text-[12.5px] text-zinc-200 outline-none transition-colors hover:border-void-500 focus:border-orange-700"
+            className="max-w-md"
           >
             {(def.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
-          </select>
+          </Select>
         ) : (
-          <input
+          <Input
             type={def.type === 'password' ? 'password' : def.type === 'number' ? 'number' : 'text'}
             value={draft}
             placeholder={def.placeholder}
             onChange={(e) => { setDraft(e.target.value); if (state !== 'saving') setState('idle'); }}
             onKeyDown={(e) => { if (e.key === 'Enter') void save(); }}
-            className={cn('w-full max-w-md rounded-sm border bg-void-950 px-2.5 py-1.5 font-mono text-[12.5px] text-zinc-200 outline-none transition-colors',
-              state === 'err' ? 'border-red-800' : dirty ? 'border-orange-700' : 'border-void-600 hover:border-void-500 focus:border-orange-700')}
+            className={cn('max-w-md',
+              (def.id.endsWith('apiKey') || def.id.endsWith('baseUrl')) && 'font-mono text-[13px]',
+              state === 'err' ? 'border-danger-line' : dirty && 'border-accent')}
           />
         )}
         {state === 'err' && (
-          <div className="mt-1.5 flex items-start gap-1.5 rounded-sm border border-red-900/50 bg-red-950/30 px-2 py-1 text-[11px] leading-snug text-red-300">
+          <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-danger-line bg-danger-bg px-2 py-1 text-[13px] leading-snug text-danger-text">
             <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />{msg || '校验失败'}
           </div>
         )}
       </div>
-      <button
+      <Button
         onClick={() => void save()}
         disabled={!dirty || state === 'saving'}
-        className={cn('flex w-[76px] items-center justify-center gap-1.5 rounded-sm border px-3 py-1.5 font-mono text-[11.5px] transition-all',
-          state === 'ok' ? 'border-emerald-700 bg-emerald-950/40 text-emerald-400'
-            : state === 'saving' ? 'border-void-600 bg-void-800 text-zinc-300'
-            : dirty ? 'border-orange-600 bg-orange-950/40 text-orange-300 hover:bg-orange-900/50 active:scale-95'
-            : 'border-void-800 text-zinc-700')}
+        variant="primary"
+        size="sm"
+        className={cn('min-w-20',
+          state === 'ok' && 'border-success-line bg-success-bg text-success-text hover:bg-success-bg')}
       >
         {state === 'saving'
           ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />检测中</>
           : state === 'ok'
             ? <><Check className="h-3.5 w-3.5" />已保存</>
             : '保存'}
-      </button>
+      </Button>
     </div>
   );
 }
@@ -140,31 +144,29 @@ function SourceCard({ src, cfg, onSave, verify }: {
   const tier = TIER_STYLE[src.tier ?? 'P2'];
   const verifyState = verify;
   return (
-    <div className={cn('overflow-hidden rounded border transition-colors',
-      mounted ? 'border-emerald-900/60 bg-void-900/40' : 'border-void-700 bg-void-900/20')}>
+    <div className={cn('overflow-hidden rounded-lg border transition-colors',
+      mounted ? 'border-success-line bg-surface' : 'border-line bg-surface')}>
       <button
         onClick={() => setOpen(!open)}
-        className="flex w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-void-800/40"
+        className="flex min-h-12 w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/40"
       >
-        <span className={cn('h-2 w-2 shrink-0 rounded-full', mounted ? 'bg-emerald-400 shadow-[0_0_6px] shadow-emerald-500/60' : tier.dot)} />
-        <span className="text-[13px] font-medium text-zinc-200">{src.label}</span>
-        <span className={cn('ml-auto shrink-0 rounded-sm px-2 py-0.5 font-mono text-[10px]',
-          verifyState && !verifyState.ok ? 'bg-red-950/60 text-red-400'
-            : mounted ? 'bg-emerald-950/60 text-emerald-400' : 'bg-void-800 text-zinc-500')}>
+        <span className={cn('h-2 w-2 shrink-0 rounded-full', mounted ? 'bg-success-text' : tier.dot)} />
+        <span className="text-[13px] font-medium text-primary">{src.label}</span>
+        <Badge tone={verifyState && !verifyState.ok ? 'danger' : mounted ? 'success' : 'neutral'} className="ml-auto shrink-0">
           {verifyState && !verifyState.ok
             ? 'key 已失效 · 不注入'
             : isParams ? `参数组 · ${paramCount} 项已注入`
             : mounted ? (verifyState ? '已验证 · 已注入' : '已挂载 MCP') : '未配置 · 不注入'}
-        </span>
+        </Badge>
         {verifyState && !verifyState.ok && verifyState.error && (
-          <span className="max-w-[220px] truncate font-mono text-[9.5px] text-red-400/70" title={verifyState.error}>{verifyState.error}</span>
+          <span className="max-w-[220px] truncate font-mono text-xs text-danger-text/80" title={verifyState.error}>{verifyState.error}</span>
         )}
-        <svg className={cn('h-3.5 w-3.5 shrink-0 text-zinc-500 transition-transform', open && 'rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg className={cn('h-3.5 w-3.5 shrink-0 text-tertiary transition-transform', open && 'rotate-90')} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M9 18l6-6-6-6" />
         </svg>
       </button>
       {open && (
-        <div className="divide-y divide-void-800 border-t border-void-800/70">
+        <div className="divide-y divide-line border-t border-line">
           {src.fields.map((f) => (
             <FieldRow
               key={f.id}
@@ -217,8 +219,12 @@ export function SettingsPage() {
     await reload();
   };
 
-  if (err) return <div className="p-6 text-red-400">设置加载失败:{err}</div>;
-  if (!data) return <div className="animate-pulse p-6 text-zinc-500">加载中…</div>;
+  if (err) return <div className="p-6 text-sm text-danger-text">设置加载失败:{err}</div>;
+  if (!data) return <div className="space-y-3 p-6">
+    <Skeleton className="h-8 w-full" />
+    <Skeleton className="h-24 w-full" />
+    <Skeleton className="h-24 w-full" />
+  </div>;
 
   const cs = data.common ?? {};
   const llm = (cs.llm ?? {}) as Record<string, string>;
@@ -237,31 +243,31 @@ export function SettingsPage() {
       {/* 标题 + 概览 */}
       <div className="mb-6 flex items-end justify-between">
         <div>
-          <h1 className="flex items-center gap-2 text-[16px] font-medium text-zinc-100">
-            <Sparkles className="h-4 w-4 text-orange-400" />设置
+          <h1 className="flex items-center gap-2 text-[16px] font-medium text-primary">
+            <Sparkles className="h-4 w-4 text-accent-text" />设置
           </h1>
-          <p className="mt-1 text-[11.5px] text-zinc-500">
+          <p className="mt-1 text-[13px] text-tertiary">
             大多数字段独立保存(逐字段探测/范围校验,失败不落盘);大模型供应商为四字段整体保存+整体探测。
           </p>
         </div>
         <div className="flex items-center gap-2">
-          <button onClick={() => void runVerify()} disabled={verifying}
-            className="mb-1 flex items-center gap-1.5 rounded-sm border border-void-600 px-2.5 py-1 font-mono text-[11px] text-zinc-300 transition-colors hover:border-orange-700 hover:text-orange-300 disabled:opacity-50">
+          <Button onClick={() => void runVerify()} disabled={verifying} variant="secondary" size="sm" className="mb-1">
             {verifying ? <><Loader2 className="h-3 w-3 animate-spin" />复查中</> : <><ShieldCheck className="h-3 w-3" />复查可用性</>}
-          </button>
-          {verifySummary && <span className="mb-1 text-[11px] text-zinc-400">{verifySummary}</span>}
-          <button onClick={() => void reload()} title="刷新"
-            className="mb-1 text-zinc-600 transition-colors hover:text-zinc-300"><RotateCw className="h-3.5 w-3.5" /></button>
+          </Button>
+          {verifySummary && <span className="mb-1 text-[13px] text-tertiary">{verifySummary}</span>}
+          <Button onClick={() => void reload()} title="刷新" variant="ghost" size="icon" className="mb-1">
+            <RotateCw className="h-3.5 w-3.5" />
+          </Button>
         </div>
       </div>
 
       {/* ---------- 通用配置(全局) ---------- */}
-      <section className="mb-8 overflow-hidden rounded border border-void-700 bg-void-900/30">
-        <div className="flex items-center gap-2 border-b border-void-700 bg-gradient-to-r from-void-800/60 to-transparent px-4 py-3">
-          <ShieldCheck className="h-3.5 w-3.5 text-zinc-400" />
-          <span className="text-[12.5px] font-medium text-zinc-200">{data.schema.common.label}</span>
+      <section className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+          <ShieldCheck className="h-3.5 w-3.5 text-tertiary" />
+          <span className="text-[13px] font-medium text-primary">{data.schema.common.label}</span>
         </div>
-        <div className="divide-y divide-void-800/70">
+        <div className="divide-y divide-line">
           {/* R32D45-N1: llm 四字段(格式/URL/Key/模型)走原子编辑器——
               逐字段保存×合并探测有跨厂商中间态死锁(换供应商先存 URL
               的瞬间=新 URL+旧 key→401 存不进)。 */}
@@ -282,25 +288,25 @@ export function SettingsPage() {
       </section>
 
       {/* ---------- R32D44: 单 Agent 大模型供应商覆盖 ---------- */}
-      <section className="mb-8 overflow-hidden rounded border border-void-700 bg-void-900/30">
-        <div className="flex items-center gap-2 border-b border-void-700 bg-gradient-to-r from-void-800/60 to-transparent px-4 py-3">
-          <span className="text-[12.5px] font-medium text-zinc-200">单 Agent 大模型覆盖</span>
-          <span className="text-[10.5px] text-zinc-500">默认供应商之上按 agent 换厂商/模型(例: 默认 GLM, 报告 agent 用 DeepSeek)</span>
+      <section className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
+        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+          <span className="text-[13px] font-medium text-primary">单 Agent 大模型覆盖</span>
+          <span className="text-xs text-tertiary">默认供应商之上按 agent 换厂商/模型(例: 默认 GLM, 报告 agent 用 DeepSeek)</span>
         </div>
-        <p className="border-b border-void-800/70 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">
+        <p className="border-b border-line px-4 py-2 text-xs leading-relaxed text-tertiary">
           四字段全留空=完全继承默认;填任一项并保存会用「覆盖后的生效配置」做真实连通探测, 通过才落盘。清除某项=保存空值。
         </p>
-        <div className="divide-y divide-void-800/70">
+        <div className="divide-y divide-line">
           {(data.schema.agentLlm ?? []).map((g) => {
             const ov = data.agentLlm?.[g.agentKey] ?? {};
             const overridden = Boolean(ov.baseUrl || ov.apiKey || ov.model || ov.format);
             return (
               <div key={g.agentKey} className="px-4 py-2.5">
                 <div className="mb-1.5 flex items-center gap-2">
-                  <span className="text-[11.5px] font-medium text-zinc-300">{g.label}</span>
+                  <span className="text-[13px] font-medium text-secondary">{g.label}</span>
                   {overridden
-                    ? <span className="rounded-sm bg-orange-950/60 px-1.5 py-0.5 font-mono text-[9.5px] text-orange-300">已覆盖</span>
-                    : <span className="rounded-sm bg-void-800 px-1.5 py-0.5 font-mono text-[9.5px] text-zinc-600">用默认</span>}
+                    ? <Badge tone="accent">已覆盖</Badge>
+                    : <Badge tone="neutral">用默认</Badge>}
                 </div>
                 {/* CS16-P1: 原子四字段编辑器(与 agent 配置页签同款共享组件)——
                     逐字段保存×整体探测有跨供应商中间态死锁 */}
@@ -313,15 +319,15 @@ export function SettingsPage() {
 
       {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
       {otherAgents.map((agent) => (
-        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded border border-void-700 bg-void-900/30">
-          <div className="flex items-center gap-2 border-b border-void-700 bg-gradient-to-r from-void-800/60 to-transparent px-4 py-3">
-            <span className="text-[12.5px] font-medium text-zinc-200">{agent.label}</span>
+        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
+          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+            <span className="text-[13px] font-medium text-primary">{agent.label}</span>
           </div>
-          {agent.hint && <p className="border-b border-void-800/70 px-4 py-2 text-[11px] leading-relaxed text-zinc-500">{agent.hint}</p>}
+          {agent.hint && <p className="border-b border-line px-4 py-2 text-xs leading-relaxed text-tertiary">{agent.hint}</p>}
           {agent.sources.length === 0 ? (
-            <div className="px-4 py-3 text-[11.5px] text-zinc-500">该智能体无独立数据源配置。</div>
+            <div className="px-4 py-3 text-[13px] text-tertiary">该智能体无独立数据源配置。</div>
           ) : (
-            <div className="divide-y divide-void-800/70">
+            <div className="divide-y divide-line">
               {agent.sources.map((src) => (
                 <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
               ))}
@@ -335,30 +341,30 @@ export function SettingsPage() {
       <section className="mb-8">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Radar className="h-4 w-4 text-orange-400" />
-            <span className="text-[13.5px] font-medium text-zinc-100">资产测绘 Agent · 数据源</span>
-            <span className="text-[11px] text-zinc-500">按重要性排序</span>
+            <Radar className="h-4 w-4 text-accent-text" />
+            <span className="text-[13px] font-medium text-primary">资产测绘 Agent · 数据源</span>
+            <span className="text-xs text-tertiary">按重要性排序</span>
           </div>
-          <div className="flex items-center gap-2 font-mono text-[11px]">
-            <span className="text-zinc-500">已启用</span>
-            <span className={cn('rounded-sm px-2 py-0.5', mountedCount ? 'bg-emerald-950/60 text-emerald-400' : 'bg-void-800 text-zinc-500')}>
+          <div className="flex items-center gap-2 text-xs">
+            <span className="text-tertiary">已启用</span>
+            <Badge tone={mountedCount ? 'success' : 'neutral'} className="font-mono tabular-nums">
               {mountedCount}/{sources.length}
-            </span>
-            <span className={cn('rounded-sm px-2 py-0.5', mountedCount ? 'bg-orange-950/60 text-orange-300' : 'bg-void-800 text-zinc-600')}>
+            </Badge>
+            <Badge tone={mountedCount ? 'accent' : 'neutral'}>
               MCP {mountedCount ? '已挂载' : '未挂载'}
-            </span>
+            </Badge>
           </div>
         </div>
-        <p className="mb-4 text-[11px] leading-relaxed text-zinc-500">
+        <p className="mb-4 text-xs leading-relaxed text-tertiary">
           填好并通过连通验证的源才会挂载为 MCP 工具;未配置的源对 agent 完全不可见(零污染)。Base URL 留空一律使用官方地址。
         </p>
 
         {(['P0', 'P1', 'P2'] as const).map((t) => (
           <div key={t} className="mb-4">
             <div className="mb-2 flex items-center gap-2">
-              <span className={cn('h-1.5 w-1.5 rounded-full', TIER_STYLE[t].dot)} />
-              <span className="text-[11.5px] font-medium text-zinc-400">{TIER_STYLE[t].groupLabel}</span>
-              <span className="h-px flex-1 bg-gradient-to-r from-void-700 to-transparent" />
+              <Badge tone={TIER_STYLE[t].tone} className="font-mono">{TIER_STYLE[t].label}</Badge>
+              <span className="text-[13px] font-medium text-secondary">{TIER_STYLE[t].groupLabel}</span>
+              <span className="h-px flex-1 bg-line" />
             </div>
             <div className="space-y-2">
               {byTier(t).map((src) => (

@@ -1,8 +1,12 @@
 import { useEffect, useState } from 'react';
-import { FileCode2, Plus, Search, Trash2 } from 'lucide-react';
+import { FileCode2, PackageOpen, Plus, Search, Trash2 } from 'lucide-react';
 
 import { api } from '../api/client';
 import { ToolingChat } from '../components/ToolingChat';
+import { Badge } from '../components/ui/Badge';
+import { Button } from '../components/ui/Button';
+import { EmptyState } from '../components/ui/EmptyState';
+import { Input, Select, Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
@@ -72,114 +76,112 @@ export function SkillsPage({ wsId }: { wsId: string }) {
         title="已挂载 Skills（按 Agent）"
         right={
           <div className="flex items-center gap-2">
-            <div className="relative">
-              <Search className="pointer-events-none absolute left-2 top-1/2 h-3 w-3 -translate-y-1/2 text-zinc-600" />
-              <input
+            <div className="relative w-48">
+              <Search className="pointer-events-none absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-faint" />
+              <Input
                 value={filter}
                 onChange={e => setFilter(e.target.value)}
                 placeholder="过滤…"
-                className="w-36 rounded-sm border border-void-600 bg-void-900 py-1 pl-7 pr-2 text-[11px] text-zinc-200 placeholder:text-zinc-600 outline-none focus:border-void-500"
+                className="pl-8"
               />
             </div>
-            <button
-              onClick={() => setCreating(v => !v)}
-              className="flex items-center gap-1 rounded-sm bg-orange-600 px-2 py-1 text-[11px] font-medium text-white hover:bg-orange-500"
-            >
-              <Plus className="h-3 w-3" /> {creating ? '收起' : '导入 Skill'}
-            </button>
+            <Button variant="primary" size="sm" onClick={() => setCreating(v => !v)}>
+              <Plus className="h-3.5 w-3.5" /> {creating ? '收起' : '导入 Skill'}
+            </Button>
           </div>
         }
         className="min-h-0 xl:col-span-2"
         bodyClassName="p-0"
       >
         {creating && (
-          <div className="space-y-2 border-b border-void-700 p-3">
+          <div className="m-4 space-y-3 rounded-lg border border-line bg-surface-2 p-4">
             <div className="flex gap-2">
-              <select
+              <Select
                 value={form.agentKey}
                 onChange={e => setForm({ ...form, agentKey: e.target.value })}
-                className="rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200"
+                className="w-36"
               >
                 {AGENTS.map(a => <option key={a} value={a}>{a}</option>)}
-              </select>
-              <input
+              </Select>
+              <Input
                 value={form.name}
                 onChange={e => setForm({ ...form, name: e.target.value })}
                 placeholder="skill 名（如 subdomain-sweep）"
-                className="flex-1 rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
+                className="flex-1"
               />
-              <input
+              <Input
                 value={form.description}
                 onChange={e => setForm({ ...form, description: e.target.value })}
                 placeholder="触发条件一句话（进索引）"
-                className="flex-1 rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 text-[12px] text-zinc-200 placeholder:text-zinc-600"
+                className="flex-1"
               />
             </div>
-            <textarea
+            <Textarea
               value={form.content}
               onChange={e => setForm({ ...form, content: e.target.value })}
               rows={6}
               placeholder="技能全文 markdown（SKILL.md 正文；模型按需读取）"
-              className="w-full rounded-sm border border-void-600 bg-void-900 px-2 py-1.5 font-mono text-[12px] text-zinc-200 placeholder:text-zinc-600"
+              className="font-mono text-[13px]"
             />
-            <button
-              onClick={() => void create()}
-              disabled={busy}
-              className="rounded-sm bg-orange-600 px-3 py-1 text-[11px] font-medium text-white hover:bg-orange-500 disabled:opacity-50"
-            >
+            <Button variant="primary" size="sm" onClick={() => void create()} disabled={busy} className="min-w-20">
               {busy ? '保存中…' : '保存并挂载'}
-            </button>
+            </Button>
           </div>
         )}
         <table className="w-full text-left">
           <thead>
-            <tr className="border-b border-void-700 text-[10px] uppercase tracking-wider text-zinc-600">
-              <th className="px-3 py-2 font-semibold">Skill</th>
-              <th className="px-3 py-2 font-semibold">挂载 Agent</th>
-              <th className="px-3 py-2 font-semibold">文件</th>
-              <th className="px-3 py-2" />
+            <tr className="border-b border-line text-xs font-medium text-tertiary">
+              <th className="px-3 py-2.5 font-medium">Skill</th>
+              <th className="px-3 py-2.5 font-medium">挂载 Agent</th>
+              <th className="px-3 py-2.5 font-medium">文件</th>
+              <th className="px-3 py-2.5" />
             </tr>
           </thead>
-          <tbody className="divide-y divide-void-700">
+          <tbody className="divide-y divide-line">
             {list.map(s => (
-              <tr key={`${s.agentKey}/${s.name}`} className="hover:bg-void-800/60">
+              <tr key={`${s.agentKey}/${s.name}`} className="hover:bg-surface-2/60">
                 <td className="px-3 py-2.5">
-                  <div className="font-mono text-[12px] font-medium text-zinc-200">{s.name}</div>
-                  <div className="mt-0.5 text-[11px] text-zinc-500">{s.description}</div>
+                  <div className="font-mono text-[13px] font-medium text-primary">{s.name}</div>
+                  <div className="mt-0.5 text-[13px] text-secondary">{s.description}</div>
                 </td>
                 <td className="px-3 py-2.5">
-                  <span className="rounded-sm bg-void-700 px-1.5 py-0.5 font-mono text-[10px] text-orange-300/90">
-                    {s.agentKey}
-                  </span>
+                  <Badge tone="accent">{s.agentKey}</Badge>
                 </td>
-                <td className="px-3 py-2.5 font-mono text-[10px] text-zinc-600">{s.filePath}</td>
+                <td className="px-3 py-2.5 font-mono text-xs text-tertiary">{s.filePath}</td>
                 <td className="px-3 py-2.5 text-right">
-                  <button
+                  <Button
+                    variant="ghost"
+                    size="icon"
                     onClick={() => void remove(s.agentKey, s.name)}
-                    className="rounded-sm p-1 text-zinc-600 hover:bg-void-700 hover:text-red-400"
                     title="卸载"
                   >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                    <Trash2 className="h-4 w-4" />
+                  </Button>
                 </td>
               </tr>
             ))}
             {list.length === 0 && (
-              <tr><td colSpan={4} className="px-3 py-8 text-center text-[11px] text-zinc-600">
-                暂无挂载 — 每个 agent 只加载属于自己的技能（防止工具面污染）
-              </td></tr>
+              <tr>
+                <td colSpan={4} className="p-0">
+                  <EmptyState
+                    icon={PackageOpen}
+                    title="暂无挂载 Skill"
+                    hint="每个 agent 只加载属于自己的技能（防止工具面污染）——上方「导入 Skill」创建"
+                  />
+                </td>
+              </tr>
             )}
           </tbody>
         </table>
       </Panel>
 
       <div className="flex min-h-0 flex-col gap-3">
-      <Panel title="机制说明" bodyClassName="p-3 space-y-2 text-[11.5px] leading-relaxed text-zinc-400">
-        <p className="flex items-start gap-1.5"><FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-orange-400/80" />
+      <Panel title="机制说明" bodyClassName="space-y-2 text-[13px] leading-relaxed text-secondary">
+        <p className="flex items-start gap-1.5"><FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary" />
           存储为 agentskills.io 官方格式（SKILL.md + frontmatter），由 pi 官方加载器解析。</p>
-        <p><span className="text-zinc-200">按需加载：</span>会话创建时仅注入索引（名称+触发条件），模型判断匹配后自行 read 全文——不撑爆上下文。</p>
-        <p><span className="text-zinc-200">角色挂载：</span>每个 agent 只看到挂给自己的技能目录。</p>
-        {msg && <p className={cn('font-mono text-[10.5px]', msg.includes('已') ? 'text-emerald-400' : 'text-amber-400')}>{msg}</p>}
+        <p><span className="font-medium text-primary">按需加载：</span>会话创建时仅注入索引（名称+触发条件），模型判断匹配后自行 read 全文——不撑爆上下文。</p>
+        <p><span className="font-medium text-primary">角色挂载：</span>每个 agent 只看到挂给自己的技能目录。</p>
+        {msg && <p className={cn('text-[13px]', msg.includes('已') ? 'text-success-text' : 'text-danger-text')}>{msg}</p>}
       </Panel>
       <ToolingChat agentKey="skill-config" workSessionId={wsId} />
       </div>

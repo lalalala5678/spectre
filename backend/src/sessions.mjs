@@ -421,6 +421,10 @@ export class SessionStore {
       throw Object.assign(new Error('agent 忙(并发锁定)——请用 steer'), { statusCode: 409 });
     }
     record.busy = true;
+    // FEBUGS-P1-1: busy 翻转必须落 journal——此前仅内存置位, SSE 永远
+    // 看不到 agent_start, 前端 busy 状态机断裂(运行中 pill 撒谎/工具
+    // 进度分相永不触发/第二条消息误走 prompt→409)。
+    this._journal(record, 'agent_start', { via: 'prompt' });
     // Context compaction (user-configurable window): when the running
     // context exceeds window−reserve, summarize the head and keep the
     // recent tail — BEFORE queuing the new turn, while the agent is idle.
@@ -545,6 +549,7 @@ export class SessionStore {
       return;
     }
     record.busy = true;  // same synchronous-flip rule as prompt()
+    this._journal(record, 'agent_start', { via: 'followup' });  // FEBUGS-P1-1
     this._journal(record, 'followup_injected', { text: truncateText(text, 200) });
     Promise.resolve(record.agent.prompt(msg)).catch(() => {
       // R1-F2: 同 prompt()——输给竞态时不清 busy(见上)。

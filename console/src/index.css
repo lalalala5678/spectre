@@ -1,47 +1,146 @@
 @import "tailwindcss";
 
-/* 细滚动条：默认收起，悬停区域时浮现 */
+/* §3-C/§4.1: dark 变体挂 data-theme(与 prefers-color-scheme 默认 + 手动切换共存) */
+@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+
+/* ---------- 字体栈(§4.3): latin 走自托管 Inter/JBM, 中文永远走系统栈 ---------- */
+:root {
+  --app-font-sans: 'Inter', 'Inter var', system-ui, -apple-system, 'Segoe UI',
+    'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Noto Sans SC',
+    'Microsoft YaHei', sans-serif;
+  --app-font-mono: 'JetBrains Mono', 'SFMono-Regular', 'Cascadia Code', Menlo,
+    Consolas, 'Liberation Mono', 'Noto Sans Mono CJK SC', monospace;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/spectre/fonts/inter-latin-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+2000-206F;
+}
+@font-face {
+  font-family: 'JetBrains Mono';
+  font-style: normal;
+  font-weight: 100 800;
+  font-display: swap;
+  src: url('/spectre/fonts/jetbrains-mono-latin-var.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+2000-206F;
+}
+
+/* ---------- 语义 token: 浅色(默认, §4.1/§4.2 全部实测达标) ---------- */
+:root {
+  color-scheme: light;
+  --bg:            #f8f9fb;  /* 页面底 */
+  --surface:       #ffffff;  /* 卡片/面板/输入框 */
+  --surface-2:     #f1f3f5;  /* 次级填充: hover/表头/芯片底 */
+  --surface-3:     #e9edf1;  /* 按压/选中填充 */
+  --line:          #e2e5ea;  /* 装饰性分隔线 */
+  --line-strong:   #8b95a5;  /* 交互控件边界(≥3:1, §7-4) */
+  --text-primary:   #1a1f28;
+  --text-secondary: #4b5563;
+  --text-tertiary:  #616b7a;  /* 4.64:1 on surface-2 */
+  --text-faint:     #9ca3af;  /* 仅 disabled/装饰, 禁止承载信息 */
+  --accent:        #4f46e5;  /* 主色 indigo-600: 白字 6.29:1 */
+  --accent-hover:  #4338ca;
+  --accent-subtle: #eef2ff;  /* 选中态底色 */
+  --accent-text:   #4338ca;  /* 浅底上的链接/强调文字 7.9:1 */
+  --ring:          #4f46e5;
+  --success-text: #047857; --success-bg: #ecfdf5; --success-line: #a7f3d0;
+  --warning-text: #92400e; --warning-bg: #fffbeb; --warning-line: #fde68a;
+  --danger-text:  #b91c1c; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
+  --info-text:    #0369a1; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
+  --shadow-color: 16 24 40;
+}
+
+/* ---------- 语义 token: 暗色 ---------- */
+[data-theme="dark"] {
+  color-scheme: dark;
+  --bg:            #0f1115;
+  --surface:       #161a22;
+  --surface-2:     #1d222c;
+  --surface-3:     #252b37;
+  --line:          #272d38;
+  --line-strong:   #626e83;  /* 3.38:1 on surface */
+  --text-primary:   #e6e9ef;
+  --text-secondary: #a8b0bd;
+  --text-tertiary:  #8791a0;  /* 5.0:1 on surface-2 */
+  --text-faint:     #5c6470;
+  --accent:        #4f46e5;  /* 实心按钮底(白字恒 6.29) */
+  --accent-hover:  #4338ca;
+  --accent-subtle: #1d2030;  /* 选中态底(暗) */
+  --accent-text:   #818cf8;  /* 暗底上的链接/强调文字 5.84:1 */
+  --ring:          #818cf8;
+  --success-text: #34d399; --success-bg: #14231d; --success-line: #1f4a38;
+  --warning-text: #fbbf24; --warning-bg: #272115; --warning-line: #4a3c1a;
+  --danger-text:  #f87171; --danger-bg:  #2b1717; --danger-line:  #4a2323;
+  --info-text:    #60a5fa; --info-bg:    #14212e; --info-line:    #1f3a55;
+  --shadow-color: 0 0 0;
+}
+
+/* 工具类 → token(@theme inline: 类名直接引用 CSS 变量, 随 data-theme 自动切换) */
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-primary: var(--text-primary);
+  --color-secondary: var(--text-secondary);
+  --color-tertiary: var(--text-tertiary);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-subtle: var(--accent-subtle);
+  --color-accent-text: var(--accent-text);
+  --color-ring: var(--ring);
+  --color-success-text: var(--success-text);  --color-success-bg: var(--success-bg);  --color-success-line: var(--success-line);
+  --color-warning-text: var(--warning-text);  --color-warning-bg: var(--warning-bg);  --color-warning-line: var(--warning-line);
+  --color-danger-text: var(--danger-text);   --color-danger-bg: var(--danger-bg);    --color-danger-line: var(--danger-line);
+  --color-info-text: var(--info-text);       --color-info-bg: var(--info-bg);        --color-info-line: var(--info-line);
+  --font-sans: var(--app-font-sans);
+  --font-mono: var(--app-font-mono);
+  /* 海拔(§4.5): 浅色用阴影, 暗色 shadow-color=0 0 0 → 透明, 层级由 surface 分层承担 */
+  --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.05);
+  --shadow-sm: 0 1px 3px rgb(var(--shadow-color) / 0.10), 0 1px 2px rgb(var(--shadow-color) / 0.06);
+  --shadow-lg: 0 12px 32px -8px rgb(var(--shadow-color) / 0.24);
+}
+
+
+/* ---------- 滚动条标准化(§6.1-0): 默认可见细条, 随主题着色 ---------- */
 * {
   scrollbar-width: thin;
-  scrollbar-color: transparent transparent;
-}
-*:hover {
-  scrollbar-color: #313134 transparent;
+  scrollbar-color: var(--line-strong) transparent;
 }
 *::-webkit-scrollbar {
-  width: 5px;
-  height: 5px;
+  width: 8px;
+  height: 8px;
 }
 *::-webkit-scrollbar-track {
   background: transparent;
 }
 *::-webkit-scrollbar-thumb {
-  background: transparent;
+  background: var(--line-strong);
   border-radius: 9999px;
 }
-*:hover::-webkit-scrollbar-thumb {
-  background: #313134;
-}
 *::-webkit-scrollbar-thumb:hover {
-  background: #3d3d41;
+  background: var(--text-faint);
 }
 
-@theme {
-  --font-sans: 'Inter', 'PingFang SC', 'Microsoft YaHei', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
-
-  /* 中性灰背景层次（无蓝调，参照 Cobalt Strike / Grafana dark） */
-  --color-void-950: #101011;
-  --color-void-900: #141415;
-  --color-void-850: #181819;
-  --color-void-800: #1d1d1f;
-  --color-void-750: #222224;
-  --color-void-700: #28282b;
-  --color-void-600: #313134;
-  --color-void-500: #3d3d41;
-
-  /* 唯一强调色：暗橙 */
-  --color-accent-600: #c2410c;
-  --color-accent-500: #ea580c;
-  --color-accent-400: #f97316;
+/* ---------- 全局基线(§4.3/§4.5) ---------- */
+html {
+  background-color: var(--bg); /* 防 React 挂载前暗色下白底闪烁 */
+}
+body {
+  font-family: var(--app-font-sans);
+}
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    transition-duration: 0ms;
+    animation-duration: 0ms;
+  }
 }

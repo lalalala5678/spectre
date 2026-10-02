@@ -3,7 +3,9 @@ import { ClipboardList } from 'lucide-react';
 
 import type { ApiBusEvent } from '../api/client';
 import { getPrefs } from '../api/worksession';
+import { EmptyState } from '../components/ui/EmptyState';
 import { Panel } from '../components/ui/Panel';
+import { Skeleton } from '../components/ui/Skeleton';
 import { TaskReportsPanel } from '../components/session/TaskReportsPanel';
 import { EntryDetail } from '../components/session/EntryDetail';
 
@@ -25,8 +27,8 @@ export function TaskReportsPage() {
       <Panel
         title="任务报告"
         right={
-          <span className="flex items-center gap-1 font-mono text-[10px] text-zinc-500">
-            <ClipboardList className="h-3 w-3 text-orange-400/80" />
+          <span className="flex items-center gap-1 text-xs text-tertiary">
+            <ClipboardList className="h-3 w-3 text-accent-text/80" />
             安装/卸载/渗透任务的闭环交付记录
           </span>
         }
@@ -34,12 +36,16 @@ export function TaskReportsPage() {
         bodyClassName="p-0"
       >
         <div className="h-full max-h-[calc(100vh-180px)] overflow-y-auto">
-          {err && <p className="p-4 text-[11px] text-red-400">项目信息加载失败:{err}</p>}
+          {err && <p className="p-4 text-[13px] text-danger-text">项目信息加载失败:{err}</p>}
           {!err && wsId === null && (
-            <p className="animate-pulse p-6 text-center text-[11px] text-zinc-600">正在加载项目…</p>
+            <div className="space-y-2 p-4">
+              <Skeleton className="h-4 w-3/4" />
+              <Skeleton className="h-4 w-1/2" />
+              <Skeleton className="h-4 w-2/3" />
+            </div>
           )}
           {!err && wsId === '' && (
-            <p className="p-6 text-center text-[11px] text-zinc-600">无当前项目,请先在顶栏选择</p>
+            <p className="p-6 text-center text-[13px] text-tertiary">无当前项目,请先在顶栏选择</p>
           )}
           {!err && wsId && (
             <TaskReportsPanel workSessionId={wsId} onOpen={setSelected} />
@@ -51,10 +57,8 @@ export function TaskReportsPage() {
           ? <EntryDetail event={selected} onBack={() => setSelected(null)} />
           : (
             <Panel title="报告详情" bodyClassName="p-6">
-              <p className="text-center text-[11px] text-zinc-600">
-                点击左侧任一任务报告查看全文
-                （状态、行动、证据、验证会话、修订历史）
-              </p>
+              <EmptyState icon={ClipboardList} title="选择左侧报告查看详情"
+                hint="状态、行动、证据、验证会话、修订历史" />
             </Panel>
           )}
       </div>

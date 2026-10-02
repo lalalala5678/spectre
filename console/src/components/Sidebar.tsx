@@ -21,21 +21,21 @@ export function Sidebar({
   ];
 
   return (
-    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-void-700 bg-void-900">
-      {/* 品牌区：自绘图标 + 文本标识 */}
-      <div className="flex items-center gap-2.5 border-b border-void-700 px-3.5 py-3">
+    <aside className="flex h-full w-56 shrink-0 flex-col border-r border-line bg-surface">
+      {/* 品牌区：自绘图标 + 文本标识(§6.1-1: 副标去中英重复) */}
+      <div className="flex items-center gap-2.5 border-b border-line px-3.5 py-3">
         <SpectreMark />
         <div>
-          <div className="text-[13px] font-semibold tracking-widest text-zinc-100">SPECTRE</div>
-          <div className="mt-px text-[10px] text-zinc-600">SPECTRE · agent console</div>
+          <div className="text-sm font-semibold text-primary">SPECTRE</div>
+          <div className="mt-px text-xs text-tertiary">agent console</div>
         </div>
       </div>
 
-      {/* Nav */}
+      {/* Nav(§6.1-1: 单层主标签 14px/500, 副信息并入 title; 激活 accent-subtle) */}
       <nav className="flex-1 overflow-y-auto px-2 py-2.5">
         {groups.map((g) => (
           <div key={g.id} className="mb-3.5">
-            <div className="px-1.5 pb-1 text-[9.5px] font-semibold uppercase tracking-widest text-zinc-600">
+            <div className="px-2 pb-1 text-xs font-semibold text-tertiary">
               {g.label}
             </div>
             <div>
@@ -46,21 +46,17 @@ export function Sidebar({
                   <button
                     key={n.key}
                     onClick={() => onRoute(n.key)}
+                    title={n.sub}
                     className={cn(
-                      'group flex w-full items-center gap-2 rounded-sm border-l-2 px-1.5 py-1.5 text-left transition-colors',
+                      'group flex min-h-9 w-full items-center gap-2 rounded-md px-2 py-2 text-left transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
                       active
-                        ? 'border-orange-500 bg-void-800 text-zinc-100'
-                        : 'border-transparent text-zinc-500 hover:bg-void-800/70 hover:text-zinc-300',
+                        ? 'bg-accent-subtle text-accent-text'
+                        : 'text-secondary hover:bg-surface-2 hover:text-primary',
                     )}
                   >
-                    <Icon className={cn('h-3.5 w-3.5 shrink-0', active ? 'text-orange-400' : 'text-zinc-600 group-hover:text-zinc-500')} />
-                    <span className="min-w-0 flex-1">
-                      <span className="flex items-center gap-1.5">
-                        <span className="truncate text-[12.5px] font-medium">{n.label}</span>
-                        {n.key === 'autopwn' && runningCount > 0 && <Dot tone="orange" pulse />}
-                      </span>
-                      <span className="block truncate text-[10px] text-zinc-600">{n.sub}</span>
-                    </span>
+                    <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-accent-text' : 'text-tertiary group-hover:text-secondary')} />
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{n.label}</span>
+                    {n.key === 'autopwn' && runningCount > 0 && <Dot tone="orange" pulse />}
                   </button>
                 );
               })}
@@ -70,8 +66,8 @@ export function Sidebar({
       </nav>
 
       {/* 底部：开源项目标识 */}
-      <div className="border-t border-void-700 px-3.5 py-2.5">
-        <div className="font-mono text-[10px] text-zinc-600">v0.4.0 · MIT</div>
+      <div className="border-t border-line px-3.5 py-2.5">
+        <div className="text-xs text-tertiary">v0.4.0 · MIT</div>
       </div>
     </aside>
   );

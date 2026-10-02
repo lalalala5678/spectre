@@ -3,6 +3,8 @@ import { Bot } from 'lucide-react';
 
 import { api, type ApiSessionSummary } from '../../api/client';
 import { Dot } from '../ui/Badge';
+import { EmptyState } from '../ui/EmptyState';
+import { Skeleton } from '../ui/Skeleton';
 import { cn } from '../../utils/cn';
 import { AGENTS as REGISTRY } from '../../api/agentRegistry';
 
@@ -56,33 +58,33 @@ function Node({ node, depth, activeId, onDrill }: {
         onClick={() => onDrill(session.id)}
         style={{ marginLeft: depth * 12 }}
         className={cn(
-          'mb-0.5 flex w-[calc(100%-8px)] flex-col rounded-sm border px-1.5 py-1 text-left',
+          'mb-0.5 flex min-h-11 w-[calc(100%-8px)] flex-col rounded-md border px-1.5 py-1 text-left',
           session.id === activeId
-            ? 'border-orange-800 bg-orange-950/20'
-            : 'border-void-700 bg-void-900 hover:border-void-500',
+            ? 'border-accent bg-accent-subtle'
+            : 'border-line bg-surface hover:bg-surface-2',
         )}
       >
         <div className="flex w-full items-center gap-1.5">
           <Dot tone={session.busy ? 'orange' : 'slate'} pulse={session.busy} />
-          {isOrch && <Bot className="h-2.5 w-2.5 shrink-0 text-orange-400" />}
+          {isOrch && <Bot className="h-2.5 w-2.5 shrink-0 text-accent-text" />}
           <span className={cn(
-            'truncate text-[12px]',
-            isOrch ? 'font-semibold text-orange-300' : 'text-zinc-300',
+            'truncate text-[13px]',
+            isOrch ? 'font-semibold text-accent-text' : 'font-medium text-primary',
           )}>
             {displayName}
           </span>
-          <span className="shrink-0 text-[10px] text-zinc-500">
+          <span className="shrink-0 text-xs text-tertiary">
             （{typeLabel}）
           </span>
           {depth > 0 && (
-            <span className="shrink-0 font-mono text-[9px] text-zinc-600">L{depth}</span>
+            <span className="shrink-0 font-mono text-xs tabular-nums text-tertiary">L{depth}</span>
           )}
-          <span className="ml-auto shrink-0 font-mono text-[9.5px] text-zinc-600">
+          <span className="ml-auto shrink-0 text-xs text-tertiary">
             {session.busy ? '运行中' : '结束'}
           </span>
         </div>
         {session.spawnDescription && (
-          <p className="mt-0.5 truncate pl-4 text-[10px] leading-tight text-zinc-600">
+          <p className="mt-0.5 truncate pl-4 text-xs leading-tight text-tertiary">
             {session.spawnDescription}
           </p>
         )}
@@ -169,20 +171,20 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
   const count = tree ? sizeOf(tree) : 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded border border-void-700 bg-void-850">
-      <header className="flex items-center justify-between border-b border-void-700 px-3 py-1.5">
-        <h3 className="text-[10px] font-semibold uppercase tracking-widest text-zinc-500">
+    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
+      <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
+        <h3 className="text-xs font-semibold text-secondary">
           编排树
         </h3>
-        <span className="font-mono text-[10px] text-zinc-600">{count} 节点</span>
+        <span className="text-xs tabular-nums text-tertiary">{count} 节点</span>
       </header>
       <div className="flex-1 overflow-y-auto p-1.5">
         {!tree && (
-          <p className={cn('py-3 text-center text-[11px]',
-            connError ? 'animate-pulse text-amber-400' : 'text-zinc-700')}>
-            {connError ? '连接中断，重试中…'
-              : rootId ? '载入中…' : '无主控会话'}
-          </p>
+          connError
+            ? <p className="animate-pulse py-3 text-center text-sm text-warning-text">连接中断，重试中…</p>
+            : rootId
+              ? <Skeleton className="m-1 h-11" />
+              : <EmptyState icon={Bot} title="无主控会话" />
         )}
         {tree && (
           <Node node={tree} depth={0} activeId={activeId} onDrill={onDrill} />
