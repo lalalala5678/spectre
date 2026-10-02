@@ -48,6 +48,7 @@ else
   # 无证书可发→握手 internal error, 实测)。
   SITE="$DOMAIN"
   TLS_BLOCK='    tls internal'
+  IP_MODE=1
 fi
 
 # ---------- 3) 配置(网关保持 127.0.0.1:8081——安全侧默认不动) ----------
@@ -90,6 +91,15 @@ Restart=on-failure
 RestartSec=2
 AmbientCapabilities=CAP_NET_BIND_SERVICE
 CapabilityBoundingSet=CAP_NET_BIND_SERVICE
+# R32D100-F5: 公网面最小加固(证书/存储读写仅限数据根; 其余只读)。
+NoNewPrivileges=true
+ProtectSystem=strict
+ReadWritePaths=/var/lib/spectre
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
 
 [Install]
 WantedBy=multi-user.target
@@ -98,12 +108,16 @@ systemctl daemon-reload
 systemctl enable spectre-caddy >/dev/null 2>&1
 systemctl restart spectre-caddy
 
-# ---------- 5) 验证 + 下一步指引 ----------
+# ---------- 5) 验证 + 下一步指引(R32D100-F3: 失败必须 exit 1+单元活性双查) ----------
 sleep 2
-if curl -fsk --max-time 8 "https://${DOMAIN}/spectre/" -o /dev/null 2>/dev/null \
-   || curl -fsk --max-time 8 "https://127.0.0.1/spectre/" -o /dev/null 2>/dev/null; then
+FAIL=0
+systemctl is-active --quiet spectre-caddy || FAIL=1
+if [ "$FAIL" = 0 ] && { curl -fsk --max-time 8 "https://${DOMAIN}/spectre/" -o /dev/null 2>/dev/null \
+   || curl -fsk --max-time 8 "https://127.0.0.1/spectre/" -o /dev/null 2>/dev/null; }; then
   echo "[setup-tls] ✓ TLS 入口就绪: https://${DOMAIN}/spectre/"
+  [ -n "${IP_MODE:-}" ] && echo '[setup-tls] 无域名模式: 内部 CA 证书——浏览器首访「高级→继续访问」; Caddy 已尝试把内部根装入系统信任库'
 else
-  echo '[setup-tls] 警告: 本机自检未通——查 journalctl -u spectre-caddy -n 20; 常见: 80/443 防火墙或安全组未放行' >&2
+  echo '[setup-tls] FATAL: 自检未通——journalctl -u spectre-caddy -n 20; 常见: 80/443 防火墙或安全组未放行' >&2
+  exit 1
 fi
 echo "[setup-tls] 浏览器访问 https://${DOMAIN}/spectre/ 并用 admin 登录(密码=spectre-passwd.py add 所设)"
