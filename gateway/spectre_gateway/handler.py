@@ -329,9 +329,17 @@ def serve():
             "FATAL: INTERNAL_TOKEN 仍是占位值 — 填入与 backend/.env 相同的真实随机令牌")
 
     GatewayHandler.security = Security()
-    server = QuietHTTPServer(
-        (config.BIND_HOST, config.BIND_PORT), GatewayHandler,
-    )
+    try:
+        server = QuietHTTPServer(
+            (config.BIND_HOST, config.BIND_PORT), GatewayHandler,
+        )
+    except OSError as e:
+        # R32D91-N1: bind 失败友好 FATAL(对齐 runtime R32D79-N1——此前
+        # 裸 Python 栈, 同仓同面两制)。
+        raise SystemExit(
+            f"[gateway] FATAL: 无法监听 {config.BIND_HOST}:{config.BIND_PORT}"
+            f" — {e}\n          端口被占用时: 找到持有进程"
+            f"(lsof -i :{config.BIND_PORT} 或 ss -ltnp)或换 GATEWAY_PORT")
     server.daemon_threads = True
     audit("gateway_start",
           bind=f"{config.BIND_HOST}:{config.BIND_PORT}",
