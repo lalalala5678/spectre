@@ -22,7 +22,7 @@ test('read_session: 裸 ID 原样/payloadRef 仅剥 sess: 段(CS80-1 锁)', asyn
   try {
     const { buildIntelTools } = await import('../src/tools.mjs');
     const seen = [];
-    const caps = { readSessionMessages: (sid, last, ws) => { seen.push(sid); return [{ role: 'assistant', text: `ok:${sid}` }]; } };
+    const caps = { readSessionMessages: (sid, _last, _ws) => { seen.push(sid); return [{ role: 'assistant', text: `ok:${sid}` }]; } };
     const rec = { id: 'sess-call', agentKey: 'recon', workSessionId: 'ws' };
     const read = buildIntelTools(rec, caps).find(t => t.name === 'read_session');
     assert.ok(read, 'read_session 在 buildIntelTools 面');
