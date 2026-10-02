@@ -83,3 +83,26 @@ test('syncSourceKeyFiles: smtp allow_plaintext 透传+schema 下发(CS59-F1 锁)
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('recon-source select 叶子 options 校验(R32D78-N1 锁)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'st-sel-'));
+  mkdirSync(join(dir, 'tools'), { recursive: true });
+  process.env.SPECTRE_DATA_DIR = dir;
+  process.env.INTERNAL_TOKEN ||= 'shape-test';
+  process.env.TEMPORAL_ADDRESS ||= '127.0.0.1:7233';
+  const prevCwd = process.cwd();
+  process.chdir(join(ROOT, 'backend'));
+  try {
+    const m = await import('../src/agent-settings.mjs');
+    const bad = await m.saveSetting({ group: 'recon-source', field: 'smtp.allow_plaintext', value: 'maybe' });
+    assert.equal(bad.ok, false, "allow_plaintext='maybe' 须拒");
+    assert.match(bad.error ?? '', /true\/false/, '错误信息须列合法选项');
+    // 非法值不得落 prefs
+    const { getPrefs } = await import('../src/projects.mjs');
+    assert.equal(getPrefs().reconApiKeys?.smtp?.allow_plaintext, undefined, '非法值不得落盘');
+  } finally {
+    process.chdir(prevCwd);
+    delete process.env.SPECTRE_DATA_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

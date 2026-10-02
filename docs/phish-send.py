@@ -179,8 +179,12 @@ def _smtp_dialog_send(s, from_addr, to_addr, raw):
     # 客户端 socket 带未读数据 close → RST → 服务端 drain() 崩溃、邮件不落盘(实测)。
     # 注意 as_bytes() 默认 LF 行尾 —— 必须先 CRLF 规范化再计数。
     n_replies = q.count(b'\n') + 2  # 正文行 + '.' + 余量
-    old_to = s.sock.gettimeout()
-    s.sock.settimeout(2)
+    # R32D78-N2: 排空超时→smtplib close() 置 sock=None——恢复超时须
+    # 判活(此前 s.sock.settimeout AttributeError 使已发出的正文误报
+    # FAIL; 触发面=应答行数少于预估的中继)。
+    old_to = s.sock.gettimeout() if s.sock else None
+    if s.sock:
+        s.sock.settimeout(2)
     for _ in range(n_replies):
         try:
             c, _ = s.getreply()
@@ -188,7 +192,8 @@ def _smtp_dialog_send(s, from_addr, to_addr, raw):
             break
         if c == 221:
             break
-    s.sock.settimeout(old_to)
+    if s.sock and old_to is not None:
+        s.sock.settimeout(old_to)
     return (250, b'ok (non-rfc relay accepted)')
 
 def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,

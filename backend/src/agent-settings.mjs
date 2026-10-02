@@ -624,6 +624,12 @@ export async function saveSetting({ group, field, value }, wal) {
     if (!Object.keys(src.fields ?? {}).includes(leaf)) {
       return { ok: false, error: `未知字段 ${leaf}(该源字段: ${Object.keys(src.fields ?? {}).join('/')})` };
     }
+    // R32D78-N1: select 叶子须校验 options(与 common 组同款; 此前
+    // allow_plaintext='maybe' 落 prefs 而 UI 回退首项显示 true)。
+    const selDef = reconField(srcId, leaf, src.fields[leaf]);
+    if (selDef.type === 'select' && !selDef.options.includes(clean(value))) {
+      return { ok: false, error: `${leaf} 必须是 ${selDef.options.join('/')}` };
+    }
     // R32D59-N6: 掩码哨兵还原(读面已掩码, 表单原样回传不毁真钥);
     // R32D60-NEW3: 掩码形不匹配存量→显式拒绝(不得字面落库)。
     const leafVal = unmaskSecret(getPrefs().reconApiKeys?.[srcId]?.[leaf], clean(value));
