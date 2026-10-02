@@ -4,6 +4,7 @@ import { Loader2, Radio, RefreshCw, TerminalSquare } from 'lucide-react';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../utils/cn';
+import { usePageTitle } from '../utils/usePageTitle';
 
 interface ShellHandle {
   id: string; name: string; target: string; transport: string;
@@ -20,6 +21,7 @@ interface ExecResult { ok: boolean; stdout?: string; stderr?: string; code?: num
 
 /** Shell 控制台 — C2 植入通道的运维终端(SSH 式) */
 export function ShellPage() {
+  usePageTitle('Shell 控制台'); // FEVERIFY-N3
   const [shells, setShells] = useState<ShellHandle[]>([]);
   const [active, setActive] = useState<string | null>(null);
   const [cmd, setCmd] = useState('');

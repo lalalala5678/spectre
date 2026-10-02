@@ -9,6 +9,7 @@ import { EmptyState } from '../components/ui/EmptyState';
 import { Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
+import { usePageTitle } from '../utils/usePageTitle';
 
 interface SandboxStatus {
   driver: 'local' | 'docker';
@@ -19,6 +20,7 @@ interface SandboxStatus {
 /** CLI 工具页 — 共享工具层：安装一次，全部 agent（全部项目）可用。
  *  安装命令在沙箱内执行并经挂载卷持久化。 */
 export function CliPage({ wsId }: { wsId: string }) {
+  usePageTitle('CLI 工具'); // FEVERIFY-N3
   const [status, setStatus] = useState<SandboxStatus | null>(null);
   const [tools, setTools] = useState<string[]>([]);
   interface InstalledTool { name: string; layer: string; note?: string }

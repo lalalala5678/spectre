@@ -10,6 +10,7 @@ import { Input, Select, Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
+import { usePageTitle } from '../utils/usePageTitle';
 
 // CS2-#6: 挂载目标单源 agentRegistry 派生(与 McpPage 同式; 过滤配置
 // 三键, 语义=业务面)。CRUD 外壳刻意不抽象为通用 hook——四页差异面
@@ -27,6 +28,7 @@ interface SkillRow {
 /** Skill 管理页 — per-agent 挂载（目录即仓库，SKILL.md 官方格式；
  *  会话创建时官方索引注入，模型按需 read 全文）。 */
 export function SkillsPage({ wsId }: { wsId: string }) {
+  usePageTitle('技能管理'); // FEVERIFY-N3
   const [skills, setSkills] = useState<SkillRow[]>([]);
   const [filter, setFilter] = useState('');
   const [creating, setCreating] = useState(false);

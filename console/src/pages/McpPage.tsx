@@ -10,6 +10,7 @@ import { Input, Label, Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
+import { usePageTitle } from '../utils/usePageTitle';
 
 // CRUD 外壳刻意不抽象为通用 hook——四管理页差异面远大于共性(CS1-R19)。
 // CS1-R13: 挂载目标单源 agentRegistry(此前本地 11 键, 增删 agent 双处
@@ -30,6 +31,7 @@ interface McpServer {
 /** MCP Server 管理页 — 双传输：远程 HTTP（用户自建机器直连）与本地
  *  stdio（宿主或沙箱内进程）。按 agent 挂载；工具在会话创建时合并。 */
 export function McpPage({ wsId }: { wsId: string }) {
+  usePageTitle('MCP 服务器'); // FEVERIFY-N3
   const [servers, setServers] = useState<McpServer[]>([]);
   const [form, setForm] = useState({
     name: '', transport: 'http' as 'http' | 'stdio',

@@ -9,6 +9,7 @@ import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { Input, Select } from '../components/ui/Input';
 import { Skeleton } from '../components/ui/Skeleton';
+import { usePageTitle } from '../utils/usePageTitle';
 
 /**
  * 设置页 — 通用配置(全局)+ Agent 特有配置(数据源/LLM 覆盖)。
@@ -181,6 +182,7 @@ function SourceCard({ src, cfg, onSave, verify }: {
   );
 }
 export function SettingsPage() {
+  usePageTitle('设置'); // FEVERIFY-N3
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [err, setErr] = useState('');
   const [verify, setVerify] = useState<Record<string, { ok: boolean; error?: string | null }> | null>(null);

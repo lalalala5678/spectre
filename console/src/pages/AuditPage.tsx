@@ -7,12 +7,14 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Panel } from '../components/ui/Panel';
 import { Skeleton } from '../components/ui/Skeleton';
+import { usePageTitle } from '../utils/usePageTitle';
 
 /** 审计与证据链页 —— F23: 原为 mock 假数据,接真实 bus 事件流(WAL 持久审计源) */
 // CS67-5: 类型复用 ApiBusEvent 单源(此前手抄窄版且 to?/engagement?
 // 两死字段零读取——违 CS44-F16 手抄类型先例)。
 
 export function AuditPage() {
+  usePageTitle('审计与证据链'); // FEVERIFY-N3
   const [events, setEvents] = useState<ApiBusEvent[] | null>(null);
   const [err, setErr] = useState('');
   const [limit, setLimit] = useState(50);

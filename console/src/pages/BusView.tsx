@@ -5,6 +5,7 @@ import type { MessageChannel } from '../types';
 import { Badge, type BadgeTone } from '../components/ui/Badge';
 import { Panel } from '../components/ui/Panel';
 import { cn } from '../utils/cn';
+import { usePageTitle } from '../utils/usePageTitle';
 
 const CH_META: Record<string, { label: string; tone: BadgeTone }> = {
   announce: { label: '公告', tone: 'danger' },
@@ -24,6 +25,7 @@ const fmtTime = (iso: string) => {
 
 /** 消息总线视图:跨智能体实时流量(Temporal 编排驱动),按频道筛选 */
 export function BusView({ workSessionId }: { workSessionId: string }) {
+  usePageTitle('总线事件'); // FEVERIFY-N3
   const [filter, setFilter] = useState<MessageChannel | 'all'>('all');
   const [events, setEvents] = useState<ApiBusEvent[]>([]);
   const cursor = useRef(0);

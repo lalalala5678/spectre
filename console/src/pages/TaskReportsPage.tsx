@@ -8,11 +8,13 @@ import { Panel } from '../components/ui/Panel';
 import { Skeleton } from '../components/ui/Skeleton';
 import { TaskReportsPanel } from '../components/session/TaskReportsPanel';
 import { EntryDetail } from '../components/session/EntryDetail';
+import { usePageTitle } from '../utils/usePageTitle';
 
 /** 任务报告页 — 全项目的任务报告流（配置/安装/卸载等闭环的最终
  *  交付物）。复用会话侧 TaskReportsPanel（SSE 驱动 + 修订折叠），
  *  提供全宽列表 + 详情侧栏。 */
 export function TaskReportsPage() {
+  usePageTitle('任务报告'); // FEVERIFY-N3
   const [wsId, setWsId] = useState<string | null>(null);
   const [err, setErr] = useState('');
   const [selected, setSelected] = useState<ApiBusEvent | null>(null);
