@@ -261,11 +261,12 @@ def serve(listen, target, db_file=None):
     except OSError as e:
         print(f'[phish-proxy] FATAL: 事件库不可写 {DB_FILE} — {e}', flush=True)
         sys.exit(1)
+    # CS79-F1: 构造+serve_forever 同 try(对齐 phishlet——此前仅包
+    # 构造, serve_forever 期 OSError 裸栈 rc=1, 同失败类两契约)。
     try:
-        server = HTTPServer((host or '0.0.0.0', int(port or 8080)), ProxyHandler)
-    except OSError as e:  # R32D95-N2: 主机名解析失败等干净拒
+        HTTPServer((host or '0.0.0.0', int(port or 8080)), ProxyHandler).serve_forever()
+    except OSError as e:  # R32D95-N2: 主机名解析失败/运行期异常干净拒
         print(f'--listen 无法绑定 {listen}: {e}', file=sys.stderr); sys.exit(2)
-    server.serve_forever()
 
 if __name__ == '__main__':
     # R32D74-N1/CS55-F2: -h 永先(家族最高契约), 门在 -h 后、解析前
