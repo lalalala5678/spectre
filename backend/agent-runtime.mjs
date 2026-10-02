@@ -500,3 +500,11 @@ server.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`[agent-runtime] http://${CONFIG.host}:${CONFIG.port}`);
   console.log(`[agent-runtime] model=${effectiveCommon().model || '(未配置——设置页配)'} temporal=${CONFIG.temporalAddress}`);
 });
+// R32D79-N1: bind 失败(EADDRINUSE 等)须 FATAL 非零退——此前异常落
+// uncaughtException 兜底仅打日志, 进程 exit 0 被 systemd 视作成功,
+// 半正常引导日志误导排障(对比 WAL 双机锁面是干净 FATAL)。
+server.on('error', err => {
+  console.error(`[agent-runtime] FATAL: 无法监听 ${CONFIG.host}:${CONFIG.port} — ${err.code ?? ''} ${err.message}`);
+  console.error('[agent-runtime] 端口被占用时: 找到持有进程(lsof -i :PORT)或换 PORT env');
+  process.exit(1);
+});
