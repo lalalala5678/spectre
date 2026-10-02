@@ -8,6 +8,10 @@ v2 新增: DKIM 签名 / Message-ID 域名一致性 / Reply-To 同域 / 路径�
       --html template.html --track-url https://t.co \\
       [--dkim-key key.pem --dkim-selector s1 --dkim-domain example.co] \\
       [--attach file] [--rate 5/min]
+      (--smtp 可省:设置页已配经验证 SMTP 通道时自动回退)
+  phish-send.py dryrun --from "..." --to t.txt --subject s --html b.html
+      (不联 SMTP; --from/--html 同 send 必填)
+  phish-send.py genkey --genkey-domain example.co [--genkey-selector s1]
 """
 import sys, os, smtplib, time, json, hashlib, argparse, secrets
 from email.mime.multipart import MIMEMultipart
@@ -339,9 +343,11 @@ def main():
         if getattr(args, 'html', None) and not os.path.isfile(args.html):
             print(f'--html 文件不存在: {args.html}', file=sys.stderr)
             return 2
-        # R32D75-F6: send 缺 --smtp 前置校验(此前 smtplib 内部文案)。
-        if args.mode == 'send' and not getattr(args, 'smtp', None):
-            print('send 需要 --smtp host:port(dryrun 免)', file=sys.stderr)
+        # R32D75-F6/CS57-F1: send 缺 --smtp 时先看面板默认(验证过才落盘)——
+        # 仅两者皆无才前置拒(此前一律 rc=2 使面板存量配置用户回归)。
+        if args.mode == 'send' and not getattr(args, 'smtp', None) \
+                and not (load_smtp_default() or {}).get('host'):
+            print('send 需要 --smtp host:port(或在设置页配置经验证的 SMTP 通道; dryrun 免)', file=sys.stderr)
             return 2
 
     # DKIM 密钥生成模式
