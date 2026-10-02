@@ -693,9 +693,11 @@ export class SessionStore {
     safeWalAppend(this.wal, { t: 'meta', d: { sid: record.id, meta: this._metaOf(record) } });
   }
 
-  /** Resolve when the session's current run ends (agent_end). Purely
-   *  event-driven — used by the synchronous report_vulnerability tool
-   *  to wait for its writer session. Resolves immediately if idle. */
+  /** Resolve when the session's current run ends (agent_end) or the
+   *  bounded timeoutMs cap (R15-F2 — agent_end may never fire on
+   *  stuck/error paths; CS82-2: 同机制第三处同步) — used by the
+   *  synchronous report_vulnerability tool to wait for its writer
+   *  session. Resolves immediately if idle. */
   awaitCompletion(record, timeoutMs) {
     if (!record.busy) return Promise.resolve();
     return new Promise(resolve => {
