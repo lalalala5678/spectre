@@ -100,8 +100,6 @@ def _atomic_write(lines):
         print(f"[spectre-passwd] 已创建 {PASSWD}")
 
 
-
-
 def _locked_update(mutate):
     """R32D83-N1: read→mutate→write 全程持排它锁(锁文件在凭据目录,
     与凭据文件同生命周期; 此前 8 并发 add 终态 5/8 且全部报'已写入')。"""
