@@ -243,6 +243,9 @@ def serve(listen, target, db_file=None):
     except OSError as e:
         print(f'[phish-proxy] FATAL: 事件库不可写 {DB_FILE} — {e}', flush=True)
         sys.exit(1)
+    port_s = listen.rpartition(':')[2] or '8080'
+    if not port_s.isdigit():
+        print(f'--listen/--port 端口须数字: {port_s}(如 :8080)', file=sys.stderr); sys.exit(2)  # CS76-4
     server = HTTPServer((host or '0.0.0.0', int(port or 8080)), ProxyHandler)
     server.serve_forever()
 

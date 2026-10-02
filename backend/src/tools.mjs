@@ -659,8 +659,9 @@ export function buildOrchestratorTools(record, caps) {
           details: verdict,
         };
       }
-      // R32D90-OBS1: Temporal 缺席时透出 @temporalio/client 原文裸错
-      // 串——包一层指路(可选依赖, deploy/README 有载)。
+      // R32D90-OBS1/CS76-1: 源点 temporalClient 已打 temporalUnreachable
+      // 标并附完整指引文案——此处直接透传, 不再正则嗅探/二次包装
+      // (此前嵌套致 deploy/README×2 与 stutter)。
       let started;
       try {
         started = await caps.dispatch({
@@ -671,14 +672,8 @@ export function buildOrchestratorTools(record, caps) {
         });
       } catch (e) {
         const msg = String(e?.message ?? e);
-        const temporal = /temporal|Failed to connect before/i.test(msg);
         return {
-          content: [{
-            type: 'text',
-            text: (temporal
-              ? `调度失败: Temporal 不可达(${msg})。dispatch_agents 的并行编排经 Temporal——单机部署可先由编排会话逐个 spawn_agent 替代; 启用见 deploy/README(Temporal 可选编排链)。`
-              : `调度失败: ${msg}`),
-          }],
+          content: [{ type: 'text', text: `调度失败: ${msg}` }],
           details: { error: msg },
         };
       }
@@ -768,8 +763,7 @@ export function buildOrchestratorTools(record, caps) {
           }
         } catch (e) {
           // CS75-F1: 不可达≠不存在(第二消费点)。
-          why = e?.temporalUnreachable
-            ? `Temporal 不可达——${e.message}` : '不存在(id 有误或从未创建)。';
+          why = e?.temporalUnreachable ? e.message : '不存在(id 有误或从未创建)。';  // CS76-2: 去前缀 stutter
         }
         return {
           content: [{

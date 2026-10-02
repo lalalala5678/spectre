@@ -791,10 +791,17 @@ function realRouter({ store, bus, caps, wal }) {
       if (wsParam && !/^[\w-]+$/.test(wsParam)) {
         return bad(res, 400, 'workSessionId 仅允许 [a-zA-Z0-9_-]{1,64}');
       }
-      const started = await startAutopwn({
-        engagementId: undefined, instruction, agents,
-        workSessionId: wsParam || undefined,
-      });
+      // CS76-6: Temporal 不可达 503 分流(与三处消费点一致, 此前落 500)。
+      let started;
+      try {
+        started = await startAutopwn({
+          engagementId: undefined, instruction, agents,
+          workSessionId: wsParam || undefined,
+        });
+      } catch (e) {
+        if (e?.temporalUnreachable) return bad(res, 503, e.message);
+        throw e;
+      }
       return json(res, 201, started);
     }
     // ---------- autopwn resume(断点续跑——只补跑未完成的 agent) ----------
@@ -849,8 +856,14 @@ function realRouter({ store, bus, caps, wal }) {
       if (wsResume && !/^[\w-]+$/.test(wsResume)) {
         return bad(res, 400, 'workSessionId 仅允许 [a-zA-Z0-9_-]{1,64}');
       }
-      const started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun,
-        workSessionId: wsResume || undefined });
+      let started;
+      try {
+        started = await startAutopwn({ engagementId: undefined, instruction, agents: rerun,
+          workSessionId: wsResume || undefined });
+      } catch (e) {
+        if (e?.temporalUnreachable) return bad(res, 503, e.message);
+        throw e;
+      }
       return json(res, 201, { ...started, resumed: true,
         completed: [...completed], rerun,
         message: `续跑:跳过 ${completed.size} 个已完成,重跑 ${rerun.length} 个` });
