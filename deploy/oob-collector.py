@@ -87,7 +87,12 @@ s = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 s.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
 # R32D42-P3: 端口占用(OSError 98)此前裸栈——给一行可行动提示。
 try:
-    s.bind(('0.0.0.0', int(os.environ.get('OOB_PORT', '19999')))); s.listen(16)
+    # R32D95-N3: 端口值守卫(此前 abc → int() 裸栈)。
+    _p = os.environ.get('OOB_PORT', '19999')
+    if not (_p.isascii() and _p.isdigit() and 0 < int(_p) < 65536):
+        print(f'[oob] FATAL: OOB_PORT={_p!r} 须为 1-65535 整数', file=sys.stderr, flush=True)
+        sys.exit(1)
+    s.bind(('0.0.0.0', int(_p))); s.listen(16)
 except OSError as e:
     print(f'[oob] 监听失败: {e}(端口被占? 换 OOB_PORT=<端口> 或停占用进程)', flush=True)
     sys.exit(1)

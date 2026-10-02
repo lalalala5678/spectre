@@ -46,7 +46,8 @@ def cmd_bind(args):
     # R32D60-NEW4: payload 不存在/是目录→干净 rc=2(此前裸栈 rc=1)。
     if not os.path.isfile(p):
         print(f'用法错误: --payload 文件不存在或不是常规文件: {p}', file=sys.stderr); return 2
-    if a.get('--days') and not a['--days'].lstrip('-').isdigit():
+    _d = a.get('--days')
+    if _d and not (_d.lstrip('-').isascii() and _d.lstrip('-').isdigit()):  # CS78-2
         print('用法: --days 须为整数天数', file=sys.stderr); return 2
     target = a.get('--target', sc['targets'][0] if sc.get('targets') else '')
     # CS30-F8/CS39-6: targets 通配语义单源(_common.target_matches)。

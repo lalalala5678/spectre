@@ -179,7 +179,7 @@ def make_handler(phishlet, db_file):
                 # CS75-F3/CS76-3: 单条域重写——捕获分隔符(^|;\s* 任意
                 # 空白)+属性名(保大小写), 值整体含 :port 重写, 锚定边界
                 # 防 somedomain= 误中。
-                raw = re.sub(r'(?i)(^|;\s*)([Dd]omain=)[^;]*',
+                raw = re.sub(r'(?i)(^|;\s*)(domain=)[^;]*',
                              lambda m: m.group(1) + m.group(2) + (proxy_host.rpartition(':')[0] or proxy_host), raw)
                 # R32D94-N2: 属性名大小写不敏感(RFC 6265; 此前 SECURE/
                 # sEcUrE/SAMESITE 原样通过)。
@@ -318,6 +318,11 @@ def make_handler(phishlet, db_file):
 def serve(listen, phishlet, db_file):
     edusrc_gate((phishlet.get('proxy_host', '') if isinstance(phishlet, dict) else '',))
     scope_gate_full()  # F10: 完整授权门(targets+exercise+window 三必填, CS37-F5)
+    # R32D94-OBS1/CS78-1: 端口守卫先于任何横幅/DB 自检(此前三横幅
+    # +自检写盘副作用先行——与 phish-proxy 族内分叉)。
+    port_s = listen.rpartition(':')[2] or '8443'
+    if not (port_s.isascii() and port_s.isdigit()) or not (0 < int(port_s) < 65536):  # R32D95-N2
+        print(f'--listen/--port 端口须 1-65535 数字: {port_s}', file=sys.stderr); sys.exit(2)
     host, _, port = listen.rpartition(':')
     handler = make_handler(phishlet, db_file)
     # R32D88-F1: 启动自检事件库可写(凭据路径开箱即崩防线)。
@@ -335,10 +340,10 @@ def serve(listen, phishlet, db_file):
     print(f'[phishlet-proxy] {phishlet["name"]}: {listen} → {phishlet["target_host"]}', flush=True)
     print(f'[phishlet-proxy] session cookies: {phishlet.get("session", {}).get("cookie_names", [])}', flush=True)
     print(f'[phishlet-proxy] cred fields: {phishlet.get("credential_fields", [])}', flush=True)
-    port_s = listen.rpartition(':')[2] or '8443'
-    if not (port_s.isascii() and port_s.isdigit()):  # CS77-2
-        print(f'--listen/--port 端口须数字: {port_s}(如 :8080)', file=sys.stderr); sys.exit(2)  # CS76-4
-    HTTPServer((host or '0.0.0.0', int(port or 8443)), handler).serve_forever()
+    try:  # R32D95-N2: 主机名解析失败等干净拒
+        HTTPServer((host or '0.0.0.0', int(port or 8443)), handler).serve_forever()
+    except OSError as e:
+        print(f'--listen 无法绑定 {listen}: {e}', file=sys.stderr); sys.exit(2)
 
 # ============================================================
 # 内置 phishlet 样例(参考模板)

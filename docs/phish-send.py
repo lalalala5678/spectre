@@ -398,10 +398,10 @@ def main():
     host, _, port = smtp_str.rpartition(':')
     # R32D76-NEW5: --smtp 形状校验(此前 ValueError 裸栈 rc=1; 仅 send——
     # dryrun 不联 SMTP, 无默认时空 host 合法)。
-    if args.mode == 'send' and (not host or not port.isdigit()):
+    if args.mode == 'send' and (not host or not (port.isascii() and port.isdigit())):  # CS78-2
         print(f'--smtp 非法: {smtp_str}(形如 host:port)', file=sys.stderr)
         return 2
-    smtp_cfg = {'host': host, 'port': int(port) if port.isdigit() else 587,
+    smtp_cfg = {'host': host, 'port': int(port) if (port.isascii() and port.isdigit()) else 587,  # CS78-2
                 'user': args.user or dflt.get('user', ''),
                 'pass': args.password or dflt.get('pass', ''),
                 'tls': True, 'timeout': 30,
@@ -432,7 +432,7 @@ def main():
     # R32D76-NEW5/CS59-F4: --rate 按因分报(此前单位错也报'数值须正
     # 整数'——名错约束)。
     num, _, unit = args.rate.partition('/')
-    if not num.isdigit() or int(num) <= 0:
+    if not (num.isascii() and num.isdigit()) or int(num) <= 0:  # CS78-2
         print(f'--rate 数值非法: {num}(须正整数)', file=sys.stderr)
         return 2
     if not unit.startswith('min'):

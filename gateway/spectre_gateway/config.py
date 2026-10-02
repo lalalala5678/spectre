@@ -7,8 +7,22 @@ PREFIX = "/spectre"
 
 #: 全部可经环境变量覆盖(部署审计 R32: 此前全硬编码, 新用户必须手改
 #: 源码才能换端口/路径——与后端 ENV 风格对齐)。示例见 deploy/README.md。
+
+
+def _port_env(name, default):
+    """R32D95-N3: 端口 env 值守卫(此前 abc/99999 导入期/绑定裸栈)。"""
+    raw = os.environ.get(name, str(default))
+    try:
+        v = int(raw)
+    except (TypeError, ValueError):
+        raise SystemExit(f"[gateway] FATAL: {name}={raw!r} 须为 1-65535 整数")
+    if not 0 < v < 65536:
+        raise SystemExit(f"[gateway] FATAL: {name}={raw!r} 超出端口范围 1-65535")
+    return v
+
+
 BIND_HOST = os.environ.get("GATEWAY_BIND_HOST", "127.0.0.1")
-BIND_PORT = int(os.environ.get("GATEWAY_PORT", "8081"))
+BIND_PORT = _port_env("GATEWAY_PORT", 8081)
 
 #: Static SPA built by console/ (`npm run build`).
 DIST_DIR = os.environ.get("GATEWAY_DIST_DIR", "../console/dist")
@@ -21,7 +35,7 @@ LOG_FILE = os.path.join(LOG_DIR, "auth.log")
 
 #: Upstream agent runtime for /spectre/api/*.
 RUNTIME_HOST = os.environ.get("RUNTIME_HOST", "127.0.0.1")
-RUNTIME_PORT = int(os.environ.get("RUNTIME_PORT", "8090"))
+RUNTIME_PORT = _port_env("RUNTIME_PORT", 8090)
 #: 是否信任 X-Forwarded-For。缺省按绑定面取安全侧(R32D32-R5):
 #: loopback 绑定(默认, 前面必有反代或本机使用)保持信任; 非 loopback
 #: 绑定(GATEWAY_BIND_HOST 指向外部网卡)缺省不信——否则直连者可自旋

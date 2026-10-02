@@ -505,6 +505,13 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
+// R32D95-N4: PORT=abc → Number=NaN → listen 同步抛落入 uncaughtException
+// 兜底仅打日志 → exit 0(systemd 判绿)——server.on('error') 接不住同步
+// 异常。启动前显式校验。
+if (!Number.isInteger(CONFIG.port) || CONFIG.port < 1 || CONFIG.port > 65535) {
+  console.error(`[agent-runtime] FATAL: PORT=${process.env.PORT ?? ''} 非法(须 1-65535 整数)`);
+  process.exit(1);
+}
 server.listen(CONFIG.port, CONFIG.host, () => {
   console.log(`[agent-runtime] http://${CONFIG.host}:${CONFIG.port}`);
   console.log(`[agent-runtime] model=${effectiveCommon().model || '(未配置——设置页配)'} temporal=${CONFIG.temporalAddress}`);
