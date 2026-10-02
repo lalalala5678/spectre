@@ -166,9 +166,11 @@ async function runDetachedAgent(o) {
 
 /** Last non-empty assistant reply of a session (CS1-R5 ×3 收敛). */
 function lastReply(s) {
+  // R32D85-E1(P1): textOf 收 content(string|parts), 此前传整消息对象
+  // 恒 ''——lastReply/readSessionMessages/wake 三面自 cb381c5 起死读。
   const last = [...s.agent.state.messages].reverse()
-    .find(m => m.role === 'assistant' && textOf(m).trim());
-  return last ? textOf(last) : '';
+    .find(m => m.role === 'assistant' && textOf(m.content).trim());
+  return last ? textOf(last.content) : '';
 }
 
 const caps = {
@@ -193,7 +195,7 @@ const caps = {
     // 用户直连会话含内)。null===null 时旧会话互通。
     if ((record.workSessionId ?? null) !== (callerWs ?? null)) return null;
     return record.agent.state.messages.slice(-last)
-      .map(m => ({ role: m.role, text: textOf(m) || '' }));
+      .map(m => ({ role: m.role, text: textOf(m.content) || '' }));
   },
   /** Provenance snapshot for intel events (delegates to SessionStore). */
   authorOf: (record) => store.authorOf(record),

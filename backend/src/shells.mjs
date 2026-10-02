@@ -116,7 +116,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
   function gate(shell) {
     // Server-side authorization: exercise window + target binding.
     const sc = listScope?.() ?? null;
-    if (!sc) return { ok: false, error: 'scope 不可读:授权门配置缺失' };
+    // R32D85-E2: 缺件指路(与 CLI SCOPE-REJECT 同格)——此前只报
+    // '配置缺失' 不给路径/三必填, 注册能过 exec 才卡, 用户两跳才明。
+    if (!sc) return { ok: false, error: 'scope 不可读:期望 tools/c2/scope.json(targets/exercise/window 三必填; 容器位 /opt/tools/c2/, 宿主位 $SPECTRE_DATA_DIR/tools/c2/)' };
     const now = isoNow();
     const inWindow = sc.window && sc.window.start <= now && now <= sc.window.end;
     // R32D50-F8/CS27-7: targets 语义=模块级 targetMatches(详见其 doc 注释)。
