@@ -10,11 +10,13 @@
       SPECTRE_ALLOW_DEFAULT_AUTH=1 放行(管道/脚本误写生产防线)。
 """
 import base64
+import fcntl  # R32D83-N1: 并发写锁(此前 read→write 竞态静默丢号)
 import getpass
 import hashlib  # CS1-E1: 此前 __import__() 动态导入(PEP 8 禁项), 无任何动态理由
 import os
 import secrets
 import sys
+import tempfile  # R32D83-N1: 原子写(临时文件+rename)
 
 AUTH_DIR = os.environ.get("SPECTRE_AUTH_DIR", "/etc/spectre-auth")
 PASSWD = os.path.join(AUTH_DIR, "passwd")
@@ -52,9 +54,10 @@ def _write_guard():
                  f"或设 SPECTRE_AUTH_DIR 指向可写目录")
 
 
-def write_lines(lines):
+def _confirm_default_write():
+    """D1+F2(十/十六轮): 缺省生产凭据防误写双闸(R32D83-N1: 前置于
+    取锁——不得持锁等 tty 输入)。"""
     if os.path.exists(PASSWD) and not os.environ.get("SPECTRE_AUTH_DIR"):
-        # D1+F2(十/十六轮): 缺省生产凭据已有内容——防误写双闸。
         print(f"[spectre-passwd] 注意: 即将修改缺省凭据文件 "
               f"{PASSWD}(既有装机账号将受影响)", file=sys.stderr)
         if os.environ.get("SPECTRE_ALLOW_DEFAULT_AUTH") != "1":
@@ -71,13 +74,45 @@ def write_lines(lines):
                 print("[spectre-passwd] 已取消(SPECTRE_AUTH_DIR 隔离 / "
                       "SPECTRE_ALLOW_DEFAULT_AUTH=1 跳过)", file=sys.stderr)
                 sys.exit(1)
+
+
+def _atomic_write(lines):
+    """R32D83-N1: 临时文件+rename 原子写(直接 w 全量重写在并发下
+    互相覆盖丢号)。"""
     _write_guard()
     existed = os.path.exists(PASSWD)
-    with open(PASSWD, "w", encoding="utf-8") as f:
-        f.write("\n".join(lines) + ("\n" if lines else ""))
-    os.chmod(PASSWD, 0o640)
+    fd, tmp = tempfile.mkstemp(dir=os.path.dirname(PASSWD) or ".",
+                               prefix=".passwd-", suffix=".tmp")
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as f:
+            f.write("\n".join(lines) + ("\n" if lines else ""))
+            f.flush()
+            os.fsync(f.fileno())
+        os.chmod(tmp, 0o640)
+        os.replace(tmp, PASSWD)
+    except BaseException:
+        try:
+            os.unlink(tmp)
+        except OSError:
+            pass
+        raise
     if not existed:
         print(f"[spectre-passwd] 已创建 {PASSWD}")
+
+
+
+
+def _locked_update(mutate):
+    """R32D83-N1: read→mutate→write 全程持排它锁(锁文件在凭据目录,
+    与凭据文件同生命周期; 此前 8 并发 add 终态 5/8 且全部报'已写入')。"""
+    _write_guard()
+    lock_path = os.path.join(os.path.dirname(PASSWD) or ".", ".passwd.lock")
+    with open(lock_path, "a+") as lock:
+        fcntl.flock(lock.fileno(), fcntl.LOCK_EX)
+        try:
+            _atomic_write(mutate(read_lines()))
+        finally:
+            fcntl.flock(lock.fileno(), fcntl.LOCK_UN)
 
 
 def main():
@@ -101,16 +136,21 @@ def main():
     # CS3-N18: 消息与校验对齐——此前只拒冒号/全空, 'jo hn' 被接受
     if ":" in user or not user.strip() or any(ch.isspace() for ch in user):
         sys.exit("用户名不允许含冒号或空白字符")
-    lines = read_lines()
-    rest = [line for line in lines if line.split(":", 1)[0] != user]
-    if cmd == "del":
+    # R32D83-N1: add/del 均为读-改-写, 全程持锁; 交互闸前置。
+    _confirm_default_write()
+
+    def _del(lines):
+        rest = [line for line in lines
+                if line.split(":", 1)[0] != user]
         if len(rest) == len(lines):
             sys.exit(f"用户不存在: {user}")
-        write_lines(rest)
+        return rest
+
+    if cmd == "del":
+        _locked_update(_del)
         print(f"[spectre-passwd] 已删除 {user}")
         return
-    if len(rest) != len(lines):
-        print(f"[spectre-passwd] 注意: 用户 {user} 已存在, 本次将覆盖其密码")
+
     pw = os.environ.get("PASS")
     if not pw:
         if not sys.stdin.isatty():
@@ -119,7 +159,17 @@ def main():
         pw = getpass.getpass(f"为 {user} 设置密码: ")
     if len(pw) < 8:
         sys.exit("密码至少 8 位")
-    write_lines(rest + [f"{user}:{hash_pw(pw)}"])
+    record = f"{user}:{hash_pw(pw)}"
+
+    def _add(lines):
+        rest = [line for line in lines
+                if line.split(":", 1)[0] != user]
+        if len(rest) != len(lines):
+            print(f"[spectre-passwd] 注意: 用户 {user} 已存在, "
+                  "本次将覆盖其密码")
+        return rest + [record]
+
+    _locked_update(_add)
     print(f"[spectre-passwd] 已写入 {user}(scrypt$n={SCRYPT_N}) → {PASSWD}")
 
 
