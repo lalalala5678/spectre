@@ -70,10 +70,11 @@ ck('requester 白名单透传', bus.list().at(-1).requester?.name === '发现者
 
 // ---------- tool sets ----------
 const childNames = buildChildTools(rec, childCaps).map(x => x.name);
-ck('child 集含委托+申请+修订', childNames.includes('report_vulnerability')
+// CS81-F1: 恒真 || true 删——机锁此前失效(revise_entry 不入 child 集
+// 全仓无有效锁); 三子句现况均真, 删后即真锁。
+ck('child 集含委托+申请+修订(不含 revise_entry)', childNames.includes('report_vulnerability')
   && childNames.includes('request_vulnerability_revision')
-  && childNames.includes('revise_entry') === false // revise_entry 在 intel 集(矩阵拼接)
-  || true);
+  && childNames.includes('revise_entry') === false);  // revise_entry 在 intel 集(矩阵拼接)
 const directNames = buildDirectTools(store.create('recon', { workSessionId: 'ws2' }), makeCaps(rec)).map(x => x.name);
 ck('direct 非report=委托版', directNames.includes('report_vulnerability') && !directNames.includes('publish_vulnerability'));
 const wNames = buildDirectTools(store.create('report', { workSessionId: 'ws2' }), makeCaps(writer)).map(x => x.name);

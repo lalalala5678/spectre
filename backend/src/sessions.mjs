@@ -984,8 +984,8 @@ export class SessionStore {
         this._maybeSummarize(record);
         this._reportSpawnCompletion(record);
         // Synchronous tool callers (report_vulnerability → writer wait)
-        // resolve here — event-driven, no polling, no timeout (agent_end
-        // always fires, including error paths).
+        // resolve here — event-driven, no polling; bounded by the R15-F2
+        // 300s cap (agent_end may never fire on stuck/error paths).
         for (const fn of record.completionWaiters ?? []) fn();
         record.completionWaiters = [];
         break;

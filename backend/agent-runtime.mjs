@@ -244,8 +244,9 @@ const caps = {
    * engagementId, no orchestratorSessionId — so it never joins any
    * dispatch tree (parentNodeId null ⇒ rootIdOf = itself ⇒ countTree
    * and DispatchTreePanel ignore it) and never touches spawn quotas.
-   * Synchronous: resolves at the writer's agent_end (event-driven, no
-   * timeout — agent_end always fires, error paths included). Verdict:
+   * Bounded wait (CS81-F2): resolves at the writer's agent_end
+   * (event-driven) or the 300s cap — agent_end may never fire on
+   * stuck/error paths. Verdict:
    * the writer's published vulnerability event, or its decline reason.
    */
 
