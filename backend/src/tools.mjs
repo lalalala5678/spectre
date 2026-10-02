@@ -766,8 +766,10 @@ export function buildOrchestratorTools(record, caps) {
           } else if (desc.status === 'RUNNING') {
             why = '投递信号失败(engagement 仍在运行,可重试)。';
           }
-        } catch {
-          why = '不存在(id 有误或从未创建)。';
+        } catch (e) {
+          // CS75-F1: 不可达≠不存在(第二消费点)。
+          why = e?.temporalUnreachable
+            ? `Temporal 不可达——${e.message}` : '不存在(id 有误或从未创建)。';
         }
         return {
           content: [{
