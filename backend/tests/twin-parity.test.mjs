@@ -215,8 +215,11 @@ test('FAMILIES 名单唯一定义点: 仅 _common.py(手抄复发面)', () => {
 test('private-qa-server 双文件 CL 两段式守卫在场(CS73-F6 锁)', () => {
   for (const f of ['tools/c2/private-qa-server.py', 'tools/c2/mock/private-qa-server.py']) {
     const src = readFileSync(join(ROOT, f), 'utf8');
+    // CS74-N3: 两段都锁(此前断言文案称两段式却只锁 400 段)。
     assert.match(src, /except \(ValueError, TypeError\):[\s\S]{0,120}send_response\(400\)/,
-      `${f} 须含族先例 CL 两段式守卫(非数字 400/过大 413)`);
+      `${f} 须含 CL 守卫第一段(非数字 400)`);
+    assert.match(src, /ln < 0 or ln > [\d_]+:[\s\S]{0,80}send_response\(413\)/,
+      `${f} 须含 CL 守卫第二段(负值/过大 413)`);
   }
 });
 

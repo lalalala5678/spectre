@@ -11,11 +11,21 @@ import { CONFIG } from './config.mjs';
 
 let clientPromise = null;
 
+// CS74-N5: Connection 失败在源点包一层指路(三调用方
+// tools.dispatch/routes×2 共享; @temporalio/client 原文裸串对
+// 单机部署用户不可读——Temporal 为可选编排链, deploy/README 有载)。
 async function temporalClient() {
   clientPromise ??= (async () => {
-    const connection = await Connection.connect({
-      address: CONFIG.temporalAddress,
-    });
+    let connection;
+    try {
+      connection = await Connection.connect({
+        address: CONFIG.temporalAddress,
+      });
+    } catch (e) {
+      throw Object.assign(
+        new Error(`Temporal 不可达(${e?.message ?? e})——并行编排经 Temporal(可选依赖); 单机可由编排会话逐个 spawn_agent 替代, 启用见 deploy/README`),
+        { temporalUnreachable: true });
+    }
     return new Client({ connection });
   })();
   return clientPromise;

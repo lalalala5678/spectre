@@ -813,7 +813,12 @@ function realRouter({ store, bus, caps, wal }) {
       if (!knownByBus) {
         try {
           await describeWorkflow(prevEngagement);
-        } catch {
+        } catch (e) {
+          // CS74-N5: Temporal 不可达≠engagement 不存在——503 指路而非
+          // 404 误导(源点 temporalClient 包裹打 temporalUnreachable 标)。
+          if (e?.temporalUnreachable) {
+            return bad(res, 503, `Temporal 不可达——无法核对战役(${e.message}); 单机可走会话内编排, 启用见 deploy/README`);
+          }
           return bad(res, 404, 'engagement 不存在, 请先 POST /api/autopwn');
         }
       }

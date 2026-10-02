@@ -66,6 +66,14 @@ def _scope_ok():
         return False
 
 class TrackHandler(BaseHTTPRequestHandler):
+    # R32D90-OBS2/CS74-N1+N2: 匿名三件套(gateway handler.py 先例——
+    # 只置 sys_version='' 会留尾随空格, 须 version_string() 覆盖)。
+    server_version = 'phish-track/1'
+    sys_version = ''
+
+    def version_string(self):
+        return self.server_version
+
     def do_GET(self):
         # V2: 逐请求 scope 复查
         if not _scope_ok():

