@@ -659,12 +659,29 @@ export function buildOrchestratorTools(record, caps) {
           details: verdict,
         };
       }
-      const started = await caps.dispatch({
-        instruction: params.instruction,
-        agents: [...params.agents],
-        orchestratorSessionId: record.id,
-        workSessionId: record.workSessionId ?? null,
-      });
+      // R32D90-OBS1: Temporal 缺席时透出 @temporalio/client 原文裸错
+      // 串——包一层指路(可选依赖, deploy/README 有载)。
+      let started;
+      try {
+        started = await caps.dispatch({
+          instruction: params.instruction,
+          agents: [...params.agents],
+          orchestratorSessionId: record.id,
+          workSessionId: record.workSessionId ?? null,
+        });
+      } catch (e) {
+        const msg = String(e?.message ?? e);
+        const temporal = /temporal|Failed to connect before/i.test(msg);
+        return {
+          content: [{
+            type: 'text',
+            text: (temporal
+              ? `调度失败: Temporal 不可达(${msg})。dispatch_agents 的并行编排经 Temporal——单机部署可先由编排会话逐个 spawn_agent 替代; 启用见 deploy/README(Temporal 可选编排链)。`
+              : `调度失败: ${msg}`),
+          }],
+          details: { error: msg },
+        };
+      }
       record.activeEngagement = started;
       return {
         content: [{

