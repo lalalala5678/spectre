@@ -2,7 +2,7 @@
  * twin-parity (CS8-P0/CS9-N2/N14): 双胞胎副本一致性机锁。
  *
  * 约定:
- * - docs/*.py 权威, tools/bin/*.py 部署产物(tools-sync 交付);
+ * - 12 对 docs/*.py↔tools/bin/*.py 逐字节一致(docs 权威, tools-sync 交付); 另 9 个 bin 文件自为权威无 docs 对应(CS73-F7: 表述收窄);
  * - docs/<技能>/ 与 docs/<skills-root>/<技能>/ 的技能双胞胎逐字节一致;
  * - 双侧存在性纳入断言(N14: 任一侧被删即红, 无静默逃生道)。
  * 单侧编辑/删除任一侧 → 本测试红(AGENTS.md:67 的机器防线)。
@@ -210,4 +210,24 @@ test('FAMILIES 名单唯一定义点: 仅 _common.py(手抄复发面)', () => {
     }
   }
   assert.deepEqual(offenders, [], `FAMILIES/KNOWN_FAMILIES 手抄: ${offenders.join(', ')}——应 from _common import`);
+});
+
+test('private-qa-server 双文件 CL 两段式守卫在场(CS73-F6 锁)', () => {
+  for (const f of ['tools/c2/private-qa-server.py', 'tools/c2/mock/private-qa-server.py']) {
+    const src = readFileSync(join(ROOT, f), 'utf8');
+    assert.match(src, /except \(ValueError, TypeError\):[\s\S]{0,120}send_response\(400\)/,
+      `${f} 须含族先例 CL 两段式守卫(非数字 400/过大 413)`);
+  }
+});
+
+test('RESP_STRIP_HEADERS 唯一定义点: 仅 _common.py(CS73-F5 锁)', () => {
+  const offenders = [];
+  for (const dir of ['docs', 'tools/bin']) {
+    for (const f of readdirSync(join(ROOT, dir))) {
+      if (!f.endsWith('.py') || f === '_common.py') continue;
+      const src = readFileSync(join(ROOT, dir, f), 'utf8');
+      if (/^RESP_STRIP_HEADERS = /m.test(src)) offenders.push(`${dir}/${f}`);
+    }
+  }
+  assert.deepEqual(offenders, [], `RESP_STRIP_HEADERS 手抄: ${offenders.join(', ')}——应 from _common import`);
 });

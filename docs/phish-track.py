@@ -30,16 +30,6 @@ def load_db():
     except Exception:
         return {'events': []}
 
-def save_db(db):
-    # V6: 排他文件锁——phishlet-proxy 与 track 并发写同库曾互踩
-    # (agent 实战目击 proxy 事件消失)。load-modify-save 全程持锁。
-    import fcntl
-    with open(DB_FILE + '.lock', 'w') as lf:
-        fcntl.flock(lf, fcntl.LOCK_EX)
-        try:
-            json.dump(db, open(DB_FILE, 'w'), indent=1, ensure_ascii=False)
-        finally:
-            fcntl.flock(lf, fcntl.LOCK_UN)
 
 def add_event(kind, uid, extra=None):  # CS72-4: db 死参删(锁内重读, 调用方 load_db 为死读)
     # V6b: 整个 read-modify-write 持排他锁——此前锁只在 save 段,
@@ -160,6 +150,7 @@ def serve(port):
 
 def report():
     edusrc_gate()
+    db = load_db()  # CS73-F1: 活读(CS72-4 正则误删致 NameError)
     events = db['events']
     by_uid = {}
     for ev in events:
@@ -200,7 +191,7 @@ if __name__ == '__main__':
     ap.add_argument('--db', help='事件库路径(缺省=数据根 tools/phish/track.json, 双运行位)')
     a = ap.parse_args()
     if a.db:
-        DB_FILE = a.db  # load_db/save_db 均引用模块全局,重绑即生效
+        DB_FILE = a.db  # load_db/add_event 引用模块全局,重绑即生效(CS73-F3: save_db 已删)
     if a.mode == 'serve':
         port = a.port or a.port_pos or 8080
         serve(port)
