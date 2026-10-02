@@ -31,7 +31,7 @@
 
 ### 参数描述
 - **做什么 → 何时用 → 参数引导 → 限制** 四段式
-- 首词标注副作用:`[read-only]` / `[creates event]` / `[side-effects: spawns agent]` 等
+- 首词标注副作用:`[read-only]` / `[creates event]` / `[spawns agent]` 等(简式标签, CS63-F2 与工具表同形)
 - 不要用指代不明的词(如 "receipts" — LLM 可能误解为别的操作)
 
 ## 输出规范

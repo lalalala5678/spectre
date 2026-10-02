@@ -549,7 +549,7 @@ function buildRequestRevisionTool(record, caps) {
 /**
  * Shared spawn_agent tool — registered in BOTH the orchestrator and the
  * child tool sets (identical definition; extracted to prevent drift).
- * [side-effects: spawns agent] [idempotent: no]
+ * [spawns agent] [idempotent: no]  // CS63-F2: 与描述首词/AGENTS.md 表同形
  */
 function buildSpawnAgentTool(record, caps) {
   return {

@@ -165,7 +165,7 @@ test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移�
   for (const entry of listed) {
     const entryName = entry.slice(0, entry.lastIndexOf('('));
     assert.ok(known.has(entryName),
-      `行数表出现未知条目 ${entry}(不在受锁七文件内)——清理 docs/ARCHITECTURE.md:105`);
+      `行数表出现未知条目 ${entry}(不在受锁七文件内)——清理 docs/ARCHITECTURE.md 行数软指引表`);
   }
   for (const [name, rel] of rows) {
     const content = readFileSync(join(ROOT, rel), 'utf8');
@@ -174,7 +174,7 @@ test('ARCHITECTURE 行数软指引表与实际一致(CS17-3: 两轮连续漂移�
     assert.equal(listed.filter(x => x.startsWith(`${name}(`)).length, 1,
       `行数表 ${name} 出现多次/缺失: ${listed.join(',')}`);
     assert.ok(listed.includes(`${name}(${actual})`),
-      `行数表漂移: ${name} 实际 ${actual} 行, 表内为「${listed.join(',')}」——改文件须同步 docs/ARCHITECTURE.md:105`);
+      `行数表漂移: ${name} 实际 ${actual} 行, 表内为「${listed.join(',')}」——改文件须同步 docs/ARCHITECTURE.md 行数软指引表`);
   }
 });
 
