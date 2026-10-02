@@ -7,6 +7,9 @@ sys.path[0] 即本目录。docs/_common.py 为权威孪生; tools-sync 整目录
 import os, sys, json, time, hashlib
 
 
+_DATA_WARNED = False  # R32D92-N3: 进程内一次(此前每调用一打, --db 覆盖时也双打)
+
+
 def _data_root():
     """数据根(R32D36 双运行位唯一制式): 容器内 /opt/tools 是 bind 挂载
     (bootstrap 标记识别); 宿主侧 SPECTRE_DATA_DIR。
@@ -22,7 +25,10 @@ def _data_root():
     # CS34-F11: 家族契约"-h 永先"——求助时帮助不该被 env 警告前置,
     # 单源静默(py 工具模块级常量在 import 期即触发本函数)。
     if not any(a in ('-h', '--help') for a in sys.argv[1:]):
-        print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
+        global _DATA_WARNED
+        if not _DATA_WARNED:
+            _DATA_WARNED = True
+            print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
               '(如非本意请先设置 SPECTRE_DATA_DIR)', file=sys.stderr)
     return '/var/lib/spectre/tools'
 

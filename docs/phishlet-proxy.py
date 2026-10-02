@@ -362,10 +362,19 @@ if __name__ == '__main__':
     if len(sys.argv) < 2 or sys.argv[1] not in ('serve', 'list', 'init'):
         print(__doc__); sys.exit(2)
     if sys.argv[1] == 'serve':
-        listen = '--listen' in sys.argv and sys.argv[sys.argv.index('--listen') + 1] or ':8443'
-        pl_path = '--phishlet' in sys.argv and sys.argv[sys.argv.index('--phishlet') + 1]
-        db = '--db' in sys.argv and sys.argv[sys.argv.index('--db') + 1] \
-            or os.path.join(_data_root(), 'phish/track.json')  # CS9-N1
+        # R32D92-N1: 成对解析+未知旗标拒 rc=2(此前静默忽略)+--port 别名。
+        PAIR_FLAGS = ('--listen', '--port', '--phishlet', '--db')
+        toks, flags = sys.argv[2:], {}
+        i = 0
+        while i < len(toks):
+            t = toks[i]
+            if t in PAIR_FLAGS and i + 1 < len(toks):
+                flags[t] = toks[i + 1]; i += 2
+            else:
+                print(f'未知/缺值参数: {t}(用法: -h)', file=sys.stderr); sys.exit(2)
+        listen = flags.get('--listen') or (':' + flags['--port'] if '--port' in flags else ':8443')
+        pl_path = flags.get('--phishlet')
+        db = flags.get('--db') or os.path.join(_data_root(), 'phish/track.json')  # CS9-N1
         if not pl_path:
             print('serve 需要 --phishlet <json>', file=sys.stderr); sys.exit(1)
         serve(listen, load_phishlet(pl_path), db)
