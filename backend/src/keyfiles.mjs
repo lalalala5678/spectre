@@ -51,10 +51,13 @@ export async function syncSourceKeyFiles() {
   const smtpCfg = keys.smtp ?? {};
   const smtpHasSecret = hasCred(smtpCfg, 'smtp');  // CS19-7: 单源谓词
   await mkdir(path_mod.join(root, 'tools/phish'), { recursive: true });
+  // CS58-F3: 保留 allow_plaintext(消费方 phish-send 契约——此前整写
+  // 定形对象使手工/上游持久化的该键静默清除)。
   await writeFile(path_mod.join(root, 'tools/phish/smtp.json'),
     JSON.stringify(smtpHasSecret ? { host: smtpCfg.host,
       port: Number(smtpCfg.port) || 587, user: smtpCfg.user,
-      pass: smtpCfg.password } : {}, null, 1), 'utf8');
+      pass: smtpCfg.password,
+      ...(smtpCfg.allow_plaintext === true ? { allow_plaintext: true } : {}) } : {}, null, 1), 'utf8');
 
   // 最小权限: recon server 的配置文件只收 recon 组源——此前全量落盘
   // 使 c2 组 key(virustotal/hybridanalysis)混入(server 虽按注册表忽略,

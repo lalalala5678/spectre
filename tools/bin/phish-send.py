@@ -10,7 +10,7 @@ v2 新增: DKIM 签名 / Message-ID 域名一致性 / Reply-To 同域 / 路径�
       [--attach file] [--rate 5/min]
       (--smtp 可省:设置页已配经验证 SMTP 通道时自动回退)
   phish-send.py dryrun --from "..." --to t.txt --subject s --html b.html
-      (不联 SMTP; --from/--html 同 send 必填)
+      (不联 SMTP; --from 必填, --html 可选——缺省用内置模板)
   phish-send.py genkey --genkey-domain example.co [--genkey-selector s1]
 """
 import sys, os, smtplib, time, json, hashlib, argparse, secrets
@@ -228,8 +228,8 @@ def send_with_dkim(smtp_cfg, from_addr, to_addr, subject, html_body,
                 if has_creds and not allowed:
                     raise SystemExit(
                         '[refuse] 中继不支持 STARTTLS 且已配置凭据——明文降级会把 AUTH '
-                        'PLAIN 凭据裸送线路。如确需(仅限本地授权靶)在 smtp.json 加 '
-                        '"allow_plaintext": true 或 CLI 传 --allow-plaintext。')
+                        'PLAIN 凭据裸送线路。如确需(仅限本地授权靶)CLI 传 --allow-plaintext(或设置页 smtp 源 '
+                        'allow_plaintext 开关——keyfiles 落盘时保留)。')
                 print('[warn] relay lacks STARTTLS, downgrade to plaintext'
                       + (' (no credentials)' if not has_creds else ' (explicitly allowed)'), file=sys.stderr)
         if smtp_cfg.get('user') and 'auth' in s.esmtp_features:
@@ -358,15 +358,15 @@ def main():
         gate()
         # F36: selector 未校验+域允许 '..' 字面量 → 组合穿越(root 任意
         # 目录覆写 *.pem, exploit PoC)。双字段白名单+段级 '..' 拒绝。
+        # CS58-F2: 段级 split('.') 检查恒假(切分段永不='..')——改字面
+        # 包含; 空域同时被 fullmatch 拒(缺参分支不可达已删)。
         if not _re.fullmatch(r'[A-Za-z0-9.-]{1,253}', args.genkey_domain or '') \
-                or '..' in (args.genkey_domain or '').split('.'):
-            print('genkey-domain 非法(仅 [A-Za-z0-9.-] 且无 .. 段)', file=sys.stderr)
+                or '..' in (args.genkey_domain or ''):
+            print('genkey-domain 非法(仅 [A-Za-z0-9.-] 且无 .. 序列)', file=sys.stderr)
             sys.exit(2)
         if not _re.fullmatch(r'[A-Za-z0-9_-]{1,63}', args.genkey_selector or 's1'):
             print('genkey-selector 非法(仅 [A-Za-z0-9_-])', file=sys.stderr)
             sys.exit(2)
-        if not args.genkey_domain:
-            print('genkey 需要 --genkey-domain', file=sys.stderr); sys.exit(1)
         import subprocess
         d = os.path.join(_data_root(), f'c2/dkim/{args.genkey_domain}')
         os.makedirs(d, exist_ok=True)
