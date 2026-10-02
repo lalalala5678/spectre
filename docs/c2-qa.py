@@ -15,14 +15,20 @@ from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f
 
 AUDIT = os.path.join(_data_root(), 'c2/audit.log')  # CS36-Z4: 五列制式单源(_common.audit_log)
 
-def gate():
-    # CS44-F3: 收敛 _common 单源门(basetype/bytecode 同款 wrapper——此前
-    # ~29 行本地孤本+死参 payload)。qa 独有差异仅 EDUSRC 拒绝落审计行。
-    # 门序族统一=edusrc 先; scope 三必填/缺/坏 JSON 全在单源门。
+def _edusrc_gate_audit():
+    # CS44-F3/R32D87-D: qa 独有差异=EDUSRC 拒绝落审计行; 提局部助手供
+    # gate 与 main 派发前共用(此前派发先于门使未知子命令+EDUSRC→2,
+    # phish 族同输入→76, 门序表同文档两实现分裂)。
     if _edusrc_hit():
         audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
         print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
         sys.exit(76)
+
+def gate():
+    # CS44-F3: 收敛 _common 单源门(basetype/bytecode 同款 wrapper——此前
+    # ~29 行本地孤本+死参 payload)。门序族统一=edusrc 先; scope 三必填/
+    # 缺/坏 JSON 全在单源门。
+    _edusrc_gate_audit()
     return scope_gate_full()
 
 def audit(target, action, sha, note=''):
@@ -453,6 +459,7 @@ def main():
         print(__doc__); return 0
     if len(sys.argv) < 2:
         print(__doc__); return 2
+    _edusrc_gate_audit()  # R32D87-D: 派发前对齐 phish 族(未知子命令+EDUSRC→76)
     cmd, args = sys.argv[1], sys.argv[2:]
     if cmd == 'scan': return cmd_scan(args)
     if cmd == 'run': return cmd_run(args)

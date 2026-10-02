@@ -514,6 +514,6 @@ server.listen(CONFIG.port, CONFIG.host, () => {
 // 半正常引导日志误导排障(对比 WAL 双机锁面是干净 FATAL)。
 server.on('error', err => {
   console.error(`[agent-runtime] FATAL: 无法监听 ${CONFIG.host}:${CONFIG.port} — ${err.code ?? ''} ${err.message}`);
-  console.error('[agent-runtime] 端口被占用时: 找到持有进程(lsof -i :PORT)或换 PORT env');
+  console.error('[agent-runtime] 端口被占用时: 找到持有进程(lsof -i :PORT 或 ss -ltnp)或换 PORT env');
   process.exit(1);
 });

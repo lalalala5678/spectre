@@ -167,6 +167,10 @@ class GatewayHandler(BaseHTTPRequestHandler):
         target = static_files.resolve(rel)
         if target is None:
             audit("static_miss", ip=self.client_ip(), path=rel)
+            # R32D87-B: SPA 深链回退——路径式 /spectre/settings 此前
+            # 404(hash 路由应用自会归位), 误删 # 的书签不可用。
+            if static_files.resolve("/index.html") is not None:
+                return self._serve_static("/index.html")
             return self._send(404, b"not found")
         with open(target, "rb") as handle:
             body = handle.read()

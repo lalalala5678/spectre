@@ -35,9 +35,9 @@ def scope_gate_full():
     try:
         sc = json.load(open(SCOPE))
     except FileNotFoundError:
-        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE})', file=sys.stderr); sys.exit(75)
+        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE}; 字段唯一记载: docs/scope-gate/SKILL.md)', file=sys.stderr); sys.exit(75)  # R32D87-C
     except Exception as e:
-        print(f'SCOPE-REJECT: bad scope.json: {e}', file=sys.stderr); sys.exit(75)
+        print(f'SCOPE-REJECT: bad scope.json: {e}(字段见 docs/scope-gate/SKILL.md)', file=sys.stderr); sys.exit(75)
     try:
         now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
         # CS36-Z3: SKILL 三必填契约(targets/exercise/window)——exercise
@@ -48,7 +48,7 @@ def scope_gate_full():
     except Exception:
         ok = False
     if not ok:
-        print('SCOPE-REJECT: empty targets/exercise or out of window', file=sys.stderr)
+        print('SCOPE-REJECT: empty targets/exercise or out of window(三必填语义见 docs/scope-gate/SKILL.md)', file=sys.stderr)
         sys.exit(75)
     return sc
 

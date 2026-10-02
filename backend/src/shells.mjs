@@ -76,6 +76,11 @@ function boundedExecResult(err, so, se, timeoutNote) {
   const code = err ? (err.code ?? 1) : 0;
   if (code === 124 || code === 137) stderr += `\n${timeoutNote}`;
   if (err?.killed) stderr += '\n[timeout]';
+  // R32D87-A: docker 二进制缺失(ENOENT)具名根因——local 传输即
+  // docker exec 沙箱容器, 此前仅 [exit ENOENT] 用户须读源码。
+  if (err?.code === 'ENOENT') {
+    stderr += '\n[根因: docker 不可用——local/web/ssh 传输均经沙箱容器执行, 需容器运行时; 纯宿主无容器时请用宿主 CLI 工具面]';
+  }
   if (err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
     stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
   }
