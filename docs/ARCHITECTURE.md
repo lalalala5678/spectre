@@ -1,13 +1,13 @@
 # SPECTRE 架构设计
 
-> 自主渗透测试作战控制台。单文件入口 `/root/spectre`,部署于单台公网主机。
+> 自主渗透测试作战控制台。仓库任意目录部署(见 deploy/README「快速开始」),面向单台主机。
 > 阶段状态:基座(全部子智能体 = 同一套基础 pi,零定制);定制化是规划中的扩展点。
 
 ## 1. 系统总览
 
 ```
 浏览器
-  │ https://www.REDACTED-DOMAIN/spectre/
+  │ https://<你的域名或IP>/spectre/
   ▼
 caddy (:443, /spectre*) ── 真实 TLS,唯一公网入口
   ▼
