@@ -1,4 +1,4 @@
-# SPECTRE 对外 TLS 暴露样例(替换 your.domain 与邮箱后使用)
+# SPECTRE 对外 TLS 手工样例——默认路径用 setup.sh/setup-tls.sh 自动装配(本文件留给自定义场景)
 # 内部链路: Caddy :443 --TLS--> gateway 127.0.0.1:8081 -->> runtime :8090
 your.domain.com {
 	tls you@example.com

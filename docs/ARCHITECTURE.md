@@ -83,7 +83,8 @@ gateway (Python :8081, 仅 127.0.0.1)
 │
 ├── deploy/                        # 运维物料
 │   ├── systemd/                   # 单元文件 ×6
-│   ├── Caddyfile                  # TLS 反代样例(顶层单文件)
+│   ├── setup.sh / setup-tls.sh    # 一键部署 + 对外 TLS 装配(小白默认路径)
+│   ├── Caddyfile                  # TLS 反代手工样例(默认由 setup-tls 生成等效配置)
 │   ├── oob-collector.py           # OOB TCP 收集器
 │   └── tools-sync/skills-seed/fetch-jars/fetch-fingerprints/
 │       fetch-wordlists/bootstrap 六脚本(前五=SPECTRE_DATA_DIR

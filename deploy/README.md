@@ -1,6 +1,20 @@
 # 部署
 
-完整部署 = 后端运行时 + 前端控制台 + 网关 + 可选基础设施（Temporal / OOB / Caddy / 私架面杀）。
+完整部署 = 后端运行时 + 前端控制台 + 网关 + 可选基础设施（Temporal / OOB / 私架面杀）; 对外 TLS 由部署脚本默认装配（R32D100 起）。
+
+## 快速开始（一键, 推荐）
+
+```bash
+git clone https://github.com/lalalala5678/spectre && cd spectre
+sudo bash deploy/setup.sh                 # 公网 IP + 内部 CA 证书(浏览器首次访问须手动信任)
+sudo bash deploy/setup.sh your.domain.com # 有域名则自动 Let's Encrypt
+```
+
+setup.sh 幂等地完成: Node≥22 检装 → 依赖安装/前端构建 → `INTERNAL_TOKEN` 生成 →
+admin 建号(密码存 `/root/spectre-admin-cred.txt`, 600) → systemd 三单元
+(`spectre-agent-runtime`/`spectre-console`/`spectre-caddy`)→ 对外 TLS
+(Caddy :443→网关 127.0.0.1:8081, 网关保持环回)。结束时打印入口与账号。
+以下是各步骤的手工等价拆解（排障/自定义时用）。
 
 ## 环境要求
 
@@ -56,7 +70,7 @@ python3 server.py                             # dist 默认 ../console/dist
 # 4) 登录验证
 #    本机: http://127.0.0.1:8081/spectre/ → admin 登录
 #    远程纯 HTTP: cookie 带 Secure 位会静默无法登录——要么 GATEWAY_INSECURE_COOKIE=1(仅测试),
-#    要么经 TLS(Caddy 样例见 deploy/Caddyfile; 网关默认只绑 127.0.0.1, 远程需 GATEWAY_BIND_HOST 或隧道)
+#    要么走默认 TLS(setup.sh/setup-tls.sh 已自动装配 Caddy :443; 网关保持只绑 127.0.0.1——手工场景样例见 deploy/Caddyfile)
 #    注意: 前端 npm i 与 npm run build 需同一 Node ≥ 22(混版本装出的原生依赖会损坏)
 
 # 5) systemd(可选, 路径经环境文件驱动)
@@ -64,6 +78,7 @@ sudo mkdir -p /etc/spectre && sudo cp deploy/spectre.env.example /etc/spectre/sp
 #   按机修改 spectre.env(SPECTRE_REPO/NODE_BIN 等), 然后:
 sudo cp deploy/systemd/spectre-*.service /etc/systemd/system/
 sudo systemctl daemon-reload && sudo systemctl enable --now spectre-agent-runtime spectre-console
+#   对外 TLS(默认自动化): sudo bash deploy/setup-tls.sh [域名] —— 装配 spectre-caddy 单元(:443→127.0.0.1:8081)
 
 # 6) 沙箱容器(可选; docker driver + /opt/tools 挂载, 见 backend/src/sandbox/container.mjs)
 # 五脚本统一数据根(不要设默认值兜底——留空让脚本守卫拦截生产误写;

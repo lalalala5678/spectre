@@ -34,8 +34,15 @@
 
 ## 快速开始
 
+**一键(推荐)**:
+
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
+sudo bash deploy/setup.sh                 # 或带域名: sudo bash deploy/setup.sh your.domain.com
+```
+
+一键含: 依赖构建/admin 建号/systemd 三单元/对外 TLS(Caddy)——结束打印入口与账号。
+以下为手工逐步等价(排障/自定义用):
 
 # ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串; 占位行删除而非追加——
 #    逐行 first-wins, 保留 change-me 行会遮蔽你在后面写的值)
@@ -61,7 +68,7 @@ cd ../gateway && SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<密码>' \
 > 开**新终端**执行, 并先 `cd` 回仓库根(deploy/README.md 步骤 0-4 的
 > 命令路径都在各自子目录内)。
 
-远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS）。
+远程纯 HTTP 需 `GATEWAY_INSECURE_COOKIE=1`（仅测试；生产走 TLS——`sudo bash deploy/setup.sh [域名]` 一键含对外 TLS, 见 deploy/README「快速开始」）。
 
 **配置大模型**（登录后, 平台统一接管）: 「设置」页 → 通用配置 → 接口格式
 （OpenAI 兼容/Anthropic/Gemini）+ Base URL + API Key + 模型名——四字段一个
