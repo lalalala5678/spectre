@@ -278,7 +278,10 @@ const RECON_SOURCES = {
     label: 'SMTP 发信',
     tier: 'P0', why: '钓鱼 agent 邮件发送通道(直连/中继)',
     agents: ['phish'],
-    fields: { host: 'SMTP 主机', port: '端口', user: '账号', password: '密码' },
+    // CS59-F1: allow_plaintext 持久化通道落地(此前 phish-send 降级指
+    // 引指向不存在的面板开关——手改 smtp.json 又被整写清除)。
+    fields: { host: 'SMTP 主机', port: '端口', user: '账号', password: '密码',
+      allow_plaintext: '明文降级(STARTTLS 缺失时)' },
     async validate({ host, port, user, password: _password }) {
       if (!host || !user) return { ok: false, error: 'SMTP 需要 host + user' };
       const p = Number(port) || 587;
@@ -340,10 +343,7 @@ export function settingsSchema() {
           .filter(([sid, sv]) => (sv.agents ?? ['recon']).includes('c2') && sid !== 'smtp')
           .map(([id, sv]) => ({
             id, label: sv.label, defaultBase: sv.defaultBase, tier: sv.tier, why: sv.why,
-            fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
-              id: `${id}.${fid}`, label: flabel,
-              type: fieldTypeOf(fid),
-            })),
+            fields: Object.entries(sv.fields).map(([fid, flabel]) => reconField(id, fid, flabel)),
           })),
       },
       {
@@ -353,10 +353,7 @@ export function settingsSchema() {
           .filter(([, sv]) => (sv.agents ?? ['recon']).includes('phish'))
           .map(([id, sv]) => ({
             id, label: sv.label, defaultBase: sv.defaultBase ?? '', tier: sv.tier, why: sv.why,
-            fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
-              id: `${id}.${fid}`, label: flabel,
-              type: fieldTypeOf(fid),
-            })),
+            fields: Object.entries(sv.fields).map(([fid, flabel]) => reconField(id, fid, flabel)),
           })),
       },
       {
@@ -383,10 +380,7 @@ export function settingsSchema() {
           .filter(([, sv]) => (sv.agents ?? ['recon']).includes('nday'))
           .map(([id, sv]) => ({
             id, label: sv.label, defaultBase: sv.defaultBase, tier: sv.tier, why: sv.why,
-            fields: Object.entries(sv.fields).map(([fid, flabel]) => ({
-              id: `${id}.${fid}`, label: flabel,
-              type: fieldTypeOf(fid),
-            })),
+            fields: Object.entries(sv.fields).map(([fid, flabel]) => reconField(id, fid, flabel)),
           })),
       },
       {
@@ -397,10 +391,7 @@ export function settingsSchema() {
           .sort((a, b) => (a[1].tier ?? 'P9').localeCompare(b[1].tier ?? 'P9'))
           .map(([id, s]) => ({
           id, label: s.label, defaultBase: s.defaultBase, tier: s.tier, why: s.why,
-          fields: Object.entries(s.fields).map(([fid, flabel]) => ({
-            id: `${id}.${fid}`, label: flabel,
-            type: fieldTypeOf(fid),
-          })),
+          fields: Object.entries(s.fields).map(([fid, flabel]) => reconField(id, fid, flabel)),
         })),
       },
     ],
@@ -426,6 +417,11 @@ export function settingsSchema() {
  */
 const CRED_FIELD = new Set(['key', 'secret', 'token', 'password']);
 const fieldTypeOf = fid => (CRED_FIELD.has(fid) ? 'password' : 'text');
+// CS59-F1: recon 源字段 def 单源(三处 schema map 此前各写一份)。
+const reconField = (sid, fid, flabel) => (fid === 'allow_plaintext'
+  ? { id: `${sid}.${fid}`, label: flabel, type: 'select', options: ['true', 'false'], default: 'false',
+      hint: 'true=中继无 STARTTLS 时允许明文降级(明文发 AUTH 凭据, 仅限本地授权靶)' }
+  : { id: `${sid}.${fid}`, label: flabel, type: fieldTypeOf(fid) });
 
 // R32D59-N6: 凭据读面掩码(••••+尾4)/写面掩码哨兵还原——多账号共享
 // 机下低权登录者不再能读管理员 LLM Key 全文; 保存表单原样回传掩码时

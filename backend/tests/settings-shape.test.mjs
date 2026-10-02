@@ -48,3 +48,38 @@ test('getSettings: recon 源叶级掩码, 非凭据叶原样(形状锁)', async 
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('syncSourceKeyFiles: smtp allow_plaintext 透传+schema 下发(CS59-F1 锁)', async () => {
+  const dir = mkdtempSync(join(tmpdir(), 'st-smtp-'));
+  mkdirSync(join(dir, 'tools'), { recursive: true });
+  process.env.SPECTRE_DATA_DIR = dir;
+  process.env.INTERNAL_TOKEN ||= 'shape-test';
+  process.env.TEMPORAL_ADDRESS ||= '127.0.0.1:7233';
+  const prevCwd = process.cwd();
+  process.chdir(join(ROOT, 'backend'));
+  try {
+    const { setPrefs } = await import('../src/projects.mjs');
+    const { settingsSchema } = await import('../src/agent-settings.mjs');
+    const { syncSourceKeyFiles } = await import('../src/keyfiles.mjs');
+    const { readFileSync } = await import('node:fs');
+    // schema 面: allow_plaintext 下发 select(设置页可持久化通道)
+    const phish = settingsSchema().agents.find(a => a.agentKey === 'phish');
+    const smtpSrc = phish.sources.find(sv => sv.id === 'smtp');
+    const ap = smtpSrc.fields.find(f => f.id === 'smtp.allow_plaintext');
+    assert.ok(ap, 'smtp 源须下发 allow_plaintext 字段');
+    assert.equal(ap.type, 'select', 'allow_plaintext 须为 select');
+    // 落盘面: 'true' 字符串→布尔透传; 'false'/缺省→不落键
+    setPrefs({ reconApiKeys: { smtp: { host: 'h', port: 25, user: 'u', password: 'p', allow_plaintext: 'true' } } });
+    await syncSourceKeyFiles();
+    const on = JSON.parse(readFileSync(join(dir, 'tools/phish/smtp.json'), 'utf8'));
+    assert.equal(on.allow_plaintext, true, "allow_plaintext='true' 须透传布尔 true");
+    setPrefs({ reconApiKeys: { smtp: { host: 'h', port: 25, user: 'u', password: 'p' } } });
+    await syncSourceKeyFiles();
+    const off = JSON.parse(readFileSync(join(dir, 'tools/phish/smtp.json'), 'utf8'));
+    assert.equal(off.allow_plaintext, undefined, '未开启时不得落 allow_plaintext 键');
+  } finally {
+    process.chdir(prevCwd);
+    delete process.env.SPECTRE_DATA_DIR;
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

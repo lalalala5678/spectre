@@ -57,7 +57,7 @@ export async function syncSourceKeyFiles() {
     JSON.stringify(smtpHasSecret ? { host: smtpCfg.host,
       port: Number(smtpCfg.port) || 587, user: smtpCfg.user,
       pass: smtpCfg.password,
-      ...(smtpCfg.allow_plaintext === true ? { allow_plaintext: true } : {}) } : {}, null, 1), 'utf8');
+      ...(String(smtpCfg.allow_plaintext) === 'true' ? { allow_plaintext: true } : {}) } : {}, null, 1), 'utf8');
 
   // 最小权限: recon server 的配置文件只收 recon 组源——此前全量落盘
   // 使 c2 组 key(virustotal/hybridanalysis)混入(server 虽按注册表忽略,

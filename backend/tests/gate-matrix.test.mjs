@@ -231,3 +231,16 @@ test('phish 族 -h+EDUSRC→0 帮助永先(CS55-F2 锁)', () => {
     rmSync(dir, { recursive: true, force: true });
   }
 });
+
+test('-h 任意位=0 家族契约(CS59-F2 锁: c2 八员+外围四员)', () => {
+  const dir = mkdtempSync(join(tmpdir(), 'anypos-h-'));
+  try {
+    const probe = { 'c2-variant.py': ['gen', '-h'], 'c2-qa.py': ['scan', '-h'], 'c2-javart.py': ['badmode', '-h'], 'toklab.py': ['badmode', '-h'], 'jsondiff.py': ['a.json', 'b.json', '-h'] };
+    for (const [tool, argv] of Object.entries(probe)) {
+      const r = runTool(tool, argv, dir, false);
+      assert.equal(r.status, 0, `${tool} ${argv.join(' ')} 应 0(-h 任意位), 实得 ${r.status}`);
+    }
+  } finally {
+    rmSync(dir, { recursive: true, force: true });
+  }
+});

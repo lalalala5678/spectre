@@ -42,11 +42,14 @@ def ledger(label, code, dt, body_path):
 def main():
     # R32D41-N2: 此前 --help/无参均裸栈(FileNotFoundError/IndexError)。
     # R32D55-N4: - 开头未知 flag 不再当计划文件路径(语义歧义)。
-    if len(sys.argv) >= 2 and sys.argv[1].startswith('-') and sys.argv[1] not in ('-h', '--help'):
+    # CS59-F2: -h 任意位先判(此前限 argv[1], plan.json -h 落未知参)。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
+        print(__doc__); return 0
+    if len(sys.argv) >= 2 and sys.argv[1].startswith('-'):
         print(f'[authmatrix] 未知参数: {sys.argv[1]}', file=sys.stderr); return 2
-    if len(sys.argv) != 2 or sys.argv[1] in ('-h', '--help'):
+    if len(sys.argv) != 2:
         print(__doc__)
-        return 2 if len(sys.argv) != 2 else 0
+        return 2
     try:
         plan = json.load(open(sys.argv[1]))
     except (OSError, ValueError) as e:

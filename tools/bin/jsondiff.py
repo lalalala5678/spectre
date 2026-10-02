@@ -24,8 +24,11 @@ def flat(o, prefix=''):
 
 def main():
     # R32D42-P1/P2: --help/参数不足/坏 JSON 均不再裸栈。
-    if len(sys.argv) < 3 or any(x in ('-h', '--help') for x in sys.argv[1:3]):
-        print(__doc__); return 0 if '--help' in sys.argv or '-h' in sys.argv else 2
+    # CS59-F2: -h 任意位(此前仅 argv[1:3] 扫描)。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
+        print(__doc__); return 0
+    if len(sys.argv) < 3:
+        print(__doc__); return 2
     try:
         a, b = load(sys.argv[1]), load(sys.argv[2])
     except (OSError, ValueError) as e:

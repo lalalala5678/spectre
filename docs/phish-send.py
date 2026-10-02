@@ -413,23 +413,27 @@ def main():
         else:
             print(f'--to 非地址非文件(缺 @): {args.to}', file=sys.stderr)
         return 2
-    # R32D76-NEW1: 非 UTF-8 容错读取。
+    # R32D76-NEW1/CS59-F3: 非 UTF-8 容错读取; 零目标/缺 --to 前置拒
+    # (此前 0/0 total rc=0 假成功且落审计账)。
     targets = [l.strip() for l in open(args.to, errors='replace')
                if l.strip() and '@' in l] if os.path.isfile(args.to or '') \
         else ([args.to.strip()] if args.to else [])
+    if not targets:
+        print('目标为空: --to 缺失/文件无含 @ 行', file=sys.stderr)
+        return 2
 
     html_tpl = open(args.html, errors='replace').read() if args.html else '<html><body>{{BODY}}</body></html>'
 
-    # R32D76-NEW5: --rate 数值校验(此前 ZeroDivision/ValueError 裸栈)。
+    # R32D76-NEW5/CS59-F4: --rate 按因分报(此前单位错也报'数值须正
+    # 整数'——名错约束)。
     num, _, unit = args.rate.partition('/')
-    try:
-        n = int(num)
-        if n <= 0 or not unit.startswith('min'):
-            raise ValueError
-        interval = 60 / n
-    except ValueError:
-        print(f'--rate 非法: {args.rate}(形如 5/min, 数值须正整数)', file=sys.stderr)
+    if not num.isdigit() or int(num) <= 0:
+        print(f'--rate 数值非法: {num}(须正整数)', file=sys.stderr)
         return 2
+    if not unit.startswith('min'):
+        print(f'--rate 单位非法: {unit or "(空)"}(仅支持 /min)', file=sys.stderr)
+        return 2
+    interval = 60 / int(num)
 
     sent = 0; failed = 0
     for i, to_addr in enumerate(targets):

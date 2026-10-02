@@ -107,8 +107,8 @@ def cmd_brute(args):
     return 1
 
 def main():
-    # R32D53: -h rc=0(家族统一)。
-    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+    # R32D53/CS59-F2: -h 任意位 rc=0(家族统一; 此前限 argv[1])。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
         print(__doc__)
         return 0
     if len(sys.argv) < 3:

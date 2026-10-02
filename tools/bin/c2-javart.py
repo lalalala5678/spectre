@@ -103,9 +103,12 @@ def run_harness(mode, name, marker, cp_extra, lane='javax'):
 
 def main():
     args = sys.argv[1:]
-    # -h 永先(家族契约, CS40-4: 引擎预检须在其后)。
-    if not args or args[0] in ('-h', '--help'):
-        print(__doc__); return 0 if args else 2
+    # -h 永先且任意位(家族契约, CS40-4/CS59-F2: 引擎预检须在其后;
+    # 此前限 args[0]——badmode -h 落奇数参错误)。
+    if any(x in args for x in ('-h', '--help')):
+        print(__doc__); return 0
+    if not args:
+        print(__doc__); return 2
     # R32D62-P3: env-only EDUSRC 门(家族一致; -h 后)。
     edusrc_gate()
     # CS42-F6: 门序契约=用法(2)→引擎(2)——奇数参先于引擎预检。
