@@ -29,7 +29,8 @@ _TEMPLATE = """<!doctype html>
     color-scheme: light;
     --bg: #f8f9fb; --surface: #ffffff; --line: #e2e5ea;
     --text-primary: #1a1f28; --text-secondary: #4b5563;
-    --text-tertiary: #616b7a; --accent: #4f46e5; --accent-hover: #4338ca;
+    --text-tertiary: #616b7a; --line-strong: #8b95a5;
+    --accent: #4f46e5; --accent-hover: #4338ca;
     --danger: #b91c1c;
     --shadow: 0 1px 3px rgb(16 24 40 / 0.10), 0 1px 2px rgb(16 24 40 / 0.06);
   }
@@ -37,7 +38,8 @@ _TEMPLATE = """<!doctype html>
     color-scheme: dark;
     --bg: #0f1115; --surface: #161a22; --line: #272d38;
     --text-primary: #e6e9ef; --text-secondary: #a8b0bd;
-    --text-tertiary: #8791a0; --accent: #4f46e5; --accent-hover: #4338ca;
+    --text-tertiary: #8791a0; --line-strong: #626e83;
+    --accent: #4f46e5; --accent-hover: #4338ca;
     --danger: #f87171;
     --shadow: none;
   }
@@ -52,7 +54,7 @@ _TEMPLATE = """<!doctype html>
   }
   .card {
     width: 360px; padding: 32px 28px;
-    background: var(--surface); border: 1px solid var(--line);
+    background: var(--surface); border: 1px solid var(--line-strong);
     border-radius: 8px; box-shadow: var(--shadow);
   }
   h1 { font-size: 20px; font-weight: 600; color: var(--text-primary); }

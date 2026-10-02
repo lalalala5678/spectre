@@ -393,7 +393,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         <div className="relative">
           <button
             onClick={() => setSwitcherOpen(v => !v)}
-            className="flex h-8 items-center gap-2 rounded-md border border-line bg-surface px-2.5 text-sm text-secondary hover:bg-surface-2 hover:text-primary"
+            className="flex h-8 items-center gap-2 rounded-md border border-line-strong bg-surface px-2.5 text-sm text-secondary hover:bg-surface-2 hover:text-primary"
           >
             <Dot tone={current?.busy ? 'orange' : 'slate'} pulse={current?.busy} />
             <span className="max-w-56 truncate font-medium">{workSession.label}</span>

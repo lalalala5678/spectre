@@ -517,7 +517,7 @@ const ToolTimeline = memo(function ToolTimeline({ steps }: { steps: ToolStep[] }
           'flex w-full items-center gap-2 rounded-md border px-3 py-1.5 text-left transition-colors',
           errorSteps.length
             ? 'border-danger-line bg-danger-bg hover:brightness-95'
-            : 'border-line bg-surface hover:border-line-strong',
+            : 'border-line-strong bg-surface hover:border-accent',
         )}
       >
         {anyRunning
