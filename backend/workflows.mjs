@@ -170,7 +170,11 @@ export async function autoPwnWorkflow(input) {
       if (value.report) {
         return `- ${key}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
       }
-      return `- ${key}: ${clipMarked(value.summary ?? value.error ?? '', CHILD_SUMMARY_MAX, 'read_session 取全文')}`;
+      // CS68-F4: summary 在 child 侧已单层截断(:305), 此处再 clip 会
+      // 切掉首层标记且总长谎报(5000→标记'2000/2018')——原样用, 仅
+      // error 分支需本层截断。
+      if (value.error) return `- ${key}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, 'read_session 取全文')}`;
+      return `- ${key}: ${value.summary ?? ''}`;
     })
     .join('\n');
   try {

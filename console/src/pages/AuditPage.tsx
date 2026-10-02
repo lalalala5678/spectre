@@ -6,7 +6,7 @@ import { Dot } from '../components/ui/Badge';
 import { Panel } from '../components/ui/Panel';
 
 /** 审计与证据链页 —— F23: 原为 mock 假数据,接真实 bus 事件流(WAL 持久审计源) */
-// CS67-5: 类型复用 ApiApiBusEvent 单源(此前手抄窄版且 to?/engagement?
+// CS67-5: 类型复用 ApiBusEvent 单源(此前手抄窄版且 to?/engagement?
 // 两死字段零读取——违 CS44-F16 手抄类型先例)。
 
 export function AuditPage() {
@@ -42,7 +42,8 @@ export function AuditPage() {
         className="xl:col-span-2"
         bodyClassName="p-0"
       >
-        <div className="mb-2 flex justify-end">          <button
+        <div className="mb-2 flex justify-end">
+          <button
             onClick={() => setExportTick(t => t + 1)}
             className="flex items-center gap-1 rounded-sm border border-void-600 bg-void-800 px-2 py-1 text-[11px] text-zinc-400 hover:bg-void-700">
             <Download className="h-3 w-3" /> 导出 JSON

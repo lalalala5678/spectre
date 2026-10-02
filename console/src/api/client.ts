@@ -44,13 +44,22 @@ export interface ApiMessage {
   streamingThinking?: boolean;
 }
 
+// CS68-F5: 对齐后端 sessions.summary() 真身 13 字段(此前窄版 6 字段
+// 使 LiveSession 同端点手抄——违 CS44-F16 手抄类型先例)。
 export interface ApiSessionDetail {
   id: string;
   agentKey: string;
   title: string;
+  rawTitle: string;
   createdAt: string;
   busy: boolean;
+  engagementId: string | null;
+  workSessionId: string | null;
+  spawnName: string | null;
+  spawnDescription: string | null;
   messages: ApiMessage[];
+  brief: string | null;
+  lastSeq: number;
 }
 
 export interface ApiSessionEvent {

@@ -5,10 +5,10 @@
   phish-track.py report              # 同上, --db 可覆盖
 追踪点: /open.gif (打开) / /click/<uid> (点击) / /submit (凭据提交)
 """
-import sys, os, json, time, hashlib, base64, re
+import sys, os, json, time, base64, re
 from http.server import HTTPServer, BaseHTTPRequestHandler
 from urllib.parse import urlparse, parse_qs
-from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate
+from _common import _data_root, scope_gate_full, edusrc_gate_phish as edusrc_gate, cred_hash as _cred_hash  # CS68-F3: 导入归顶
 
 
 def _phish_dir():
@@ -142,7 +142,6 @@ class TrackHandler(BaseHTTPRequestHandler):
             # 优化项(seq1914): 只哈希凭据字段——str(qs) 曾把 uid 卷入,
             # 同凭据不同收件人哈希不同,不可比对
             cred_only = {k: v for k, v in qs.items() if k.lower() != 'uid'}
-            from _common import cred_hash as _cred_hash  # CS67-2: 单源(列表值规范化)
             cred_hash = _cred_hash(cred_only)
             add_event(db, 'submit', uid, {'cred_hash': cred_hash, 'ip': self.client_address[0]})
             self.send_response(302)

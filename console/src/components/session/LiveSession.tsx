@@ -5,6 +5,7 @@ import {
   api,
   subscribeSse,
   type ApiMessage,
+  type ApiSessionDetail,
   type ApiSessionEvent,
 } from '../../api/client';
 import { ChatInput } from './ChatInput';
@@ -92,9 +93,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
     setError('');  // stale errors must never follow the user across sessions
     (async () => {
       try {
-        const detail = await api<{
-          messages: ApiMessage[]; busy: boolean; lastSeq?: number;
-        }>(`/sessions/${sessionId}`);
+        const detail = await api<ApiSessionDetail>(`/sessions/${sessionId}`);  // CS68-F5: 单源
         if (cancelled) return;
         setMessages(detail.messages);
         setBusy(detail.busy);

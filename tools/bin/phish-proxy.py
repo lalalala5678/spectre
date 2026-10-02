@@ -9,7 +9,7 @@
   phish-proxy.py serve --listen :8080 --target https://login.target.com \
       [--db <数据根>/tools/phish/track.json]
 """
-import sys, os, json, time, hashlib
+import sys, os, json, time
 from http.server import HTTPServer, BaseHTTPRequestHandler
 
 
