@@ -31,7 +31,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 ## 2. 目录结构(目标状态)
 
 ```
-/root/spectre/
+<仓库根>/
 ├── docs/                          # 本文档、ADR、runbook
 │   └── ARCHITECTURE.md
 │
