@@ -46,6 +46,3 @@ ck('批量超配拒绝并报缺口', v.ok === false && String(v.reason).includes
 setSpawnSettings({});
 finish();
 
-// R12-F1 契约: readSessionMessages 项目作用域(caps 由 agent-runtime 装配,
-// 这里验证语义签名——真实门在 agent-runtime.mjs readSessionMessages)
-ck('read_session 作用域签名存在(三参)', true);

@@ -12,7 +12,7 @@
  *         signal → targeted dm into child pi sessions
  *       · child ↔ child: never direct; shares journal on the bus (共享) but
  *         are NOT auto-fan-out — relaying is the orchestrator's call
- *       · broadcast signal → fan out to all children (公告)
+ *       (CS61-F1: 旧 broadcast/agentShare/agentResult 信号 v1.0 遗留零发射方, 已删)
  *   - on completion: notifies the orchestrator session (auto-summary)
  *
  * agentTaskWorkflow (child, one per stage agent)
@@ -34,10 +34,10 @@ import {
 // CS1-A4: 单源常量——nudge-text.mjs 纯字符串模块(零副作用), Temporal determinism 安全。
 import { REPORT_NUDGE_TEXT } from './src/nudge-text.mjs';
 
+// CS61-F1: agentShare/agentResult/broadcast 三信号 v1.0 遗留——全仓
+// 零发射方(唯一发射方是 orchestratorRelay, tools.mjs relay_to_agents),
+// handler+drain 分支+头注释一并删除。
 const signals = {
-  agentShare: defineSignal('agentShare'),
-  agentResult: defineSignal('agentResult'),
-  broadcast: defineSignal('broadcast'),
   dm: defineSignal('dm'),
   orchestratorRelay: defineSignal('orchestratorRelay'),
 };
@@ -85,15 +85,6 @@ export async function autoPwnWorkflow(input) {
   const inbox = [];               // {kind, from, to, text, summary, payloadRef}
   let open = true;
 
-  setHandler(signals.agentShare, (msg) => {
-    inbox.push({ kind: 'share', ...msg });
-  });
-  setHandler(signals.agentResult, (msg) => {
-    inbox.push({ kind: 'result', ...msg });
-  });
-  setHandler(signals.broadcast, (msg) => {
-    inbox.push({ kind: 'broadcast', ...msg });
-  });
   setHandler(signals.orchestratorRelay, (msg) => {
     inbox.push({ kind: 'relay', from: 'orchestrator', ...msg });
   });
@@ -104,41 +95,15 @@ export async function autoPwnWorkflow(input) {
       await condition(() => inbox.length > 0 || !open);
       if (inbox.length === 0) break;
       const msg = inbox.shift();
-      if (msg.kind === 'share') {
-        await quick.busEmit({
-          channel: 'share', from: msg.from, type: 'handoff',
-          summary: `情报共享:${msg.summary}`,
-          payloadRef: msg.payloadRef ?? null, engagement,
-          workSessionId,
-        });
-      } else if (msg.kind === 'result') {
-        await quick.busEmit({
-          channel: 'dm', from: msg.from, to: 'orchestrator', type: 'result',
-          summary: `任务完成:${msg.summary}`, engagement,
-          workSessionId,
-        });
-      } else if (msg.kind === 'broadcast') {
-        await quick.busEmit({
-          channel: 'announce', from: msg.from || 'user', type: 'context',
-          summary: msg.text, engagement,
-          workSessionId,
-        });
-        for (const [, handle] of children) {
-          // R7-F2: 已完成/失败的 child 接受 signal 会抛错并拖垮整个
-          // 父工作流(notify+汇总全丢)。空投本就无人消费——best-effort
-          // 跳过(7829e91 删码前的先例语义)。
-          try {
+      // CS61-F1: 仅剩 relay 分支(share/result/broadcast 三 kind 零发射
+      // 方, handler 与分支一并删除)。
+      for (const key of msg.to ?? []) {
+        const handle = children.get(key);
+        if (handle) {
+          try {  // R7-F2: 已完成/失败 child 接受 signal 会抛错并拖垮整
+            // 个父工作流(notify+汇总全丢)——best-effort 跳过。
             await handle.signal(signals.dm, { from: 'orchestrator', text: msg.text });
           } catch { /* child closed — skip */ }
-        }
-      } else if (msg.kind === 'relay') {
-        for (const key of msg.to ?? []) {
-          const handle = children.get(key);
-          if (handle) {
-            try {  // R7-F2: 同 broadcast——已完成 child 跳过
-              await handle.signal(signals.dm, { from: 'orchestrator', text: msg.text });
-            } catch { /* child closed — skip */ }
-          }
         }
       }
     }
