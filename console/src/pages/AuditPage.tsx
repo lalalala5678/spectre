@@ -1,29 +1,22 @@
 import { useEffect, useState } from 'react';
 import { Download, Loader2 } from 'lucide-react';
 import { api } from '../api/client';
+import type { ApiBusEvent } from '../api/client';
 import { Dot } from '../components/ui/Badge';
 import { Panel } from '../components/ui/Panel';
 
 /** 审计与证据链页 —— F23: 原为 mock 假数据,接真实 bus 事件流(WAL 持久审计源) */
-interface BusEvent {
-  seq: number;
-  ts: string;
-  channel: string;
-  from: string;
-  to?: string;
-  type?: string;
-  summary?: string;
-  engagement?: string | null;
-}
+// CS67-5: 类型复用 ApiApiBusEvent 单源(此前手抄窄版且 to?/engagement?
+// 两死字段零读取——违 CS44-F16 手抄类型先例)。
 
 export function AuditPage() {
-  const [events, setEvents] = useState<BusEvent[] | null>(null);
+  const [events, setEvents] = useState<ApiBusEvent[] | null>(null);
   const [err, setErr] = useState('');
   const [limit, setLimit] = useState(50);
   const [exportTick, setExportTick] = useState(0);
 
   useEffect(() => {
-    api<BusEvent[]>('/bus')
+    api<ApiBusEvent[]>('/bus')
       .then(all => setEvents([...all].reverse()))
       .catch(e => setErr(e instanceof Error ? e.message : String(e)));
   }, []);

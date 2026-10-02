@@ -57,11 +57,12 @@ const quick = proxyActivities({
  * runtime modules — architecture rule). One-line digests fed into the
  * orchestrator's completion DM are never cut silently.
  */
-function clipMarked(value, max) {
+function clipMarked(value, max, note) {
   const text = String(value ?? '');
   if (text.length <= max) return text;
-  // CS66-F3: 已显示/总长并列(pi.mjs 单源同制式)。
-  return `${text.slice(0, max)}[已截断:${max}/${text.length} 字符]`;
+  // CS66-F3: 已显示/总长并列; CS67-7: 补全手段 note(pi.mjs 同形)。
+  const pointer = note ? `,${note}` : '';
+  return `${text.slice(0, max)}[已截断:${max}/${text.length} 字符${pointer}]`;
 }
 
 /**
@@ -167,9 +168,9 @@ export async function autoPwnWorkflow(input) {
   const summaryLines = [...results.entries()]
     .map(([key, value]) => {
       if (value.report) {
-        return `- ${key}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60)}》—详情用 query_intel 读取`;
+        return `- ${key}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
       }
-      return `- ${key}: ${clipMarked(value.summary ?? value.error ?? '', CHILD_SUMMARY_MAX)}`;
+      return `- ${key}: ${clipMarked(value.summary ?? value.error ?? '', CHILD_SUMMARY_MAX, 'read_session 取全文')}`;
     })
     .join('\n');
   try {
@@ -186,7 +187,7 @@ export async function autoPwnWorkflow(input) {
       await quick.busEmit({
         channel: 'announce', from: 'orchestrator', type: 'context',
         title: `战役汇总(编排会话投递失败兜底): ${engagementId}`,
-        summary: clipMarked(summaryLines.join('\n'), 480),  // CS44-F15: 打标截断(再 slice 会切掉标记)
+        summary: clipMarked(summaryLines.join('\n'), 480, 'query_intel 读全文'),  // CS44-F15: 打标截断(再 slice 会切掉标记)
         engagement, workSessionId,
       });
     } catch { /* 战役确已完成: 结果在返回值+先前的关闭公告 */ }

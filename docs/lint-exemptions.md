@@ -122,3 +122,12 @@ DB(da6d2c4)提交信息"PEP8 0"失实——该树 pycodestyle 实报 E105:1 E303
 (4 空行), 22 秒后 bcebeab 删 2 行才达 0; 已知失实仍走 style 补丁而非
 勘误记档。CS66-A2 立案补记。教训: 基线声明必须在**提交树**上复跑,
 中断重试后的产物不得沿用前次结论。
+
+## DD 批次勘误(CS67, 第十三轮, 2026-10-02)
+
+DD(c4626ec)两处宣称失实: ①F4"maskPrefs 提至模块层"——仅缩进变化,
+AST 实证仍嵌 realRouter 内(注释自称提层); ②F5"cred_hash 统一 track
+口径"——proxy 字符串值 JSON vs track parse_qs 列表值 JSON, 实测同凭
+据两哈希。CS67-1/2 立案补修(真提层+单源 _common.cred_hash 值规范
+化)。教训: "统一/提层"类断言须以 AST/实测两工具输出核对, 不能只看
+两处代码"形似"。

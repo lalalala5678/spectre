@@ -74,8 +74,9 @@ export class Bus {
       requester: entry.requester ?? null,
       detail: entry.detail ? clipMarked(entry.detail, CONFIG.busDetailMaxChars) : null,
     };
-    // Idempotency for vulnerability publications: an agent re-calling the tool
-    // with the same title+severity (receipt-style duplicates) is a no-op.
+    // Idempotency for vulnerability/intel publications(CS67-4: 代码两
+    // 分支, 注释此前只提 vulnerability): 同 title+severity 重复落账
+    // (receipt 式重发)幂等 no-op。
     if ((entry.type === 'vulnerability' || entry.type === 'intel')
       && entry.title && entry.severity && !entry.revises) {
       const dup = [...this.events].reverse().find(e =>

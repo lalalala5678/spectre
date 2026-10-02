@@ -59,7 +59,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
   const remove = async (agentKey: string, name: string) => {
     if (!window.confirm(`卸载技能 ${name}（从 ${agentKey}，对其新会话生效）？`)) return;
     try {
-      await api(`/sandbox/skills?agentKey=${agentKey}&name=${encodeURIComponent(name)}`,
+      await api(`/sandbox/skills?agentKey=${encodeURIComponent(agentKey)}&name=${encodeURIComponent(name)}`,  // CS67-6: 两参同编码
         { method: 'DELETE' });
       setMsg(`已卸载 ${agentKey}/${name}`);
       await load();

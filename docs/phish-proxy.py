@@ -183,10 +183,10 @@ class ProxyHandler(BaseHTTPRequestHandler):
         if captured_password:
             # Hash immediately (NEVER store plaintext)
             db = load_db()
-            # CS66-F5: 与 phish-track 同口径——只哈希凭据字段 JSON
-            # (此前 email:password 拼串公式跨工具不可比对)。
-            cred_only = {'email': captured_email, 'password': captured_password}
-            cred_hash = hashlib.sha256(json.dumps(cred_only, sort_keys=True).encode()).hexdigest()[:16]
+            # CS66-F5/CS67-2: cred_hash 单源 _common.cred_hash(此前
+            # 本地 JSON 公式与 track 的 parse_qs 列表值口径仍分裂)。
+            from _common import cred_hash as _cred_hash
+            cred_hash = _cred_hash({'email': captured_email, 'password': captured_password})
             add_event(db, 'submit', 'proxy', {
                 'cred_hash': cred_hash,
                 'email_domain': captured_email.split('@')[1] if '@' in (captured_email or '') else '',

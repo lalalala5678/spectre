@@ -97,3 +97,10 @@ def target_matches(pattern, target):
 
 # CS54-P2: 变形族名单源(此前 6 份手抄副本——漂移即 NEW-B 类复发)。
 FAMILIES = ['mask', 'decomp', 'id', 'enc', 'code', 'struct']
+
+def cred_hash(cred_only):
+    """CS67-2: 凭据哈希单源——值规范化 str(parse_qs 列表/裸串两来源
+    同字节), sha256 前 16 hex。CS67 前两工具口径分裂且存量无版本,
+    旧事件哈希不与新公式可比(只影响跨工具比对, 不影响单工具内)。"""
+    norm = {k: (v[0] if isinstance(v, list) else v) for k, v in cred_only.items()}
+    return hashlib.sha256(json.dumps(norm, sort_keys=True).encode()).hexdigest()[:16]

@@ -305,7 +305,7 @@ const caps = {
    *  no quota — same detach rules as the report writer), ask it to
    *  confirm its own toolface state, await its reply, return it. */
   wakeAgent: async (requesterRecord, agentKey, question) => {
-    const { session: target } = await runDetachedAgent({
+    const { session: target, timeout } = await runDetachedAgent({
       agentKey,
       ws: requesterRecord.workSessionId ?? null,
       name: `唤醒验证:${agentKey}`,
@@ -316,6 +316,13 @@ const caps = {
       `要求:只做验证本身——检查你的技能索引/工具清单,必要时实际调用一次,` +
       `把回执要点如实报告。不要展开其它任务。完成后一句话结论即可。`,
     });
+    // CS67-3: 超时兜底对齐 reportWriter 孪生(R15-F2)——此前解构丢
+    // 弃 timeout, 半成品回复包装成'验证答复'(会话仍在跑, 伪造判定)。
+    if (timeout) {
+      return { ok: false, timeout: true,
+        text: `${agentKey} 验证会话 300s 未完成仍在运行, 本回执不是验证结论——` +
+          `稍后用 read_session(sessionId: ${target.id}) 复盘其最终回复。` };
+    }
     const reply = lastReply(target) || '(无输出)';
     return {
       ok: Boolean(reply !== '(无输出)'),
