@@ -48,6 +48,7 @@ sudo bash deploy/setup.sh                 # 或带域名: sudo bash deploy/setup
 > 首访「高级→继续访问」即可。
 以下为手工逐步等价(排障/自定义用):
 
+```bash
 # ① 后端(Node ≥ 22)——编辑 .env: INTERNAL_TOKEN(自定随机串; 占位行删除而非追加——
 #    逐行 first-wins, 保留 change-me 行会遮蔽你在后面写的值)
 #    LLM 不走 env: 登录控制台后在「设置」页配置(见下方「配置大模型」)
