@@ -68,6 +68,23 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, busy, loaded, error]);
 
+  // FE-B1(用户报): 思考流期间拖到底部会"抽搐"——每次 delta 提交先 pin
+  // 一次, 但内容异步再变高(语法高亮换行/字体就位)时视口又高于底,
+  // 下一提交再 pin = 来回跳。ResizeObserver 在 stick 期间对内容高度
+  // 变化即时 re-pin(overflow-anchor:none 已关浏览器原生锚定与手动
+  // pin 的互相拉扯)。
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const inner = el.firstElementChild as HTMLElement | null;
+    if (!inner) return;
+    const ro = new ResizeObserver(() => {
+      if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(inner);
+    return () => ro.disconnect();
+  }, []);
+
   const scrollToBottom = useCallback(() => {
     requestAnimationFrame(() => {
       const el = scrollRef.current;
@@ -311,7 +328,7 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-void-700 bg-void-950 p-3"
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded border border-void-700 bg-void-950 p-3 [overflow-anchor:none]"
       >
         {!loaded && !error && (
           <div className="flex flex-col items-center gap-2 py-10">
@@ -344,7 +361,20 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
         {busy && (
           <div className="flex items-center gap-2 px-1 text-[11px] text-zinc-600">
             <Bot className="h-3 w-3 animate-pulse" />
-            <span className="animate-pulse">思考中…</span>
+            {/* FE-B2(用户报): 多工具并行期恒显"思考中"像卡死——按尾块
+                分相: 尾块为含在途步骤的活动块时显示工具进度 n/m(步骤
+                行内已有各自 spinner), 否则才是思考中。 */}
+            <span className="animate-pulse">
+              {(() => {
+                const tail = items[items.length - 1];
+                if (tail?.kind === 'activity') {
+                  const done = tail.steps.filter(st => st.result).length;
+                  const total = tail.steps.length;
+                  if (done < total) return `执行工具中 ${done}/${total}…`;
+                }
+                return '思考中…';
+              })()}
+            </span>
           </div>
         )}
         {error && (
