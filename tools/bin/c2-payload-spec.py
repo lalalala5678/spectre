@@ -128,7 +128,7 @@ def init_builtin():
 if __name__ == '__main__':
     # BUG-3: --help/拼错子命令零输出 RC=0——与姊妹工具一致兜底
     # R32D51-5: 退出码与姊妹 CLI 统一——无参/未知子命令 rc=2, -h/--help rc=0。
-    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):  # R32D76-N3: 任意位(对齐 phish 族)
         print(__doc__); sys.exit(0)
     if len(sys.argv) < 2 or sys.argv[1] not in ('list', 'validate', 'gen', 'init'):
         print(__doc__); sys.exit(2)

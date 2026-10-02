@@ -116,7 +116,7 @@ temporal server start-dev --port 7233    # 前台; systemd 部署用 deploy/syst
 OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 ```
 
-两个变量显式带上——缺省数据根即生产路径, 测试时务必指向隔离目录。
+两个变量显式带上——缺省数据根即生产路径, 未设 `SPECTRE_DATA_DIR` 时脚本硬拒 rc=1(fetch 家族同制式, R32D76 起), 测试时务必指向隔离目录。
 语义: 裸 TCP 字节收集器非 HTTP——curl 探测会挂起(属预期), 测试用 `nc 127.0.0.1 <port>` 或 `/dev/tcp`。
 
 ## API 契约

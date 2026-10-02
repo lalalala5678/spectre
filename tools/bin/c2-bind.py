@@ -129,7 +129,7 @@ def cmd_expire(args):
 
 def main():
     # CS27-9: -h/--help rc=0(与 javart/functest/payload-spec 家族统一)。
-    if len(sys.argv) >= 2 and sys.argv[1] in ('-h', '--help'):
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):  # R32D76-N3: 任意位(对齐 phish 族)
         print(__doc__); return 0
     if len(sys.argv) < 2:
         print(__doc__); return 2

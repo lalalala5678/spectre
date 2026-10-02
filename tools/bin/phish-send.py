@@ -343,6 +343,10 @@ def main():
         if getattr(args, 'html', None) and not os.path.isfile(args.html):
             print(f'--html 文件不存在: {args.html}', file=sys.stderr)
             return 2
+        # R32D76-NEW6: --dkim-key 不存在文件前置拒(此前静默无签名发出)。
+        if getattr(args, 'dkim_key', None) and not os.path.isfile(args.dkim_key):
+            print(f'--dkim-key 文件不存在: {args.dkim_key}', file=sys.stderr)
+            return 2
         # R32D75-F6/CS57-F1: send 缺 --smtp 时先看面板默认(验证过才落盘)——
         # 仅两者皆无才前置拒(此前一律 rc=2 使面板存量配置用户回归)。
         if args.mode == 'send' and not getattr(args, 'smtp', None) \
@@ -387,24 +391,40 @@ def main():
     dflt = load_smtp_default()
     smtp_str = args.smtp or f"{dflt.get('host', '')}:{dflt.get('port', 587)}"
     host, _, port = smtp_str.rpartition(':')
-    smtp_cfg = {'host': host, 'port': int(port or 587),
+    # R32D76-NEW5: --smtp 形状校验(此前 ValueError 裸栈 rc=1; 仅 send——
+    # dryrun 不联 SMTP, 无默认时空 host 合法)。
+    if args.mode == 'send' and (not host or not port.isdigit()):
+        print(f'--smtp 非法: {smtp_str}(形如 host:port)', file=sys.stderr)
+        return 2
+    smtp_cfg = {'host': host, 'port': int(port) if port.isdigit() else 587,
                 'user': args.user or dflt.get('user', ''),
                 'pass': args.password or dflt.get('pass', ''),
                 'tls': True, 'timeout': 30,
                 'allow_plaintext': bool(getattr(args, 'allow_plaintext', False))
                     or bool(dflt.get('allow_plaintext'))}
 
-    if os.path.isfile(args.to or ''):
-        targets = [l.strip() for l in open(args.to) if l.strip() and '@' in l]
-    elif args.to:
-        targets = [args.to.strip()]
-    else:
-        targets = []
+    # R32D76-NEW2: --to 形如路径但不存在→拒(此前静默当单地址假成功)。
+    if args.to and not os.path.isfile(args.to) \
+            and (args.to.endswith('.txt') or '/' in args.to or not('@' in args.to)):
+        print(f'--to 路径不存在: {args.to}(单地址须含 @)', file=sys.stderr)
+        return 2
+    # R32D76-NEW1: 非 UTF-8 容错读取。
+    targets = [l.strip() for l in open(args.to, errors='replace')
+               if l.strip() and '@' in l] if os.path.isfile(args.to or '') \
+        else ([args.to.strip()] if args.to else [])
 
-    html_tpl = open(args.html).read() if args.html else '<html><body>{{BODY}}</body></html>'
+    html_tpl = open(args.html, errors='replace').read() if args.html else '<html><body>{{BODY}}</body></html>'
 
+    # R32D76-NEW5: --rate 数值校验(此前 ZeroDivision/ValueError 裸栈)。
     num, _, unit = args.rate.partition('/')
-    interval = 60 / int(num) if unit.startswith('min') else 1 / int(num)
+    try:
+        n = int(num)
+        if n <= 0 or not unit.startswith('min'):
+            raise ValueError
+        interval = 60 / n
+    except ValueError:
+        print(f'--rate 非法: {args.rate}(形如 5/min, 数值须正整数)', file=sys.stderr)
+        return 2
 
     sent = 0; failed = 0
     for i, to_addr in enumerate(targets):

@@ -103,8 +103,12 @@ def php_check(p):
 def main():
     # R32D42-P1/P2: --help 进用法(此前裸栈 FileNotFoundError); 坏路径
     # 报干净错误 rc=2。
-    if len(sys.argv) < 2 or sys.argv[1] in ('-h', '--help'):
-        print(__doc__); return 0 if sys.argv[1:] else 2
+    # R32D76-N3: -h 任意位先判(此前 argv[1] 限定位——文件名误触/后置
+    # -h 均落文件读错误而非帮助)。
+    if any(x in sys.argv[1:] for x in ('-h', '--help')):
+        print(__doc__); return 0
+    if len(sys.argv) < 2:
+        print(__doc__); return 2
     # R32D62-P3: env-only EDUSRC 门(家族一致; -h 永先)。
     edusrc_gate()
     p = sys.argv[1]

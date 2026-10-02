@@ -12,11 +12,13 @@ import socket, sys, threading, time, os, datetime
 from collections import defaultdict, deque
 OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
 if not os.environ.get('SPECTRE_DATA_DIR'):
-    # R32D41-N1/CS15-3: 与 py 工具守卫同制式([warn] stderr);
-    # 服务常驻 stdout 留给监听/事件流。
-    print('[warn] SPECTRE_DATA_DIR 未设置, 回退缺省数据根 /var/lib/spectre'
-          '(oob 数据落 %s; 如非本意请先设置 SPECTRE_DATA_DIR)' % OUT,
+    # R32D41-N1/CS15-3 → R32D76-N7: 与 fetch 家族同硬拒——此前仅 [warn]
+    # 后仍在生产根 makedirs(新用户第一发探测即落 /var/lib/spectre)。
+    # systemd 单元总带该 env(生产不受影响); 手跑必须显式指定数据根。
+    print('[fatal] SPECTRE_DATA_DIR 未设置——拒绝回退生产根 /var/lib/spectre'
+          '(oob-collector 由 systemd 拉起时总带该 env; 手跑请显式指定)',
           file=sys.stderr, flush=True)
+    sys.exit(1)
 QUOTA_BYTES = 512 * 1024 * 1024      # 目录总量上限
 RATE_PER_IP = 10                     # 每 IP 每分钟连接数
 RATE_WINDOW = 60.0
