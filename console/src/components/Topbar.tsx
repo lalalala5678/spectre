@@ -197,12 +197,12 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
         />
         <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-chrome-line bg-chrome-surface px-1.5 py-0.5 text-[11px] text-chrome-tertiary md:inline">⌘K</kbd>
         {open && sessHits.length === 0 && busHits.length === 0 && (
-          <div className="absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-chrome-line bg-chrome-surface p-4 text-center text-[13px] text-chrome-tertiary shadow-lg">
+          <div className="animate-enter absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-chrome-line bg-chrome-surface p-4 text-center text-[13px] text-chrome-tertiary shadow-lg">
             无结果——输入 ≥2 字搜索会话与总线条目
           </div>
         )}
         {open && (sessHits.length > 0 || busHits.length > 0) && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
+          <div className="animate-enter absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
             {sessHits.length > 0 && (
               <div className="px-2.5 py-1 text-xs font-medium text-chrome-tertiary">会话</div>
             )}
@@ -286,13 +286,13 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
         >
           <Bell className="h-4 w-4" />
           {unread > 0 && (
-            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold text-white">
+            <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-accent px-1 text-xs font-semibold tabular-nums text-white">
               {unread > 9 ? '9+' : unread}
             </span>
           )}
         </Button>
         {bellOpen && (
-          <div className="absolute right-0 top-full z-30 mt-1 w-80 rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
+          <div className="animate-enter absolute right-0 top-full z-30 mt-1 w-80 rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
             {notices.length === 0 ? (
               <EmptyState tone="chrome" icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
             ) : notices.slice(0, 20).map(n => (

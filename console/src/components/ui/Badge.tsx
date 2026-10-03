@@ -1,7 +1,6 @@
 import type { ReactNode } from 'react';
 
 import { cn } from '../../utils/cn';
-import type { BadgeTone as DotTone } from './badgeTones';
 
 /** §5.5 语义徽章: 六 tone 三件套(替代手抄色表)。
  * severity 映射: critical/high→danger, medium→warning, low/info→info;
@@ -27,28 +26,28 @@ export function Badge({
   children: ReactNode;
 }) {
   return (
-    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium', TONES[tone], className)}>
+    <span className={cn('inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs font-medium tabular-nums', TONES[tone], className)}>
       {children}
     </span>
   );
 }
 
-/** 状态色点: 颜色换语义 token(§5.5: busy→accent / active→success / idle→faint)。
- * 旧 tone 名保留映射, 迁移完随别名一并删除。 */
-const DOT: Record<DotTone, string> = {
-  green: 'bg-success-text',
-  cyan: 'bg-info-text',
-  red: 'bg-danger-text',
-  rose: 'bg-danger-text',
-  amber: 'bg-warning-text',
-  blue: 'bg-info-text',
-  slate: 'bg-faint',
-  violet: 'bg-accent-text',
-  orange: 'bg-accent',
-};
+/** 状态色点(§5.5 语义名, 与 Badge 同一套六 tone):
+ * busy/运行中→accent · 完成/就绪→info · 异常→danger · 告警→warning
+ * · 成功→success · 空闲/无→neutral。旧色名别名已随调用方迁移删除。 */
+const DOT = {
+  accent: 'bg-accent',
+  success: 'bg-success-text',
+  warning: 'bg-warning-text',
+  danger: 'bg-danger-text',
+  info: 'bg-info-text',
+  neutral: 'bg-faint',
+} as const;
+
+export type DotTone = keyof typeof DOT;
 
 export function Dot({
-  tone = 'slate',
+  tone = 'neutral',
   pulse = false,
   className,
 }: {

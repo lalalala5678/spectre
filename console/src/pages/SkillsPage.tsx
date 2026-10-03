@@ -93,11 +93,11 @@ export function SkillsPage({ wsId }: { wsId: string }) {
             </Button>
           </div>
         }
-        className="min-h-0 xl:col-span-2"
-        bodyClassName="p-0"
+        className="h-full min-h-0"
+        bodyClassName="flex min-h-0 flex-col p-0"
       >
         {creating && (
-          <div className="m-4 space-y-3 rounded-lg border border-line bg-surface-2 p-4">
+          <div className="m-4 shrink-0 space-y-3 rounded-lg border border-line bg-surface-2 p-4">
             <div className="flex gap-2">
               <Select
                 value={form.agentKey}
@@ -131,18 +131,18 @@ export function SkillsPage({ wsId }: { wsId: string }) {
             </Button>
           </div>
         )}
-        <table className="w-full text-left">
+        <div className="min-h-0 flex-1 overflow-auto"><table className="w-full text-left">
           <thead>
-            <tr className="border-b border-line text-xs font-medium text-tertiary">
-              <th className="px-3 py-2.5 font-medium">Skill</th>
-              <th className="px-3 py-2.5 font-medium">挂载 Agent</th>
-              <th className="px-3 py-2.5 font-medium">文件</th>
-              <th className="px-3 py-2.5" />
+            <tr className="text-xs font-medium text-tertiary">
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">Skill</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">挂载 Agent</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">文件</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2" />
             </tr>
           </thead>
           <tbody className="divide-y divide-line">
             {list.map(s => (
-              <tr key={`${s.agentKey}/${s.name}`} className="hover:bg-surface-2/60">
+              <tr key={`${s.agentKey}/${s.name}`} className="odd:bg-surface-2/50 hover:bg-surface-2">
                 <td className="px-3 py-2.5">
                   <div className="font-mono text-[13px] font-medium text-primary">{s.name}</div>
                   <div className="mt-0.5 text-[13px] text-secondary">{s.description}</div>
@@ -175,7 +175,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
               </tr>
             )}
           </tbody>
-        </table>
+        </table></div>
       </Panel>
 
       

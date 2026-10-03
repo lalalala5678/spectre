@@ -80,7 +80,10 @@ export function hostPathToContainer(p) {
       return c + '/' + p.slice(h.length + 1);
     }
   }
-  return p;
+  // r8-D2: 未映射路径一律 null——此前原样返回, 宿主任意绝对路径
+  // (如 /var/lib/x)被当合法容器路径流转, 与 cwd/resolve 叠加后落
+  // 双前缀位置(/var/lib/spectre/var/lib/x)。
+  return null;
 }
 
 /**
@@ -179,7 +182,7 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
   // 截止时刻在容器内执行——超时契约真正终止该次执行而非仅断视图。
   const argvv = argv.length
     ? [...argv, 'timeout', '-k', '2', String(timeoutSec || 86400), 'bash', '-c', command]
-    : ['bash', '-lc', command];
+    : ['bash', '-c', command];  // r8-D5: -l 读 profile(line11 env 缺失噪声进 stderr)
   // Docker branch: `docker exec -w` already sets the CONTAINER cwd — the
   // host-side spawn cwd must merely EXIST. Passing the container path here
   // (e.g. /workspace/<ws>) made spawn die with ENOENT the moment the docker

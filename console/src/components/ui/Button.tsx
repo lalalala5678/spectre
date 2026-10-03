@@ -8,7 +8,7 @@ type Variant = 'primary' | 'secondary' | 'ghost' | 'ghostChrome' | 'danger';  //
 type Size = 'sm' | 'md' | 'lg' | 'icon';
 
 const BASE =
-  'inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50';
+  'inline-flex select-none items-center justify-center gap-1.5 whitespace-nowrap rounded-md font-medium transition-colors active:translate-y-px focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50';
 
 const VARIANTS: Record<Variant, string> = {
   primary: 'bg-accent text-white shadow-xs hover:bg-accent-hover active:bg-accent-hover',

@@ -116,23 +116,24 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
           ))}
         </div>
       }
-      bodyClassName="p-0"
-      className="w-full"
+      bodyClassName="flex min-h-0 flex-col p-0"
+      className="h-full w-full"
     >
+      <div className="min-h-0 flex-1 overflow-auto">
       <table className="w-full text-left">
         <thead>
-          <tr className="border-b border-line text-xs font-medium text-tertiary">
-            <th className="px-3 py-2.5">时间</th>
-            <th className="px-3 py-2.5">频道</th>
-            <th className="px-3 py-2.5">传递</th>
-            <th className="px-3 py-2.5">类型</th>
-            <th className="px-3 py-2.5">内容摘要</th>
-            <th className="px-3 py-2.5">引用</th>
+          <tr className="text-xs font-medium text-tertiary">
+            <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2">时间</th>
+            <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2">频道</th>
+            <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2">传递</th>
+            <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2">类型</th>
+            <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2">内容摘要</th>
+            <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2">引用</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-line">
           {list.map((m) => (
-            <tr key={m.seq} className={cn('hover:bg-surface-2/60', m.channel === 'announce' && 'bg-danger-bg/40')}>
+            <tr key={m.seq} className={cn('hover:bg-surface-2', m.channel === 'announce' ? 'bg-danger-bg/40' : 'odd:bg-surface-2/50')}>
               <td className="px-3 py-2.5 font-mono text-xs tabular-nums text-tertiary">{fmtTime(m.ts)}</td>
               <td className="px-3 py-2.5">
                 <Badge tone={chMeta(m.channel).tone}>
@@ -164,7 +165,8 @@ export function BusView({ workSessionId }: { workSessionId: string }) {
           ))}
         </tbody>
       </table>
-      <div className="border-t border-line px-3 py-2.5 text-xs leading-relaxed text-tertiary">
+      </div>
+      <div className="shrink-0 border-t border-line px-3 py-2.5 text-xs leading-relaxed text-tertiary">
         公告 = 主控 → 全员(范围/约束变更);私信 = 点对点调度与回报;共享 = 情报广播(凭据/攻击面)。
         事件源:Temporal 编排信号 → 消息总线 journal · SSE 实时推送。
       </div>

@@ -71,8 +71,8 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
   const { events, loaded } = useBusPanelEntries(accept, { ws: workSessionId });
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
-      <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
+    <div className="animate-enter flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface shadow-xs">
+      <header className="flex items-center justify-between border-b border-line bg-surface-2/50 px-3 py-1.5">
         <h3 className="text-[13px] font-semibold text-secondary">
           漏洞
         </h3>

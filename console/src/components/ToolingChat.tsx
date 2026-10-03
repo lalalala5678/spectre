@@ -50,7 +50,7 @@ export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; wor
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between px-1">
         <span className="flex items-center gap-1.5 text-[13px] font-medium text-secondary">
-          <Bot className="h-3 w-3 text-accent-text" />
+          <Bot className="h-3.5 w-3.5 text-accent-text" />
           与工具配置智能体对话
         </span>
         <Button
@@ -59,7 +59,7 @@ export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; wor
           variant="ghost"
           size="icon"
         >
-          <RefreshCw className="h-3 w-3" />
+          <RefreshCw className="h-4 w-4" />
         </Button>
       </div>
       {error && (

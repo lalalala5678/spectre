@@ -79,7 +79,7 @@ export function CliPage({ wsId }: { wsId: string }) {
             variant="secondary"
             size="sm"
           >
-            <RefreshCw className="h-3 w-3" /> 刷新
+            <RefreshCw className="h-3.5 w-3.5" /> 刷新
           </Button>
         }
         className="min-h-0 xl:col-span-2"
@@ -150,7 +150,7 @@ export function CliPage({ wsId }: { wsId: string }) {
           size="sm"
           className="w-full"
         >
-          <Terminal className="h-3 w-3" /> {busy ? '执行中…' : '执行安装'}
+          <Terminal className="h-3.5 w-3.5" /> {busy ? '执行中…' : '执行安装'}
         </Button>
         {msg && <p className={cn('text-[13px]', msg.includes('完成') ? 'text-success-text' : 'text-warning-text')}>{msg}</p>}
         {output && (

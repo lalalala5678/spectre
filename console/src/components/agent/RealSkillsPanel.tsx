@@ -60,7 +60,7 @@ export function RealSkillsPanel({ agentKey, expandable = false }: { agentKey: st
                 : <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />)}
               <span className="truncate font-mono text-[13px] text-secondary">#{n}</span>
             </span>
-            <Dot tone="cyan" />
+            <Dot tone="info" />
           </button>
           {expandable && open === n && (
             <div className="border-t border-line px-2.5 py-2">

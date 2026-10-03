@@ -178,7 +178,7 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
   const tier = TIER_STYLE[src.tier ?? 'P2'];
   const verifyState = verify;
   return (
-    <div className={cn('overflow-hidden rounded-lg border transition-colors',
+    <div className={cn('overflow-hidden rounded-lg border shadow-xs transition-colors',
       mounted ? 'border-success-line bg-surface' : 'border-line bg-surface')}>
       <button
         onClick={() => setOpen(!open)}
@@ -354,18 +354,18 @@ export function SettingsPage() {
         </div>
         <div className="flex items-center gap-2">
           <Button onClick={() => void runVerify()} disabled={verifying} variant="secondary" size="sm" className="mb-1">
-            {verifying ? <><Loader2 className="h-3 w-3 animate-spin" />复查中</> : <><ShieldCheck className="h-3 w-3" />复查可用性</>}
+            {verifying ? <><Loader2 className="h-3.5 w-3.5 animate-spin" />复查中</> : <><ShieldCheck className="h-3.5 w-3.5" />复查可用性</>}
           </Button>
           {verifySummary && <span className="mb-1 text-[13px] text-tertiary">{verifySummary}</span>}
           <Button onClick={() => void reload()} title="刷新" variant="ghost" size="icon" className="mb-1">
-            <RotateCw className="h-3.5 w-3.5" />
+            <RotateCw className="h-4 w-4" />
           </Button>
         </div>
       </div>
 
       {/* ---------- 通用配置(全局) ---------- */}
-      <section id="sec-common" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface">
-        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+      <section id="sec-common" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
           <ShieldCheck className="h-3.5 w-3.5 text-tertiary" />
           <span className="text-[13px] font-medium text-primary">{data.schema.common.label}</span>
         </div>
@@ -390,8 +390,8 @@ export function SettingsPage() {
       </section>
 
       {/* ---------- R32D44: 单 Agent 大模型供应商覆盖 ---------- */}
-      <section id="sec-agentllm" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface">
-        <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+      <section id="sec-agentllm" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
+        <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
           <span className="text-[13px] font-medium text-primary">单 Agent 大模型覆盖</span>
           <span className="text-xs text-tertiary">默认供应商之上按 agent 换厂商/模型(例: 默认 GLM, 报告 agent 用 DeepSeek)</span>
         </div>
@@ -422,8 +422,8 @@ export function SettingsPage() {
       {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
       <div id="sec-agents" className="scroll-mt-4" />
       {otherAgents.map((agent) => (
-        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
-          <div className="flex items-center gap-2 border-b border-line px-4 py-3">
+        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
+          <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
             <span className="text-[13px] font-medium text-primary">{agent.label}</span>
           </div>
           {agent.hint && <p className="border-b border-line px-4 py-2 text-xs leading-relaxed text-tertiary">{agent.hint}</p>}
@@ -463,7 +463,7 @@ export function SettingsPage() {
         </p>
 
         {/* EQ-6: 与其它智能体配置同构(单一卡片列表, 重要性徽章随卡显示) */}
-        <div className="divide-y divide-line rounded-lg border border-line bg-surface">
+        <div className="divide-y divide-line rounded-lg border border-line bg-surface shadow-xs">
           {[...byTier('P0'), ...byTier('P1'), ...byTier('P2')].map((src) => (
             <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
           ))}

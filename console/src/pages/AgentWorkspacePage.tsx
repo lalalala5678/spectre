@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {PanelRight, ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2} from 'lucide-react';
+import {Activity, ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Lightbulb, MessagesSquare, PanelRight, Play, Plus, ShieldAlert, Trash2} from 'lucide-react';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Badge, Dot } from '../components/ui/Badge';
@@ -25,6 +25,7 @@ import {
   setLastSession, putPrefsSync, getPrefs, cnNumber, type WorkSession,
 } from '../api/worksession';
 import { takePendingOpen, OPEN_SESSION_EVENT } from '../api/openSessionChannel';
+import { useProjectCounts } from '../api/useProjectCounts';
 // CS44-F17: 三组件拆出 components/agent/(905 行四职责收敛, 先例 nav.ts)
 import { AgentConfigTab } from '../components/agent/AgentConfigTab';
 
@@ -64,6 +65,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   }, []);
 
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
+  // 项目态势(AutoPwn 态势条): -1 = 尚未取到, 显示 –
+  const [wsStats, setWsStats] = useState({ sessions: -1, running: -1 });
+  const projCounts = useProjectCounts(agent.id === 'autopwn' ? workSession?.id : undefined);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);
   // R26(二十六轮): 全局搜索深链 #<agent>?s=<id>——Topbar 点击直达目标
@@ -220,6 +224,12 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       try {
         if (stopped) return;
         const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(wsId)}`);
+        // 态势条复用同一响应(零新增请求): 项目全会话数 + 忙会话数
+        setWsStats(prev => {
+          const running = all.filter(s => s.busy).length;
+          return prev.sessions === all.length && prev.running === running
+            ? prev : { sessions: all.length, running };
+        });
         const mine = all.filter(s =>
           s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
           && s.workSessionId === wsId,
@@ -408,6 +418,38 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         </div>
 
         <div className="flex-1" />
+        {/* 项目态势条(AutoPwn 视觉锚点): 既有 API 聚合的纯展示轻卡片 */}
+        {isAuto && (
+          <div className="hidden items-center gap-2 xl:flex" aria-label="项目态势">
+            <span className="flex items-center gap-1.5 rounded-md bg-surface-2/60 px-2.5 py-1 text-[13px]">
+              <MessagesSquare className="h-3.5 w-3.5 text-tertiary" />
+              <span className="font-semibold tabular-nums text-primary">{wsStats.sessions < 0 ? '–' : wsStats.sessions}</span>
+              <span className="text-tertiary">会话</span>
+            </span>
+            <span className="flex items-center gap-1.5 rounded-md bg-surface-2/60 px-2.5 py-1 text-[13px]">
+              <ShieldAlert className="h-3.5 w-3.5 text-tertiary" />
+              <span className="font-semibold tabular-nums text-primary">{projCounts ? projCounts.vulns : '–'}</span>
+              <span className="text-tertiary">漏洞</span>
+            </span>
+            <span className="flex items-center gap-1.5 rounded-md bg-surface-2/60 px-2.5 py-1 text-[13px]">
+              <Lightbulb className="h-3.5 w-3.5 text-tertiary" />
+              <span className="font-semibold tabular-nums text-primary">{projCounts ? projCounts.intel : '–'}</span>
+              <span className="text-tertiary">情报</span>
+            </span>
+            <span className={cn('flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px]',
+              wsStats.running > 0 ? 'bg-accent-subtle' : 'bg-surface-2/60')}>
+              {wsStats.running > 0
+                ? <Dot tone="accent" pulse />
+                : <Activity className="h-3.5 w-3.5 text-tertiary" />}
+              <span className={cn('font-semibold tabular-nums',
+                wsStats.running > 0 ? 'text-accent-text' : 'text-primary')}>
+                {wsStats.running < 0 ? '–' : wsStats.running}
+              </span>
+              <span className="text-tertiary">运行中</span>
+            </span>
+          </div>
+        )}
+        <div className="flex-1" />
 
         {/* 大会话(项目)切换 */}
         <div className="relative">
@@ -415,12 +457,12 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             onClick={() => setSwitcherOpen(v => !v)}
             className="flex h-8 items-center gap-2 rounded-md border border-line-strong bg-surface px-2.5 text-sm text-secondary hover:bg-surface-2 hover:text-primary"
           >
-            <Dot tone={current?.busy ? 'orange' : 'slate'} pulse={current?.busy} />
+            <Dot tone={current?.busy ? 'accent' : 'neutral'} pulse={current?.busy} />
             <span className="max-w-56 truncate font-medium">{workSession.label}</span>
             <ChevronDown className="h-4 w-4 text-faint" />
           </button>
           {switcherOpen && (
-            <div className="absolute right-0 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
+            <div className="animate-enter absolute right-0 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
               {naming ? (
                 <div className="mb-1 flex gap-1">
                   <Input
@@ -533,7 +575,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       {tab === 'session' && (
         <div className="flex min-h-0 flex-1 gap-3 overflow-hidden px-6 pt-5 pb-0">
           {/* 左：运行流（仅此处滚动） */}
-          <section className="flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5">
+          <section className="animate-enter flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5 shadow-xs">
             {entryView ? (
               <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id)} />
             ) : drillSession ? (
@@ -648,7 +690,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                   <button key={s.id}
                     onClick={() => { setTab('session'); openDrill(s.id); }}
                     className="flex w-full items-center gap-3 px-3 py-2.5 text-left hover:bg-surface-2">
-                    <Dot tone={s.busy ? 'orange' : 'cyan'} />
+                    <Dot tone={s.busy ? 'accent' : 'info'} />
                     <div className="min-w-0 flex-1">
                       <div className="truncate text-[13px] font-medium text-primary">
                         {s.title || '(未命名会话)'}

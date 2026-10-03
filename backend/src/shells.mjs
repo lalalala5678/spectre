@@ -146,7 +146,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     const inTargets = Array.isArray(sc.targets)
       && sc.targets.some(t => targetMatches(t, shell.target));
     if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
-    if (!inTargets) return { ok: false, error: `授权门:目标 ${shell.target} 不在清单(拒绝)` };
+    if (!inTargets) return { ok: false, error: `授权门:目标 ${shell.target} 不在清单(拒绝)。target 只写目标名(如 127.0.0.1), 不带端口——端口属于 transportRef` };
     if (shell.expiresAt && now > shell.expiresAt) {
       // R6-F3: 过期是事实终态——懒翻 status 让查重/list 反映真值
       // (此前僵尸 status=active 永久占名, 卡死同名重注册)。
@@ -378,7 +378,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           if (marker) {
             const m1 = txt.indexOf('<' + marker + '>');
             const m2 = txt.indexOf('</' + marker + '>');
-            if (m1 >= 0) txt = m2 > m1 ? txt.slice(m1 + marker.length + 2, m2) : txt.slice(m1 + marker.length + 2);
+            if (m1 >= 0) {
+              txt = m2 > m1 ? txt.slice(m1 + marker.length + 2, m2) : txt.slice(m1 + marker.length + 2);
+              // r8-D4: 残余开/闭包装标签一并剥净(stdout 不再回显标签)
+              const safe = marker.replace(/[^\w]/g, ch => '\\' + ch);
+              txt = txt.replace(new RegExp('</?' + safe + '>', 'g'), '');
+            }
           }
           stdout = txt.slice(0, MAX_OUT); stderr = ''; code = r.ok ? 0 : 1;
           if (cappedAt) stdout += `\n(timeoutMs 已按 web 通道上限裁剪为 ${cappedAt}ms)`;

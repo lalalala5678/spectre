@@ -16,9 +16,9 @@ export function Panel({
   bodyClassName?: string;
 }) {
   return (
-    <section className={cn('flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-xs', className)}>
+    <section className={cn('animate-enter flex flex-col overflow-hidden rounded-lg border border-line bg-surface shadow-xs', className)}>
       {title && (
-        <header className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-line px-4">
+        <header className="flex h-10 shrink-0 items-center justify-between gap-2 border-b border-line bg-surface-2/50 px-4">
           <h3 className="truncate text-sm font-semibold text-primary">{title}</h3>
           {right}
         </header>

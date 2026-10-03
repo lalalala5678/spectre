@@ -19,13 +19,13 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
   onNew: () => void;
 }) {
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
-      <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
+    <div className="animate-enter flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface shadow-xs">
+      <header className="flex items-center justify-between border-b border-line bg-surface-2/50 px-3 py-1.5">
         <h3 className="text-[13px] font-semibold text-secondary">
           会话
         </h3>
         <Button onClick={onNew} variant="primary" size="sm">
-          <Plus className="h-3 w-3" /> 新对话
+          <Plus className="h-3.5 w-3.5" /> 新对话
         </Button>
       </header>
       <div className="flex-1 space-y-1 overflow-y-auto p-2" tabIndex={0} aria-label="会话列表">
@@ -43,7 +43,7 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
                 : 'border-line-strong bg-surface hover:bg-surface-2',
             )}
           >
-            <Dot tone={session.busy ? 'orange' : 'slate'} pulse={session.busy} />
+            <Dot tone={session.busy ? 'accent' : 'neutral'} pulse={session.busy} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
                 <span className="truncate text-sm font-medium text-primary">

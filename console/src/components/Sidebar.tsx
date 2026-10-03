@@ -56,7 +56,7 @@ export function Sidebar({
                   >
                     <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-chrome-accent-text' : 'text-chrome-tertiary group-hover:text-chrome-secondary')} />
                     <span className="min-w-0 flex-1 truncate text-sm font-medium">{n.label}</span>
-                    {n.key === 'autopwn' && runningCount > 0 && <Dot tone="orange" pulse />}
+                    {n.key === 'autopwn' && runningCount > 0 && <Dot tone="accent" pulse />}
                   </button>
                 );
               })}

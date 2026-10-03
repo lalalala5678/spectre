@@ -111,7 +111,7 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
               <div key={m.name} className="rounded-md border border-line bg-surface px-2.5 py-1.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="min-w-0 truncate font-mono text-[13px] text-secondary">{m.name}</span>
-                  <Dot tone="cyan" />
+                  <Dot tone="info" />
                 </div>
                 <div className="mt-0.5 truncate font-mono text-xs text-tertiary" title={m.url ?? m.command}>
                   {m.transport === 'stdio' ? (Array.isArray(m.command) ? m.command.join(' ') : String(m.command ?? 'stdio')) : (m.url ?? m.transport ?? '')}

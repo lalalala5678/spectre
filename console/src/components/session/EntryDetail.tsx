@@ -117,9 +117,9 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
     }
   };
   return (
-    <div className="flex min-h-0 flex-1 flex-col gap-2">
+    <div className="animate-enter flex min-h-0 flex-1 flex-col gap-2">
       <Button onClick={onBack} variant="secondary" size="sm" className="w-fit">
-        <CornerUpLeft className="h-3 w-3" /> 返回对话
+        <CornerUpLeft className="h-3.5 w-3.5" /> 返回对话
       </Button>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-line bg-bg p-4">
         <div className="mb-1 flex flex-wrap items-center gap-2">

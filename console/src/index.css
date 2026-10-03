@@ -111,6 +111,12 @@
 }
 
 
+/* ---------- 入场微动效: 面板/下拉 150ms fade + 2px 上移(§4.5) ----------
+ * prefers-reduced-motion 由文件末尾同名块归零(简写特异性需重申)。 */
+@keyframes spectre-enter {
+  from { opacity: 0; transform: translateY(2px); }
+}
+.animate-enter { animation: spectre-enter 150ms ease-out both; }
 /* ---------- 滚动条标准化(§6.1-0): 默认可见细条, 随主题着色 ---------- */
 * {
   scrollbar-width: thin;
@@ -143,6 +149,11 @@ body {
   *::before,
   *::after {
     transition-duration: 0ms;
+    animation-duration: 0ms;
+  }
+  /* .animate-enter 的 animation 简写以类选择器特异性盖过上面的 * 规则,
+   * 此处同特异性置后重申, 保证 reduce 下入场动效同样归零。 */
+  .animate-enter {
     animation-duration: 0ms;
   }
 }

@@ -65,7 +65,7 @@ function Node({ node, depth, activeId, onDrill }: {
         )}
       >
         <div className="flex w-full items-center gap-1.5">
-          <Dot tone={session.busy ? 'orange' : 'slate'} pulse={session.busy} />
+          <Dot tone={session.busy ? 'accent' : 'neutral'} pulse={session.busy} />
           {isOrch && <Bot className="h-2.5 w-2.5 shrink-0 text-accent-text" />}
           <span className={cn(
             'truncate text-[13px]',
@@ -171,9 +171,9 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
   const count = tree ? sizeOf(tree) : 0;
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface">
-      <header className="flex items-center justify-between border-b border-line px-3 py-1.5">
-        <h3 className="text-xs font-semibold text-secondary">
+    <div className="animate-enter flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface shadow-xs">
+      <header className="flex items-center justify-between border-b border-line bg-surface-2/50 px-3 py-1.5">
+        <h3 className="text-[13px] font-semibold text-secondary">
           编排树
         </h3>
         <span className="text-xs tabular-nums text-tertiary">{count} 节点</span>

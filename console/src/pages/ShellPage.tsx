@@ -112,7 +112,7 @@ export function ShellPage() {
         )}
         {shells.map(s => (
           <div key={s.id}
-            className={cn('min-h-20 rounded-lg border px-3 py-2 text-left transition-colors',
+            className={cn('min-h-20 rounded-lg border px-3 py-2 text-left transition shadow-xs hover:shadow-sm',
               s.id === active ? 'border-accent-text bg-accent-subtle' : 'border-line-strong bg-surface hover:bg-surface-2')}>
             {/* P3-12/nested-interactive: 卡片改 div, 主点击区与关闭钮为兄弟 */}
             <button onClick={() => { setActive(s.id); setLines([]); }}
@@ -139,7 +139,7 @@ export function ShellPage() {
       </div>
 
       {cur && (
-        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-bg">
+        <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-bg shadow-xs">
           <div className="flex items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-xs text-secondary">
             <span className="text-success-text">●</span>
             <span className="tabular-nums">{cur.user || '?'}@{cur.target}</span>

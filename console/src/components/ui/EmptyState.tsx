@@ -22,10 +22,10 @@ export function EmptyState({
 }) {
   const chrome = tone === 'chrome';
   return (
-    <div className={cn('flex min-h-40 flex-col items-center justify-center gap-2 p-8 text-center', className)}>
-      <span className={cn('flex h-10 w-10 items-center justify-center rounded-full',
-        chrome ? 'bg-chrome-surface-2' : 'bg-surface-2')}>
-        <Icon className={cn('h-5 w-5', chrome ? 'text-chrome-tertiary' : 'text-tertiary')} />
+    <div className={cn('flex min-h-40 flex-col items-center justify-center gap-2.5 p-8 text-center', className)}>
+      <span className={cn('flex h-11 w-11 items-center justify-center rounded-full',
+        chrome ? 'bg-gradient-to-b from-chrome-surface-2 to-chrome-bg' : 'bg-gradient-to-b from-surface-2 to-surface-3/60')}>
+        <Icon className={cn('h-5 w-5', chrome ? 'text-chrome-accent-text' : 'text-accent-text')} />
       </span>
       <p className={cn('text-sm font-medium', chrome ? 'text-chrome-primary' : 'text-primary')}>{title}</p>
       {hint && <p className={cn('max-w-sm text-[13px]', chrome ? 'text-chrome-tertiary' : 'text-tertiary')}>{hint}</p>}
