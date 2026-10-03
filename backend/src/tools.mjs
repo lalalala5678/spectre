@@ -222,7 +222,7 @@ export function buildIntelTools(record, caps) {
       const lines = hits.map(e => {
         const a = e.author;
         const prov = a
-          ? `${a.name}(${a.typeLabel}${a.parent ? `,父:${a.parent.name}` : ''},L${a.depth})`
+          ? `${a.name}(${a.typeLabel}${a.parent ? `,父:${a.parent.name}` : ''}${Number.isInteger(a.depth) ? `,L${a.depth}` : ''})`
           : `${e.from}(溯源缺失)`;
         const head = e.type === 'task-report'
           ? `[seq=${e.seq}][任务报告|${e.status ?? '?'}] ${prov}`
