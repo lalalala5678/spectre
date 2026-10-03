@@ -348,7 +348,18 @@ function makeFileSystem(cwdContainer) {
  *  commands to their host mounts — agents reason in CONTAINER paths
  *  (/workspace /opt/uploads …) regardless of the driver underneath. */
 export function rewritePathsForLocal(command) {
+  // r9-D2 真根修(幂等化): 宿主前缀(/var/lib/spectre/workspace/x)内含
+  // 容器键子串(/workspace/), 此前被二次替换成 /var/lib/spectre/var/
+  // lib/spectre/workspace/x——每执行一层加一层前缀(r9 铁证: echo 单
+  // 前缀→回显双前缀, stat 双前缀→三前缀)。先把宿主前缀占位保护,
+  // 再做容器→宿主替换, 最后还原——幂等。
   let out = command;
+  const stash = [];
+  for (const key of Object.keys(HOST)) {
+    const ph = `\u0000SPH_${key}\u0000`;
+    out = out.split(HOST[key]).join(ph);
+    stash.push([ph, HOST[key]]);
+  }
   for (const key of Object.keys(CONTAINER)) {
     const c = CONTAINER[key];
     const h = HOST[key];
@@ -358,6 +369,7 @@ export function rewritePathsForLocal(command) {
     out = out.split(c + '"').join(h + '"');
     out = out.split(c + '\'').join(h + '\'');
   }
+  for (const [ph, h] of stash) out = out.split(ph).join(h);
   return out;
 }
 
