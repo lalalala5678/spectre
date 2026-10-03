@@ -1,3 +1,4 @@
+import { forwardRef } from 'react';
 import type { HTMLAttributes, InputHTMLAttributes, SelectHTMLAttributes, TextareaHTMLAttributes } from 'react';
 
 import { cn } from '../../utils/cn';
@@ -7,9 +8,11 @@ import { cn } from '../../utils/cn';
 const FIELD =
   'w-full rounded-md border border-line-strong bg-surface px-2.5 text-sm text-primary shadow-xs transition-colors placeholder:text-faint hover:border-line-strong/70 focus:border-ring focus:ring-2 focus:ring-ring/25 focus-visible:outline-none disabled:opacity-50';
 
-export function Input({ className, ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input className={cn(FIELD, 'h-8', className)} {...props} />;
-}
+/** FEUX5-P3: 三控件 forwardRef 化(顶栏搜索 Cmd/Ctrl+K 聚焦需要 ref)。 */
+export const Input = forwardRef<HTMLInputElement, InputHTMLAttributes<HTMLInputElement>>(
+  function Input({ className, ...props }, ref) {
+    return <input ref={ref} className={cn(FIELD, 'h-8', className)} {...props} />;
+  });
 
 export function Textarea({ className, ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   return <textarea className={cn(FIELD, 'min-h-20 py-2 leading-relaxed', className)} {...props} />;

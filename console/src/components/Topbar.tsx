@@ -53,6 +53,17 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
   const [now, setNow] = useState(() => new Date());
   const [health, setHealth] = useState<HealthInfo | null>(null);
   const [q, setQ] = useState('');
+  const searchRef = useRef<HTMLInputElement>(null);  // FEUX5-P3: Cmd/Ctrl+K
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        searchRef.current?.focus();
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const [open, setOpen] = useState(false);
   const [sessHits, setSessHits] = useState<TreeSess[]>([]);
   const [sessTotal, setSessTotal] = useState(0);  // R32D31-N3: 截断计数提示
@@ -176,7 +187,8 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           onFocus={() => { if (q.trim().length >= 2) setOpen(true); }}
           onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQ(''); } }}
           placeholder="搜索会话 / 资产 / 发现 / CVE…"
-          className="pl-8"
+          ref={searchRef}
+          className="pl-8 border-chrome-line bg-chrome-surface-2 text-chrome-primary placeholder:text-chrome-tertiary focus:border-chrome-accent-text"
         />
         {open && sessHits.length === 0 && busHits.length === 0 && (
           <div className="absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-chrome-line bg-chrome-surface p-4 text-center text-[13px] text-chrome-tertiary shadow-lg">

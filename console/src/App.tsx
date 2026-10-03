@@ -117,6 +117,19 @@ export default function App() {
   }, [route]);
 
   const [navOpen, setNavOpen] = useState(false);
+  const [navIsDrawer, setNavIsDrawer] = useState(() => window.innerWidth < 768);  // FEUX5-P2: inert 仅抽屉态
+  // FEUX5-P2: 全局 Esc 关抽屉(此前仅焦点在抽屉内才生效)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
+  useEffect(() => {
+    const mq = matchMedia('(max-width: 767px)');
+    const on = () => setNavIsDrawer(mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg font-sans text-primary">
       {/* 窄窗(<md)侧栏改抽屉: 主区加 hamburger; 路由切换自动收起 */}
@@ -125,10 +138,12 @@ export default function App() {
       )}
       <div
         role={navOpen ? 'dialog' : undefined}
-        aria-modal={navOpen ? 'true' : undefined}
+        aria-modal={navOpen && navIsDrawer ? 'true' : undefined}
+        aria-hidden={navIsDrawer && !navOpen}
+        inert={navIsDrawer && !navOpen}
         onKeyDown={e => { if (e.key === 'Escape') setNavOpen(false); }}
         className={cn('fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0',
-          navOpen ? 'translate-x-0' : '-translate-x-full max-md:invisible')}>
+          navOpen ? 'translate-x-0' : '-translate-x-full')}>
         <Sidebar route={route} onRoute={r => { nav(r); setNavOpen(false); }} runningCount={runningCount} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">

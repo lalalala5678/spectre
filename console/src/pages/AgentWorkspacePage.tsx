@@ -282,6 +282,19 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // 恒走默认(只写不读)。改常量初始化 + boot then 内恢复。
   const [rightRatio, setRightRatio] = useState<number>(DEFAULT_RIGHT_RATIO);
   const [rightOpen, setRightOpen] = useState(false);  // 窄窗右栏抽屉(自适应填充)
+  // FEUX5-P2: 抽屉态感知——inert/role 仅 <lg 生效, 桌面静态右栏常驻可交互
+  const [rightIsDrawer, setRightIsDrawer] = useState(() => window.innerWidth < 1024);
+  useEffect(() => {
+    const mq = matchMedia('(max-width: 1023px)');
+    const on = () => setRightIsDrawer(mq.matches);
+    on(); mq.addEventListener('change', on);
+    return () => mq.removeEventListener('change', on);
+  }, []);
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setRightOpen(false); };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, []);
   const dragW = useRef<{ startX: number; startW: number; moved: boolean } | null>(null);
   const onResizeDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragW.current = {
@@ -549,20 +562,26 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             )}
           </section>
 
+          {/* FEUX5-P2: 右抽屉遮罩(此前无遮罩点外不关) */}
+          {rightIsDrawer && rightOpen && (
+            <div className="fixed inset-0 z-20 bg-black/40 lg:hidden" onClick={() => setRightOpen(false)} />
+          )}
           {/* 右栏：AutoPwn = 子Agent + 全量漏洞/情报;stage agent = 会话面板 + 自己的漏洞/情报 */}
           <div
-            role={typeof window !== 'undefined' && window.innerWidth < 1024 ? 'dialog' : undefined}
-            aria-modal={typeof window !== 'undefined' && window.innerWidth < 1024 ? 'true' : undefined}
+            role={rightIsDrawer ? 'dialog' : undefined}
+            aria-modal={rightIsDrawer && rightOpen ? 'true' : undefined}
+            aria-hidden={rightIsDrawer && !rightOpen}
+            inert={rightIsDrawer && !rightOpen}
             onKeyDown={e => { if (e.key === 'Escape') setRightOpen(false); }}
             className={cn(
               'relative z-30 h-full shrink-0 border-l border-line bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',
-              // FEAESTH4-P1-2/P2: 抽屉态固定 85vw≤360px(此前 ratio*vw 375px 屏
-              // 仅 90px 不可用)+关闭态 invisible 移出 Tab 序(此前离屏可聚焦)+
-              // Esc 关闭。
+              // FEAESTH4-P1-2/FEUX5-P2: 抽屉态固定 min(85vw,360px)(此前
+              // ratio*vw 在 375px 屏仅 90px)+关闭态 inert 移出 Tab 序+Esc 关闭;
+              // 静态态 clamp(240px, ratio·vw, 480px) 防拖拽压死聊天区。
               'max-lg:!w-[min(85vw,360px)]',
-              !rightOpen && 'max-lg:invisible',
+              !rightOpen && 'max-lg:translate-x-full',
             )}
-            style={{ width: `clamp(${(rightRatio * 100).toFixed(2)}vw, 240px, 480px)` }}
+            style={{ width: `clamp(240px, ${(rightRatio * 100).toFixed(2)}vw, 480px)` }}
           >
             <div
               onPointerDown={onResizeDown}
