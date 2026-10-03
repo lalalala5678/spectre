@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { Loader2, Check, AlertTriangle, RotateCw, Radar, Sparkles, ShieldCheck } from 'lucide-react';
 import { cn } from '../utils/cn';
@@ -50,10 +50,11 @@ const TIER_STYLE: Record<string, { label: string; tone: BadgeTone; dot: string; 
 };
 
 /** 单字段行:label + input/select + 保存按钮(未保存高亮/转圈/成功/失败态) */
-function FieldRow({ def, value, onSave }: {
+function FieldRow({ def, value, onSave, onDirtyChange }: {
   def: FieldDef;
   value: string | number | undefined;
   onSave: (v: string) => Promise<void>;
+  onDirtyChange?: (dirty: boolean) => void;  // FEVERIFY6-P3: 脏离开提示
 }) {
   const [draft, setDraft] = useState(String(value ?? def.default ?? ''));
   const [orig, setOrig] = useState(String(value ?? def.default ?? ''));
@@ -65,6 +66,7 @@ function FieldRow({ def, value, onSave }: {
   }, [value, def.default]);
 
   const dirty = draft !== orig;
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     if (!dirty || state === 'saving') return;
@@ -133,11 +135,12 @@ function FieldRow({ def, value, onSave }: {
 }
 
 /** 数据源卡片(带 tier 徽章 + 挂载状态) */
-function SourceCard({ src, cfg, onSave, verify }: {
+function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
   src: SourceDef;
   cfg: Record<string, string> | undefined;
   onSave: (leaf: string) => (v: string) => Promise<void>;
   verify?: { ok: boolean; error?: string | null };
+  onDirtyChange?: (dirty: boolean) => void;  // FEVERIFY6-P3: 透传脏态
 }) {
   const [open, setOpen] = useState(true);
   const isParams = src.id === 'brute';
@@ -173,6 +176,7 @@ function SourceCard({ src, cfg, onSave, verify }: {
         <div className="divide-y divide-line border-t border-line">
           {src.fields.map((f) => (
             <FieldRow
+              onDirtyChange={onDirtyChange}
               key={f.id}
               def={{ ...f, placeholder: f.placeholder ?? (f.id.endsWith('baseUrl') ? `默认 ${src.defaultBase}` : undefined) }}
               value={cfg?.[f.id.split('.')[1]]}
@@ -185,6 +189,18 @@ function SourceCard({ src, cfg, onSave, verify }: {
   );
 }
 export function SettingsPage() {
+  // FEVERIFY6-P3: 未保存改动计数——派发全局事件, App 路由切换前拦截确认
+  const dirtyCount = useRef(0);
+  useEffect(() => {
+    const fire = () => window.dispatchEvent(new CustomEvent('spectre:dirty', { detail: dirtyCount.current }));
+    fire();
+    window.addEventListener('spectre:dirty-query', fire);
+    return () => window.removeEventListener('spectre:dirty-query', fire);
+  }, []);
+  const bumpDirty = (d: boolean) => {
+    dirtyCount.current = Math.max(0, dirtyCount.current + (d ? 1 : -1));
+    window.dispatchEvent(new CustomEvent('spectre:dirty', { detail: dirtyCount.current }));
+  };
   usePageTitle('设置'); // FEVERIFY-N3
   const [data, setData] = useState<SettingsPayload | null>(null);
   const [err, setErr] = useState('');
@@ -287,7 +303,7 @@ export function SettingsPage() {
             // CS16-P2: webSearch 三字段此前落空 bucket(只认 llm/comp)——
             // 保存后回显恒空, 用户以为没存上。
             const bucket = top === 'llm' ? llm : (top === 'webSearch' ? ws : comp);
-            return <FieldRow key={f.id} def={f} value={bucket[leaf]} onSave={saveCommon(f.id)} />;
+            return <FieldRow key={f.id} def={f} value={bucket[leaf]} onSave={saveCommon(f.id)} onDirtyChange={bumpDirty} />;
           })}
         </div>
       </section>
@@ -334,7 +350,7 @@ export function SettingsPage() {
           ) : (
             <div className="divide-y divide-line">
               {agent.sources.map((src) => (
-                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
+                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
               ))}
             </div>
           )}
@@ -373,7 +389,7 @@ export function SettingsPage() {
             </div>
             <div className="space-y-2">
               {byTier(t).map((src) => (
-                <SourceCard key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
+                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
               ))}
             </div>
           </div>

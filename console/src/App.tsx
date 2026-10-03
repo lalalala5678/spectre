@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { cn } from './utils/cn';
 import { api } from './api/client';
 import { Sidebar } from './components/Sidebar';
@@ -118,6 +118,18 @@ export default function App() {
 
   const [navOpen, setNavOpen] = useState(false);
   const [navIsDrawer, setNavIsDrawer] = useState(() => window.innerWidth < 768);  // FEUX5-P2: inert 仅抽屉态
+  // FEVERIFY6-P3: 脏离开拦截(设置页未保存改动, 路由切换前确认)
+  const dirtyCount = useRef(0);
+  useEffect(() => {
+    const onDirty = (e: Event) => { dirtyCount.current = (e as CustomEvent).detail ?? 0; };
+    window.addEventListener('spectre:dirty', onDirty);
+    return () => window.removeEventListener('spectre:dirty', onDirty);
+  }, []);
+  const navGuarded = (r: RouteKey) => {
+    if (dirtyCount.current > 0
+      && !window.confirm(`有 ${dirtyCount.current} 项设置改动未保存, 离开将丢弃。确定离开?`)) return;
+    nav(r);
+  };
   // FEUX5-P2: 全局 Esc 关抽屉(此前仅焦点在抽屉内才生效)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };
@@ -144,7 +156,7 @@ export default function App() {
         onKeyDown={e => { if (e.key === 'Escape') setNavOpen(false); }}
         className={cn('fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0',
           navOpen ? 'translate-x-0' : '-translate-x-full')}>
-        <Sidebar route={route} onRoute={r => { nav(r); setNavOpen(false); }} runningCount={runningCount} />
+        <Sidebar route={route} onRoute={r => { navGuarded(r); setNavOpen(false); }} runningCount={runningCount} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenu={() => setNavOpen(true)} />

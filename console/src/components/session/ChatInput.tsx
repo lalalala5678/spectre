@@ -60,7 +60,7 @@ export function ChatInput({
   };
 
   return (
-    <div className="rounded-lg border border-line bg-bg py-1.5 focus-within:border-line-strong">
+    <div className="@container rounded-lg border border-line bg-bg py-1.5 focus-within:border-line-strong">
       <div className="flex items-center gap-2 px-3">
         <span className="shrink-0 text-sm text-accent-text">
           {busy ? '⇢' : '›'}
@@ -108,7 +108,8 @@ export function ChatInput({
             }
           }}
         />
-        <span className="flex shrink-0 items-center gap-1 text-[13px] text-tertiary">
+        {/* FEVERIFY6-P2: 窄容器收纳——行内放不下时提示退场(容器查询), 不再挤死 textarea */}
+        <span className="flex shrink-0 items-center gap-1 text-[13px] text-tertiary @[380px]:flex hidden">
           {busy
             ? <><Kbd>Alt+Enter</Kbd> 插话</>
             : <><Kbd>Enter</Kbd> 发送 · <Kbd>Shift+Enter</Kbd> 换行</>}

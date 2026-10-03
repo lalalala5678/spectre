@@ -188,8 +188,9 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQ(''); } }}
           placeholder="搜索会话 / 资产 / 发现 / CVE…"
           ref={searchRef}
-          className="pl-8 border-chrome-line bg-chrome-surface-2 text-chrome-primary placeholder:text-chrome-tertiary focus:border-chrome-accent-text"
+          className="pl-8 pr-12 border-chrome-line bg-chrome-surface-2 text-chrome-primary placeholder:text-chrome-tertiary focus:border-chrome-accent-text"
         />
+        <kbd className="pointer-events-none absolute right-2.5 top-1/2 hidden -translate-y-1/2 rounded border border-chrome-line bg-chrome-surface px-1.5 py-0.5 text-[11px] text-chrome-tertiary md:inline">⌘K</kbd>
         {open && sessHits.length === 0 && busHits.length === 0 && (
           <div className="absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-chrome-line bg-chrome-surface p-4 text-center text-[13px] text-chrome-tertiary shadow-lg">
             无结果——输入 ≥2 字搜索会话与总线条目
@@ -290,7 +291,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
             ) : notices.slice(0, 20).map(n => (
               <button key={n.seq} onClick={() => { setBellOpen(false); window.location.hash = n.hash; }}
                 className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-chrome-surface-2">
-                <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className="shrink-0">
+                <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className="shrink-0 bg-transparent border border-danger-text/50 [&.border-warning-text]:border-warning-text/50">
                   {n.kind === 'vulnerability' ? '漏洞' : '失败'}
                 </Badge>
                 <span className="min-w-0 truncate text-sm text-chrome-secondary">{n.text}</span>
