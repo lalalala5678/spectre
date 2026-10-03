@@ -373,10 +373,19 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
   async function fingerprint(id) {
     const sh = shells.get(id);
     if (!sh || sh.host) return sh;
-    const u = await exec(id, 'id -un 2>/dev/null; uname -a 2>/dev/null | head -1');
+    // 自测r3(指纹污染): 输出带定界哨兵——非定界 200 响应(错误页/HTML)
+    // 此前原样进 user 字段(实测 user="<html>…")。
+    const u = await exec(id,
+      'printf "__SPF1__"; id -un 2>/dev/null; printf "__SPF2__"; uname -a 2>/dev/null | head -1; printf "__SPF3__"');
     if (u.ok) {
-      const [user, ...rest] = String(u.stdout).split('\n');
-      sh.user = (user || '').trim() || null;
+      const m1 = String(u.stdout).indexOf('__SPF1__');
+      const m2 = String(u.stdout).indexOf('__SPF2__');
+      const m3 = String(u.stdout).indexOf('__SPF3__');
+      const clean = (a, b) => (a >= 0 && b > a ? String(u.stdout).slice(a + 8, b) : '');
+      const [user, ...rest] = (m1 >= 0 && m3 > m1)
+        ? [clean(m1, m2).split('\n')[0], clean(m2, m3)]
+        : String(u.stdout).split('\n');
+      sh.user = (user || '').trim().slice(0, 64) || null;
       sh.os = rest.join(' ').trim() || null;
       sh.host = sh.os ? String(sh.os).split(' ')[1] : null;
       persistShells();  // R6-F2

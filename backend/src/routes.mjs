@@ -305,8 +305,13 @@ function realRouter({ store, bus, caps, wal }) {
         if (typeof body.text !== 'string' || !body.text.trim()) {
           return bad(res, 400, 'text 必填(非空字符串)');
         }
-        const text = body.text.slice(0, CONFIG.maxPromptChars);
-        store.followUp(record, text);
+        // 自测r3-#8 真接线: engagement DM 实走 /followup(此前仅
+        // /messages+/steer 包序号——两轮宣称两轮不可见的根因)。
+        const raw = String(body.text).slice(0, CONFIG.maxPromptChars);
+        const tagged = /^\[DM #\d+ from /.test(raw)
+          ? raw
+          : `[DM #${dmNextSeq(record.id)} from ${String(body.from ?? 'system')}] ${raw}`;
+        store.followUp(record, tagged);
         return json(res, 202, { ok: true });
       }
       if ((action === '/messages' || action === '/steer') && method === 'POST') {
@@ -328,10 +333,17 @@ function realRouter({ store, bus, caps, wal }) {
           // never renders them as the human user.
           // 自测r2-#8: agent 注入统一带投递序号(与 sessions 本地 DM
           // 同一序号器; [DM from X] → [DM #n from X])。
-          const injectText = body.source === 'agent'
-            ? text.replace(/^\[DM from ([^\]]+)\]/,
-                (_, who) => `[DM #${dmNextSeq(record.id)} from ${who}]`)
-            : text;
+          let injectText = text;
+          if (body.source === 'agent') {
+            injectText = /^\[DM #\d+ from /.test(injectText)
+              ? injectText
+              : injectText.replace(/^\[DM from ([^\]]+)\]/,
+                  (_, who) => `[DM #${dmNextSeq(record.id)} from ${who}]`);
+            // 任务注入(非 DM 文本)带投递序号头(自测r3 第 5 观测点)
+            if (!injectText.startsWith('[DM #')) {
+              injectText = `[DM #${dmNextSeq(record.id)} from system] ${injectText}`;
+            }
+          }
           const source = body.source === 'agent'
             ? injectionOriginOf(injectText) : undefined;
           if (action === '/messages') {
