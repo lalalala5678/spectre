@@ -343,7 +343,7 @@ const caps = {
       return {
         ok: true,
         text: `漏洞报告已产出并入库:《${published.title}》` +
-          `(severity=${published.severity},seq=${published.seq})。` +
+          `(severity=${published.severity},seq=${published.seq};同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
           `撰写对话 ${writer.id}(read_session 可复盘其思考与验证过程)。`,
         details: { sessionId: writer.id, seq: published.seq,
           title: published.title, severity: published.severity,
@@ -354,7 +354,7 @@ const caps = {
     const reply = lastReply(writer);
     return {
       ok: false,
-      text: `报告agent未将此线索立为漏洞。其判定说明:\n` +
+      text: `报告agent未将此线索立为漏洞(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。其判定说明:\n` +
         `${(reply || '(无输出)').slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,
