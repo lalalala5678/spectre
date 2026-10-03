@@ -8,15 +8,17 @@ import { getPrefs, putPrefsSync } from '../../api/worksession';
  * 与 PanelStack 同协议: prefs 持久化(storageKey 隔离)+双击复位+min/max 夹取。
  * <xl(1280) 自动纵向堆叠(handle 隐藏)——窄屏自适应。
  */
-export function SplitPane({ storageKey, initial = 0.62, min = 0.2, max = 0.8,
+export function SplitPane({ storageKey, initial = 0.62,
   children, className }: {
   storageKey: string;
   initial?: number;
-  min?: number;
-  max?: number;
   children: [ReactNode, ReactNode];
   className?: string;
 }) {
+  // 用户裁定: 拖动不做任何限制——min/max 仅防 0/负值(handle 定位与
+  // 除零的工程底线), 0.1%~99.9% 全程自由。
+  const min = 0.001;
+  const max = 0.999;
   const [ratio, setRatio] = useState(initial);
   const [wide, setWide] = useState(() => window.innerWidth >= 1280);
   useEffect(() => {

@@ -329,7 +329,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     const ratio = (dragW.current.startW + delta) / window.innerWidth;
     // 用户实测: 右栏最多占视口 55%(与 CSS min(55vw,900px) 同口径)——
     // 此前 480px 硬帽让分界线只能右拖(左向到 480 即钉死)。
-    setRightRatio(Math.min(0.55, Math.max(0.12, ratio)));
+    // 用户裁定: 拖动不做任何限制——仅防 0/负值, 0.1%~99.9% 全程自由。
+    setRightRatio(Math.min(0.999, Math.max(0.001, ratio)));
   };
   const onResizeUp = () => {
     if (dragW.current?.moved) {
@@ -579,13 +580,12 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               'relative z-30 h-full shrink-0 border-l border-line bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',
               // FEAESTH4-P1-2/FEUX5-P2: 抽屉态固定 min(85vw,360px)(此前
               // ratio*vw 在 375px 屏仅 90px)+关闭态 inert 移出 Tab 序+Esc 关闭;
-              // 静态态防拖死: 地板 240px; 上限 min(55vw, 900px,
-              // 100vw-464px)——末项保聊天区 ≥240px(侧栏 224+聊天 240,
-              // 1024 屏曾压到 177px 的教训); 480 硬帽只能右拖的教训同批。
+              // 静态态宽度=ratio·vw 无 clamp(用户裁定: 拖动零限制,
+              // 480 硬帽/55% 帽/聊天区地板全撤, 双击复位保留)。
               'max-lg:!w-[min(85vw,360px)]',
               !rightOpen && 'max-lg:translate-x-full',
             )}
-            style={{ width: `clamp(240px, ${(rightRatio * 100).toFixed(2)}vw, min(55vw, 900px, 100vw - 464px))` }}
+            style={{ width: `${(rightRatio * 100).toFixed(2)}vw` }}
           >
             <div
               onPointerDown={onResizeDown}
