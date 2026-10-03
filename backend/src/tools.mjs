@@ -247,7 +247,13 @@ export function buildIntelTools(record, caps) {
             : `[seq=${e.seq}][情报] ${prov}`;
         const hasDetail = Boolean(e.detail);
         const full = String(e.detail ?? e.summary ?? '');
-        const body = full.slice(0, 400);
+        // r10v3 打磨: 列表态预览剥正文首行历史状态声明(全文态有注记,
+        // 列表态 400 字内曾露出与现行不符的旧状态行)
+        const firstL = full.split('\n').find(l => l.trim()) ?? '';
+        const stDeclared = /\*\*状态\*\*[:：]\s*[a-z-]+/i.test(firstL)
+          && (e.revisedCount ?? 0) > 0;
+        const body = (stDeclared
+          ? full.split('\n').slice(1).join('\n') : full).slice(0, 400).replace(/^\s+/, '');
         // Never cut silently (repo rule): shown/total + 可行动补全手段
         // (AGENTS.md:39-44)。CS44-F2/CS45-N2: 消费 emit 的 summaryClipped
         // 标志分三态——detail 在=seq 可取全文; detail 缺+emit 已截=如实
