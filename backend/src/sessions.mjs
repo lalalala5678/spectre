@@ -703,6 +703,18 @@ export class SessionStore {
     return n;
   }
 
+  /** r12-UX: 拒绝文案列名用——与 countTree(activeOnly) 完全同口径
+   * (rootIdOf 全扫描, 非递归遍历——树语义单源)。 */
+  treeActiveAgents(rootId) {
+    const out = [];
+    for (const s of this.sessions.values()) {
+      if (this.rootIdOf(s.id) !== rootId) continue;
+      if (s.taskReportCount > 0 && !s.busy) continue;
+      out.push(s.agentKey + (s.id === rootId ? '(根)' : ''));
+    }
+    return out.slice(0, 12);
+  }
+
   /** Member agentKeys of an engagement (derived from live sessions —
    *  engagement children carry engagementId; restart-safe via WAL). */
   engagementMembersOf(engagementId) {

@@ -99,6 +99,7 @@ export function buildIntelTools(record, caps) {
       q: Type.Optional(Type.String({
         description: 'Keyword substring matched against title/detail',
       })),
+      includeVoid: Type.Optional(Type.Boolean({ description: '默认排除已作废条目;true=审计面(含 void, 作废行有 [已作废] 注记)' })),
       before: Type.Optional(Type.Number({
         description: 'Pagination cursor: only entries with seq < before (pass the oldest seq of the current page to fetch the next older page)',
       })),
@@ -178,7 +179,7 @@ export function buildIntelTools(record, caps) {
 
       const matched = inWs
         .filter(isEntry)
-        .filter(e => !e.void)  // voided entries: audit-only, not for queries
+        .filter(e => !e.void || params.includeVoid)  // r12: includeVoid=true 审计面含作废条目
         .filter(e => kind === 'both' || entryKind(e) === kind)
         .filter(e => !params.agentType || e.from === params.agentType)
         .filter(e => !status || e.status === status)
@@ -226,7 +227,7 @@ export function buildIntelTools(record, caps) {
         if (params.author) relax.push('author');
         if (q) relax.push('q');
         const hasAny = reports + vulns + notes > 0;
-        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条。(注: seq 非连续系日志滚动上限与查重合并所致, 空洞非数据丢失)`;
+        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条(作废条目默认排除——审计需 includeVoid: true)。(注: seq 非连续系日志滚动上限与查重合并所致, 空洞非数据丢失)`;
         hint += relax.length
           ? (hasAny ? `当前过滤(${relax.join('/')})过窄,可放宽或去掉。` : `项目本身为空——过滤(${relax.join('/')})不是原因。`)
           : (hasAny ? '' : '项目尚无任何产出。');

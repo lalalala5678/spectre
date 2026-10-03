@@ -23,10 +23,14 @@ export function makeSpawnPolicy(store) {
           depth: childDepth, active, total };
       }
       if (active + 1 > spawnMaxAgents) {
+        // r12-UX: 拒绝文案列名计数构成(观察项采纳——树根计入系反推
+        // 而非明示的怨念)
+        const names = (store.treeActiveAgents?.(rootId) ?? []).join('、');
         return { ok: false, reason:
           `活跃智能体上限 ${spawnMaxAgents}(当前活跃 ${active}/历史 ${total}` +
-          `——已提交任务报告的空闲会话不计入名额)。可等待在途任务完成后` +
-          `重试,或经控制台调整 spawnMaxAgents。`,
+          `——已提交任务报告的空闲会话不计入名额)。` +
+          (names ? `当前活跃构成:${names}(含树根本身)。` : '') +
+          `可等待在途任务完成后重试,或经控制台调整 spawnMaxAgents。`,
           depth: childDepth, active, total };
       }
       return { ok: true, depth: childDepth, active, total };
@@ -43,9 +47,11 @@ export function makeSpawnPolicy(store) {
       const active = store.countTree(rootId, { activeOnly: true });
       const total = store.countTree(rootId);
       if (active + count > spawnMaxAgents) {
+        const names = (store.treeActiveAgents?.(rootId) ?? []).join('、');
         return { ok: false, reason:
           `活跃智能体上限 ${spawnMaxAgents}(当前活跃 ${active}/历史 ${total}。` +
           `本批需 ${count} 个名额,超出 ${active + count - spawnMaxAgents}。` +
+          (names ? `当前活跃构成:${names}(含树根本身)。` : '') +
           `可分批派发、等待在途任务完成,或经控制台调高 spawnMaxAgents。`,
           active, total };
       }
