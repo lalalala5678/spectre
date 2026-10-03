@@ -409,6 +409,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // 降级形态(容器语义丢失: 无 cuser 隔离/无容器 FS)。
         const haveDocker = sandboxConfig().driver === 'docker';
         let res;
+        let degradedNote;
         if (haveDocker) {
           const argv = cuser
             ? ['exec', '-u', cuser, cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command]
@@ -425,15 +426,15 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           // read_file 恒空 content)。timeout 直执行 bash, 引号由 execFile
           // 数组参数天然隔离。落盘以 /tmp/probe.mjs 四用例实证为准。
           res = await new Promise((resolve) => {
-            execFile('timeout', ['-k', '5', String(tSec), 'bash', '-lc', command],
+            execFile('timeout', ['-k', '5', String(tSec), 'bash', '-c', command],  // r9-D5: 去 -l 消 profile 噪声
               { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
               resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
           });
           ({ stdout, stderr, code } = boundedExecResult(
             res.err, res.so, res.se, '[timeout: 宿主侧进程已被 timeout(1) 终止]', 'sh 降级(docker 缺席, 宿主直跑——无容器隔离)'));
-          if (stdout && !stdout.includes('sh 降级')) {
-            stdout += '\n[driver=sh 降级: docker 缺席, 本命令实际跑在宿主而非 ' + cbox + ' 容器]';
-          }
+          // r9-D10: 降级注记是元数据——进独立字段, 不再混入 stdout 载荷
+          // (read_file 的 content 曾被污染)。
+          degradedNote = 'docker 缺席, 实际跑在宿主而非 ' + cbox + ' 容器';
         }
       } else {
         return { ok: false, error: `transport ${sh.transport} 未接入(真实植入通道后续挂)` };
@@ -447,7 +448,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     persistShells();  // R6-F2: every-mutation 契约
     if (sh.tasks.length > 100) sh.tasks.splice(0, sh.tasks.length - 100);
     audit('shell-exec', { id, target: sh.target, cmd: command.slice(0, 120), code, ms: task.ms });
-    return { ok: code === 0, stdout: stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task };
+    return { ok: code === 0, stdout: stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task, ...(degradedNote ? { degradedNote } : {}) };
   }
 
   /** Auto-fingerprint the host once (whoami/uname) — Sliver-style session meta. */
@@ -499,6 +500,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
 
   /** Convenience: read one file through the shell (cat), for agent tool. */
   async function readFile(id, path) {
+    // r9-D9: 状态前置检查与 exec 同文案——closed/expired 通道此前返回
+    // {"ok":false,"content":""} 无说明, 首测即被坑(形态不一致)。
+    const sh0 = shells.get(id);
+    if (!sh0) return { ok: false, error: 'shell 不存在' };
+    if (sh0.status !== 'active') return { ok: false, error: `shell 状态 ${sh0.status}(read_file 与 exec 同判)` };
     // R6-F4: 单引号安全转义(双引号内 $()/反引号会展开, path 即注入
     // 点); cat 退出码经 PIPESTATUS 传播——读失败不再被 head 的恒 0
     // 吞掉, 错误文本仍在 stdout 可诊断。
