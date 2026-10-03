@@ -617,6 +617,10 @@ export class SessionStore {
   }
 
   _journal(record, type, data = {}) {
+    // r6v3-#9: 回合计时基准统一挂 journal 层(agent_start 无论 via
+    // prompt/followUp/steer 均置位——此前仅 prompt 分支, followUp 起的
+    // 长回合内排队 DM 无基准不打迟到标)。
+    if (type === 'agent_start') record.turnStartedAt = Date.now();
     const event = {
       seq: ++seq,
       ts: new Date().toISOString(),

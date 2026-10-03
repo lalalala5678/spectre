@@ -490,8 +490,11 @@ loadSandboxConfig().then(async cfg => {
   // 不可用(注册表持久但进程/文件已失——此前零通知)。
   // r6v2-观测11: 平台重启预告——沙箱进程/临时文件随重启重置, 战场
   // 进程若跑在 /tmp 会被带走(部署前应预告; 事后 bus 告知可对账)。
-  bus.emit({ channel: 'audit', from: 'system', type: 'context',
-    summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置——战场自建靶场如需保留请用部署预告窗口。' });
+  bus.emit({ channel: 'audit', from: 'system', type: 'intel-note',
+    title: '平台运行时已重启',
+    summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置',
+    detail: '平台刚完成重启部署。/tmp 下的自建靶场进程与临时文件已被重置;需要保留的战场环境请提前落工作区或等部署窗口。本条经 query_intel 可查。',
+    workSessionId: null });
   if (ensured.recreated) {
     const { markTransportDead } = await import('./src/shells.mjs');
     const dead = markTransportDead();

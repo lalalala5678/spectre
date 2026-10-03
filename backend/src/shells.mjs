@@ -477,7 +477,10 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         osLine = '';
       }
       sh.user = (user || '').trim().slice(0, 64) || null;
-      sh.os = (osLine ?? '').trim() || null;
+      // r6v3-#4: os 同过形态白名单——可打印 ASCII, 禁编码/HTML 形态
+      const osClean = (osLine ?? '').trim();
+      sh.os = (/^[\x20-\x7e]{4,120}$/.test(osClean) && !/[<>%]/.test(osClean))
+        ? osClean : null;
       sh.host = sh.os ? String(sh.os).split(' ')[1] : null;
       persistShells();  // R6-F2
     }

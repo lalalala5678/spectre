@@ -73,13 +73,27 @@ export async function markReportSynthesized(sessionId, meta = {}) {
 
 /** Notify the orchestrator session that its engagement finished. */
 export async function notifyEngagementDone({ orchestratorSessionId,
-                                             engagementId, summary }) {
+                                             engagementId, summary, recheck = [] }) {
   if (!orchestratorSessionId) {
     return { skipped: true };
   }
+  // r6v3-#10: 送达时对账——workflow 判死与终报落账存在时序窗, 构建时
+  // 快照可能恒旧。投递前对 error 成员重查情报库, 追加终局状态。
+  let lateRecon = '';
+  if (Array.isArray(recheck) && recheck.length) {
+    try {
+      const children = await runtime.engagementChildren(engagementId);
+      const parts = recheck
+        .map(k => children[k]
+          ? `${k}: 终报已落账(${children[k].status ?? '?'})《${String(children[k].title ?? '').slice(0, 50)}》(seq=${children[k].seq})——勿判失败`
+          : `${k}: 送达时库内仍无终报`)
+        .map(x => `- ${x}`);
+      if (parts.length) lateRecon = `\n[送达对账·${new Date().toISOString().slice(11, 19)}]\n${parts.join('\n')}`;
+    } catch { /* 对账尽力——不影响通知本体 */ }
+  }
   return runtime.followUp(
     orchestratorSessionId,
-    `[engagement ${engagementId} 完成] 全部子智能体产出:\n${summary}\n` +
+    `[engagement ${engagementId} 完成] 全部子智能体产出:\n${summary}${lateRecon}\n` +
     '请向用户汇总本次结果(重点、风险、建议)。',
   );
 }

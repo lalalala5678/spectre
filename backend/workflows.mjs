@@ -187,7 +187,10 @@ export async function autoPwnWorkflow(input) {
       if (value.error) {
         const r = recon[key];
         if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
-        return `- ${key}${ts}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}(库内无终报——真失败)`;
+        // r6v3-#10: 构建时对账有固有盲区(终报可能晚于 workflow 判死落账)
+        // ——绝对断言"真失败"被实测证伪。降格为时点陈述, 送达时 activity
+        // 会再对账一次(见 notifyEngagementDone)。
+        return `- ${key}${ts}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}(截至通知构建时库内无终报——送达对账见下, 终局以 query_intel 为准)`;
       }
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
@@ -197,6 +200,10 @@ export async function autoPwnWorkflow(input) {
       orchestratorSessionId,
       engagementId,
       summary: summaryLines,
+      // r6v3-#10: 送达时对账原料——activity 投递前重查情报库, 对这些
+      // 成员追加最新终报状态(构建与送达之间的落账不再漏报)。
+      recheck: [...results.entries()]
+        .filter(([, v]) => v.error).map(([k]) => k),
     });
   } catch {
     // R7-F4: 编排会话 404/runtime 停机曾把已完成战役标 FAILED——
