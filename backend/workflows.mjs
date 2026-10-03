@@ -84,6 +84,7 @@ export async function autoPwnWorkflow(input) {
           workSessionId } = input;
   const engagement = `autopwn-${engagementId}`;
   const children = new Map();     // agentKey -> child handle
+  const childTiming = new Map();  // EW-3: agentKey -> {start, end}
   const inbox = [];               // {kind, from, to, text}(CS62-#1: share/result 已删, 形状收窄)
   let open = true;
 
@@ -135,8 +136,11 @@ export async function autoPwnWorkflow(input) {
       taskQueue: 'spectre',
     });
     children.set(agentKey, handle);
+    // EW-3: 成员起止时间戳(四轮合规建议最后一项)——完成通知随行
+    childTiming.set(agentKey, { start: new Date().toISOString() });
     try {
       const result = await handle.result();
+      childTiming.get(agentKey).end = new Date().toISOString();
       results.set(agentKey, result);
       {
         // R7-F1: 无条件发完成 share——resume 完成判定依赖 channel='share'
@@ -167,15 +171,17 @@ export async function autoPwnWorkflow(input) {
   // Q2(a): completion notice auto-injected into the orchestrator session.
   const summaryLines = [...results.entries()]
     .map(([key, value]) => {
+      const t = childTiming.get(key);
+      const ts = t ? ` [${t.start.slice(11, 19)}→${(t.end ?? '?').slice(11, 19)}]` : '';
       if (value.report) {
-        return `- ${key}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
+        return `- ${key}${ts}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
       }
       // CS68-F4: summary 在 child 侧已单层截断(agentTaskWorkflow 返回
       // 处), 此处再 clip 会切掉首层标记且总长谎报(5000→'2000/2018')
       // ——原样用。CS69-3: 去行号引用(自引必漂); CS69-4: error 非
       // 会话消息且无 sessionId, 补全手段不得指 read_session。
-      if (value.error) return `- ${key}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}`;
-      return `- ${key}: ${value.summary ?? ''}`;
+      if (value.error) return `- ${key}${ts}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}`;
+      return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
     .join('\n');
   try {
@@ -235,7 +241,10 @@ export async function agentTaskWorkflow(input) {
       if (finished) break;
       const msg = inbox.shift();
       if (msg) {
-        await llm.steerSession(session.sessionId, `[DM #${msg.seq} from ${msg.from}] ${msg.text}`);
+        // EW-1: 序号统一由 runtime routes 层补(单一计数器, per-target
+        // 单调)——此处若自带 #n 会被 routes 正则跳过, 造成 per-child
+        // 重复序号(r4 实测两条 #1)。
+        await llm.steerSession(session.sessionId, `[DM from ${msg.from}] ${msg.text}`);
       }
     }
   })();

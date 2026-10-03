@@ -381,12 +381,21 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       const m1 = String(u.stdout).indexOf('__SPF1__');
       const m2 = String(u.stdout).indexOf('__SPF2__');
       const m3 = String(u.stdout).indexOf('__SPF3__');
-      const clean = (a, b) => (a >= 0 && b > a ? String(u.stdout).slice(a + 8, b) : '');
-      const [user, ...rest] = (m1 >= 0 && m3 > m1)
-        ? [clean(m1, m2).split('\n')[0], clean(m2, m3)]
-        : String(u.stdout).split('\n');
+      const raw = String(u.stdout);
+      const clean = (a, b) => (a >= 0 && b > a ? raw.slice(a + 8, b) : '');
+      let user, osLine;
+      if (m1 >= 0 && m3 > m1) {
+        user = clean(m1, m2).split('\n')[0];
+        osLine = clean(m2, m3);
+      } else {
+        // EW-2: 哨兵残缺的响应(截断/污染)——剥哨兵后取首行, 非打印/
+        // HTML 形态直接判污染置空(r4 实测 user 残留哨兵)。
+        const stripped = raw.replace(/__SPF\d__/g, '').split('\n')[0].trim();
+        user = /^[A-Za-z0-9._-]{1,32}$/.test(stripped) ? stripped : '';
+        osLine = '';
+      }
       sh.user = (user || '').trim().slice(0, 64) || null;
-      sh.os = rest.join(' ').trim() || null;
+      sh.os = (osLine ?? '').trim() || null;
       sh.host = sh.os ? String(sh.os).split(' ')[1] : null;
       persistShells();  // R6-F2
     }
