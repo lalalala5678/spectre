@@ -195,7 +195,16 @@ const caps = {
       throw Object.assign(new Error(`编排器会话不存在: ${sessionId}`),
         { statusCode: 404 });
     }
-    store.followUp(record, text);
+    // r6v4-#9: 中段情报 DM(publish_intel→此处)的真实入口——主控长
+    // 回合(busy)中排队 5min+ 的消息预打迟到标(store 层三穿后的实证
+    // 调用链兜底, 双保险)。
+    let t = text;
+    if (record.busy && record.turnStartedAt
+        && Date.now() - record.turnStartedAt > 5 * 60_000
+        && !t.startsWith('[迟到') && !t.startsWith('[engagement ')) {
+      t = `[迟到中段消息](注入时主控回合已进行 ${Math.round((Date.now() - record.turnStartedAt) / 60_000)}min, 注意与情报库终态对账)\n${text}`;
+    }
+    store.followUp(record, t);
   },
   /** Read the last N messages of a session (read_session tool backing). */
   readSessionMessages: (sessionId, last, callerWs) => {
@@ -490,11 +499,15 @@ loadSandboxConfig().then(async cfg => {
   // 不可用(注册表持久但进程/文件已失——此前零通知)。
   // r6v2-观测11: 平台重启预告——沙箱进程/临时文件随重启重置, 战场
   // 进程若跑在 /tmp 会被带走(部署前应预告; 事后 bus 告知可对账)。
+  // r6v4-观测11: 归属当前活跃项目(query_intel 项目作用域可见——
+  // 此前 workSessionId:null 在任何项目内都查不到, 三轮"零预告"根因)
+  const { getPrefs } = await import('./src/projects.mjs');
+  const curWs = getPrefs().currentWs ?? null;
   bus.emit({ channel: 'audit', from: 'system', type: 'intel-note',
     title: '平台运行时已重启',
     summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置',
     detail: '平台刚完成重启部署。/tmp 下的自建靶场进程与临时文件已被重置;需要保留的战场环境请提前落工作区或等部署窗口。本条经 query_intel 可查。',
-    workSessionId: null });
+    workSessionId: curWs });
   if (ensured.recreated) {
     const { markTransportDead } = await import('./src/shells.mjs');
     const dead = markTransportDead();

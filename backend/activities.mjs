@@ -88,7 +88,7 @@ export async function notifyEngagementDone({ orchestratorSessionId,
           ? `${k}: 终报已落账(${children[k].status ?? '?'})《${String(children[k].title ?? '').slice(0, 50)}》(seq=${children[k].seq})——勿判失败`
           : `${k}: 送达时库内仍无终报`)
         .map(x => `- ${x}`);
-      if (parts.length) lateRecon = `\n[送达对账·${new Date().toISOString().slice(11, 19)}]\n${parts.join('\n')}`;
+      if (parts.length) lateRecon = `\n[排空对账·${new Date().toISOString().slice(11, 19)}(投递前快照; 终局以 query_intel 为准)]\n${parts.join('\n')}`;
     } catch { /* 对账尽力——不影响通知本体 */ }
   }
   return runtime.followUp(
