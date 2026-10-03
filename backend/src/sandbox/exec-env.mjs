@@ -203,9 +203,11 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
         env: sanitizedEnv(extraEnv), cwd: cwdHost,
       });
       bg.unref();
-      return Promise.resolve({ ok: true, stdout: '(后台任务已启动, 不等待输出; 稍后用 bash/文件检查进度)', stderr: '', code: 0, background: true });
+      // FLv2: 与 spawnShell 正常 resolve 形状对齐({exitCode,text})——
+      // 上版给 {ok,stdout} 被官方 bash 工具的 text.split 路径炸(undefined)
+      return Promise.resolve({ exitCode: 0, text: '(后台任务已启动, 不等待输出; 稍后用 bash/文件检查进度)', timedOut: false, background: true });
     } catch (e) {
-      return Promise.resolve({ ok: false, stdout: '', stderr: String(e?.message ?? e), code: 1 });
+      return Promise.resolve({ exitCode: -1, text: String(e?.message ?? e), timedOut: false, spawnError: String(e?.message ?? e) });
     }
   }
   return new Promise(resolve => {
