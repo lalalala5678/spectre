@@ -248,7 +248,17 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     return sh;
   }
 
+  const listNow = () => new Date().toISOString();
   function list(f = {}) {
+    // r14-②: 过期懒翻到 list 面(gate 已懒翻——list 此前仍显 active,
+    // r13 候选建议采纳)
+    const now = listNow();
+    for (const sh of shells.values()) {
+      if (sh.status === 'active' && sh.expiresAt && sh.expiresAt <= now) {
+        sh.status = 'expired';
+        try { persistShells(); } catch { /* best-effort */ }
+      }
+    }
     let out = [...shells.values()];
     if (f.target) out = out.filter(x => x.target === f.target);
     if (f.transport) out = out.filter(x => x.transport === String(f.transport).toLowerCase());  // CS26-8/CS27-6: 与 agent 入口(tools.mjs)归一同口径
