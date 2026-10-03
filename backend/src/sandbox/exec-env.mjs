@@ -190,6 +190,24 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
   // nday live run — surfaced 2026-09-12).
   const cwdHost = argv.length ? process.cwd()
     : (containerPathToHost(cwdContainer) ?? cwdContainer);
+  // r12 建议: 后台形态命令(nohup/& 收尾/setsid/screen/tmux)提前返回——
+  // 此前后台子进程持有 stdout fd, execFile 一直等到 300s 超时(r12 靶场
+  // 重建实测"包装器挂起怪癖")。detached+ignore stdio 让父进程即时退出。
+  const cmdStr = String(command);
+  const isBg = /(^|\s)(nohup|setsid|screen|tmux)\b/.test(cmdStr)
+    || /&\s*(#.*)?$/.test(cmdStr.trim()) || /\s&\s/.test(cmdStr);
+  if (isBg) {
+    try {
+      const bg = spawn('bash', ['-c', cmdStr], {
+        detached: true, stdio: 'ignore',
+        env: sanitizedEnv(extraEnv), cwd: cwdHost,
+      });
+      bg.unref();
+      return Promise.resolve({ ok: true, stdout: '(后台任务已启动, 不等待输出; 稍后用 bash/文件检查进度)', stderr: '', code: 0, background: true });
+    } catch (e) {
+      return Promise.resolve({ ok: false, stdout: '', stderr: String(e?.message ?? e), code: 1 });
+    }
+  }
   return new Promise(resolve => {
     const child = spawn(argvv[0], argvv.slice(1), {
       env: sanitizedEnv(extraEnv),
