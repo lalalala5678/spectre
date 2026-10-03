@@ -593,7 +593,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               onPointerUp={onResizeUp}
               onDoubleClick={resetRightW}
               title="拖动调整宽度 · 双击恢复默认"
-              className="absolute -left-2 top-0 z-10 h-full w-4 cursor-col-resize after:absolute after:left-1/2 after:h-full after:w-px after:-translate-x-1/2 after:bg-line after:transition-colors hover:after:bg-accent"
+              className="absolute -left-2 top-0 z-10 h-full w-4 cursor-col-resize"
             />
             <div className="h-full pb-3.5">
               {isAuto ? (

@@ -81,9 +81,9 @@ export function SplitPane({ storageKey, initial = 0.62,
           e.preventDefault();
         }}
         title="拖动调整宽度 · 双击恢复默认 · 聚焦后可用左右方向键微调"
-        className="group hidden w-1.5 shrink-0 cursor-col-resize rounded-full bg-line transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring xl:block"
+        className="hidden w-1.5 shrink-0 cursor-col-resize focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring xl:block"
       >
-        <span className="mx-auto block h-8 w-0.5 rounded-full bg-line-strong opacity-0 transition-opacity group-hover:opacity-100" />
+        {/* 用户令: 分割线不可见(命中区+光标+键盘可及保留) */}
       </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children[1]}</div>
     </div>
