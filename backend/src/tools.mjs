@@ -160,8 +160,19 @@ export function buildIntelTools(record, caps) {
           ? `(注:seq 模式下其它过滤参数已忽略,本条为 seq=${e.seq} 全文)\n` : '';
         const voidNote = e.void
           ? `\n[已作废——本条不再出现在常规查询中,仅存档审计]\n` : '';
+        // r10v2-D1: 修订后状态与正文首行提交态不符时加平台注记——正文是
+        // 历史提交原文(append-only 不可改), 无注记时头部/正文矛盾观感
+        // (2571 案例: 头部 success vs 正文 '**状态**:partial')。
+        let revNote = '';
+        if ((e.revisedCount ?? 0) > 0 && e.detail) {
+          const firstLine = String(e.detail).split('\n').find(l => l.trim()) ?? '';
+          const declared = /\*\*状态\*\*[:：]\s*([a-z-]+)/i.exec(firstLine)?.[1]?.toLowerCase();
+          if (declared && declared !== String(e.status ?? '').toLowerCase()) {
+            revNote = `\n[注: 现行状态=${e.status}(第 ${e.revisedCount} 次修订生效); 下方正文为历史提交原文, 其首行状态为当时口径]\n`;
+          }
+        }
         return { content: [{ type: 'text', text:
-          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}${voidNote}\n` +
+          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}${voidNote}${revNote}\n` +
           `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${e.detail ?? e.summary ?? ''}` }] };
       }
 
