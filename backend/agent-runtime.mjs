@@ -199,10 +199,15 @@ const caps = {
     // 回合(busy)中排队 5min+ 的消息预打迟到标(store 层三穿后的实证
     // 调用链兜底, 双保险)。
     let t = text;
-    if (record.busy && record.turnStartedAt
-        && Date.now() - record.turnStartedAt > 5 * 60_000
-        && !t.startsWith('[迟到') && !t.startsWith('[engagement ')) {
-      t = `[迟到中段消息](注入时主控回合已进行 ${Math.round((Date.now() - record.turnStartedAt) / 60_000)}min, 注意与情报库终态对账)\n${text}`;
+    // r6v5-#9: 诊断日志(四连穿后按建议先实证)——caps 入口判定三要素
+    // 落 journal, 下轮穿透可直接读数。
+    const wdTurnMs = record.turnStartedAt ? Date.now() - record.turnStartedAt : -1;
+    const wdHit = record.busy && wdTurnMs > 5 * 60_000
+      && !t.startsWith('[迟到') && !t.startsWith('[engagement ');
+    store._journal(record, 'wd_probe', { busy: record.busy, turnMs: wdTurnMs, hit: wdHit,
+      textHead: truncateTextForJournal(t) });
+    if (wdHit) {
+      t = `[迟到中段消息](注入时主控回合已进行 ${Math.round(wdTurnMs / 60_000)}min, 注意与情报库终态对账)\n${text}`;
     }
     store.followUp(record, t);
   },
@@ -504,6 +509,7 @@ loadSandboxConfig().then(async cfg => {
   const { getPrefs } = await import('./src/projects.mjs');
   const curWs = getPrefs().currentWs ?? null;
   bus.emit({ channel: 'audit', from: 'system', type: 'intel-note',
+    author: { key: 'system', name: '平台运维', typeLabel: '系统' },
     title: '平台运行时已重启',
     summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置',
     detail: '平台刚完成重启部署。/tmp 下的自建靶场进程与临时文件已被重置;需要保留的战场环境请提前落工作区或等部署窗口。本条经 query_intel 可查。',
@@ -550,6 +556,8 @@ process.on('SIGTERM', () => {
   server.close(() => seal());
   setTimeout(seal, 1500).unref();
 });
+function truncateTextForJournal(t) { return String(t).slice(0, 60); }
+
 const route = createRouter({ store, bus, caps, wal });
 
 const server = http.createServer(async (req, res) => {

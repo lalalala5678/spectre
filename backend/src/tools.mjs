@@ -988,9 +988,11 @@ function buildPublishIntelTool(record, caps, mode) {
       if (dm) {
         const dmTarget = record.orchestratorSessionId ?? record.parentSessionId;
         if (dmTarget) {
+          // r6v5-#9: 中段情报 DM 自带发出时戳——迟到与否与情报库终态
+          // 对账不再依赖投递路径的任何判定(四轮 busy 判定穿透教训)。
           await caps.followUp(
             dmTarget,
-            `[DM from ${record.agentKey}] [情报] ${params.title}\n` +
+            `[DM from ${record.agentKey}] [中段情报 ${new Date().toISOString().slice(11, 19)}发出] ${params.title}\n` +
             `${params.text}\n` +
             '(如其他智能体需要知情,用 relay_to_agents 转发;否则继续等待产出)',
           );
