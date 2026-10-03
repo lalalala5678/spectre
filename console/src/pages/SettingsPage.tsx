@@ -302,10 +302,12 @@ export function SettingsPage() {
     <div className="flex h-full min-h-0">
       <nav aria-label="设置分组" className="hidden w-44 shrink-0 flex-col gap-0.5 border-r border-line px-3 py-4 lg:flex">
         {SECTIONS.map(sec => (
-          <a key={sec.id} href={`#${sec.id}`}
-            className="rounded-md px-2.5 py-2 text-[13px] text-secondary transition-colors hover:bg-surface-2 hover:text-primary">
+          /* 锚点不走 href——hash 路由会把 #sec-* 解析成非法路由跳走 */
+          <button key={sec.id}
+            onClick={e => { e.preventDefault(); document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
+            className="rounded-md px-2.5 py-2 text-left text-[13px] text-secondary transition-colors hover:bg-surface-2 hover:text-primary">
             {sec.label}
-          </a>
+          </button>
         ))}
       </nav>
       <div className="mx-auto min-w-0 max-w-4xl flex-1 px-6 py-6">

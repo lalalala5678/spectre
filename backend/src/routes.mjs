@@ -420,7 +420,7 @@ function realRouter({ store, bus, caps, wal }) {
         return bad(res, 400, '非法 reveal 参数');
       }
       const value = revealSetting(kind, id, field);
-      wal.push({ kind: 'note', ts: new Date().toISOString(), title: `查看密钥明文 ${kind}:${id || '-'}:${field}` });
+      wal.append({ kind: 'note', ts: new Date().toISOString(), title: `查看密钥明文 ${kind}:${id || '-'}:${field}` });
       return json(res, 200, { value });
     }
     if (path === '/api/agent-settings/save' && method === 'POST') {
