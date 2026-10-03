@@ -45,6 +45,11 @@ export async function steerSession(sessionId, text) {
 }
 
 /** Append an event to the console message bus. */
+/** r6v2-#10: engagement 成员终报对账(情报库事实源)。 */
+export async function engagementChildren(engagementId) {
+  return runtime.engagementChildren(engagementId);
+}
+
 export async function busEmit(entry) {
   return runtime.busEmit(entry);
 }

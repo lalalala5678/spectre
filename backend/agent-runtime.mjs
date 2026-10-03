@@ -488,6 +488,10 @@ loadSandboxConfig().then(async cfg => {
     ensured.error ?? '');
   // 自测-7: 容器重建→bus 通知(全 agent 可见)+依赖容器态的 shell 标记
   // 不可用(注册表持久但进程/文件已失——此前零通知)。
+  // r6v2-观测11: 平台重启预告——沙箱进程/临时文件随重启重置, 战场
+  // 进程若跑在 /tmp 会被带走(部署前应预告; 事后 bus 告知可对账)。
+  bus.emit({ channel: 'audit', from: 'system', type: 'context',
+    summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置——战场自建靶场如需保留请用部署预告窗口。' });
   if (ensured.recreated) {
     const { markTransportDead } = await import('./src/shells.mjs');
     const dead = markTransportDead();

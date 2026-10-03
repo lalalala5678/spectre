@@ -556,10 +556,16 @@ export class SessionStore {
   followUp(record, text, source = injectionOriginOf(text)) {
     this._requireLiveAgent(record);
     const agent = record.agent;
-    const msg = { role: 'user', content: text, timestamp: Date.now(), source };
+    // r6v2-#9: 迟到预判同 steer——正在流式的长回合里排队的 DM 在收官
+    // 后才注入, 预打 [迟到中段消息] 头(r6 验证轮实测 9-10min 仍裸头)。
+    const turnMs = record.turnStartedAt ? Date.now() - record.turnStartedAt : 0;
+    const tagged = agent.state.isStreaming && turnMs > 5 * 60_000
+      && !text.startsWith('[迟到')
+      ? `[迟到中段消息](排队时回合已进行 ${Math.round(turnMs / 60_000)}min, 注意与情报库终态对账)\n${text}` : text;
+    const msg = { role: 'user', content: tagged, timestamp: Date.now(), source };
     const queue = () => {
       agent.followUp(msg);
-      this._journal(record, 'followup_queued', { text: truncateText(text, 200) });
+      this._journal(record, 'followup_queued', { text: truncateText(tagged, 200) });
     };
     if (agent.state.isStreaming) {
       queue();

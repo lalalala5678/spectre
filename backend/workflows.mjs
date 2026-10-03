@@ -169,6 +169,10 @@ export async function autoPwnWorkflow(input) {
   });
 
   // Q2(a): completion notice auto-injected into the orchestrator session.
+  // r6v2-#10: 情报库终报对账——workflow 失败(心跳丢失/worker 重启的
+  // ChildWorkflowFailure)与终报已落账可并存, 以库为准消灭假警报。
+  let recon = {};
+  try { recon = await quick.engagementChildren?.(engagementId) ?? {}; } catch { recon = {}; }
   const summaryLines = [...results.entries()]
     .map(([key, value]) => {
       const t = childTiming.get(key);
@@ -180,7 +184,11 @@ export async function autoPwnWorkflow(input) {
       // 处), 此处再 clip 会切掉首层标记且总长谎报(5000→'2000/2018')
       // ——原样用。CS69-3: 去行号引用(自引必漂); CS69-4: error 非
       // 会话消息且无 sessionId, 补全手段不得指 read_session。
-      if (value.error) return `- ${key}${ts}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}`;
+      if (value.error) {
+        const r = recon[key];
+        if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
+        return `- ${key}${ts}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}(库内无终报——真失败)`;
+      }
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
     .join('\n');

@@ -227,6 +227,22 @@ function realRouter({ store, bus, caps, wal }) {
         spawnName: s.spawnName, busy: s.busy,
       })));
     }
+    // r6v2-#10: engagement 成员终报对账面——完成通知/状态判定用情报库
+    // 作事实源(ChildWorkflowFailure 可能与已落账终报并存, 直接报失败
+    // 即假警报)。内部调用。
+    if (path.startsWith('/api/engagements/') && path.endsWith('/children') && method === 'GET') {
+      if (!isInternalCaller(req)) return bad(res, 401, '仅限内部调用');
+      const engId = path.split('/')[3];
+      const out = {};
+      for (const e of bus.list()) {
+        if (e.engagement !== engId || e.type !== 'task-report') continue;
+        const key = e.from;
+        if (!out[key] || e.seq > out[key].seq) {
+          out[key] = { seq: e.seq, status: e.status, title: e.title };
+        }
+      }
+      return json(res, 200, out);
+    }
     if (path === '/api/sessions' && method === 'POST') {
       const body = await readJson(req);
       // R12-1(十二轮): requireFields 失败时已发送 400, 再 bad() 双发

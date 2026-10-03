@@ -202,8 +202,28 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
     // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
     const tr = String(transportRef || '');
-    if (transport === 'web' && !tr.includes('{CMD}'))
-      return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK);自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
+    if (transport === 'web') {
+      if (!tr.includes('{CMD}'))
+        return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK);自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
+      // r6v2-观测12: 注册预验与执行解析同规(此前 GET|前缀注册不拒、
+      // 执行才爆)。全段跑一遍: POST 段形态/GET 禁 |/头段合法。
+      const spec0 = tr.split('#')[0].replace(/\s+$/, '');
+      if (!spec0.startsWith('POST|') && spec0.includes('|'))
+        return { error: 'GET 形态不含 "|"(检测到 GET| 前缀误写——POST 才用 | 分隔)' };
+      const headerRe = /^\s*H:\s*([!#$%&'*+.^`|~0-9A-Za-z-]+):\s*(.*)$/;
+      if (spec0.startsWith('POST|')) {
+        const parts = spec0.slice(5).split('|');
+        for (const part of parts.slice(1)) {
+          if (!headerRe.test(part) && !part.includes('{CMD}'))
+            return { error: `POST 段无法识别(${part.slice(0, 40)})——段须含 {CMD} 或形如 "H: 名称: 值"` };
+        }
+      } else {
+        for (const seg of spec0.split(/\s+(?=H:\s)/).slice(1)) {
+          if (!headerRe.test(seg.trim()))
+            return { error: `GET 头段无法识别(${seg.slice(0, 40)})——形如 "H: 名称: 值", 空格分隔` };
+        }
+      }
+    }
     if (transport === 'ssh' && !SSH_REF_RE.test(tr))
       return { error: 'ssh transportRef 需 user:pass@host[:port]' };
     if (transport === 'local' && !tr)
@@ -439,6 +459,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       if (m1 >= 0 && m3 > m1) {
         user = clean(m1, m2).split('\n')[0];
         osLine = clean(m2, m3);
+        // r6v2-#4: 哨兵齐全分支同样过形态白名单(标记间夹带编码/回显
+        // 残渣此前直入 user)
+        if (!/^[A-Za-z0-9._-]{1,32}$/.test(user)) user = '';
       } else {
         // EW-2: 哨兵残缺的响应(截断/污染)——剥哨兵后取首行, 非打印/
         // HTML 形态直接判污染置空(r4 实测 user 残留哨兵)。
