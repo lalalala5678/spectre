@@ -386,7 +386,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
               txt = m2 > m1 ? txt.slice(m1 + marker.length + 2, m2) : txt.slice(m1 + marker.length + 2);
               // r8-D4: 残余开/闭包装标签一并剥净(stdout 不再回显标签)
               const safe = marker.replace(/[^\w]/g, ch => '\\' + ch);
-              txt = txt.replace(new RegExp('</?' + safe + '>', 'g'), '');
+              txt = txt.replace(new RegExp('</?' + safe + '>', 'g'), '').replace(/^\n+/, '');  // r8v4 足注: 标签位前导换行一并清
             }
           }
           stdout = txt.slice(0, MAX_OUT); stderr = ''; code = r.ok ? 0 : 1;
