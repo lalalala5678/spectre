@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { cn } from './utils/cn';
 import { api } from './api/client';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
@@ -14,7 +15,6 @@ import { ShellPage } from './pages/ShellPage';
 import { TaskReportsPage } from './pages/TaskReportsPage';
 import type { RouteKey } from './types';
 import { setPendingOpen } from './api/openSessionChannel';
-import { initTheme } from './utils/theme';
 
 const STAGE_ROUTES: RouteKey[] = [
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
@@ -27,7 +27,6 @@ const VALID_ROUTES: RouteKey[] = [...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES, 'repo
 
 export default function App() {
   // §4.1: 断言 data-theme(与 index.html 防闪烁脚本一致)+无手工偏好时跟随系统
-  useEffect(() => initTheme(), []);
   const [route, setRoute] = useState<RouteKey>(() => {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
     const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
@@ -117,11 +116,19 @@ export default function App() {
     return () => { cancelled = true; };
   }, [route]);
 
+  const [navOpen, setNavOpen] = useState(false);
   return (
     <div className="flex h-screen w-screen overflow-hidden bg-bg font-sans text-primary">
-      <Sidebar route={route} onRoute={nav} runningCount={runningCount} />
+      {/* 窄窗(<md)侧栏改抽屉: 主区加 hamburger; 路由切换自动收起 */}
+      {navOpen && (
+        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setNavOpen(false)} />
+      )}
+      <div className={cn('fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0',
+        navOpen ? 'translate-x-0' : '-translate-x-full')}>
+        <Sidebar route={route} onRoute={r => { nav(r); setNavOpen(false); }} runningCount={runningCount} />
+      </div>
       <div className="flex min-w-0 flex-1 flex-col">
-        <Topbar />
+        <Topbar onMenu={() => setNavOpen(true)} />
         <main className="min-h-0 flex-1 overflow-hidden bg-bg">
           {[...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES].includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(route)} />

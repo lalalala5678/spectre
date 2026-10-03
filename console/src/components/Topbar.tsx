@@ -1,9 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
-import { Activity, Bell, LogOut, Moon, Search, Sun } from 'lucide-react';
+import { Menu, Activity, Bell, LogOut, Search } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
-import { getTheme, setTheme, type Theme } from '../utils/theme';
 
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -50,10 +49,9 @@ function noticeOf(e: BusEvt): Notice | null {
   return null;
 }
 
-export function Topbar() {
+export function Topbar({ onMenu }: { onMenu?: () => void }) {
   const [now, setNow] = useState(() => new Date());
   const [health, setHealth] = useState<HealthInfo | null>(null);
-  const [theme, setThemeState] = useState<Theme>(() => getTheme());
   const [q, setQ] = useState('');
   const [open, setOpen] = useState(false);
   const [sessHits, setSessHits] = useState<TreeSess[]>([]);
@@ -165,10 +163,13 @@ export function Topbar() {
 
   const fmt = (d: Date) => d.toLocaleString('sv-SE', { hour12: false }).replace('T', ' ');
   return (
-    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-line bg-surface px-4">
+    <header className="flex h-12 shrink-0 items-center gap-3 border-b border-chrome-line bg-chrome-surface px-4">
+      <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} aria-label="打开导航">
+        <Menu className="h-4 w-4" />
+      </Button>
       {/* 全局搜索 (F69: 实装; §6.1-2 + §5.4/§5.8) */}
       <div ref={boxRef} className="relative w-80">
-        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-faint" />
+        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-chrome-tertiary" />
         <Input
           value={q}
           onChange={e => setQ(e.target.value)}
@@ -178,20 +179,20 @@ export function Topbar() {
           className="pl-8"
         />
         {open && sessHits.length === 0 && busHits.length === 0 && (
-          <div className="absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-line bg-surface p-4 text-center text-[13px] text-tertiary shadow-lg">
+          <div className="absolute left-1/2 top-full z-40 mt-2 w-[26rem] -translate-x-1/2 rounded-lg border border-chrome-line bg-chrome-surface p-4 text-center text-[13px] text-chrome-tertiary shadow-lg">
             无结果——输入 ≥2 字搜索会话与总线条目
           </div>
         )}
         {open && (sessHits.length > 0 || busHits.length > 0) && (
-          <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-line bg-surface p-1 shadow-lg">
+          <div className="absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
             {sessHits.length > 0 && (
-              <div className="px-2.5 py-1 text-xs font-medium text-tertiary">会话</div>
+              <div className="px-2.5 py-1 text-xs font-medium text-chrome-tertiary">会话</div>
             )}
             {sessHits.length === 0 && busHits.length > 0 && (
-              <p className="px-2.5 pb-1 pt-0.5 text-xs text-tertiary">无会话命中——以下为总线条目</p>
+              <p className="px-2.5 pb-1 pt-0.5 text-xs text-chrome-tertiary">无会话命中——以下为总线条目</p>
             )}
             {sessTotal > sessHits.length && (
-              <p className="px-2.5 pb-1 text-xs text-tertiary">会话命中 {sessTotal} 条, 仅显示前 {sessHits.length}(换更精确关键词)</p>
+              <p className="px-2.5 pb-1 text-xs text-chrome-tertiary">会话命中 {sessTotal} 条, 仅显示前 {sessHits.length}(换更精确关键词)</p>
             )}
             {sessHits.map(s => (
               <button key={s.id} onClick={() => {
@@ -205,18 +206,18 @@ export function Topbar() {
                 go(key);
                 setPendingOpen(key, s.id);
               }}
-                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-secondary hover:bg-surface-2 hover:text-primary">
-                <span className="shrink-0 font-mono text-xs text-tertiary">{s.agentKey}</span>
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary">
+                <span className="shrink-0 font-mono text-xs text-chrome-tertiary">{s.agentKey}</span>
                 <span className="min-w-0 truncate">{s.title ?? s.id}</span>
               </button>
             ))}
             {busHits.length > 0 && (
-              <div className="mt-1 px-2.5 py-1 text-xs font-medium text-tertiary">总线条目</div>
+              <div className="mt-1 px-2.5 py-1 text-xs font-medium text-chrome-tertiary">总线条目</div>
             )}
             {busHits.map(e => (
               <button key={e.seq} onClick={() => go(e.type === 'task-report' ? 'reports' : 'audit')}
-                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-secondary hover:bg-surface-2 hover:text-primary">
-                <span className="shrink-0 font-mono text-xs text-tertiary">#{e.seq}</span>
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary">
+                <span className="shrink-0 font-mono text-xs text-chrome-tertiary">#{e.seq}</span>
                 <span className="min-w-0 truncate">{e.title ?? e.summary ?? ''}</span>
               </button>
             ))}
@@ -227,7 +228,7 @@ export function Topbar() {
       {/* F60: 时钟+运行状态(§6.1-2: sans 12px tertiary, · 分隔分组)。
           R32D44: 模型名字样移除——供应商已平台化(默认+单 agent 覆盖),
           单一模型名不再能代表全平台, 模型信息在设置页与各 agent 配置页签可见。 */}
-      <div className="flex items-center gap-2 text-xs tabular-nums text-tertiary">
+      <div className="flex items-center gap-2 text-xs tabular-nums text-chrome-tertiary">
         <span>{fmt(now)} 本地</span>
         <span aria-hidden="true">·</span>
         <div
@@ -244,20 +245,6 @@ export function Topbar() {
       </div>
 
       <div className="flex-1" />
-
-      {/* §4.1 主题切换(浅/深), 手动选择持久化覆盖系统偏好 */}
-      <Button
-        variant="ghost"
-        size="icon"
-        onClick={() => {
-          const next = theme === 'dark' ? 'light' : 'dark';
-          setTheme(next);
-          setThemeState(next);
-        }}
-        title={theme === 'dark' ? '切换浅色' : '切换深色'}
-      >
-        {theme === 'dark' ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
-      </Button>
 
       <Button
         variant="ghost"
@@ -285,16 +272,16 @@ export function Topbar() {
           )}
         </Button>
         {bellOpen && (
-          <div className="absolute right-0 top-full z-30 mt-1 w-80 rounded-lg border border-line bg-surface p-1 shadow-lg">
+          <div className="absolute right-0 top-full z-30 mt-1 w-80 rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
             {notices.length === 0 ? (
               <EmptyState icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
             ) : notices.slice(0, 20).map(n => (
               <button key={n.seq} onClick={() => { setBellOpen(false); window.location.hash = n.hash; }}
-                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-surface-2">
+                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-chrome-surface-2">
                 <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className="shrink-0">
                   {n.kind === 'vulnerability' ? '漏洞' : '失败'}
                 </Badge>
-                <span className="min-w-0 truncate text-sm text-secondary">{n.text}</span>
+                <span className="min-w-0 truncate text-sm text-chrome-secondary">{n.text}</span>
               </button>
             ))}
           </div>

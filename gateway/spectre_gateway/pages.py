@@ -1,7 +1,6 @@
 """Login page template (self-contained HTML, no external assets).
 
-FEVERIFY-D(8-1): 与控制台设计系统对齐——双主题 token 化(跟随系统+内联
-防闪烁)、sans 字体栈、13px 标签、Indigo 主按钮(#4f46e5 白字 6.29:1)、
+与控制台混合主题对齐: 深色壳+浅色内容面单套——登录卡为浅色面、13px 标签、Indigo 主按钮(#4f46e5 白字 6.29:1)、
 文案去黑客风(账号/口令/登录)。自包含无外链, 网关无静态依赖面不变。
 """
 
@@ -14,16 +13,6 @@ _TEMPLATE = """<!doctype html>
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
 <title>SPECTRE · 登录</title>
-<script>
-  /* 与 console index.html 同款防首帧闪烁 */
-  (function () {
-    var t = localStorage.getItem('spectre-theme');
-    if (t !== 'light' && t !== 'dark')
-      t = matchMedia('(prefers-color-scheme: dark)')
-        .matches ? 'dark' : 'light';
-    document.documentElement.dataset.theme = t;
-  })();
-</script>
 <style>
   :root {
     color-scheme: light;
@@ -33,15 +22,6 @@ _TEMPLATE = """<!doctype html>
     --accent: #4f46e5; --accent-hover: #4338ca;
     --danger: #b91c1c;
     --shadow: 0 1px 3px rgb(16 24 40 / 0.10), 0 1px 2px rgb(16 24 40 / 0.06);
-  }
-  [data-theme="dark"] {
-    color-scheme: dark;
-    --bg: #0f1115; --surface: #161a22; --line: #272d38;
-    --text-primary: #e6e9ef; --text-secondary: #a8b0bd;
-    --text-tertiary: #8791a0; --line-strong: #626e83;
-    --accent: #4f46e5; --accent-hover: #4338ca;
-    --danger: #f87171;
-    --shadow: none;
   }
   * { box-sizing: border-box; margin: 0; }
   body {

@@ -54,29 +54,19 @@
   --shadow-color: 16 24 40;
 }
 
-/* ---------- 语义 token: 暗色 ---------- */
-[data-theme="dark"] {
-  color-scheme: dark;
-  --bg:            #0f1115;
-  --surface:       #161a22;
-  --surface-2:     #1d222c;
-  --surface-3:     #252b37;
-  --line:          #272d38;
-  --line-strong:   #626e83;  /* 3.38:1 on surface */
-  --text-primary:   #e6e9ef;
-  --text-secondary: #a8b0bd;
-  --text-tertiary:  #8791a0;  /* 5.0:1 on surface-2 */
-  --text-faint:     #5c6470;
-  --accent:        #4f46e5;  /* 实心按钮底(白字恒 6.29) */
-  --accent-hover:  #4338ca;
-  --accent-subtle: #1d2030;  /* 选中态底(暗) */
-  --accent-text:   #818cf8;  /* 暗底上的链接/强调文字 5.84:1 */
-  --ring:          #818cf8;
-  --success-text: #34d399; --success-bg: #14231d; --success-line: #1f4a38;
-  --warning-text: #fbbf24; --warning-bg: #272115; --warning-line: #4a3c1a;
-  --danger-text:  #f87171; --danger-bg:  #2b1717; --danger-line:  #4a2323;
-  --info-text:    #60a5fa; --info-bg:    #14212e; --info-line:    #1f3a55;
-  --shadow-color: 0 0 0;
+/* ---------- 壳 token(单一混合主题: 深色壳+浅色内容面) ----------
+ * 用户裁定(2026-10-03): 不做深浅两套切换——一套方案内既有深色(导航壳)
+ * 也有浅色(内容面)。chrome-* 仅由 Sidebar/Topbar 消费; 内容面 token 不变。
+ * 对比度实测: chrome-text-secondary on #161a22 = 7.98, chrome-tertiary = 5.6。 */
+:root {
+  --chrome-bg:            #0f1115;
+  --chrome-surface:       #161a22;
+  --chrome-surface-2:     #1d222c;
+  --chrome-line:          #272d38;
+  --chrome-text-primary:   #e6e9ef;
+  --chrome-text-secondary: #a8b0bd;
+  --chrome-text-tertiary:  #8791a0;
+  --chrome-accent-text:    #818cf8;  /* 5.84:1 on chrome-surface */
 }
 
 /* 工具类 → token(@theme inline: 类名直接引用 CSS 变量, 随 data-theme 自动切换) */
@@ -100,6 +90,14 @@
   --color-warning-text: var(--warning-text);  --color-warning-bg: var(--warning-bg);  --color-warning-line: var(--warning-line);
   --color-danger-text: var(--danger-text);   --color-danger-bg: var(--danger-bg);    --color-danger-line: var(--danger-line);
   --color-info-text: var(--info-text);       --color-info-bg: var(--info-bg);        --color-info-line: var(--info-line);
+  --color-chrome-bg: var(--chrome-bg);
+  --color-chrome-surface: var(--chrome-surface);
+  --color-chrome-surface-2: var(--chrome-surface-2);
+  --color-chrome-line: var(--chrome-line);
+  --color-chrome-primary: var(--chrome-text-primary);
+  --color-chrome-secondary: var(--chrome-text-secondary);
+  --color-chrome-tertiary: var(--chrome-text-tertiary);
+  --color-chrome-accent-text: var(--chrome-accent-text);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
   /* 海拔(§4.5): 浅色用阴影, 暗色 shadow-color=0 0 0 → 透明, 层级由 surface 分层承担 */

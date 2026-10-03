@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {
-  ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2 } from 'lucide-react';
+import {PanelRight, ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Play, Plus, Trash2} from 'lucide-react';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Badge, Dot } from '../components/ui/Badge';
@@ -282,6 +281,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // R13-F2: 持久化读回——初始化器先于 boot effect 执行, ref 必 null
   // 恒走默认(只写不读)。改常量初始化 + boot then 内恢复。
   const [rightRatio, setRightRatio] = useState<number>(DEFAULT_RIGHT_RATIO);
+  const [rightOpen, setRightOpen] = useState(false);  // 窄窗右栏抽屉(自适应填充)
   const dragW = useRef<{ startX: number; startW: number; moved: boolean } | null>(null);
   const onResizeDown = (e: React.PointerEvent<HTMLDivElement>) => {
     dragW.current = {
@@ -378,6 +378,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     <div className="flex h-full min-h-0 flex-col">
       {/* 页头：agent 信息 + 会话控制 */}
       <div className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-6 h-12">
+        <button onClick={() => setRightOpen(v => !v)} aria-label="切换信息面板"
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary hover:bg-surface-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:hidden">
+          <PanelRight className="h-4 w-4" />
+        </button>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h1 className="text-[15px] font-semibold text-primary">{agent.name}</h1>
@@ -547,7 +551,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
           {/* 右栏：AutoPwn = 子Agent + 全量漏洞/情报;stage agent = 会话面板 + 自己的漏洞/情报 */}
           <div
-            className="relative hidden min-h-0 shrink-0 xl:block"
+            className={cn(
+              'relative z-30 h-full shrink-0 border-l border-line bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',
+              !rightOpen && 'max-lg:translate-x-full',
+            )}
             style={{ width: `${(rightRatio * 100).toFixed(2)}vw` }}
           >
             <div
