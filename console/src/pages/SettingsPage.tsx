@@ -296,7 +296,9 @@ export function SettingsPage() {
     };
     host.addEventListener('scroll', onScroll, { passive: true });
     return () => host.removeEventListener('scroll', onScroll);
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    // FEVERIFY13-P3-11: 依赖 data——骨架帧 scrollHostRef=null 且 [] 不重跑,
+    // listener 永不绑定(scroll-spy 全死)。data 到达后重跑绑定。
+  }, [data]); // eslint-disable-line react-hooks/exhaustive-deps
   const goSec = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
 
   if (err) return <div className="p-6 text-sm text-danger-text">设置加载失败:{err}</div>;

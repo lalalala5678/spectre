@@ -69,11 +69,14 @@ export function SplitPane({ storageKey, initial = 0.62, min = 0.2, max = 0.8,
         role="separator" aria-orientation="vertical" tabIndex={0}
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onDoubleClick={reset}
         onKeyDown={e => {
-          if (e.key === 'ArrowLeft') { setRatio(r => Math.max(min, r - 0.03)); e.preventDefault(); }
-          if (e.key === 'ArrowRight') { setRatio(r => Math.min(max, r + 0.03)); e.preventDefault(); }
-          if (e.key === 'ArrowLeft' || e.key === 'ArrowRight') {
-            void putPrefsSync({ ui: { splitRatios: { [storageKey]: ratio } } });
-          }
+          if (e.key !== 'ArrowLeft' && e.key !== 'ArrowRight') return;
+          // FEVERIFY13-P3-9: 落盘用计算值——闭包 ratio 是上一渲染值, 此前
+          // 永远滞后一步(连按 3 次落 0.56 屏显 0.50)。
+          const next = e.key === 'ArrowLeft'
+            ? Math.max(min, ratio - 0.03) : Math.min(max, ratio + 0.03);
+          setRatio(next);
+          void putPrefsSync({ ui: { splitRatios: { [storageKey]: next } } });
+          e.preventDefault();
         }}
         title="拖动调整宽度 · 双击恢复默认 · 聚焦后可用左右方向键微调"
         className="group hidden w-1.5 shrink-0 cursor-col-resize rounded-full bg-line transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring xl:block"

@@ -136,6 +136,15 @@ export function setPrefs(patch, wal) {
       else ui.stackRatios[k] = v;
     }
   }
+  // FEVERIFY13-P3-12: splitRatios 同款按 key 合并——SplitPane 各页独立
+  // storageKey, 浅合并此前使任一页保存整替 map(跨页抹比例)。
+  if (patch.ui?.splitRatios) {
+    ui.splitRatios = { ...prefs.ui?.splitRatios };
+    for (const [k, v] of Object.entries(patch.ui.splitRatios)) {
+      if (v === null) delete ui.splitRatios[k];
+      else ui.splitRatios[k] = v;
+    }
+  }
   prefs = { ...prefs, ...patch, ui };
   wal?.append({ t: 'pref', d: prefs });
   return getPrefs();
