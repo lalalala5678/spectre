@@ -343,6 +343,7 @@ function realRouter({ store, bus, caps, wal }) {
         if (body.source === 'agent' && !isInternalCaller(req)) {
           return bad(res, 401, 'source=agent 需要内部令牌');
         }
+        let r14pending = false;  // r14-③(作用域提升——try 内声明曾致 catch 外引用炸, degradedNote 同型)
         try {
           // body.source==='agent' marks Temporal-side injections (internal
           // token enforced above); classify their origin so the console
@@ -369,7 +370,7 @@ function realRouter({ store, bus, caps, wal }) {
           }
           // r14-③: steer 回执附未决提醒——目标代理尚未提交任务报告时
           // 明示(编排器可判断该代理仍在途)。
-          const r14pending = action === '/steer' && (record.taskReportCount ?? 0) === 0;
+          r14pending = action === '/steer' && (record.taskReportCount ?? 0) === 0;
         } catch (err) {
           return bad(res, err.statusCode || 500, err.message);
         }
