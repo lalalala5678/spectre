@@ -24,7 +24,7 @@ export function Sidebar({
     <aside className="flex h-full w-56 shrink-0 flex-col border-r border-chrome-line bg-chrome-surface">
       {/* 品牌区：自绘图标 + 文本标识(§6.1-1: 副标去中英重复) */}
       <div className="flex items-center gap-2.5 border-b border-chrome-line px-3.5 py-3">
-        <SpectreMark />
+        <SpectreMark tone="chrome" />
         <div>
           <div className="text-sm font-semibold text-chrome-primary">SPECTRE</div>
           <div className="mt-px text-xs text-chrome-tertiary">agent console</div>

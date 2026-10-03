@@ -169,6 +169,8 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
 
   const go = (hash: string) => {
     setOpen(false);
+    // FEVERIFY7-P3: hash 直改入口过脏守卫
+    window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: { deny: () => {} } }));
     window.location.hash = hash;
   };
 
@@ -289,9 +291,13 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
             {notices.length === 0 ? (
               <EmptyState tone="chrome" icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
             ) : notices.slice(0, 20).map(n => (
-              <button key={n.seq} onClick={() => { setBellOpen(false); window.location.hash = n.hash; }}
+              <button key={n.seq} onClick={() => { setBellOpen(false); window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: { deny: () => {} } })); window.location.hash = n.hash; }}
                 className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-chrome-surface-2">
-                <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className="shrink-0 bg-transparent border border-danger-text/50 [&.border-warning-text]:border-warning-text/50">
+                <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className={
+              n.kind === 'vulnerability'
+                ? 'shrink-0 bg-transparent border border-chrome-danger-text/50 text-chrome-danger-text'
+                : 'shrink-0 bg-transparent border border-chrome-warning-text/50 text-chrome-warning-text'
+            }>
                   {n.kind === 'vulnerability' ? '漏洞' : '失败'}
                 </Badge>
                 <span className="min-w-0 truncate text-sm text-chrome-secondary">{n.text}</span>

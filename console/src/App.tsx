@@ -128,8 +128,29 @@ export default function App() {
   const navGuarded = (r: RouteKey) => {
     if (dirtyCount.current > 0
       && !window.confirm(`有 ${dirtyCount.current} 项设置改动未保存, 离开将丢弃。确定离开?`)) return;
+    dirtyCount.current = 0;  // FEVERIFY7-P2: 确定离开即清零(此前残留→假警报连环弹)
     nav(r);
   };
+  useEffect(() => {
+    // FEVERIFY7-P3: hash 直改入口(顶栏搜索/铃铛)统一过守卫; 浏览器前进后退
+    // (popstate)无法拦截, 记为已知限制。
+    const guard = (e: Event) => {
+      const n = (e as CustomEvent).detail as { count?: number; deny?: () => void };
+      if (dirtyCount.current > 0
+        && !window.confirm(`有 ${dirtyCount.current} 项设置改动未保存, 离开将丢弃。确定离开?`)) {
+        n?.deny?.();
+      } else {
+        dirtyCount.current = 0;
+      }
+    };
+    window.addEventListener('spectre:nav-guard', guard);
+    const onZero = () => { dirtyCount.current = 0; };
+    window.addEventListener('spectre:dirty-zero', onZero);  // Settings 卸载归零
+    return () => {
+      window.removeEventListener('spectre:nav-guard', guard);
+      window.removeEventListener('spectre:dirty-zero', onZero);
+    };
+  }, []);
   // FEUX5-P2: 全局 Esc 关抽屉(此前仅焦点在抽屉内才生效)
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') setNavOpen(false); };

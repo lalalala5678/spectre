@@ -11,10 +11,11 @@ import { Input, Select } from './ui/Input';
  * 用完整生效配置做真实连通探测, 失败零落盘。
  * - mode='override'(默认): agent 覆盖——留空字段=清除该项回默认。
  * - mode='default': 默认供应商——三项必填(格式默认 openai)。 */
-export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', formats }: {
+export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', formats, onDirtyChange }: {
   agentId: string; ov?: Record<string, string>; onSaved: () => void;
   mode?: 'override' | 'default';
   formats: LlmFormatMeta[];  // CS19-4/CS20-7/CS21-3: schema 单源必传
+  onDirtyChange?: (dirty: boolean) => void;  // FEVERIFY7-P3: 脏离开接线
 }) {
 
   const isDefault = mode === 'default';
@@ -27,6 +28,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
     setDraft(v); setOrig(v); setState('idle'); setMsg('');
   }, [agentId, ov?.format, ov?.baseUrl, ov?.apiKey, ov?.model]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(orig);
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!dirty || state === 'saving') return;

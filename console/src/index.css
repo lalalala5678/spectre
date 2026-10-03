@@ -67,6 +67,8 @@
   --chrome-text-secondary: #a8b0bd;
   --chrome-text-tertiary:  #8791a0;
   --chrome-accent-text:    #818cf8;  /* 5.84:1 on chrome-surface */
+  --chrome-danger-text:    #f87171;  /* 6.30:1 on chrome-surface */
+  --chrome-warning-text:   #fbbf24;  /* 8.9:1 on chrome-surface */
 }
 
 /* 工具类 → token(@theme inline: 类名直接引用 CSS 变量, 随 data-theme 自动切换) */
@@ -98,6 +100,8 @@
   --color-chrome-secondary: var(--chrome-text-secondary);
   --color-chrome-tertiary: var(--chrome-text-tertiary);
   --color-chrome-accent-text: var(--chrome-accent-text);
+  --color-chrome-danger-text: var(--chrome-danger-text);
+  --color-chrome-warning-text: var(--chrome-warning-text);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
   /* 海拔(§4.5): 浅色用阴影, 暗色 shadow-color=0 0 0 → 透明, 层级由 surface 分层承担 */

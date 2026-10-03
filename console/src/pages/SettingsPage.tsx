@@ -195,7 +195,12 @@ export function SettingsPage() {
     const fire = () => window.dispatchEvent(new CustomEvent('spectre:dirty', { detail: dirtyCount.current }));
     fire();
     window.addEventListener('spectre:dirty-query', fire);
-    return () => window.removeEventListener('spectre:dirty-query', fire);
+    // FEVERIFY7-P2: 卸载即弃草稿——通知 App 清零(此前跨页泄漏假警报)
+    return () => {
+      window.removeEventListener('spectre:dirty-query', fire);
+      dirtyCount.current = 0;
+      window.dispatchEvent(new CustomEvent('spectre:dirty-zero'));
+    };
   }, []);
   const bumpDirty = (d: boolean) => {
     dirtyCount.current = Math.max(0, dirtyCount.current + (d ? 1 : -1));
