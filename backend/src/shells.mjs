@@ -420,8 +420,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           ({ stdout, stderr, code } = boundedExecResult(
             res.err, res.so, res.se, '[timeout: 容器内进程已被 timeout(1) 终止]', 'docker(local 传输经沙箱容器执行)'));
         } else {
+          // r8-D1(真修, 前批虚报勘误): 单层 shell——外层 bash -lc 再包一层
+          // 时 $o/$X 被外层提前展开(赋值丢失, printf 输出字面 "$o",
+          // read_file 恒空 content)。timeout 直执行 bash, 引号由 execFile
+          // 数组参数天然隔离。落盘以 /tmp/probe.mjs 四用例实证为准。
           res = await new Promise((resolve) => {
-            execFile('bash', ['-lc', `timeout -k 5 ${tSec} bash -lc ${JSON.stringify(command)}`],
+            execFile('timeout', ['-k', '5', String(tSec), 'bash', '-lc', command],
               { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
               resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
           });
@@ -484,7 +488,8 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       sh.user = (user || '').trim().slice(0, 64) || null;
       // r6v3-#4: os 同过形态白名单——可打印 ASCII, 禁编码/HTML 形态
       const osClean = (osLine ?? '').trim();
-      sh.os = (/^[\x20-\x7e]{4,120}$/.test(osClean) && !/[<>%]/.test(osClean))
+      // r8-D3: uname 全串实测 ~130 字符, 上限 120 曾误杀→os 恒 null
+      sh.os = (/^[\x20-\x7e]{4,200}$/.test(osClean) && !/[<>%]/.test(osClean))
         ? osClean : null;
       sh.host = sh.os ? String(sh.os).split(' ')[1] : null;
       persistShells();  // R6-F2
