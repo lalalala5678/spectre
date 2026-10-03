@@ -538,10 +538,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                 <Button variant="secondary" size="sm" onClick={closeDrill} className="w-fit">
                   <CornerUpLeft className="h-3.5 w-3.5" /> 返回主控会话
                 </Button>
-                <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} />
+                <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} heading="子任务会话" />
               </div>
             ) : sessionId ? (
-              <LiveSession agentKey={liveKey} sessionId={sessionId} onGone={handleSessionGone} />
+              <LiveSession agentKey={liveKey} sessionId={sessionId} onGone={handleSessionGone} heading={isAuto ? '主控会话' : `${agent.name} · 会话`} />
             ) : !bootDoneRef.current ? (
               /* CS26-7: boot 在途(拉锚点/建会话中)——闪现'还没有主会话'
                  可点按钮会与 :180 自动建会话竞争产重复空会话。 */

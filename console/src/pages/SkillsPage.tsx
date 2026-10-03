@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Input, Select, Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
+import { SplitPane } from '../components/ui/SplitPane';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
 import { usePageTitle } from '../utils/usePageTitle';
@@ -73,7 +74,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
+    <SplitPane storageKey="spectre.split.skills" initial={0.62}>
       <Panel
         title="已挂载 Skills（按 Agent）"
         right={
@@ -177,7 +178,9 @@ export function SkillsPage({ wsId }: { wsId: string }) {
         </table>
       </Panel>
 
+      
       <div className="flex min-h-0 flex-col gap-3">
+
       <Panel title="机制说明" bodyClassName="space-y-2 text-[13px] leading-relaxed text-secondary">
         <p className="flex items-start gap-1.5"><FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary" />
           存储为 agentskills.io 官方格式（SKILL.md + frontmatter），由 pi 官方加载器解析。</p>
@@ -187,6 +190,6 @@ export function SkillsPage({ wsId }: { wsId: string }) {
       </Panel>
       <ToolingChat agentKey="skill-config" workSessionId={wsId} />
       </div>
-    </div>
+    </SplitPane>
   );
 }

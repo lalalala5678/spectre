@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import { Loader2, Check, AlertTriangle, RotateCw, Radar, Sparkles, ShieldCheck } from 'lucide-react';
+import { Loader2, Check, AlertTriangle, RotateCw, Radar, Sparkles, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { AgentLlmOverride } from '../components/AgentLlmOverride';
 import { hasCred } from '../utils/hasCred';
@@ -50,11 +50,12 @@ const TIER_STYLE: Record<string, { label: string; tone: BadgeTone; dot: string; 
 };
 
 /** 单字段行:label + input/select + 保存按钮(未保存高亮/转圈/成功/失败态) */
-function FieldRow({ def, value, onSave, onDirtyChange }: {
+function FieldRow({ def, value, onSave, onDirtyChange, revealCtx }: {
   def: FieldDef;
   value: string | number | undefined;
   onSave: (v: string) => Promise<void>;
   onDirtyChange?: (dirty: boolean) => void;  // FEVERIFY6-P3: 脏离开提示
+  revealCtx?: { kind: 'common' | 'source'; id: string };  // EQ-4: password 眼睛
 }) {
   const [draft, setDraft] = useState(String(value ?? def.default ?? ''));
   const [orig, setOrig] = useState(String(value ?? def.default ?? ''));
@@ -66,6 +67,18 @@ function FieldRow({ def, value, onSave, onDirtyChange }: {
   }, [value, def.default]);
 
   const dirty = draft !== orig;
+  // EQ-4: 小眼睛——密码类字段点击查看存量明文(后端留审计)
+  const [peek, setPeek] = useState(false);
+  const [peekVal, setPeekVal] = useState('');
+  const togglePeek = async () => {
+    if (peek) { setPeek(false); return; }
+    if (!revealCtx) return;
+    try {
+      const r = await api<{ value: string }>('/agent-settings/reveal', {
+        method: 'POST', json: { kind: revealCtx.kind, id: revealCtx.id, field: def.id.split('.').pop() ?? def.id } });
+      setPeekVal(r.value || '(空)'); setPeek(true);
+    } catch { setPeekVal('(查看失败)'); setPeek(true); }
+  };
   // FEVERIFY9-P2: 拆两 effect——[dirty] 只上报, [] 只管卸载(此前 cleanup
   // 在每次 dirty 变迁也执行, 相对计数被 -2 双发 → 欠账 → 守卫旁路)
   useEffect(() => { onDirtyChange?.(dirty); }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
@@ -102,17 +115,27 @@ function FieldRow({ def, value, onSave, onDirtyChange }: {
             {(def.options ?? []).map((o) => <option key={o} value={o}>{o}</option>)}
           </Select>
         ) : (
-          <Input
-            id={`fld-${def.id}`}
-            type={def.type === 'password' ? 'password' : def.type === 'number' ? 'number' : 'text'}
-            value={draft}
-            placeholder={def.placeholder}
-            onChange={(e) => { setDraft(e.target.value); if (state !== 'saving') setState('idle'); }}
-            onKeyDown={(e) => { if (e.key === 'Enter') void save(); }}
-            className={cn('max-w-md',
-              (def.id.endsWith('apiKey') || def.id.endsWith('baseUrl')) && 'font-mono text-[13px]',
-              state === 'err' ? 'border-danger-line' : dirty && 'border-accent')}
-          />
+          <div className="relative max-w-md">
+            <Input
+              id={`fld-${def.id}`}
+              type={def.type === 'password' && !peek ? 'password' : def.type === 'number' ? 'number' : 'text'}
+              value={def.type === 'password' && peek ? peekVal : draft}
+              readOnly={def.type === 'password' && peek}
+              placeholder={def.placeholder}
+              onChange={(e) => { setDraft(e.target.value); if (state !== 'saving') setState('idle'); }}
+              onKeyDown={(e) => { if (e.key === 'Enter') void save(); }}
+              className={cn('w-full',
+                (def.id.endsWith('apiKey') || def.id.endsWith('baseUrl')) && 'font-mono text-[13px]',
+                state === 'err' ? 'border-danger-line' : dirty && 'border-accent')}
+            />
+            {def.type === 'password' && revealCtx && (
+              <button type="button" onClick={() => void togglePeek()}
+                aria-label={peek ? '隐藏明文' : '查看明文'} title={peek ? '隐藏明文' : '查看明文(操作会留审计日志)'}
+                className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-tertiary hover:bg-surface-2 hover:text-primary">
+                {peek ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+              </button>
+            )}
+          </div>
         )}
         {state === 'err' && (
           <div className="mt-1.5 flex items-start gap-1.5 rounded-md border border-danger-line bg-danger-bg px-2 py-1 text-[13px] leading-snug text-danger-text">
@@ -181,6 +204,7 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
           {src.fields.map((f) => (
             <FieldRow
               onDirtyChange={onDirtyChange}
+              revealCtx={{ kind: 'source', id: src.id }}
               key={f.id}
               def={{ ...f, placeholder: f.placeholder ?? (f.id.endsWith('baseUrl') ? `默认 ${src.defaultBase}` : undefined) }}
               value={cfg?.[f.id.split('.')[1]]}
@@ -267,8 +291,24 @@ export function SettingsPage() {
   const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
   const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
 
+  // EQ-3: 二级菜单——左锚点分组导航(替代单页倾倒)
+  const SECTIONS = [
+    { id: 'sec-common', label: '通用与模型' },
+    { id: 'sec-agentllm', label: '按智能体换模型' },
+    { id: 'sec-agents', label: '智能体专属配置' },
+    { id: 'sec-recon', label: '资产测绘数据源' },
+  ];
   return (
-    <div className="mx-auto max-w-4xl px-6 py-6">
+    <div className="flex h-full min-h-0">
+      <nav aria-label="设置分组" className="hidden w-44 shrink-0 flex-col gap-0.5 border-r border-line px-3 py-4 lg:flex">
+        {SECTIONS.map(sec => (
+          <a key={sec.id} href={`#${sec.id}`}
+            className="rounded-md px-2.5 py-2 text-[13px] text-secondary transition-colors hover:bg-surface-2 hover:text-primary">
+            {sec.label}
+          </a>
+        ))}
+      </nav>
+      <div className="mx-auto min-w-0 max-w-4xl flex-1 px-6 py-6">
       {/* 标题 + 概览 */}
       <div className="mb-6 flex items-end justify-between">
         <div>
@@ -276,7 +316,7 @@ export function SettingsPage() {
             <Sparkles className="h-4 w-4 text-accent-text" />设置
           </h1>
           <p className="mt-1 text-[13px] text-tertiary">
-            大多数字段独立保存(逐字段探测/范围校验,失败不落盘);大模型供应商为四字段整体保存+整体探测。
+            修改后逐项保存;保存前会做真实连通校验,校验不通过不会写入。
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -291,7 +331,7 @@ export function SettingsPage() {
       </div>
 
       {/* ---------- 通用配置(全局) ---------- */}
-      <section className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
+      <section id="sec-common" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <ShieldCheck className="h-3.5 w-3.5 text-tertiary" />
           <span className="text-[13px] font-medium text-primary">{data.schema.common.label}</span>
@@ -311,13 +351,13 @@ export function SettingsPage() {
             // CS16-P2: webSearch 三字段此前落空 bucket(只认 llm/comp)——
             // 保存后回显恒空, 用户以为没存上。
             const bucket = top === 'llm' ? llm : (top === 'webSearch' ? ws : comp);
-            return <FieldRow key={f.id} def={f} value={bucket[leaf]} onSave={saveCommon(f.id)} onDirtyChange={bumpDirty} />;
+            return <FieldRow key={f.id} def={f} value={bucket[leaf]} onSave={saveCommon(f.id)} onDirtyChange={bumpDirty} revealCtx={{ kind: 'common', id: top }} />;
           })}
         </div>
       </section>
 
       {/* ---------- R32D44: 单 Agent 大模型供应商覆盖 ---------- */}
-      <section className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
+      <section id="sec-agentllm" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface">
         <div className="flex items-center gap-2 border-b border-line px-4 py-3">
           <span className="text-[13px] font-medium text-primary">单 Agent 大模型覆盖</span>
           <span className="text-xs text-tertiary">默认供应商之上按 agent 换厂商/模型(例: 默认 GLM, 报告 agent 用 DeepSeek)</span>
@@ -347,6 +387,7 @@ export function SettingsPage() {
       </section>
 
       {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
+      <div id="sec-agents" className="scroll-mt-4" />
       {otherAgents.map((agent) => (
         <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface">
           <div className="flex items-center gap-2 border-b border-line px-4 py-3">
@@ -367,7 +408,7 @@ export function SettingsPage() {
 
 
       {/* ---------- 资产测绘数据源(按重要性分级) ---------- */}
-      <section className="mb-8">
+      <section id="sec-recon" className="mb-8 scroll-mt-4">
         <div className="mb-3 flex items-center justify-between">
           <div className="flex items-center gap-2">
             <Radar className="h-4 w-4 text-accent-text" />
@@ -385,24 +426,17 @@ export function SettingsPage() {
           </div>
         </div>
         <p className="mb-4 text-xs leading-relaxed text-tertiary">
-          填好并通过连通验证的源才会挂载为 MCP 工具;未配置的源对 agent 完全不可见(零污染)。Base URL 留空一律使用官方地址。
+          填好 Key 并通过连通校验的源才会启用;Base URL 留空则使用官方地址。
         </p>
 
-        {(['P0', 'P1', 'P2'] as const).map((t) => (
-          <div key={t} className="mb-4">
-            <div className="mb-2 flex items-center gap-2">
-              <Badge tone={TIER_STYLE[t].tone} className="font-mono">{TIER_STYLE[t].label}</Badge>
-              <span className="text-[13px] font-medium text-secondary">{TIER_STYLE[t].groupLabel}</span>
-              <span className="h-px flex-1 bg-line" />
-            </div>
-            <div className="space-y-2">
-              {byTier(t).map((src) => (
-                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
-              ))}
-            </div>
-          </div>
-        ))}
+        {/* EQ-6: 与其它智能体配置同构(单一卡片列表, 重要性徽章随卡显示) */}
+        <div className="divide-y divide-line rounded-lg border border-line bg-surface">
+          {[...byTier('P0'), ...byTier('P1'), ...byTier('P2')].map((src) => (
+            <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
+          ))}
+        </div>
       </section>
+      </div>
     </div>
   );
 }

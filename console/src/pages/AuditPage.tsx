@@ -5,6 +5,7 @@ import type { ApiBusEvent } from '../api/client';
 import { Badge, Dot } from '../components/ui/Badge';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
+import { SplitPane } from '../components/ui/SplitPane';
 import { Panel } from '../components/ui/Panel';
 import { Skeleton } from '../components/ui/Skeleton';
 import { usePageTitle } from '../utils/usePageTitle';
@@ -43,10 +44,9 @@ export function AuditPage() {
   const shown = (events ?? []).slice(0, limit);
 
   return (
-    <div className="grid grid-cols-1 gap-3 xl:grid-cols-3">
+    <SplitPane storageKey="spectre.split.audit" initial={0.66} className="flex h-full min-h-0 w-full flex-col gap-3 xl:flex-row">
       <Panel
         title="操作审计链(总线事件,新→旧)"
-        className="xl:col-span-2"
         bodyClassName="p-0"
       >
         <div className="mb-2 flex justify-end px-3 pt-1">
@@ -110,6 +110,6 @@ export function AuditPage() {
           </div>
         </Panel>
       </div>
-    </div>
+    </SplitPane>
   );
 }

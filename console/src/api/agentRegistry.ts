@@ -5,7 +5,7 @@ export const AGENTS: AgentMeta[] = [
     id: 'autopwn',
     name: 'Orchestrator',
     codename: 'AutoPwn 主控',
-    desc: '接收目标后自主拆解任务图，调度各阶段 Agent，处理依赖、冲突与审批升级。',
+    desc: '输入目标后自动规划任务并调度各专项智能体执行，全程向你汇报。',
   },
   {
     id: 'recon',

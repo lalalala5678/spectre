@@ -1,3 +1,4 @@
+import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
 import { cn } from '../utils/cn';
@@ -63,6 +64,16 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
 
   const overridden = Boolean(orig.baseUrl || orig.apiKey || orig.model || orig.format);
   // 字段行渲染(非组件——oxlint react/static-components)
+  const [peek, setPeek] = useState(false);
+  const [peekVal, setPeekVal] = useState('');
+  const togglePeek = async () => {
+    if (peek) { setPeek(false); return; }
+    try {
+      const r = await api<{ value: string }>('/agent-settings/reveal', {
+        method: 'POST', json: { kind: isDefault ? 'llm-default' : 'llm-agent', id: agentId, field: 'apiKey' } });
+      setPeekVal(r.value || '(空)'); setPeek(true);
+    } catch { setPeekVal('(查看失败)'); setPeek(true); }
+  };
   const field = (k: 'format' | 'baseUrl' | 'apiKey' | 'model', label: string, ph: string, type = 'text') => (
     <label key={k} className="flex items-center gap-2">
       <span className="w-[86px] shrink-0 text-[13px] text-secondary">{label}</span>
@@ -74,9 +85,20 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
             : <option value="">(继承默认)</option>}
           {formats.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
         </Select>
-      ) : (
-        <Input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
-          className="min-w-0 flex-1 font-mono text-[13px]" />
+      ) : k === 'apiKey' ? (
+          <div className="relative min-w-0 flex-1">
+            <Input type={peek ? 'text' : 'password'} value={peek ? peekVal : draft.apiKey} readOnly={peek} placeholder={ph}
+              onChange={e => setDraft(d => ({ ...d, apiKey: e.target.value }))}
+              className="w-full pr-8 font-mono text-[13px]" />
+            <button type="button" onClick={() => void togglePeek()} aria-label={peek ? '隐藏明文' : '查看明文'}
+              title={peek ? '隐藏明文' : '查看明文(操作会留审计日志)'}
+              className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-tertiary hover:bg-surface-2 hover:text-primary">
+              {peek ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+            </button>
+          </div>
+        ) : (
+          <Input type={type} value={draft[k]} placeholder={ph} onChange={e => setDraft(d => ({ ...d, [k]: e.target.value }))}
+            className="min-w-0 flex-1 font-mono text-[13px]" />
       )}
     </label>
   );

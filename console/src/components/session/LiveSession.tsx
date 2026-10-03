@@ -19,10 +19,11 @@ import { Skeleton } from '../ui/Skeleton';
  * open; this component renders it, streams journal events via SSE, and
  * sends prompts / steering messages.
  */
-export function LiveSession({ agentKey, sessionId, onGone }: {
+export function LiveSession({ agentKey, sessionId, onGone, heading }: {
   agentKey: string;
   sessionId: string | null;
   onGone?: () => void;
+  heading?: string;  // EQ-10: 语义标题(替代裸 sess-xxx id)
 }) {
   const [messages, setMessages] = useState<ApiMessage[]>([]);
   const [busy, setBusy] = useState(false);
@@ -345,8 +346,8 @@ export function LiveSession({ agentKey, sessionId, onGone }: {
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-2">
       <div className="flex items-center justify-between px-1">
-        <span className="truncate font-mono text-xs text-tertiary">
-          {sessionId ?? 'no session'}
+        <span className="truncate text-xs font-medium text-secondary" title={sessionId ?? undefined}>
+          {heading ?? sessionId ?? '会话'}
         </span>
         <span className={cn(
           'flex items-center gap-1.5 text-xs',

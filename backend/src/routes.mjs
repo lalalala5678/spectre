@@ -22,7 +22,7 @@ import { applyMcpAndMounts } from './sandbox/apply-config.mjs';
 import { syncSourceKeyFiles } from './keyfiles.mjs';
 import { phishCampaignFunnel } from './phish-funnel.mjs';
 import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
-import { maskSecret, isSecretLeaf, getSettings, saveSetting, hasSourceCredential, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
+import { maskSecret, isSecretLeaf, getSettings, saveSetting, hasSourceCredential, revealSetting, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
 import { applyLlmPrefs } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
@@ -408,6 +408,20 @@ function realRouter({ store, bus, caps, wal }) {
     // (common.llm 默认供应商/agent-llm 覆盖)为四字段原子提交。
     if (path === '/api/agent-settings' && method === 'GET') {
       return json(res, 200, getSettings());
+    }
+    // EQ-U4: 小眼睛明文查看(密码类)——bus 留痕(授权访问审计面)
+    if (path === '/api/agent-settings/reveal' && method === 'POST') {
+      const body = await readJson(req);
+      const kind = String(body?.kind ?? '');
+      const id = String(body?.id ?? '');
+      const field = String(body?.field ?? '');
+      if (!/^[a-zA-Z0-9_.-]{0,64}$/.test(id) || !/^[a-zA-Z0-9_]{1,32}$/.test(field)
+        || !['llm-default', 'llm-agent', 'common', 'source'].includes(kind)) {
+        return bad(res, 400, '非法 reveal 参数');
+      }
+      const value = revealSetting(kind, id, field);
+      wal.push({ kind: 'note', ts: new Date().toISOString(), title: `查看密钥明文 ${kind}:${id || '-'}:${field}` });
+      return json(res, 200, { value });
     }
     if (path === '/api/agent-settings/save' && method === 'POST') {
       const body = await readJson(req);

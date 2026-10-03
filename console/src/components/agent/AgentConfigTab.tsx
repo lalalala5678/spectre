@@ -1,16 +1,19 @@
 /** AgentConfigTab — CS44-F17 拆出。 */
 import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
+import { cn } from '../../utils/cn';
 import type { LlmFormatMeta } from '../../api/llmFormats';
 import { AgentLlmOverride } from '../AgentLlmOverride';
 import { Panel } from '../ui/Panel';
+import { Input } from '../ui/Input';
+import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
 import { Dot } from '../ui/Badge';
 import { SpawnLimitSettings } from './SpawnLimitSettings';
 import { RealSkillsPanel } from './RealSkillsPanel';
 import { hasCred } from '../../utils/hasCred';
-import { ShieldCheck } from 'lucide-react';
+import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
 
 /** R32D44-feature: agent 配置页签——点开某 agent 后在此看它的完整配置面:
  * 生效运行配置(上下文窗口/模型/思考档位等, 来自全局通用配置)、挂载的
@@ -30,6 +33,9 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
   const [mcps, setMcps] = useState<{ name: string; transport: string; enabled?: boolean;
     url?: string; command?: string; agents?: string[] }[] | null>(null);
 
+  const reloadSources = () => api('/agent-settings')
+    .then(d => { setReconSources((d as { reconSources: Record<string, Record<string, string>> }).reconSources ?? {}); })
+    .catch(() => {});
   const reloadLlm = () => api<{ common: Record<string, Record<string, string | number>> | null; agentLlm: Record<string, Record<string, string>> }>('/agent-settings')
     .then(d => { setCommon(d.common ?? {}); setAgentLlm(d.agentLlm ?? {}); })
     .catch(() => {});
@@ -123,30 +129,106 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
         <RealSkillsPanel agentKey={agentId} expandable />
       </Panel>
 
-      {/* 专属数据源 / 参数(编辑在设置页) */}
+      {/* EQ-2: 专属数据源/参数——直接在本页编辑(与设置页同一保存协议);
+          skill/MCP 仅展示挂载态, 无添加入口(用户裁定: 子智能体不可增配 skill/MCP) */}
       <Panel title="专属配置(数据源 / 参数)">
-        {!myGroup ? <div className="text-[13px] text-tertiary">该 agent 无专属数据源配置组(仅用全局通用配置)。</div>
-          : <div className="space-y-1.5">
-            {myGroup.sources.map(src => {
-              const vals = reconSources[src.id] ?? {};
-              const has = hasCred(vals, src.id);  // R32D46-NEW-2: 第 7 处收敛
-              return (
-                <div key={src.id} className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-2.5 py-1.5">
-                  <div className="min-w-0">
-                    <div className="truncate text-[13px] text-secondary">{src.label}</div>
-                    <div className="truncate text-xs text-tertiary">{src.fields.map(f => f.label).join(' / ')}</div>
-                  </div>
-                  {has ? <span className="flex shrink-0 items-center gap-1 text-xs text-success-text"><ShieldCheck className="h-3 w-3" />已配置</span>
-                    : <span className="shrink-0 text-xs text-tertiary">未配置</span>}
-                </div>
-              );
-            })}
-            <div className="pt-1 text-xs text-tertiary">{myGroup.hint}</div>
-            <a href="#settings" className="block text-xs text-accent-text underline-offset-2 hover:underline">
-              在「设置」页配置(保存前真实连通校验) →
-            </a>
+        {!myGroup ? <div className="text-[13px] text-tertiary">该智能体没有专属配置, 使用全局通用配置即可。</div>
+          : <div className="space-y-3">
+            {myGroup.sources.map(src => (
+              <SourceInlineEditor key={src.id} src={src} cfg={reconSources[src.id] ?? {}}
+                onSaved={reloadSources} agentKey={agentId} />
+            ))}
+            {myGroup.hint && <div className="text-xs leading-relaxed text-tertiary">{myGroup.hint}</div>}
           </div>}
       </Panel>
+    </div>
+  );
+}
+
+
+/** EQ-2: agent 配置页签内的数据源内联编辑器(逐字段保存+密码眼睛,
+ * 与设置页同协议; 独立小组件避免整页状态机复制)。 */
+function SourceInlineEditor({ src, cfg, onSaved, agentKey }: {
+  src: { id: string; label: string; fields: { id: string; label: string; type?: string }[] };
+  cfg: Record<string, string>;
+  onSaved: () => void;
+  agentKey: string;
+}) {
+  const group = agentKey === 'weakcred' ? 'weakcred' : 'recon-source';
+  const save = (leaf: string) => async (v: string) => {
+    await api('/agent-settings/save', { method: 'POST', json: { group, field: `${src.id}.${leaf}`, value: v } });
+    onSaved();
+  };
+  return (
+    <div className="rounded-md border border-line bg-surface p-2.5">
+      <div className="mb-1.5 flex items-center justify-between gap-2">
+        <span className="text-[13px] font-medium text-secondary">{src.label}</span>
+        {hasCred(cfg, src.id)
+          ? <span className="flex shrink-0 items-center gap-1 text-xs text-success-text"><ShieldCheck className="h-3 w-3" />已配置</span>
+          : <span className="shrink-0 text-xs text-tertiary">未配置</span>}
+      </div>
+      <div className="space-y-1.5">
+        {src.fields.map(f => (
+          <InlineField key={f.id} id={`${src.id}.${f.id}`} label={f.label} type={f.type}
+            value={cfg[f.id]} onSave={save(f.id)} revealKind="source" revealId={src.id}
+            onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
+              { detail: { src: `agentConfig:${agentKey}:src`, count: d ? 1 : 0 } }))} />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** 单字段行(保存前探测由后端统一做; password 带眼睛)。 */
+function InlineField({ id, label, type, value, onSave, revealKind, revealId, onDirtyChange }: {
+  id: string; label: string; type?: string; value?: string;
+  onSave: (v: string) => Promise<void>; revealKind: 'source'; revealId: string;
+  onDirtyChange?: (d: boolean) => void;  // EQ-2: 脏离开接入
+}) {
+  const [draft, setDraft] = useState(String(value ?? ''));
+  const [state, setState] = useState<'idle' | 'saving' | 'ok' | 'err'>('idle');
+  const [msg, setMsg] = useState('');
+  const [peek, setPeek] = useState(false);
+  const [peekVal, setPeekVal] = useState('');
+  const dirty = draft !== String(value ?? '');
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]); // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => () => onDirtyChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
+  async function save() {
+    if (!dirty) return;
+    setState('saving'); setMsg('');
+    try { await onSave(draft); setState('ok'); setTimeout(() => setState('idle'), 1800); }
+    catch (e) { setState('err'); setMsg(e instanceof Error ? e.message : String(e)); }
+  }
+  const togglePeek = async () => {
+    if (peek) { setPeek(false); return; }
+    try {
+      const r = await api<{ value: string }>('/agent-settings/reveal', {
+        method: 'POST', json: { kind: revealKind, id: revealId, field: id.split('.').pop() ?? id } });
+      setPeekVal(r.value || '(空)'); setPeek(true);
+    } catch { setPeekVal('(查看失败)'); setPeek(true); }
+  }
+  return (
+    <div className="flex items-center gap-2">
+      <span className="w-[86px] shrink-0 text-[13px] text-secondary">{label}</span>
+      <div className="relative min-w-0 flex-1">
+        <Input type={type === 'password' && !peek ? 'password' : 'text'} value={type === 'password' && peek ? peekVal : draft}
+          readOnly={type === 'password' && peek}
+          onChange={e => { setDraft(e.target.value); setState('idle'); }}
+          onKeyDown={e => { if (e.key === 'Enter') void save(); }}
+          className={cn('w-full font-mono text-[13px]',
+            state === 'err' ? 'border-danger-line' : dirty && 'border-accent')} />
+        {type === 'password' && (
+          <button type="button" onClick={() => void togglePeek()} aria-label={peek ? '隐藏明文' : '查看明文'}
+            title={peek ? '隐藏明文' : '查看明文(操作会留审计日志)'}
+            className="absolute right-1.5 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded text-tertiary hover:bg-surface-2 hover:text-primary">
+            {peek ? <EyeOff className="h-3.5 w-3.5" /> : <Eye className="h-3.5 w-3.5" />}
+          </button>
+        )}
+      </div>
+      <Button onClick={() => void save()} disabled={!dirty || state === 'saving'} variant="primary" size="sm" className="min-w-20 shrink-0">
+        {state === 'saving' ? '检测中' : state === 'ok' ? '✓ 已保存' : '保存'}
+      </Button>
+      {state === 'err' && <span className="max-w-40 truncate text-xs text-danger-text" title={msg}>{msg}</span>}
     </div>
   );
 }

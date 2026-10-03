@@ -28,7 +28,9 @@ export interface WorkSession {
 interface Prefs {
   currentWs: string | null;
   ui?: { rightRatio?: number;
-    stackRatios?: Record<string, number[] | null> };
+    stackRatios?: Record<string, number[] | null>;
+    splitRatios?: Record<string, number | null>;  // EQ-8: SplitPane 宽度持久化
+  };
 }
 
 export async function listWorkSessions(): Promise<WorkSession[]> {

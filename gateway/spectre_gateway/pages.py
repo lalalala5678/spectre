@@ -64,7 +64,7 @@ _TEMPLATE = """<!doctype html>
 <body>
   <form class="card" method="POST" action="__ACTION__" autocomplete="off">
     <h1>SPECTRE</h1>
-    <div class="sub">多智能体渗透测试平台 · 授权访问</div>
+    <div class="sub">多智能体渗透测试平台</div>
     <label for="user">账号</label>
     <input id="user" name="user" type="text" required autofocus
       autocomplete="username">
@@ -73,7 +73,7 @@ _TEMPLATE = """<!doctype html>
       autocomplete="current-password">
     <button type="submit">登录</button>
     <div class="err">__MSG__</div>
-    <div class="foot">仅限授权渗透测试作业 · 全部访问留痕审计</div>
+    <div class="foot">仅用于授权的安全测试作业</div>
   </form>
 </body>
 </html>

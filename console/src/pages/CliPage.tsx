@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
+import { SplitPane } from '../components/ui/SplitPane';
 import { cn } from '../utils/cn';
 import { usePageTitle } from '../utils/usePageTitle';
 
@@ -69,7 +70,7 @@ export function CliPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
+    <SplitPane storageKey="spectre.split.cli" initial={0.62}>
       <Panel
         title="已安装 CLI（共享层）"
         right={
@@ -124,7 +125,9 @@ export function CliPage({ wsId }: { wsId: string }) {
         </div>
       </Panel>
 
+      
       <div className="flex min-h-0 flex-col gap-3">
+
       <Panel title="安装到沙箱" bodyClassName="p-3 space-y-2">
         {status && (
           <p className="flex items-center gap-1.5 text-xs text-tertiary">
@@ -161,6 +164,6 @@ export function CliPage({ wsId }: { wsId: string }) {
       </Panel>
       <ToolingChat agentKey="cli-config" workSessionId={wsId} />
       </div>
-    </div>
+    </SplitPane>
   );
 }

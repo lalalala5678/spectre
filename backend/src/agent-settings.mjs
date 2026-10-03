@@ -318,7 +318,7 @@ export function settingsSchema() {
     common: {
       label: '通用配置(全部智能体生效)',
       fields: [
-        { id: 'llm.thinkingLevel', label: 'Thinking Effort', type: 'select', options: THINKING_LEVELS, default: 'low', hint: '按所选档位原样传给厂商,不维护厂商映射' },
+        { id: 'llm.thinkingLevel', label: 'Thinking Effort', type: 'select', options: THINKING_LEVELS, default: 'low', hint: '数值越高回答越深入,也越慢' },
         { id: 'llm.maxTokens', label: '最大输出 Tokens', type: 'number', check: num(256, 262144), default: 32768 },
         { id: 'llm.contextWindow', label: '上下文窗口 Tokens', type: 'number', check: num(8192, 4194304), default: 786432 },
         { id: 'compaction.enabled', label: '上下文压缩', type: 'select', options: ['开启', '关闭'], default: '开启' },
@@ -326,9 +326,9 @@ export function settingsSchema() {
         // 此前是全平台唯一不经面板的 key 面(消费方 tooling.mjs PROVIDERS)。
         { id: 'webSearch.provider', label: '通用 Web 搜索 Provider', type: 'select',
           options: ['none', 'zhipu', 'brave', 'tavily', 'searxng'], default: 'none',
-          hint: '全员 search_web 兜底通道;none=仅垂直通道(MCP registry/GitHub/npm,零 key)且回执如实声明' },  // CS43-N1: pip 通道已删同步
+          hint: '网页搜索服务商;选 none 则只可用免 Key 的垂直搜索,搜索结果会如实说明' },  // CS43-N1: pip 通道已删同步
         { id: 'webSearch.apiKey', label: '搜索 API Key', type: 'password',
-          hint: 'zhipu(智谱 web_search)/brave/tavily 需要;searxng 自建免 key' },
+          hint: '所选服务商的 API Key(searxng 自建无需)' },
         { id: 'webSearch.baseUrl', label: 'SearXNG 地址', type: 'text',
           placeholder: 'http://127.0.0.1:8080', hint: '仅 provider=searxng 时使用(JSON API 端点)' },
         { id: 'compaction.reserveTokens', label: '压缩触发预留量(reserveTokens)', type: 'number', check: num(1024, 1048576), default: 16384, hint: '上下文剩余低于该值即触发压缩' },
@@ -338,7 +338,7 @@ export function settingsSchema() {
     agents: [
       {
         agentKey: 'c2', label: 'C2 Agent · 免杀云查引擎',
-        hint: '填好并通过连通验证的引擎才会写入沙箱 api-keys.json 供 c2-qa 调用;未配置/校验失败对 agent 完全不可见(零污染)。微步在「资产测绘」组配置后此处同步生效。',
+        hint: '保存前会做真实连通校验;校验通过才会启用。微步 Key 在「资产测绘数据源」里配置,此处共用。',
         sources: Object.entries(RECON_SOURCES)
           .filter(([sid, sv]) => (sv.agents ?? ['recon']).includes('c2') && sid !== 'smtp')
           .map(([id, sv]) => ({
@@ -348,7 +348,7 @@ export function settingsSchema() {
       },
       {
         agentKey: 'phish', label: '钓鱼 Agent · 发信通道',
-        hint: 'SMTP 通过 banner 探测后才写入沙箱 smtp.json(默认通道);凭据永不回显。',
+        hint: '保存前会尝试连接邮件服务器验证;验证通过后钓鱼智能体即可用它发信。',
         sources: Object.entries(RECON_SOURCES)
           .filter(([, sv]) => (sv.agents ?? ['recon']).includes('phish'))
           .map(([id, sv]) => ({
@@ -358,7 +358,7 @@ export function settingsSchema() {
       },
       {
         agentKey: 'weakcred', label: '爆破 Agent · 爆破参数(实时生效)',
-        hint: '防锁定参数与字典选择,保存后对新会话生效(注入系统提示词)。',
+        hint: '爆破速度与字典选择;保存后新会话生效。',
         sources: [{
           id: 'brute', label: '爆破约束', defaultBase: '',
           fields: [
@@ -465,6 +465,16 @@ export function getSettings() {
   const agentLlm = Object.fromEntries(
     Object.entries(p.agentLlm ?? {}).map(([k, v]) => [k, maskLlm(v)]));
   return { common, agentLlm, reconSources, schema: settingsSchema() };
+}
+
+/** EQ-U4: 小眼睛明文查看——仅密码类叶; 调用方(routes)负责 bus 留痕。 */
+export function revealSetting(kind, id, field) {
+  const p = getPrefs();
+  if (kind === 'llm-default') return String(p.commonSettings?.llm?.[field] ?? '');
+  if (kind === 'llm-agent') return String(p.agentLlm?.[id]?.[field] ?? '');
+  if (kind === 'common') return String(p.commonSettings?.[id]?.[field] ?? '');
+  if (kind === 'source') return String(p.reconApiKeys?.[id]?.[field] ?? '');
+  return '';
 }
 
 export async function saveSetting({ group, field, value }, wal) {
@@ -715,7 +725,9 @@ export function effectiveCommon() {
 /** CS38-G7: 凭据叶谓词单源(CRED_FIELD 集合 + smtp.user 特例)——掩码
  * 面/徽标面(hasSourceCredential)共用同一词源, 不再平行编码。 */
 export function isSecretLeaf(srcId, leaf) {
-  return CRED_FIELD.has(leaf) || (srcId === 'smtp' && leaf === 'user');
+  // EQ-U1: smtp.user 移出掩码——账号名是标识非凭证, 掩码回显(••••ocal)
+  // 被用户实测当 bug 报; 密码类仍掩码(reveal 端点可查看)。
+  return CRED_FIELD.has(leaf) && !(srcId === 'smtp' && leaf === 'user');
 }
 
 export function hasSourceCredential(cfg, srcId) {

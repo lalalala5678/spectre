@@ -8,6 +8,7 @@ import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { Input, Label, Textarea } from '../components/ui/Input';
 import { Panel } from '../components/ui/Panel';
+import { SplitPane } from '../components/ui/SplitPane';
 import { cn } from '../utils/cn';
 import { AGENTS as REGISTRY } from '../api/agentRegistry';
 import { usePageTitle } from '../utils/usePageTitle';
@@ -113,7 +114,7 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
+    <SplitPane storageKey="spectre.split.mcp" initial={0.62}>
       <Panel title="已注册 MCP Servers" className="min-h-0 xl:col-span-2" bodyClassName="p-0">
         <table className="w-full text-left">
           <thead>
@@ -158,8 +159,8 @@ export function McpPage({ wsId }: { wsId: string }) {
                     <PlugZap className="h-3 w-3" /> {testing[s.name] ? '测试中' : '连通测试'}
                   </Button>
                   {results[s.name] && (
-                    <div className={cn('mt-1 text-[13px]',
-                      results[s.name].startsWith('✓') ? 'text-success-text' : 'text-danger-text')}>
+                    <div className={cn('mt-1 max-w-56 break-all text-xs leading-snug',
+                      results[s.name].startsWith('✓') ? 'text-success-text' : 'text-danger-text')} title={results[s.name]}>
                       {results[s.name]}
                     </div>
                   )}
@@ -186,7 +187,9 @@ export function McpPage({ wsId }: { wsId: string }) {
         </table>
       </Panel>
 
+      
       <div className="flex min-h-0 flex-col gap-3">
+
       <Panel title="注册新 Server" bodyClassName="p-3 space-y-2">
         <Input
           value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
@@ -257,6 +260,6 @@ export function McpPage({ wsId }: { wsId: string }) {
       </Panel>
       <ToolingChat agentKey="mcp-config" workSessionId={wsId} />
       </div>
-    </div>
+    </SplitPane>
   );
 }

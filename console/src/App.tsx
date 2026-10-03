@@ -190,6 +190,8 @@ export default function App() {
       </div>
       <div className="flex min-w-0 flex-1 flex-col">
         <Topbar onMenu={() => setNavOpen(true)} />
+        {/* EQ-9: 深壳→浅内容过渡条(黑到白硬切生硬) */}
+        <div aria-hidden="true" className="h-2.5 shrink-0 bg-gradient-to-b from-chrome-surface to-bg" />
         <main className="min-h-0 flex-1 overflow-hidden bg-bg">
           {[...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES].includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(route)} />
