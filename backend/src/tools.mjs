@@ -822,10 +822,14 @@ export function buildOrchestratorTools(record, caps) {
           workSessionId: record.workSessionId ?? null,
         });
       }
+      // r14v2-③: relay 回执附成员终报未决状态(观测点搬到编排器实际
+      // 看到的工具回执面——HTTP /steer 面编排器不可见, 上批挂错层)
+      const pendingNote = params.agents.length
+        ? `(终报未决: ${params.agents.join('、')} 的任务报告提交状态可在本回合稍后经 query_intel kind=task-report 对账)` : '';
       return {
         content: [{
           type: 'text',
-          text: `Relayed to ${params.agents.join(', ')} (${engagement}).`,
+          text: `Relayed to ${params.agents.join(', ')} (${engagement}).${pendingNote}`,
         }],
         details: { engagement, agents: params.agents },
       };

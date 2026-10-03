@@ -429,6 +429,7 @@ const caps = {
   /** request_vulnerability_revision backing — writer review wake.
    *  Same detached-session + event-driven-wait pattern as reportWriter. */
   revisionWriter: async (requesterRecord, targetSeq, reason, changes) => {
+    const tRv = Date.now();  // r14-④
     const target = bus.list().find(e => e.seq === Number(targetSeq)
       && entryKindOf(e) === 'vulnerability' && !e.revises
       && e.workSessionId === (requesterRecord.workSessionId ?? null));  // F33
@@ -509,7 +510,10 @@ loadSandboxConfig().then(async cfg => {
   // 此前 workSessionId:null 在任何项目内都查不到, 三轮"零预告"根因)
   const { getPrefs } = await import('./src/projects.mjs');
   const curWs = getPrefs().currentWs ?? null;
-  bus.emit({ channel: 'audit', from: 'system', type: 'intel-note',
+  // r14v2: 重启通知去重(同标题 10 分钟内不重发——三连重启曾三连落账)
+  const recentSame = bus.list().some(e => e.title === '平台运行时已重启'
+    && Date.now() - Date.parse(e.ts) < 10 * 60_000);
+  if (!recentSame) bus.emit({ channel: 'audit', from: 'system', type: 'intel-note',
     author: { key: 'system', name: '平台运维', typeLabel: '系统' },
     title: '平台运行时已重启',
     summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置',
