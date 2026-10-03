@@ -327,6 +327,10 @@ export class SessionStore {
     return {
       title: record.title,
       rawTitle: record.rawTitle,  // R32D31-E1: 未截断标题随 WAL 持久化
+      // r14v3-分裂脑: activeEngagement 随 meta piggyback 持久化——
+      // 此前仅会话创建快照携带, dispatch 后的变更重启即丢, relay 报
+      // '无 engagement' 而 Temporal 工作流仍存活(路由层/持久层分裂)。
+      activeEngagement: record.activeEngagement ?? null,
       brief: record.brief,
       briefUpTo: record.briefUpTo,
       spawnName: record.spawnName,
