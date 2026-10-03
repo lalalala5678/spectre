@@ -193,8 +193,11 @@ export function buildIntelTools(record, caps) {
       const hits = paged.slice(0, limit);
       const latestSeq = inWs.length ? Math.max(...inWs.map(e => e.seq)) : 0;
       const olderLeft = paged.length - hits.length;
-      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条${olderLeft > 0
-        ? `,显示最新 ${hits.length} 条(续翻传 before=${hits[hits.length - 1].seq};单条全文传 seq)` : ''}(新→旧,库内最新 seq=${latestSeq}):`;
+      // r10-UX: 翻页提示置底+方向箭头(before 曾两轮被误用——语义正确
+      // 但方向直觉易反)
+      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,库内最新 seq=${latestSeq}):`;
+      const footLine = olderLeft > 0
+        ? `\n\n↓ 还有更旧 ${olderLeft} 条——续翻下一页(更旧)传 before=${hits[hits.length - 1].seq}; ↑ 回到最新一页去掉 before;单条全文传 seq=…` : '';
 
       if (hits.length === 0) {
         const scope = inWs.filter(e => isEntry(e) && !e.void);
@@ -252,7 +255,7 @@ export function buildIntelTools(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: clipMarked(`${countLine}\n\n${lines.join('\n\n---\n\n')}`,
+          text: clipMarked(`${countLine}\n\n${lines.join('\n\n---\n\n')}${footLine}`,
             CONFIG.intelDigestChars, '可减小 limit 或用 q/author/status 过滤后分批查询'),
         }],
       };
