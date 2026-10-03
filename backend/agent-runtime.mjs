@@ -312,6 +312,7 @@ const caps = {
   reportWriter: async (requesterRecord, hint) => {
     const requesterAuthor = store.authorOf(requesterRecord);
     const baseSeq = bus.list().at(-1)?.seq ?? 0;
+    const tRw = Date.now();  // r14-④: 同步等待可观测(回执附 waitedMs)
     const { session: writer, timeout } = await runDetachedAgent({
       agentKey: 'report',
       ws: requesterRecord.workSessionId ?? null,
@@ -356,7 +357,7 @@ const caps = {
         `${(reply || '(无输出)').slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,
-      details: { sessionId: writer.id, declined: true },
+      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },
     };
   },
 
@@ -482,7 +483,7 @@ const caps = {
       text: `撰写agent驳回了该修订申请。其说明:\n` +
         `${(lastReply(writer) || '(无输出)').slice(0, 600)}\n` +
         `(审核对话 ${writer.id})`,
-      details: { sessionId: writer.id, declined: true },
+      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },
     };
   },
 };

@@ -367,10 +367,13 @@ function realRouter({ store, bus, caps, wal }) {
           } else {
             store.steer(record, injectText, source);
           }
+          // r14-③: steer 回执附未决提醒——目标代理尚未提交任务报告时
+          // 明示(编排器可判断该代理仍在途)。
+          const r14pending = action === '/steer' && (record.taskReportCount ?? 0) === 0;
         } catch (err) {
           return bad(res, err.statusCode || 500, err.message);
         }
-        return json(res, 202, { ok: true });
+        return json(res, 202, { ok: true, ...(r14pending ? { pendingReport: true, hint: '该代理尚未提交任务报告(在途)' } : {}) });
       }
       if (action === '/wait-idle' && method === 'POST') {
         if (!isInternalCaller(req)) {

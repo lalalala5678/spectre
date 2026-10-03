@@ -198,14 +198,17 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
     || /&\s*(#.*)?$/.test(cmdStr.trim()) || /\s&\s/.test(cmdStr);
   if (isBg) {
     try {
-      const bg = spawn('bash', ['-c', cmdStr], {
+      // r14-①: 后台输出落盘可回读——外层重定向不影响命令内部显式重定向
+      // (内部 > 优先生效, 外层仅兜底捕获未定向输出)。回执附日志路径。
+      const bgLog = `/tmp/spectre-bg-${Date.now().toString(36)}.log`;
+      const bg = spawn('bash', ['-c', `mkdir -p /tmp; ( ${cmdStr} ) > ${bgLog} 2>&1`], {
         detached: true, stdio: 'ignore',
         env: sanitizedEnv(extraEnv), cwd: cwdHost,
       });
       bg.unref();
       // FLv2: 与 spawnShell 正常 resolve 形状对齐({exitCode,text})——
       // 上版给 {ok,stdout} 被官方 bash 工具的 text.split 路径炸(undefined)
-      return Promise.resolve({ exitCode: 0, text: '(后台任务已启动, 不等待输出; 稍后用 bash/文件检查进度)', timedOut: false, background: true });
+      return Promise.resolve({ exitCode: 0, text: `(后台任务已启动, 不等待输出。兜底输出日志: ${bgLog}(命令内部显式重定向优先); 稍后 bash 检查进度/标记文件)`, timedOut: false, background: true, bgLog });
     } catch (e) {
       return Promise.resolve({ exitCode: -1, text: String(e?.message ?? e), timedOut: false, spawnError: String(e?.message ?? e) });
     }
