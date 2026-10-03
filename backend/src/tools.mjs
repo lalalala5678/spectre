@@ -114,9 +114,11 @@ export function buildIntelTools(record, caps) {
       // Filters below see current titles/severities/status/detail.
       const inWs = foldRevisions(rawWs.filter(isEntry)).map(e => ({
         ...e,
-        title: e.current.title ?? e.title,
-        severity: e.current.severity ?? e.severity,
-        status: e.current.status ?? e.status,
+        // r10-D1: 现行版顶替用 || (空串也回退原版——?? 只挡 nullish,
+        // 修订链上空值形态曾让头部标签显示陈旧/空状态)
+        title: e.current.title || e.title,
+        severity: e.current.severity || e.severity,
+        status: e.current.status || e.status,
         detail: e.current.detail ?? e.detail,
         summary: e.current.summary ?? e.summary,
         // CS46-F2: 修订版 summary 顶替时截断标志同步顶替——否则原始条
