@@ -272,25 +272,6 @@ export function SettingsPage() {
     await reload();
   };
 
-  if (err) return <div className="p-6 text-sm text-danger-text">设置加载失败:{err}</div>;
-  if (!data) return <div className="space-y-3 p-6">
-    <Skeleton className="h-8 w-full" />
-    <Skeleton className="h-24 w-full" />
-    <Skeleton className="h-24 w-full" />
-  </div>;
-
-  const cs = data.common ?? {};
-  const llm = (cs.llm ?? {}) as Record<string, string>;
-  const comp = (cs.compaction ?? {}) as Record<string, string>;
-  const ws = (cs.webSearch ?? {}) as Record<string, string>;
-  const groups = data.schema.agents ?? [];
-  const reconAgent = groups.find((a) => a.agentKey === 'recon');
-  const otherAgents = groups.filter((a) => a.agentKey !== 'recon');
-  const sources = reconAgent?.sources ?? [];
-  const mountedCount = sources.filter((s) => hasCred(data.reconSources[s.id], s.id)).length;
-  const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
-  const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
-
   // EQ-3: 二级菜单——左锚点分组导航(替代单页倾倒)
   // FEVERIFY11-P3: scroll-spy 高亮 + <lg 横向 chips(窄屏不整体消失)
   const SECTIONS = [
@@ -317,6 +298,26 @@ export function SettingsPage() {
     return () => host.removeEventListener('scroll', onScroll);
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
   const goSec = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+
+  if (err) return <div className="p-6 text-sm text-danger-text">设置加载失败:{err}</div>;
+  if (!data) return <div className="space-y-3 p-6">
+    <Skeleton className="h-8 w-full" />
+    <Skeleton className="h-24 w-full" />
+    <Skeleton className="h-24 w-full" />
+  </div>;
+
+  const cs = data.common ?? {};
+  const llm = (cs.llm ?? {}) as Record<string, string>;
+  const comp = (cs.compaction ?? {}) as Record<string, string>;
+  const ws = (cs.webSearch ?? {}) as Record<string, string>;
+  const groups = data.schema.agents ?? [];
+  const reconAgent = groups.find((a) => a.agentKey === 'recon');
+  const otherAgents = groups.filter((a) => a.agentKey !== 'recon');
+  const sources = reconAgent?.sources ?? [];
+  const mountedCount = sources.filter((s) => hasCred(data.reconSources[s.id], s.id)).length;
+  const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
+  const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
+
   return (
     <div className="flex h-full min-h-0">
       <nav aria-label="设置分组" className="hidden w-44 shrink-0 flex-col gap-0.5 border-r border-line px-3 py-4 lg:flex">
