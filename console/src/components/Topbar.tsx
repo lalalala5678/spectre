@@ -164,11 +164,11 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
   const fmt = (d: Date) => d.toLocaleString('sv-SE', { hour12: false }).replace('T', ' ');
   return (
     <header className="flex h-12 shrink-0 items-center gap-3 border-b border-chrome-line bg-chrome-surface px-4">
-      <Button variant="ghost" size="icon" className="md:hidden" onClick={onMenu} aria-label="打开导航">
+      <Button variant="ghostChrome" size="icon" className="md:hidden" onClick={onMenu} aria-label="打开导航">
         <Menu className="h-4 w-4" />
       </Button>
       {/* 全局搜索 (F69: 实装; §6.1-2 + §5.4/§5.8) */}
-      <div ref={boxRef} className="relative w-80">
+      <div ref={boxRef} className="relative w-80 max-md:w-40 max-sm:w-full">
         <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-chrome-tertiary" />
         <Input
           value={q}
@@ -229,13 +229,13 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           R32D44: 模型名字样移除——供应商已平台化(默认+单 agent 覆盖),
           单一模型名不再能代表全平台, 模型信息在设置页与各 agent 配置页签可见。 */}
       <div className="flex items-center gap-2 text-xs tabular-nums text-chrome-tertiary">
-        <span>{fmt(now)} 本地</span>
+        <span className="hidden md:inline">{fmt(now)} 本地</span>
         <span aria-hidden="true">·</span>
         <div
           title={health
             ? `会话 ${health.sessions} · 总线事件 ${health.bus}`
             : 'runtime 不可达'}
-          className="flex items-center gap-1.5"
+          className="hidden items-center gap-1.5 md:flex"
         >
           <Activity className={health ? 'h-3.5 w-3.5 text-success-text' : 'h-3.5 w-3.5 text-danger-text'} />
           {health
@@ -247,7 +247,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
       <div className="flex-1" />
 
       <Button
-        variant="ghost"
+        variant="ghostChrome"
         size="icon"
         onClick={() => { window.location.href = '/spectre/logout'; }}
         title="登出"
@@ -258,7 +258,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
       {/* F70: 通知(实装) */}
       <div ref={bellRef} className="relative">
         <Button
-          variant="ghost"
+          variant="ghostChrome"
           size="icon"
           onClick={() => { setBellOpen(v => !v); setUnread(0); }}
           title={unread > 0 ? `通知 · ${unread} 条未读` : '通知(漏洞/失败报告)'}
@@ -274,7 +274,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
         {bellOpen && (
           <div className="absolute right-0 top-full z-30 mt-1 w-80 rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
             {notices.length === 0 ? (
-              <EmptyState icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
+              <EmptyState tone="chrome" icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
             ) : notices.slice(0, 20).map(n => (
               <button key={n.seq} onClick={() => { setBellOpen(false); window.location.hash = n.hash; }}
                 className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-chrome-surface-2">

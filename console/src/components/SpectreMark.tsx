@@ -2,7 +2,7 @@ import { cn } from '../utils/cn';
 
 /**
  * SPECTRE 品牌图标 — 自绘 SVG(§6.1-20 主题化)
- * 颜色全部注入 CSS 变量随 data-theme 切换:
+ * 颜色全部注入 CSS 变量深色壳内恒深牌(currentColor 消费方定色):
  * 徽章底 surface-2 · 边界/连线 line-strong·tertiary · 准星 danger · 顶点节点 accent
  */
 export function SpectreMark({ className }: { className?: string }) {

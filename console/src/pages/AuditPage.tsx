@@ -62,7 +62,7 @@ export function AuditPage() {
             <Skeleton className="h-6 w-2/3" />
           </div>
           : events.length === 0 ? <EmptyState icon={Download} title="暂无审计事件" hint="总线事件将在此实时列出" />
-          : <table className="w-full text-left">
+          : <div className="overflow-x-auto"><table className="w-full text-left">
           <thead>
             <tr className="border-b border-line text-xs font-medium text-tertiary">
               <th className="px-3 py-2.5">Seq</th>
@@ -85,7 +85,7 @@ export function AuditPage() {
               </tr>
             ))}
           </tbody>
-        </table>}
+        </table></div>}
         {events && events.length > limit && (
           <Button variant="secondary" size="sm" className="m-3" onClick={() => setLimit(l => l + 100)}>
             加载更多({shown.length}/{events.length})

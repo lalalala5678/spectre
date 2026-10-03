@@ -4,7 +4,7 @@ import { cn } from '../../utils/cn';
 /** §5.1 Button: 四变体 × 四尺寸, 统一 focus-visible ring(≥3:1), 图标钮 32px 命中区(D7)。
  * §7-6 修订: sm 由 h-7(28px) 升 h-8(32px)——规格 §5.1 与 §7-6(≥32px) 此前
  * 自相矛盾, 以验收硬指标 §7-6 为准统一。 */
-type Variant = 'primary' | 'secondary' | 'ghost' | 'danger';
+type Variant = 'primary' | 'secondary' | 'ghost' | 'ghostChrome' | 'danger';  // ghostChrome: 深色壳内用(FEAESTH4-P1)
 type Size = 'sm' | 'md' | 'lg' | 'icon';
 
 const BASE =
@@ -14,6 +14,7 @@ const VARIANTS: Record<Variant, string> = {
   primary: 'bg-accent text-white shadow-xs hover:bg-accent-hover active:bg-accent-hover',
   secondary: 'border border-line-strong bg-surface text-secondary shadow-xs hover:bg-surface-2 hover:text-primary',
   ghost: 'text-secondary hover:bg-surface-2 hover:text-primary',
+  ghostChrome: 'text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary',
   danger: 'border border-danger-line bg-danger-bg text-danger-text hover:brightness-95',
 };
 

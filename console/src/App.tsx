@@ -121,10 +121,14 @@ export default function App() {
     <div className="flex h-screen w-screen overflow-hidden bg-bg font-sans text-primary">
       {/* 窄窗(<md)侧栏改抽屉: 主区加 hamburger; 路由切换自动收起 */}
       {navOpen && (
-        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setNavOpen(false)} />
+        <div className="fixed inset-0 z-30 bg-black/40 md:hidden" onClick={() => setNavOpen(false)} onKeyDown={e => { if (e.key === 'Escape') setNavOpen(false); }} />
       )}
-      <div className={cn('fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0',
-        navOpen ? 'translate-x-0' : '-translate-x-full')}>
+      <div
+        role={navOpen ? 'dialog' : undefined}
+        aria-modal={navOpen ? 'true' : undefined}
+        onKeyDown={e => { if (e.key === 'Escape') setNavOpen(false); }}
+        className={cn('fixed inset-y-0 left-0 z-40 transition-transform md:static md:translate-x-0',
+          navOpen ? 'translate-x-0' : '-translate-x-full max-md:invisible')}>
         <Sidebar route={route} onRoute={r => { nav(r); setNavOpen(false); }} runningCount={runningCount} />
       </div>
       <div className="flex min-w-0 flex-1 flex-col">

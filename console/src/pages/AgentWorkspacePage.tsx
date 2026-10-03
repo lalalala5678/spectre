@@ -551,11 +551,18 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
           {/* 右栏：AutoPwn = 子Agent + 全量漏洞/情报;stage agent = 会话面板 + 自己的漏洞/情报 */}
           <div
+            role={typeof window !== 'undefined' && window.innerWidth < 1024 ? 'dialog' : undefined}
+            aria-modal={typeof window !== 'undefined' && window.innerWidth < 1024 ? 'true' : undefined}
+            onKeyDown={e => { if (e.key === 'Escape') setRightOpen(false); }}
             className={cn(
               'relative z-30 h-full shrink-0 border-l border-line bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',
-              !rightOpen && 'max-lg:translate-x-full',
+              // FEAESTH4-P1-2/P2: 抽屉态固定 85vw≤360px(此前 ratio*vw 375px 屏
+              // 仅 90px 不可用)+关闭态 invisible 移出 Tab 序(此前离屏可聚焦)+
+              // Esc 关闭。
+              'max-lg:!w-[min(85vw,360px)]',
+              !rightOpen && 'max-lg:invisible',
             )}
-            style={{ width: `${(rightRatio * 100).toFixed(2)}vw` }}
+            style={{ width: `clamp(${(rightRatio * 100).toFixed(2)}vw, 240px, 480px)` }}
           >
             <div
               onPointerDown={onResizeDown}

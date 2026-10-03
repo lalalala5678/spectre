@@ -79,7 +79,7 @@ function FieldRow({ def, value, onSave }: {
   }
 
   return (
-    <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 py-2.5 transition-colors hover:bg-surface-2/40">
+    <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 max-md:grid-cols-1 py-2.5 transition-colors hover:bg-surface-2/40">
       <div className="min-w-0 pl-1">
         <label htmlFor={`fld-${def.id}`} className="block text-[13px] font-medium text-secondary">{def.label}</label>
         {def.hint && <div className="mt-0.5 text-xs leading-tight text-tertiary">{def.hint}</div>}
