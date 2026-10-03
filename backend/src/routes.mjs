@@ -13,7 +13,7 @@ import { hasInternalToken, isInternalCaller, json, readJson, readRawBody, parseM
 import * as path_mod from 'node:path';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
-import { SESSION_NAME_MAX, SESSION_DESC_MAX, injectionOriginOf } from './sessions.mjs';
+import { SESSION_NAME_MAX, SESSION_DESC_MAX, injectionOriginOf, dmNextSeq } from './sessions.mjs';
 import { emitRevision } from './revision.mjs';
 import { sandboxConfig, saveSandboxConfig, ensureSandbox, installCli, listInstalledTools, sharedLayerTools, uninstallCliTool } from './sandbox/container.mjs';
 import { listProjects, getProject, ensureProject, renameProject, createProject, setLastSession, getPrefs, setPrefs, deleteProject, isTombstoned } from './projects.mjs';
@@ -86,6 +86,27 @@ function maskPrefs(raw) {
 }
 
 function realRouter({ store, bus, caps, wal }) {
+  /** 自测r2-#3: engagement 子会话看门狗——30min 无 journal 事件 nudge,
+   * 60min 终止+DM 通报编排者(与 agent-runtime spawnChild 同语义)。 */
+  function attachEngagementWatchdog(child, _wal) {
+    const NUDGE_MS = 30 * 60_000, KILL_MS = 60 * 60_000;
+    setInterval(() => {
+      const rec = store.get(child.id);
+      const last = rec?.events?.[rec.events.length - 1];
+      const idleMs = last ? Date.now() - Date.parse(last.ts) : 0;
+      if (!rec || !rec.busy) return;
+      if (idleMs >= KILL_MS) {
+        rec.busy = false;
+        store._journal(rec, 'watchdog_kill', { idleMs });
+        bus.emit({ channel: 'dm', from: 'system', to: 'autopwn', type: 'watchdog',
+          summary: `看门狗: engagement 子任务 ${child.id.slice(0, 16)}… 60 分钟无事件已终止。` });
+      } else if (idleMs >= NUDGE_MS && !rec._wdNudged) {
+        rec._wdNudged = true;
+        store.followUp(rec, '【看门狗】30 分钟无事件——请汇报当前状态与阻塞点; 已无法推进请立即提交任务报告收尾。');
+      }
+    }, 60_000).unref?.();
+  }
+
   const route = async function route(req, res, url) {
     const path = url.pathname;
     const method = req.method;
@@ -251,6 +272,9 @@ function realRouter({ store, bus, caps, wal }) {
         opts.description = String(body.description).slice(0, SESSION_DESC_MAX);  // CS41-B4: 单源
       }
       const record = store.create(body.agentKey, opts);
+      // 自测r2-#3: engagement 子会话同挂看门狗(此前仅 spawn 本地路径有
+      // ——engagement 4 代理越 30 分钟阈值无 nudge 的实测缺口)。
+      if (opts.orchestratorSessionId) attachEngagementWatchdog(record, wal);
       // Full summary: clients merge the response straight into session
       // lists (createdAt/messages/busy are load-bearing for sorting).
       return json(res, 201, store.summary(record));
@@ -302,12 +326,18 @@ function realRouter({ store, bus, caps, wal }) {
           // body.source==='agent' marks Temporal-side injections (internal
           // token enforced above); classify their origin so the console
           // never renders them as the human user.
+          // 自测r2-#8: agent 注入统一带投递序号(与 sessions 本地 DM
+          // 同一序号器; [DM from X] → [DM #n from X])。
+          const injectText = body.source === 'agent'
+            ? text.replace(/^\[DM from ([^\]]+)\]/,
+                (_, who) => `[DM #${dmNextSeq(record.id)} from ${who}]`)
+            : text;
           const source = body.source === 'agent'
-            ? injectionOriginOf(text) : undefined;
+            ? injectionOriginOf(injectText) : undefined;
           if (action === '/messages') {
-            store.prompt(record, text, source);
+            store.prompt(record, injectText, source);
           } else {
-            store.steer(record, text, source);
+            store.steer(record, injectText, source);
           }
         } catch (err) {
           return bad(res, err.statusCode || 500, err.message);

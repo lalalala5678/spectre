@@ -219,6 +219,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     };
     shells.set(id, sh); persistShells();
     audit('shell-register', { id, target, transport, createdBy, name: nm });
+    // 自测r2-#5: register 回执显式标注沙箱驱动形态(local=命令跑宿主,
+    // 无容器隔离; docker 未装/未用时不再静默)。#7 同批: local 驱动无
+    // "容器重建"事件语义(文件丢失与平台无关, 无 bus 通知)。
+    const drv = sandboxConfig().driver;
+    if (drv === 'local') sh.driverNote =
+      'sandbox=local(宿主直跑, 无容器隔离; docker 未启用——需隔离请装 docker 并重跑 deploy/setup.sh)';
     return sh;
   }
 
@@ -323,7 +329,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           if (cappedAt) stdout += `\n(timeoutMs 已按 web 通道上限裁剪为 ${cappedAt}ms)`;
         } catch (e) {
           clearTimeout(t);
-          return { ok: false, error: 'webshell 通道异常(已硬杀): ' + e.message };
+          const capNote = cappedAt
+            ? `(timeoutMs 超出 web 通道上限, 已按 ${cappedAt}ms 硬杀)` : '';
+          return { ok: false, error: `webshell 通道异常(已硬杀${capNote}): ${e.message}` };
         }
       } else if (sh.transport === 'local') {
         // transportRef binds the shell to ONE exec box — commands land in

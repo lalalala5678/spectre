@@ -62,7 +62,17 @@ const ORCHESTRATOR_KEY = 'autopwn';
  * The real human user NEVER passes through here.
  */
 export const injectionOriginOf = (text) =>
-  String(text).startsWith('[DM from ') ? 'agent' : 'system';
+  (/^\[DM #\d+ from /.test(String(text)) || String(text).startsWith('[DM from '))
+    ? 'agent' : 'system';
+
+/** 自测r2-#8: DM 投递序号(按目标会话计数, 进程内单调)——编排器长回合
+ * 期间积压通知涌入时到达顺序可辨。routes 层(agent 注入)共用本序号器。 */
+const dmSeqCounters = new Map();
+export function dmNextSeq(targetId) {
+  const n = (dmSeqCounters.get(targetId) ?? 0) + 1;
+  dmSeqCounters.set(targetId, n);
+  return n;
+}
 
 let seq = 0;
 
@@ -812,7 +822,7 @@ export class SessionStore {
       : '';
     this.caps.followUp(
       record.parentSessionId,
-      `[DM from ${record.agentKey}] ${label}:\n${vulnNote}${clipMarked(
+      `[DM #${dmNextSeq(record.parentSessionId)} from ${record.agentKey}] ${label}:\n${vulnNote}${clipMarked(
         reply,
         CONFIG.dmDigestChars,
         `任务报告已入库,用 query_intel 读取;原始回复见会话 ${record.id}`,

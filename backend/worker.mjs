@@ -1,5 +1,8 @@
-import { Worker } from '@temporalio/worker';
-import { Connection } from '@temporalio/client';  // R32D105-F1
+import { Worker, NativeConnection } from '@temporalio/worker';
+// 自测r2-#4 根因: @temporalio 1.24 起 client 包的 Connection(高级类)与
+// worker 桥接句柄分家——传给 Worker.create 报 neon downcast 失败(战役
+// 可创建、worker 永远连不上, engagement 零产出)。桥接必须用 worker 包
+// 的 NativeConnection。
 import net from 'node:net';
 
 import * as activities from './activities.mjs';
@@ -28,7 +31,7 @@ await new Promise(resolve => {
 const bootWorker = async () => {
   for (let attempt = 1; ; attempt += 1) {
     try {
-      const conn = await Connection.connect({ address: CONFIG.temporalAddress });  // R32D105-F1
+      const conn = await NativeConnection.connect({ address: CONFIG.temporalAddress });  // R32D105-F1/自测r2-#4
       const w = await Worker.create({
         workflowsPath: new URL('./workflows.mjs', import.meta.url).pathname,
         activities,
