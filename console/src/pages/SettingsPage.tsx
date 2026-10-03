@@ -66,7 +66,10 @@ function FieldRow({ def, value, onSave, onDirtyChange }: {
   }, [value, def.default]);
 
   const dirty = draft !== orig;
-  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);  // FEVERIFY8: 卸载归零
+  }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     if (!dirty || state === 'saving') return;
@@ -190,21 +193,20 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
 }
 export function SettingsPage() {
   // FEVERIFY6-P3: 未保存改动计数——派发全局事件, App 路由切换前拦截确认
+  // FEVERIFY8-勘误: 协议 v2 绝对值(src='settings'); 上一批 LLM 两调用点
+  // 接线实际未写入(replace 未中未断言)——本次三处全接线。
   const dirtyCount = useRef(0);
+  const SRC = 'settings';
   useEffect(() => {
-    const fire = () => window.dispatchEvent(new CustomEvent('spectre:dirty', { detail: dirtyCount.current }));
-    fire();
-    window.addEventListener('spectre:dirty-query', fire);
-    // FEVERIFY7-P2: 卸载即弃草稿——通知 App 清零(此前跨页泄漏假警报)
+    window.dispatchEvent(new CustomEvent('spectre:dirty-set', { detail: { src: SRC, count: dirtyCount.current } }));
     return () => {
-      window.removeEventListener('spectre:dirty-query', fire);
       dirtyCount.current = 0;
-      window.dispatchEvent(new CustomEvent('spectre:dirty-zero'));
+      window.dispatchEvent(new CustomEvent('spectre:dirty-zero', { detail: { src: SRC } }));
     };
   }, []);
   const bumpDirty = (d: boolean) => {
     dirtyCount.current = Math.max(0, dirtyCount.current + (d ? 1 : -1));
-    window.dispatchEvent(new CustomEvent('spectre:dirty', { detail: dirtyCount.current }));
+    window.dispatchEvent(new CustomEvent('spectre:dirty-set', { detail: { src: SRC, count: dirtyCount.current } }));
   };
   usePageTitle('设置'); // FEVERIFY-N3
   const [data, setData] = useState<SettingsPayload | null>(null);
@@ -298,7 +300,7 @@ export function SettingsPage() {
               逐字段保存×合并探测有跨厂商中间态死锁(换供应商先存 URL
               的瞬间=新 URL+旧 key→401 存不进)。 */}
           <div className="px-4 py-2.5">
-            <AgentLlmOverride agentId="" mode="default" formats={data.schema.llmFormats} ov={{
+            <AgentLlmOverride agentId="" mode="default" formats={data.schema.llmFormats} onDirtyChange={bumpDirty} ov={{
               format: String(llm.format ?? ''), baseUrl: String(llm.baseUrl ?? ''),
               apiKey: String(llm.apiKey ?? ''), model: String(llm.model ?? ''),
             }} onSaved={() => void reload()} />
@@ -336,7 +338,7 @@ export function SettingsPage() {
                 </div>
                 {/* CS16-P1: 原子四字段编辑器(与 agent 配置页签同款共享组件)——
                     逐字段保存×整体探测有跨供应商中间态死锁 */}
-                <AgentLlmOverride agentId={g.agentKey} formats={data.schema.llmFormats} ov={ov} onSaved={() => void reload()} />
+                <AgentLlmOverride agentId={g.agentKey} formats={data.schema.llmFormats} ov={ov} onSaved={() => void reload()} onDirtyChange={bumpDirty} />
               </div>
             );
           })}

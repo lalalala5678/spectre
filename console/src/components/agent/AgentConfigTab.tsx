@@ -90,7 +90,9 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
               </div>
             ))}
           </div>
-          <AgentLlmOverride agentId={agentId} formats={llmFormats} ov={agentLlm?.[agentId]} onSaved={reloadLlm} />
+          <AgentLlmOverride agentId={agentId} formats={llmFormats} ov={agentLlm?.[agentId]} onSaved={reloadLlm}
+            onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
+              { detail: { src: `agentConfig:${agentId}`, count: d ? 1 : 0 } }))} />
         </div>
       </Panel>
 

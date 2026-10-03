@@ -28,7 +28,10 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
     setDraft(v); setOrig(v); setState('idle'); setMsg('');
   }, [agentId, ov?.format, ov?.baseUrl, ov?.apiKey, ov?.model]);
   const dirty = JSON.stringify(draft) !== JSON.stringify(orig);
-  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
+  useEffect(() => {
+    onDirtyChange?.(dirty);
+    return () => onDirtyChange?.(false);  // FEVERIFY8: 卸载归零(消跨页残留)
+  }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
 
   const save = async () => {
     if (!dirty || state === 'saving') return;

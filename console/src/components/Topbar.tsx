@@ -169,8 +169,10 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
 
   const go = (hash: string) => {
     setOpen(false);
-    // FEVERIFY7-P3: hash 直改入口过脏守卫
-    window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: { deny: () => {} } }));
+    // FEVERIFY8-P2: hash 入口真闸——cancel 则不导航(此前无条件赋值=假拦截)
+    const res = { ok: true };
+    window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: res }));
+    if (!res.ok) return;
     window.location.hash = hash;
   };
 
@@ -271,7 +273,8 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
       </Button>
 
       {/* F70: 通知(实装) */}
-      <div ref={bellRef} className="relative">
+      <div ref={bellRef} className="relative"
+           onKeyDown={e => { if (e.key === 'Escape') setBellOpen(false); }}>  {/* FEVERIFY8: 铃铛 Esc */}
         <Button
           variant="ghostChrome"
           size="icon"
@@ -291,7 +294,12 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
             {notices.length === 0 ? (
               <EmptyState tone="chrome" icon={Bell} title="暂无通知" hint="漏洞发布与失败报告将推送至此" />
             ) : notices.slice(0, 20).map(n => (
-              <button key={n.seq} onClick={() => { setBellOpen(false); window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: { deny: () => {} } })); window.location.hash = n.hash; }}
+              <button key={n.seq} onClick={() => {
+                  setBellOpen(false);
+                  const res = { ok: true };
+                  window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: res }));
+                  if (res.ok) window.location.hash = n.hash;
+                }}
                 className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1.5 text-left hover:bg-chrome-surface-2">
                 <Badge tone={n.kind === 'vulnerability' ? 'danger' : 'warning'} className={
               n.kind === 'vulnerability'

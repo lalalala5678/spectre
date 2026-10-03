@@ -33,7 +33,7 @@ export function SpectreMark({ className, tone = 'surface' }: { className?: strin
         );
       })}
       {/* 准星刻度：上下左右 */}
-      <g stroke={v('--danger-text', '--danger-text')} strokeWidth="1.1">
+      <g stroke={v('--danger-text', '--chrome-danger-text')} strokeWidth="1.1">
         <line x1="16" y1="8.6" x2="16" y2="11.4" />
         <line x1="16" y1="20.6" x2="16" y2="23.4" />
         <line x1="8.6" y1="16" x2="11.4" y2="16" />
@@ -42,11 +42,11 @@ export function SpectreMark({ className, tone = 'surface' }: { className?: strin
       {/* 准星内环 */}
       <circle cx="16" cy="16" r="4.6" fill="none" stroke="var(--danger-text)" strokeWidth="1.1" />
       {/* 核心命中点 */}
-      <circle cx="16" cy="16" r="1.6" fill="var(--danger-text)" />
+      <circle cx="16" cy="16" r="1.6" fill={v('--danger-text', '--chrome-danger-text')} />
       {/* 编排节点：顶点 accent = orchestrator，其余 secondary */}
       {nodes.map((n, i) => (
         <circle key={i} cx={n.x} cy={n.y} r={n.top ? 2 : 1.5}
-          fill={n.top ? 'var(--accent)' : v('--text-secondary', '--chrome-text-secondary')} stroke={v('--surface-2', '--chrome-surface-2')} strokeWidth="0.6" />
+          fill={n.top ? v('--accent', '--chrome-accent-text') : v('--text-secondary', '--chrome-text-secondary')} stroke={v('--surface-2', '--chrome-surface-2')} strokeWidth="0.6" />
       ))}
     </svg>
   );

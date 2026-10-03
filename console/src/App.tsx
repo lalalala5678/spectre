@@ -118,34 +118,43 @@ export default function App() {
 
   const [navOpen, setNavOpen] = useState(false);
   const [navIsDrawer, setNavIsDrawer] = useState(() => window.innerWidth < 768);  // FEUX5-P2: inert 仅抽屉态
-  // FEVERIFY6-P3: 脏离开拦截(设置页未保存改动, 路由切换前确认)
-  const dirtyCount = useRef(0);
+  // FEVERIFY8-勘误: 脏计数协议 v2——绝对值按源上报(App 端求和), 消跨源冲突
+  const dirtyMap = useRef<Record<string, number>>({});
+  const dirtySum = () => Object.values(dirtyMap.current).reduce((a, b) => a + b, 0);
   useEffect(() => {
-    const onDirty = (e: Event) => { dirtyCount.current = (e as CustomEvent).detail ?? 0; };
-    window.addEventListener('spectre:dirty', onDirty);
-    return () => window.removeEventListener('spectre:dirty', onDirty);
+    const onDirtySet = (e: Event) => {
+      const d = (e as CustomEvent).detail as { src: string; count: number };
+      dirtyMap.current[d.src] = d.count;
+    };
+    window.addEventListener('spectre:dirty-set', onDirtySet);
+    return () => window.removeEventListener('spectre:dirty-set', onDirtySet);
   }, []);
   const navGuarded = (r: RouteKey) => {
-    if (dirtyCount.current > 0
-      && !window.confirm(`有 ${dirtyCount.current} 项设置改动未保存, 离开将丢弃。确定离开?`)) return;
-    dirtyCount.current = 0;  // FEVERIFY7-P2: 确定离开即清零(此前残留→假警报连环弹)
+    const n = dirtySum();
+    if (n > 0 && !window.confirm(`有 ${n} 项设置改动未保存, 离开将丢弃。确定离开?`)) return;
+    dirtyMap.current = {};  // FEVERIFY7-P2: 确定离开即清零(防假警报连环弹)
     nav(r);
   };
   useEffect(() => {
     // FEVERIFY7-P3: hash 直改入口(顶栏搜索/铃铛)统一过守卫; 浏览器前进后退
     // (popstate)无法拦截, 记为已知限制。
+    // FEVERIFY8-P2 假闸真修: 调用方传 {ok:true} 可变对象, cancel 置 ok=false
+    // (此前 deny 空回调被无视——confirm 问了答案却不听, 取消照样导航)
     const guard = (e: Event) => {
-      const n = (e as CustomEvent).detail as { count?: number; deny?: () => void };
-      if (dirtyCount.current > 0
-        && !window.confirm(`有 ${dirtyCount.current} 项设置改动未保存, 离开将丢弃。确定离开?`)) {
-        n?.deny?.();
+      const res = (e as CustomEvent).detail as { ok: boolean };
+      const n = dirtySum();
+      if (n > 0 && !window.confirm(`有 ${n} 项设置改动未保存, 离开将丢弃。确定离开?`)) {
+        res.ok = false;
       } else {
-        dirtyCount.current = 0;
+        dirtyMap.current = {};
       }
     };
     window.addEventListener('spectre:nav-guard', guard);
-    const onZero = () => { dirtyCount.current = 0; };
-    window.addEventListener('spectre:dirty-zero', onZero);  // Settings 卸载归零
+    const onZero = (e: Event) => {
+      const d = (e as CustomEvent).detail as { src?: string };
+      if (d?.src) delete dirtyMap.current[d.src];  // 源卸载归零
+    };
+    window.addEventListener('spectre:dirty-zero', onZero);
     return () => {
       window.removeEventListener('spectre:nav-guard', guard);
       window.removeEventListener('spectre:dirty-zero', onZero);
