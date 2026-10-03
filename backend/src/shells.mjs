@@ -287,6 +287,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     }
     const t0 = Date.now();
     let stdout = '', stderr = '', code = 0;
+    let degradedNote;  // r9v2-D10回归: 提升到函数顶(local 分支内声明曾致 web/ssh 路径引用未定义——exec 全瘫)
     try {
       if (sh.transport === 'ssh') {
         // transportRef: "user:pass@host:port" — VM range channel (post-creds).
@@ -311,7 +312,10 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // — only text between <MARK> and </MARK> is returned (kills the
         // Joomla/WordPress page-prefix noise that caused two misreads).
         const spec = sh.transportRef || '';
-        const [spec0raw, marker] = spec.split('#');
+        const [spec0raw, markerRaw] = spec.split('#');
+        // r9v2-D4: marker 兼容带尖括号写法(#<R6OUT> 等价 #R6OUT——
+        // 剥壳查 '<R6OUT>' 时 '<'+'<R6OUT>'+'>' 永不命中)
+        const marker = markerRaw ? markerRaw.replace(/^<+|>+$/g, '') : markerRaw;
         // r6-#3: {CMD} 与 #MARK 之间的尾随空白不进请求(击碎精确白名单)
         const spec0 = spec0raw.replace(/\s+$/, '');
         const isPost = spec0.startsWith('POST|');
@@ -409,7 +413,6 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // 降级形态(容器语义丢失: 无 cuser 隔离/无容器 FS)。
         const haveDocker = sandboxConfig().driver === 'docker';
         let res;
-        let degradedNote;
         if (haveDocker) {
           const argv = cuser
             ? ['exec', '-u', cuser, cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command]

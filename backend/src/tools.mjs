@@ -894,6 +894,8 @@ export function buildShellTools(record, caps) {
         if (p.action === 'read_file') {
           if (!p.path) return say({ ok: false, error: 'path 必填' });  // R12-F2
           const r = await R.readFile(p.shellId, p.path);
+          // r9-D9: 错误路径透传(closed/过期此前被吞成空 content 无说明)
+          if (!r.ok && r.error) return say({ ok: false, error: r.error });
           return say({ ok: r.ok,
             content: markClipped(r.stdout, 16000, '重读用 tail -c +N 分段取'), code: r.code });  // R12-F3
         }
