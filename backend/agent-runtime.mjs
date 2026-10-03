@@ -346,7 +346,8 @@ const caps = {
           `(severity=${published.severity},seq=${published.seq})。` +
           `撰写对话 ${writer.id}(read_session 可复盘其思考与验证过程)。`,
         details: { sessionId: writer.id, seq: published.seq,
-          title: published.title, severity: published.severity },
+          title: published.title, severity: published.severity,
+          waitedMs: Date.now() - tRw, stage: 'writer-review' },  // r14-④ 成功分支同样附同步等待
       };
     }
     // Declined / failed: relay the writer's final reasoning back.
