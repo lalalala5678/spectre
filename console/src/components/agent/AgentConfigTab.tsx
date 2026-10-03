@@ -5,7 +5,7 @@ import { cn } from '../../utils/cn';
 import type { LlmFormatMeta } from '../../api/llmFormats';
 import { AgentLlmOverride } from '../AgentLlmOverride';
 import { Panel } from '../ui/Panel';
-import { Input } from '../ui/Input';
+import { Input, Select } from '../ui/Input';
 import { Button } from '../ui/Button';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
@@ -149,14 +149,14 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
 /** EQ-2: agent 配置页签内的数据源内联编辑器(逐字段保存+密码眼睛,
  * 与设置页同协议; 独立小组件避免整页状态机复制)。 */
 function SourceInlineEditor({ src, cfg, onSaved, agentKey }: {
-  src: { id: string; label: string; fields: { id: string; label: string; type?: string }[] };
+  src: { id: string; label: string; fields: { id: string; label: string; type?: string; options?: string[] }[] };
   cfg: Record<string, string>;
   onSaved: () => void;
   agentKey: string;
 }) {
   const group = agentKey === 'weakcred' ? 'weakcred' : 'recon-source';
-  const save = (leaf: string) => async (v: string) => {
-    await api('/agent-settings/save', { method: 'POST', json: { group, field: `${src.id}.${leaf}`, value: v } });
+  const save = (fullId: string) => async (v: string) => {
+    await api('/agent-settings/save', { method: 'POST', json: { group, field: fullId, value: v } });
     onSaved();
   };
   return (
@@ -168,20 +168,25 @@ function SourceInlineEditor({ src, cfg, onSaved, agentKey }: {
           : <span className="shrink-0 text-xs text-tertiary">未配置</span>}
       </div>
       <div className="space-y-1.5">
-        {src.fields.map(f => (
-          <InlineField key={f.id} id={`${src.id}.${f.id}`} label={f.label} type={f.type}
-            value={cfg[f.id]} onSave={save(f.id)} revealKind="source" revealId={src.id}
-            onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
-              { detail: { src: `agentConfig:${agentKey}:src`, count: d ? 1 : 0 } }))} />
-        ))}
+        {src.fields.map(f => {
+          // FEVERIFY11-P1-2: schema f.id 已是全限定(zoomeye.key)——此前
+          // 再拼 src.id 成三段必 400; 存量值按 leaf 键取(此前查全 id 永空)。
+          const leaf = f.id.split('.').pop() as string;
+          return (
+            <InlineField key={f.id} id={f.id} label={f.label} type={f.type} options={f.options}
+              value={cfg[leaf]} onSave={save(f.id)} revealKind="source" revealId={src.id}
+              onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
+                { detail: { src: `agentConfig:${agentKey}:src`, count: d ? 1 : 0 } }))} />
+          );
+        })}
       </div>
     </div>
   );
 }
 
 /** 单字段行(保存前探测由后端统一做; password 带眼睛)。 */
-function InlineField({ id, label, type, value, onSave, revealKind, revealId, onDirtyChange }: {
-  id: string; label: string; type?: string; value?: string;
+function InlineField({ id, label, type, options, value, onSave, revealKind, revealId, onDirtyChange }: {
+  id: string; label: string; type?: string; options?: string[]; value?: string;
   onSave: (v: string) => Promise<void>; revealKind: 'source'; revealId: string;
   onDirtyChange?: (d: boolean) => void;  // EQ-2: 脏离开接入
 }) {
@@ -211,12 +216,19 @@ function InlineField({ id, label, type, value, onSave, revealKind, revealId, onD
     <div className="flex items-center gap-2">
       <span className="w-[86px] shrink-0 text-[13px] text-secondary">{label}</span>
       <div className="relative min-w-0 flex-1">
+        {type === 'select' ? (  // FEVERIFY11-P2-3: 枚举字段用下拉(与设置页一致)
+          <Select value={draft} onChange={e => { setDraft(e.target.value); setState('idle'); }}
+            className={cn('w-full', state === 'err' ? 'border-danger-line' : dirty && 'border-accent')}>
+            {(options ?? []).map(o => <option key={o} value={o}>{o}</option>)}
+          </Select>
+        ) : (
         <Input type={type === 'password' && !peek ? 'password' : 'text'} value={type === 'password' && peek ? peekVal : draft}
           readOnly={type === 'password' && peek}
           onChange={e => { setDraft(e.target.value); setState('idle'); }}
           onKeyDown={e => { if (e.key === 'Enter') void save(); }}
           className={cn('w-full font-mono text-[13px]',
             state === 'err' ? 'border-danger-line' : dirty && 'border-accent')} />
+        )}
         {type === 'password' && (
           <button type="button" onClick={() => void togglePeek()} aria-label={peek ? '隐藏明文' : '查看明文'}
             title={peek ? '隐藏明文' : '查看明文(操作会留审计日志)'}
@@ -228,7 +240,7 @@ function InlineField({ id, label, type, value, onSave, revealKind, revealId, onD
       <Button onClick={() => void save()} disabled={!dirty || state === 'saving'} variant="primary" size="sm" className="min-w-20 shrink-0">
         {state === 'saving' ? '检测中' : state === 'ok' ? '✓ 已保存' : '保存'}
       </Button>
-      {state === 'err' && <span className="max-w-40 truncate text-xs text-danger-text" title={msg}>{msg}</span>}
+      {state === 'err' && <span className="max-w-56 shrink-0 truncate text-xs text-danger-text" title={msg}>{msg}</span>}
     </div>
   );
 }

@@ -477,6 +477,22 @@ export function revealSetting(kind, id, field) {
   return '';
 }
 
+/** FEVERIFY11-P2-1: 探测错误脱敏——上游探针把带 key 的完整 URL 原样抛进
+ * 错误文案, 读面处处掩码唯独报错面裸奔。对存量所有秘密值做替换。 */
+function redactSecrets(text, prefs) {
+  let out = String(text);
+  const swap = (v) => {
+    if (typeof v === 'string' && v.length >= 8) out = out.split(v).join('***');
+  };
+  swap(prefs.commonSettings?.llm?.apiKey);
+  swap(prefs.commonSettings?.webSearch?.apiKey);
+  for (const cfg of Object.values(prefs.agentLlm ?? {})) swap(cfg?.apiKey);
+  for (const cfg of Object.values(prefs.reconApiKeys ?? {})) {
+    for (const v of Object.values(cfg ?? {})) swap(v);
+  }
+  return out;
+}
+
 export async function saveSetting({ group, field, value }, wal) {
   const schema = settingsSchema();
   const clean = (v) => (typeof v === 'string' ? v.trim() : v);
@@ -509,7 +525,7 @@ export async function saveSetting({ group, field, value }, wal) {
         return { ok: false, error: '默认供应商三项必填(Base URL/API Key/模型)' };
       }
       const r = await llmProbe(v4.baseUrl, v4.apiKey, v4.model, v4.format || 'openai');
-      if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+      if (!r.ok) return { ok: false, error: redactSecrets(`连通失败: ${r.error}`, getPrefs()) };
       const fresh = { ...getPrefs().commonSettings };
       fresh.llm = { ...fresh.llm, format: v4.format || 'openai',
         baseUrl: v4.baseUrl, apiKey: v4.apiKey, model: v4.model };
@@ -535,7 +551,7 @@ export async function saveSetting({ group, field, value }, wal) {
       const ws = { ...getPrefs().commonSettings?.webSearch, apiKey: vRaw };
       if (ws.provider && ws.provider !== 'none' && ws.provider !== 'searxng') {
         const r = await probeSearchProvider(ws.provider, ws);
-        if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+        if (!r.ok) return { ok: false, error: redactSecrets(`连通失败: ${r.error}`, getPrefs()) };
       }
     }
     const [top, leaf] = field.split('.');
@@ -588,7 +604,7 @@ export async function saveSetting({ group, field, value }, wal) {
         return { ok: false, error: '生效配置不完整(Base URL/Key/模型)——先在通用配置配好默认, 或把覆盖四字段填齐' };
       }
       const r = await llmProbe(eff.baseUrl, eff.apiKey, eff.model, eff.format);
-      if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+      if (!r.ok) return { ok: false, error: redactSecrets(`连通失败: ${r.error}`, getPrefs()) };
     }
     const freshAll = { ...getPrefs().agentLlm };
     const cleaned = Object.fromEntries(Object.entries(cur).filter(([, v2]) => v2 !== ''));
@@ -660,7 +676,7 @@ export async function saveSetting({ group, field, value }, wal) {
       return { ok: true, mounted: false };
     }
     const r = await src.validate(cur);
-    if (!r.ok) return { ok: false, error: `连通失败: ${r.error}` };
+    if (!r.ok) return { ok: false, error: redactSecrets(`连通失败: ${r.error}`, getPrefs()) };
     // R10-F2: validate(~15s 网络窗口)后重读——并发保存的兄弟字段不被
     // 陈旧快照覆盖(丢更新)。
     const freshAll = { ...getPrefs().reconApiKeys };

@@ -69,7 +69,7 @@ export function ToolingChat({ agentKey, workSessionId }: { agentKey: string; wor
       )}
       <div className={cn('min-h-[420px]', sessionId ? 'flex min-h-0 flex-1' : '')}>
         {sessionId
-          ? <LiveSession agentKey={agentKey} sessionId={sessionId} />
+          ? <LiveSession agentKey={agentKey} sessionId={sessionId} heading={`${agentKey} 配置助手`} />
           : !error && (
             <div className="space-y-2 py-8">
               <Skeleton className="h-4 w-2/3" />

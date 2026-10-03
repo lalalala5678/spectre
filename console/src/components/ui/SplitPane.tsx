@@ -63,14 +63,20 @@ export function SplitPane({ storageKey, initial = 0.62, min = 0.2, max = 0.8,
     <div ref={ref} className={className ?? 'flex h-full min-h-0 w-full flex-col gap-3 xl:flex-row'}>
       {/* 左栏: 宽屏按 ratio, 窄屏满宽堆叠 */}
       <div className="min-h-0 min-w-0 xl:shrink-0" style={wide ? { width: `${(ratio * 100).toFixed(2)}%` } : undefined}>
-        <div className="h-full min-h-0 overflow-hidden">{children[0]}</div>
+        <div className="h-full min-h-0 overflow-auto">{children[0]}</div>
       </div>
       <div
-        role="separator" aria-orientation="vertical" tabIndex={-1}
+        role="separator" aria-orientation="vertical" tabIndex={0}
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onDoubleClick={reset}
-        title="拖动调整宽度 · 双击恢复默认"
-        className="hidden w-1.5 shrink-0 cursor-col-resize rounded-full bg-line transition-colors hover:bg-accent xl:block"
-      />
+        onKeyDown={e => {
+          if (e.key === 'ArrowLeft') { setRatio(r => Math.max(min, r - 0.03)); e.preventDefault(); }
+          if (e.key === 'ArrowRight') { setRatio(r => Math.min(max, r + 0.03)); e.preventDefault(); }
+        }}
+        title="拖动调整宽度 · 双击恢复默认 · 聚焦后可用左右方向键微调"
+        className="group hidden w-1.5 shrink-0 cursor-col-resize rounded-full bg-line transition-colors hover:bg-accent focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring xl:block"
+      >
+        <span className="mx-auto block h-8 w-0.5 rounded-full bg-line-strong opacity-0 transition-opacity group-hover:opacity-100" />
+      </div>
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">{children[1]}</div>
     </div>
   );

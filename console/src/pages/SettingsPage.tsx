@@ -292,25 +292,53 @@ export function SettingsPage() {
   const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
 
   // EQ-3: 二级菜单——左锚点分组导航(替代单页倾倒)
+  // FEVERIFY11-P3: scroll-spy 高亮 + <lg 横向 chips(窄屏不整体消失)
   const SECTIONS = [
     { id: 'sec-common', label: '通用与模型' },
     { id: 'sec-agentllm', label: '按智能体换模型' },
     { id: 'sec-agents', label: '智能体专属配置' },
     { id: 'sec-recon', label: '资产测绘数据源' },
   ];
+  const [activeSec, setActiveSec] = useState('sec-common');
+  const scrollHostRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const host = scrollHostRef.current;
+    if (!host) return;
+    const onScroll = () => {
+      const line = host.getBoundingClientRect().top + 140;
+      let cur = SECTIONS[0].id;
+      for (const sec of SECTIONS) {
+        const el = document.getElementById(sec.id);
+        if (el && el.getBoundingClientRect().top <= line) cur = sec.id;
+      }
+      setActiveSec(cur);
+    };
+    host.addEventListener('scroll', onScroll, { passive: true });
+    return () => host.removeEventListener('scroll', onScroll);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+  const goSec = (id: string) => document.getElementById(id)?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   return (
     <div className="flex h-full min-h-0">
       <nav aria-label="设置分组" className="hidden w-44 shrink-0 flex-col gap-0.5 border-r border-line px-3 py-4 lg:flex">
         {SECTIONS.map(sec => (
-          /* 锚点不走 href——hash 路由会把 #sec-* 解析成非法路由跳走 */
-          <button key={sec.id}
-            onClick={e => { e.preventDefault(); document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' }); }}
-            className="rounded-md px-2.5 py-2 text-left text-[13px] text-secondary transition-colors hover:bg-surface-2 hover:text-primary">
+          <button key={sec.id} onClick={() => goSec(sec.id)}
+            className={cn('rounded-md px-2.5 py-2 text-left text-[13px] transition-colors',
+              activeSec === sec.id ? 'bg-accent-subtle font-medium text-accent-text' : 'text-secondary hover:bg-surface-2 hover:text-primary')}>
             {sec.label}
           </button>
         ))}
       </nav>
-      <div className="mx-auto min-w-0 max-w-4xl flex-1 px-6 py-6">
+      <div ref={scrollHostRef} className="mx-auto min-w-0 max-w-4xl flex-1 overflow-y-auto px-6 py-6">
+        {/* FEVERIFY11-P3-4: <lg 横向分组 chips(窄屏二级菜单形态) */}
+        <div className="mb-4 flex gap-1.5 overflow-x-auto pb-1 lg:hidden">
+          {SECTIONS.map(sec => (
+            <button key={sec.id} onClick={() => goSec(sec.id)}
+              className={cn('shrink-0 rounded-full border px-3 py-1.5 text-xs transition-colors',
+                activeSec === sec.id ? 'border-accent-text bg-accent-subtle text-accent-text' : 'border-line bg-surface text-secondary hover:bg-surface-2')}>
+              {sec.label}
+            </button>
+          ))}
+        </div>
       {/* 标题 + 概览 */}
       <div className="mb-6 flex items-end justify-between">
         <div>

@@ -104,9 +104,8 @@ export function AuditPage() {
         </Panel>
         <Panel title="导出说明">
           <div className="space-y-2 text-[13px] leading-relaxed text-tertiary">
-            审计导出为内存 journal 最近 5000 条(滚动上限,seq 单调);修订链(revises/revision)
-            与审批流(origin/requestedBy)字段均在事件内。签名/Merkle 属后续
-            增强,当前以 WAL 追加语义保证不可改写历史。
+            导出内容为最近 5000 条操作记录(超出后最旧的自动滚出);修订与审批
+            信息都包含在每条记录内。历史记录只追加、不可改写。
           </div>
         </Panel>
       </div>
