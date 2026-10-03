@@ -413,6 +413,10 @@ export function buildIntelTools(record, caps) {
         description: 'Mark the entry OBSOLETE — downstream queries exclude ' +
           'it by default; the chain stays visible for audit',
       })),
+      vulns: Type.Optional(Type.Array(Type.String({
+        description: '任务报告 only: 新的漏洞标题引用列表(整组替换, 省略=保持)——' +
+          '修正标题写偏/增删引用, 与提交时同语义(模糊匹配告警同款)',
+      }))),
     }),
     execute: async (_id, params) => {
       const result = caps.reviseEntry?.(record, params);
@@ -678,8 +682,12 @@ export function buildOrchestratorTools(record, caps) {
         });
       } catch (e) {
         const msg = String(e?.message ?? e);
+        // 自测-4: 不可达时给可行动降级路径(逐个 spawn_agent 同能力面)
+        const hint = e?.temporalUnreachable || /temporal/i.test(msg)
+          ? '\n降级建议: 可改用 spawn_agent 逐个派生子智能体(同派生树/DM 汇报语义), 不依赖 Temporal。'
+          : '';
         return {
-          content: [{ type: 'text', text: `调度失败: ${msg}` }],
+          content: [{ type: 'text', text: `调度失败: ${msg}${hint}` }],
           details: { error: msg },
         };
       }
@@ -837,7 +845,7 @@ export function buildShellTools(record, caps) {
         description: 'register: 通道定义——local: "容器名[:用户]"; ssh: "user:pass@host:port"; web: URL 模板含 {CMD}(GET 或 POST|url|body),可加 "#MARK" 响应定界(只取 <MARK>..</MARK> 之间,消页面噪声)' })),
       shellId: Type.Optional(Type.String({ description: 'shell id(sh-xxx);list 可省' })),
       command: Type.Optional(Type.String({ description: 'exec:要执行的命令' })),
-      timeoutMs: Type.Optional(Type.Number({ description: 'exec:硬超时毫秒(默认 30000,web 通道强制硬杀)' })),
+      timeoutMs: Type.Optional(Type.Number({ description: 'exec:硬超时毫秒(默认 30000;web 通道上限 60000,超出按 60000 生效并回执注明)' })),
       path: Type.Optional(Type.String({ description: 'read_file:绝对路径' })),
     }),
     execute: async (_id, p) => {

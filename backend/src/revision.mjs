@@ -78,6 +78,9 @@ export function emitRevision(bus, { target, fields, reason,
     status: fields.status !== undefined
       ? String(fields.status).toLowerCase() : base.status,
     detail: fields.text ?? base.detail,
+    // 自测-10: 任务报告 vulns 引用列表可修订(此前标题写偏=永久告警,
+    // revise_entry 无该字段只能整报告重交)
+    vulns: fields.vulns !== undefined ? fields.vulns : base.vulns,
     void: fields.void !== undefined ? Boolean(fields.void)
       : Boolean(base.void),
     origin: origin ?? 'agent',

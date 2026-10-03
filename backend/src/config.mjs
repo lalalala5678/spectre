@@ -51,8 +51,21 @@ function required(name) {
   return value;
 }
 
+/** 自测-9: 端口图单源——提示词 OOB 收集器/测试避让段/文档此前三处
+ * 硬编码互不引用, 服务端口一变即漂移。所有派生方从此处取。 */
+export const PORT_MAP = Object.freeze({
+  runtime: Number(process.env.PORT || 8090),
+  gateway: Number(process.env.GATEWAY_PORT || 8081),
+  caddy: 443,
+  temporal: Number(process.env.TEMPORAL_ADDRESS_PORT || 7233),
+  oobCollector: 19999,
+  /** 测试专用动态端口段(避让全部服务端口, 段宽 400)。 */
+  testPortBase: 19500,
+  testPortSpan: 400,
+});
+
 export const CONFIG = Object.freeze({
-  port: Number(process.env.PORT || 8090),
+  port: PORT_MAP.runtime,
   host: '127.0.0.1',
 
   // R32D44-llm: LLM 直连 env(LLM_BASE_URL/KEY/MODEL)已删——统一平台

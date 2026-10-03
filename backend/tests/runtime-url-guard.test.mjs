@@ -1,3 +1,4 @@
+import { PORT_MAP } from '../src/config.mjs';
 /**
  * runtime-url-guard (CS36-Z8): R32D58-F1(P0) 的回归机锁——含字面 ESC
  * 控制字符的请求路径曾使 new URL 抛 ERR_INVALID_URL 于 try 外, 单请求
@@ -42,7 +43,7 @@ function rawReq(port, payload) {
 test('ESC 控制字符路径 → 400 且 runtime 存活(F1 P0 回归锁)', { timeout: 30000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'rt-guard-'));
   writeFileSync(join(dir, '.env'), 'INTERNAL_TOKEN=guard-test-token\n');
-  const port = 19500 + (process.pid % 400);  // CS37: 避开 18090/18081 审计段
+  const port = PORT_MAP.testPortBase + (process.pid % PORT_MAP.testPortSpan);  // CS37: 段定义单源 config.PORT_MAP
   const child = spawn(process.execPath, ['agent-runtime.mjs'], {
     cwd: ROOT,
     // R32D60-NEW1: 数据根 env 是 SPECTRE_DATA_DIR(config.mjs:95)——此前传

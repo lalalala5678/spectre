@@ -159,7 +159,18 @@ async function runDetachedAgent(o) {
   if (o.requester) s.requester = o.requester;
   if (o.revisionTarget !== undefined) s.revisionTarget = o.revisionTarget;
   store.prompt(s, o.prompt, 'system');
+  // 自测-2: awaitCompletion 的空闲快路径与 prompt() 微任务置 busy 之间有
+  // 窗口——首次调用曾因此即时空收割(writer 还没开跑, 回执"非判定"而
+  // 落账随后发生, 重试才查到)。先等 busy 置位(≤5s), 再挂完成等待。
+  for (let i = 0; i < 50 && !s.busy; i++) {
+    await new Promise(r => setTimeout(r, 100).unref?.());
+  }
   await store.awaitCompletion(s, 300_000);
+  // 超时/空收割兜底: writer 可能仍在后台落账——再宽限 10s 轮询回执侧
+  // 事件(landed 判定由调用方做), 避免把"稍后落账"误报为"未落账"。
+  for (let i = 0; i < 10 && s.busy; i++) {
+    await new Promise(r => setTimeout(r, 1000).unref?.());
+  }
   // R15-F2: 超时兜底触发时会话仍在跑——不得伪造判定回执。
   return { session: s, timeout: s.busy };
 }
@@ -235,6 +246,40 @@ const caps = {
     });
     store.prompt(child,
       `【派生任务 · ${agentKey}】${instruction}`, 'system');
+    // 自测-3: 失速看门狗——火后即忘的子会话此前 40+ 分钟无心跳也无
+    // 任何处置。30min 无 journal 事件→注入 nudge; 60min→终止并向
+    // 派生者发 DM(会话空闲/结束时定时器自清)。
+    const WD_NUDGE_MS = 30 * 60_000;
+    const WD_KILL_MS = 60 * 60_000;
+    const wd = setInterval(() => {
+      const last = child.events?.[child.events.length - 1];
+      const idleMs = last ? Date.now() - Date.parse(last.ts) : 0;
+      if (!child.busy || store.get?.(child.id) == null) {
+        clearInterval(wd);
+        return;
+      }
+      if (idleMs >= WD_KILL_MS) {
+        clearInterval(wd);
+        child.busy = false;
+        store._journal(child, 'watchdog_kill', { idleMs });
+        bus.emit({
+          channel: 'dm', from: 'system', to: parentRecord.agentKey,
+          type: 'watchdog',
+          summary: `看门狗: 子任务 ${meta.name ?? agentKey}(${child.id.slice(0, 16)}…) 60 分钟无事件, 已终止。请评估是否重派。`,
+          workSessionId: parentRecord.workSessionId ?? null,
+        });
+      } else if (idleMs >= WD_NUDGE_MS && !child._wdNudged) {
+        child._wdNudged = true;
+        store.followUp(store.get(child.id) ?? child,
+          '【看门狗】30 分钟无事件——请汇报当前状态与阻塞点; 已无法推进请立即提交任务报告收尾。');
+        bus.emit({
+          channel: 'dm', from: 'system', to: parentRecord.agentKey,
+          type: 'watchdog',
+          summary: `看门狗: 子任务 ${meta.name ?? agentKey} 30 分钟无事件, 已注入状态询问。`,
+          workSessionId: parentRecord.workSessionId ?? null,
+        });
+      }
+    }, 60_000).unref?.();
     return child;
   },
 
@@ -441,6 +486,16 @@ loadSandboxConfig().then(async cfg => {
   const ensured = await ensureSandbox();
   console.log(`[sandbox] driver=${cfg.driver} ok=${ensured.ok}`,
     ensured.error ?? '');
+  // 自测-7: 容器重建→bus 通知(全 agent 可见)+依赖容器态的 shell 标记
+  // 不可用(注册表持久但进程/文件已失——此前零通知)。
+  if (ensured.recreated) {
+    const { markTransportDead } = await import('./src/shells.mjs');
+    const dead = markTransportDead();
+    bus.emit({
+      channel: 'audit', from: 'system', type: 'context',
+      summary: `沙箱容器已重建(此前进程/文件态全失):${dead} 个依赖容器态的 shell 通道标记失效, 请重新注册。`,
+    });
+  }
   await rebuildMounts(AGENT_KEYS);
   // rehydrate 早于暖机——重建存量 agent 使 MCP 工具进入老会话工具面
   const remounted = store.rebuildSessionAgents();

@@ -221,9 +221,11 @@ export async function agentTaskWorkflow(input) {
   const base = await quick.reportState(session.sessionId);
 
   const inbox = [];
+  let dmSeq = 0;  // 自测-8: 投递序号——orchestrator 长回合期间积压的 DM
+  // 在回合尾批量涌入时保持到达顺序可辨(此前终报先落过程后至, 无从对账)。
   let finished = false;
   setHandler(signals.dm, (msg) => {
-    inbox.push(msg);
+    inbox.push({ ...msg, seq: ++dmSeq });
   });
 
   // Steer incoming orchestrator dms into the live pi session while it works.
@@ -233,7 +235,7 @@ export async function agentTaskWorkflow(input) {
       if (finished) break;
       const msg = inbox.shift();
       if (msg) {
-        await llm.steerSession(session.sessionId, `[DM from ${msg.from}] ${msg.text}`);
+        await llm.steerSession(session.sessionId, `[DM #${msg.seq} from ${msg.from}] ${msg.text}`);
       }
     }
   })();

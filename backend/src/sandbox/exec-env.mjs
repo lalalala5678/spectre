@@ -159,6 +159,20 @@ async function runShell(runner, command, options = {}) {
  *  argv empty = plain local bash -c with the HOST-mapped cwd (container
  *  paths only exist inside the sandbox for the docker driver).
  *  Merged stdout/stderr capture. */
+/** 自测-1(安全): 子进程环境白名单——平台凭据(LLM_API_KEY/INTERNAL_TOKEN/
+ * SPECTRE_*)绝不进入 /proc/self/environ。仅透传跨平台工具链必需变量;
+ * extraEnv 是调用方显式注入(沙箱 keyfiles 等), 恒保留。 */
+const SAFE_ENV_KEYS = ['PATH', 'HOME', 'TERM', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TZ',
+  'USER', 'SHELL', 'TMPDIR', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
+function sanitizedEnv(extraEnv) {
+  const env = {};
+  for (const k of SAFE_ENV_KEYS) {
+    if (process.env[k] !== undefined) env[k] = process.env[k];
+  }
+  return Object.assign(env, extraEnv ?? {});
+}
+
 function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
   // R5-F5: 超时杀宿主 docker exec 客户端不会终止容器内命令(attached
   // exec 不转发信号, 只产生 stdin EOF)。容器分支用 timeout(1) 包装,
@@ -175,7 +189,7 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
     : (containerPathToHost(cwdContainer) ?? cwdContainer);
   return new Promise(resolve => {
     const child = spawn(argvv[0], argvv.slice(1), {
-      env: { ...process.env, ...extraEnv },
+      env: sanitizedEnv(extraEnv),
       cwd: cwdHost,
     });
     let text = '';

@@ -41,6 +41,21 @@ const shells = new Map();
 const SHELL_SNAPSHOT = pathJoin(
   process.env.SPECTRE_DATA_DIR ?? '/var/lib/spectre', 'tools/c2/shells.json');
 
+/** 自测-7: 沙箱容器重建后, 依赖容器进程态的通道全部失效——标记 dead
+ * 并持久化(注册表保留作审计, exec 时如实拒绝而非静默超时)。
+ * @returns {number} 被标记的通道数 */
+export function markTransportDead() {
+  let n = 0;
+  for (const sh of shells.values()) {
+    // 仅 local(容器内执行)依赖沙箱容器; web/ssh 是外部通道不受影响
+    if (sh.status === 'active' && sh.transport === 'local') {
+      sh.status = 'dead-sandbox-recreated'; n++;
+    }
+  }
+  if (n) persistShells();
+  return n;
+}
+
 function persistShells() {
   try {
     mkdirSync(pdirname(SHELL_SNAPSHOT), { recursive: true });
@@ -285,7 +300,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         const url = isPost ? postUrl : tpl.replace('{CMD}', enc);
         const body = isPost ? postForm.replace('{CMD}', enc) : null;
         const ctl = new AbortController();
-        const t = setTimeout(() => ctl.abort(), Math.min(timeoutMs, 60_000)); // hard kill
+        // 自测-6: 上限裁剪显式化——此前静默钳 60s, 调用方传大值无效且回执
+        // 不注明, 报告方以为超时参数生效。裁剪发生时在结果附 cappedAt。
+        const effTimeout = Math.min(timeoutMs, 60_000);
+        const t = setTimeout(() => ctl.abort(), effTimeout); // hard kill
+        const cappedAt = timeoutMs > 60_000 ? 60000 : undefined;
         try {
           const r = await fetch(url, {
             method: isPost ? 'POST' : 'GET',
@@ -301,6 +320,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
             if (m1 >= 0) txt = m2 > m1 ? txt.slice(m1 + marker.length + 2, m2) : txt.slice(m1 + marker.length + 2);
           }
           stdout = txt.slice(0, MAX_OUT); stderr = ''; code = r.ok ? 0 : 1;
+          if (cappedAt) stdout += `\n(timeoutMs 已按 web 通道上限裁剪为 ${cappedAt}ms)`;
         } catch (e) {
           clearTimeout(t);
           return { ok: false, error: 'webshell 通道异常(已硬杀): ' + e.message };

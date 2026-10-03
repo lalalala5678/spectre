@@ -15,6 +15,16 @@
  * agent (CS3-N11: 已存在, 非未来时) edits the same store through the API.
  */
 import { spawn } from 'node:child_process';
+
+/** 自测-1: stdio MCP 子进程同款凭据白名单(与 exec-env 单一语义)。 */
+const SAFE_ENV_KEYS = ['PATH', 'HOME', 'TERM', 'LANG', 'LC_ALL', 'LC_CTYPE', 'TZ',
+  'USER', 'SHELL', 'SSL_CERT_FILE', 'SSL_CERT_DIR',
+  'HTTP_PROXY', 'HTTPS_PROXY', 'NO_PROXY', 'http_proxy', 'https_proxy', 'no_proxy'];
+function sanitizedMcpEnv(extra) {
+  const env = {};
+  for (const k of SAFE_ENV_KEYS) if (process.env[k] !== undefined) env[k] = process.env[k];
+  return Object.assign(env, extra ?? {});
+}
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 
@@ -94,7 +104,7 @@ class StdioRpc {
   }
   async start() {
     this.child = spawn(this.argv[0], this.argv.slice(1), {
-      env: { ...process.env, ...this.env },
+      env: sanitizedMcpEnv(this.env),
       stdio: ['pipe', 'pipe', 'pipe'],
     });
     this.child.stdout.on('data', d => this._onData(d));
