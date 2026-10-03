@@ -579,12 +579,13 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               'relative z-30 h-full shrink-0 border-l border-line bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',
               // FEAESTH4-P1-2/FEUX5-P2: 抽屉态固定 min(85vw,360px)(此前
               // ratio*vw 在 375px 屏仅 90px)+关闭态 inert 移出 Tab 序+Esc 关闭;
-              // 静态态 clamp(240px, ratio·vw, min(55vw,900px)) 防拖拽压死
-              // 聊天区, 上限随视口伸缩(480 硬帽只能右拖的教训)。
+              // 静态态防拖死: 地板 240px; 上限 min(55vw, 900px,
+              // 100vw-464px)——末项保聊天区 ≥240px(侧栏 224+聊天 240,
+              // 1024 屏曾压到 177px 的教训); 480 硬帽只能右拖的教训同批。
               'max-lg:!w-[min(85vw,360px)]',
               !rightOpen && 'max-lg:translate-x-full',
             )}
-            style={{ width: `clamp(240px, ${(rightRatio * 100).toFixed(2)}vw, min(55vw, 900px))` }}
+            style={{ width: `clamp(240px, ${(rightRatio * 100).toFixed(2)}vw, min(55vw, 900px, 100vw - 464px))` }}
           >
             <div
               onPointerDown={onResizeDown}
