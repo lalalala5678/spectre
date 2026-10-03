@@ -173,8 +173,12 @@ export function buildIntelTools(record, caps) {
         .filter(e => {
           if (!params.author) return true;
           const a = params.author.toLowerCase();
+          // r6-#6: author 兼容 agentKey/from/author.name/author.key 四面
+          // (此前 schema 文案称"两者皆可"但 key 面缺失)
           return e.from === params.author || e.from.toLowerCase() === a
-            || (e.author?.name ?? '').toLowerCase() === a;
+            || (e.author?.name ?? '').toLowerCase() === a
+            || (e.author?.key ?? '').toLowerCase() === a
+            || String(e.from).startsWith(`${a} `);
         })
         .filter(e => {
           if (!q) return true;
@@ -206,7 +210,7 @@ export function buildIntelTools(record, caps) {
         if (params.author) relax.push('author');
         if (q) relax.push('q');
         const hasAny = reports + vulns + notes > 0;
-        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条。`;
+        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条。(注: seq 非连续系日志滚动上限与查重合并所致, 空洞非数据丢失)`;
         hint += relax.length
           ? (hasAny ? `当前过滤(${relax.join('/')})过窄,可放宽或去掉。` : `项目本身为空——过滤(${relax.join('/')})不是原因。`)
           : (hasAny ? '' : '项目尚无任何产出。');

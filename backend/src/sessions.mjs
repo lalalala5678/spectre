@@ -434,6 +434,7 @@ export class SessionStore {
     // FEBUGS-P1-1: busy 翻转必须落 journal——此前仅内存置位, SSE 永远
     // 看不到 agent_start, 前端 busy 状态机断裂(运行中 pill 撒谎/工具
     // 进度分相永不触发/第二条消息误走 prompt→409)。
+    record.turnStartedAt = Date.now();
     this._journal(record, 'agent_start', { via: 'prompt' });
     // Context compaction (user-configurable window): when the running
     // context exceeds window−reserve, summarize the head and keep the
@@ -527,10 +528,16 @@ export class SessionStore {
     if (!record.busy && !record.agent.state.isStreaming) {
       return this.prompt(record, text, source);
     }
+    // r6-#9: 迟到标注——消息带 queuedAt, 注入侧(pi 消费时)已无法改写
+    // 文本, 故在此预判: 若当前回合已持续>5min, 该消息大概率在收官后
+    // 送达, 预打 [迟到中段消息] 头供编排器对账(终报可能已含全部信息)。
+    const turnMs = record.turnStartedAt ? Date.now() - record.turnStartedAt : 0;
+    const tagged = turnMs > 5 * 60_000 && !text.startsWith('[迟到')
+      ? `[迟到中段消息](排队 ${Math.round(turnMs / 60_000)}min, 注意与情报库终态对账)\n${text}` : text;
     record.agent.steer(source
-      ? { role: 'user', content: text, timestamp: Date.now(), source }
-      : { role: 'user', content: text, timestamp: Date.now() });
-    this._journal(record, 'steer_queued', { text: truncateText(text, 200) });
+      ? { role: 'user', content: tagged, timestamp: Date.now(), source }
+      : { role: 'user', content: tagged, timestamp: Date.now() });
+    this._journal(record, 'steer_queued', { text: truncateText(tagged, 200) });
   }
 
   /**
@@ -992,6 +999,7 @@ export class SessionStore {
         break;
       case 'agent_end':
         record.busy = false;
+        record.turnStartedAt = null;  // r6-#9: 回合结束清计时基准
         this._journal(record, 'agent_end', {
           messages: record.agent.state.messages.length,
         });
