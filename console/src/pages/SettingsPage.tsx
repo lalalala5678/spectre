@@ -66,10 +66,11 @@ function FieldRow({ def, value, onSave, onDirtyChange }: {
   }, [value, def.default]);
 
   const dirty = draft !== orig;
-  useEffect(() => {
-    onDirtyChange?.(dirty);
-    return () => onDirtyChange?.(false);  // FEVERIFY8: 卸载归零
-  }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // FEVERIFY9-P2: 拆两 effect——[dirty] 只上报, [] 只管卸载(此前 cleanup
+  // 在每次 dirty 变迁也执行, 相对计数被 -2 双发 → 欠账 → 守卫旁路)
+  useEffect(() => { onDirtyChange?.(dirty); }, [dirty]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // 卸载归零(一次性, 仅卸载时执行)
+  useEffect(() => () => onDirtyChange?.(false), []); // eslint-disable-line react-hooks/exhaustive-deps
 
   async function save() {
     if (!dirty || state === 'saving') return;

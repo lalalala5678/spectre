@@ -40,7 +40,7 @@ export function SpectreMark({ className, tone = 'surface' }: { className?: strin
         <line x1="20.6" y1="16" x2="23.4" y2="16" />
       </g>
       {/* 准星内环 */}
-      <circle cx="16" cy="16" r="4.6" fill="none" stroke="var(--danger-text)" strokeWidth="1.1" />
+      <circle cx="16" cy="16" r="4.6" fill="none" stroke={v('--danger-text', '--chrome-danger-text')} strokeWidth="1.1" />
       {/* 核心命中点 */}
       <circle cx="16" cy="16" r="1.6" fill={v('--danger-text', '--chrome-danger-text')} />
       {/* 编排节点：顶点 accent = orchestrator，其余 secondary */}

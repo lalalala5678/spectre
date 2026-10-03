@@ -172,8 +172,9 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
     // FEVERIFY8-P2: hash 入口真闸——cancel 则不导航(此前无条件赋值=假拦截)
     const res = { ok: true };
     window.dispatchEvent(new CustomEvent('spectre:nav-guard', { detail: res }));
-    if (!res.ok) return;
+    if (!res.ok) return false;
     window.location.hash = hash;
+    return true;
   };
 
   const fmt = (d: Date) => d.toLocaleString('sv-SE', { hour12: false }).replace('T', ' ');
@@ -220,8 +221,9 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
                 // CS22-F1: 先 go 后 setPendingOpen——反向序时同步事件让已
                 // 挂载的同路由页写好 ?s=, 随后 go() 整体替换 hash 又剥掉
                 // (刷新恢复主控而非屏显会话)。
-                go(key);
-                setPendingOpen(key, s.id);
+                // FEVERIFY9-P3: 被闸(cancel)不设令牌——否则取消后侧栏
+                // 手动进该 agent 会被钻进旧目标会话
+                if (go(key)) setPendingOpen(key, s.id);
               }}
                 className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary">
                 <span className="shrink-0 font-mono text-xs text-chrome-tertiary">{s.agentKey}</span>
