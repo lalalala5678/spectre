@@ -103,7 +103,7 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
   );
 
   return (
-    <div className="rounded-md border border-line bg-surface p-2.5">
+    <div className="px-1 pb-1">  {/* 单框: 内框删(外层分组卡承担) */}
       <div className="mb-2 flex items-center justify-between gap-2">
         <span className="flex items-center gap-1.5 text-[13px] font-medium text-secondary">
           {isDefault ? '默认大模型供应商' : '本 agent 覆盖'}
