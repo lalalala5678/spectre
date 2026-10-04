@@ -190,7 +190,7 @@ export async function autoPwnWorkflow(input) {
         // r6v3-#10: 构建时对账有固有盲区(终报可能晚于 workflow 判死落账)
         // ——绝对断言"真失败"被实测证伪。降格为时点陈述, 送达时 activity
         // 会再对账一次(见 notifyEngagementDone)。
-        return `- ${key}${ts}: ${clipMarked(value.error, CHILD_SUMMARY_MAX, '完整错误见 worker 日志')}(截至通知构建时库内无终报——送达对账见下, 终局以 query_intel 为准)`;
+        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})——截至通知构建时库内无终报, 送达对账见下, 终局以 query_intel 为准;`;
       }
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
