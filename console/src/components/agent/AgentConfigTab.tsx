@@ -23,7 +23,31 @@ import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
  * 布局: 自适应宽度——面板 grid 随断点 1/2 列回流, 无固定像素宽; 技能
  * 正文 pre-wrap 满行折行。
  */
+/** 用户令: 配置分组总览(与平台设置页同形态的左侧一级菜单) */
+const CFG_SECTIONS = [
+  { id: 'cfg-spawn', label: '派生限额' },
+  { id: 'cfg-llm', label: '大模型' },
+  { id: 'cfg-mcp', label: '挂载 MCP' },
+  { id: 'cfg-skills', label: '挂载技能' },
+  { id: 'cfg-own', label: '专属配置' },
+];
+
 export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean }) {
+  const [activeSec, setActiveSec] = useState(CFG_SECTIONS[isAuto ? 0 : 1].id);
+  // scroll-spy: 可视比例最大的分组即高亮(IntersectionObserver 轻量)
+  useEffect(() => {
+    const els = CFG_SECTIONS
+      .map(x => document.getElementById(x.id))
+      .filter(Boolean) as HTMLElement[];
+    if (!els.length) return;
+    const io = new IntersectionObserver(entries => {
+      const best = entries.filter(e => e.isIntersecting)
+        .sort((a, b) => b.intersectionRatio - a.intersectionRatio)[0];
+      if (best) setActiveSec(best.target.id);
+    }, { threshold: [0.15, 0.4, 0.75] });
+    els.forEach(el => io.observe(el));
+    return () => io.disconnect();
+  }, [isAuto]);
   const [common, setCommon] = useState<Record<string, Record<string, string | number>> | null>(null);
   const [schemaAgents, setSchemaAgents] = useState<{ agentKey: string; label: string; hint: string;
     sources: { id: string; label: string; fields: { id: string; label: string }[] }[] }[]>([]);
@@ -73,11 +97,28 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
   const cfg = (v: string | number | undefined, d: string) => (v === undefined || v === '' ? d : String(v));
 
   return (
-    <div className="grid w-full min-w-0 grid-cols-1 items-start gap-3 lg:grid-cols-2">
-      {isAuto && <SpawnLimitSettings />}
+    /* 用户令: 配置项单列+左侧总览一级菜单(与平台设置页同形态) */
+    <div className="flex w-full min-w-0 gap-4">
+      <nav aria-label="配置分组" className="hidden w-40 shrink-0 flex-col gap-0.5 self-sticky top-0 py-1 md:flex">
+        {CFG_SECTIONS.map(sec => (
+          <button key={sec.id}
+            onClick={() => document.getElementById(sec.id)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+            className={cn('rounded-md px-2.5 py-2 text-left text-[13px] transition-colors',
+              activeSec === sec.id ? 'bg-accent-subtle font-medium text-accent-text' : 'text-secondary hover:bg-surface-2 hover:text-primary')}>
+            {sec.label}
+          </button>
+        ))}
+      </nav>
+      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      {isAuto && (
+        <section id="cfg-spawn" className="scroll-mt-2 [&>div]:shadow-xs">
+          <SpawnLimitSettings />
+        </section>
+      )}
 
       {/* 生效运行配置 + 本 agent 供应商覆盖(R32D44: 可直接改) */}
-      <Panel title="大模型(生效配置 + 本 agent 覆盖)">
+      <section id="cfg-llm" className="scroll-mt-2">
+      <Panel title="大模型(生效配置 + 本 agent 覆盖)" className="shadow-xs">
         <div className="space-y-2">
           <div className="space-y-1.5">
             {[
@@ -103,7 +144,9 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
       </Panel>
 
       {/* 挂载的 MCP */}
-      <Panel title={`挂载的 MCP(${mine.length})`}>
+      </section>
+      <section id="cfg-mcp" className="scroll-mt-2">
+      <Panel title={`挂载的 MCP(${mine.length})`} className="shadow-xs">
         {mcps === null ? <div className="space-y-1.5"><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div>
           : mine.length === 0 ? <EmptyState icon={ShieldCheck} title="该 agent 暂无挂载的 MCP 服务器" />
           : <div className="space-y-1.5">
@@ -125,13 +168,17 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
       </Panel>
 
       {/* 挂载的技能(点击直接看正文) */}
-      <Panel title="挂载的技能(点击查看内容)" className="min-w-0">
+      </section>
+      <section id="cfg-skills" className="scroll-mt-2">
+      <Panel title="挂载的技能(点击查看内容)" className="min-w-0 shadow-xs">
         <RealSkillsPanel agentKey={agentId} expandable />
       </Panel>
 
       {/* EQ-2: 专属数据源/参数——直接在本页编辑(与设置页同一保存协议);
           skill/MCP 仅展示挂载态, 无添加入口(用户裁定: 子智能体不可增配 skill/MCP) */}
-      <Panel title="专属配置(数据源 / 参数)">
+      </section>
+      <section id="cfg-own" className="scroll-mt-2">
+      <Panel title="专属配置(数据源 / 参数)" className="shadow-xs">
         {!myGroup ? <div className="text-[13px] text-tertiary">该智能体没有专属配置, 使用全局通用配置即可。</div>
           : <div className="space-y-3">
             {myGroup.sources.map(src => (
@@ -141,6 +188,8 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
             {myGroup.hint && <div className="text-xs leading-relaxed text-tertiary">{myGroup.hint}</div>}
           </div>}
       </Panel>
+      </section>
+      </div>
     </div>
   );
 }
