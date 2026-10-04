@@ -162,7 +162,9 @@ async function runDetachedAgent(o) {
   // 自测-2: awaitCompletion 的空闲快路径与 prompt() 微任务置 busy 之间有
   // 窗口——首次调用曾因此即时空收割(writer 还没开跑, 回执"非判定"而
   // 落账随后发生, 重试才查到)。先等 busy 置位(≤5s), 再挂完成等待。
-  for (let i = 0; i < 50 && !s.busy; i++) {
+  // r28-#2: 首调竞态——5s 内 busy 未置位即提前空收割(同参重试成功=
+  /// 竞态指纹)。窗口 20s, 且"已产出事件"即视为已启动。
+  for (let i = 0; i < 200 && !s.busy && !(s.events?.length > 1); i++) {
     await new Promise(r => setTimeout(r, 100).unref?.());
   }
   await store.awaitCompletion(s, 300_000);
@@ -367,7 +369,7 @@ const caps = {
         `${replyShown.slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,
-      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },
+      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRv },  // r28-#2: tRw→tRv(跨函数复制带错变量——首调 'tRw is not defined' 根因)
     };
   },
 

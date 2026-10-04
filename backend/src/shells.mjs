@@ -343,9 +343,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         const [, u, pw, h, port] = m;
         const r = await new Promise((resolve) => {
           const tSecS = Math.max(1, Math.ceil(timeoutMs / 1000));
+          // r28-#1: 单层 shell——外层再 JSON.stringify 包一层时 $o/$? 被外
+          // 展开成空(r8-D1 local 分支同款, ssh read_file 静默空的根因)。
           execFile('sshpass', ['-p', pw, 'ssh', '-o', 'StrictHostKeyChecking=no',
             '-o', 'UserKnownHostsFile=/dev/null', '-p', port || '22',
-            `${u}@${h}`, `timeout -k 5 ${tSecS} bash -lc ` + JSON.stringify(command)],
+            `${u}@${h}`, 'timeout', '-k', '5', String(tSecS), 'bash', '-lc', command],
             { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? ''), code: err ? (err.code ?? 1) : 0 }));
         });
