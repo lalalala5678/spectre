@@ -518,6 +518,11 @@ loadSandboxConfig().then(async cfg => {
     bus.emit({ channel: 'dm', from: 'system', to: rec.agentKey, type: 'watchdog',
       summary: `平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。`,
       workSessionId: rec.workSessionId ?? null });
+    // r20v4: bus 事件不进会话——同时 followUp 直接注入编排器(idle 即
+    // 触发回合, 看得见才算通知)
+    try {
+      store.followUp(rec, `[DM from system] 平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。`);
+    } catch { /* 会话不可注入时 bus 事件兜底 */ }
   }
   const ensured = await ensureSandbox();
   console.log(`[sandbox] driver=${cfg.driver} ok=${ensured.ok}`,
