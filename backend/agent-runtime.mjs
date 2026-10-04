@@ -510,7 +510,7 @@ if (replay.records.size || replay.busEvents.length) {
 loadSandboxConfig().then(async cfg => {
   // r20-②: 在役 engagement 中断通知——重启杀死的战役此前零告知(靠
   // 对账铁则兜底)。activeEngagement 已持久化(FP 批), boot 扫描并 DM。
-  for (const rec of store.list()) {
+  for (const rec of store.sessions.values()) {  // r20v5: list() 是 summary 投影(无 activeEngagement)——取真身
     const eng = rec?.activeEngagement?.engagementId;
     if (!eng) continue;
     if (rec._bootInterruptNotified) continue;
