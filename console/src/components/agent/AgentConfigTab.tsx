@@ -118,7 +118,7 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
 
       {/* 生效运行配置 + 本 agent 供应商覆盖(R32D44: 可直接改) */}
       <section id="cfg-llm" className="scroll-mt-2">
-      <Panel title="大模型(生效配置 + 本 agent 覆盖)" className="shadow-xs">
+      <Panel title="大模型" className="shadow-xs">
         <div className="space-y-2">
           <div className="space-y-1.5">
             {[
@@ -170,7 +170,7 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
       {/* 挂载的技能(点击直接看正文) */}
       </section>
       <section id="cfg-skills" className="scroll-mt-2">
-      <Panel title="挂载的技能(点击查看内容)" className="min-w-0 shadow-xs">
+      <Panel title="挂载技能" className="min-w-0 shadow-xs">
         <RealSkillsPanel agentKey={agentId} expandable />
       </Panel>
 
@@ -178,7 +178,7 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
           skill/MCP 仅展示挂载态, 无添加入口(用户裁定: 子智能体不可增配 skill/MCP) */}
       </section>
       <section id="cfg-own" className="scroll-mt-2">
-      <Panel title="专属配置(数据源 / 参数)" className="shadow-xs">
+      <Panel title="专属配置" className="shadow-xs">
         {!myGroup ? <div className="text-[13px] text-tertiary">该智能体没有专属配置, 使用全局通用配置即可。</div>
           : <div className="space-y-3">
             {myGroup.sources.map(src => (

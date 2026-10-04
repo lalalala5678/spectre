@@ -393,11 +393,7 @@ export function SettingsPage() {
       <section id="sec-agentllm" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
         <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
           <span className="text-[13px] font-medium text-primary">单 Agent 大模型覆盖</span>
-          <span className="text-xs text-tertiary">默认供应商之上按 agent 换厂商/模型(例: 默认 GLM, 报告 agent 用 DeepSeek)</span>
         </div>
-        <p className="border-b border-line px-4 py-2 text-xs leading-relaxed text-tertiary">
-          四字段全留空=完全继承默认;填任一项并保存会用「覆盖后的生效配置」做真实连通探测, 通过才落盘。清除某项=保存空值。
-        </p>
         <div className="divide-y divide-line">
           {(data.schema.agentLlm ?? []).map((g) => {
             const ov = data.agentLlm?.[g.agentKey] ?? {};
@@ -446,7 +442,6 @@ export function SettingsPage() {
           <div className="flex items-center gap-2">
             <Radar className="h-4 w-4 text-accent-text" />
             <span className="text-[13px] font-medium text-primary">资产测绘 Agent · 数据源</span>
-            <span className="text-xs text-tertiary">按重要性排序</span>
           </div>
           <div className="flex items-center gap-2 text-xs">
             <span className="text-tertiary">已启用</span>
@@ -458,9 +453,6 @@ export function SettingsPage() {
             </Badge>
           </div>
         </div>
-        <p className="mb-4 text-xs leading-relaxed text-tertiary">
-          填好 Key 并通过连通校验的源才会启用;Base URL 留空则使用官方地址。
-        </p>
 
         {/* EQ-6: 与其它智能体配置同构(单一卡片列表, 重要性徽章随卡显示) */}
         <div className="divide-y divide-line rounded-lg border border-line bg-surface shadow-xs">

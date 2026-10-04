@@ -1,7 +1,6 @@
 import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { api } from '../api/client';
-import { cn } from '../utils/cn';
 import type { LlmFormatMeta } from '../api/llmFormats';
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -119,17 +118,11 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
         {field('format', '接口格式', '')}
         {/* R32D45-N3/CS19-4: 适配说明按选中格式从 schema 下发的
             单源数据渲染。 */}
-        <p className="pl-[94px] text-xs text-tertiary">
-          {draft.format === '' && !isDefault ? '继承默认供应商的格式'
-            : (formats.find(f => f.id === (draft.format || 'openai'))?.hint ?? '')}
-        </p>
         {field('baseUrl', 'Base URL', isDefault ? 'https://open.bigmodel.cn/api/paas/v4' : '留空=用默认')}
         {field('apiKey', 'API Key', isDefault ? '' : '留空=用默认', 'password')}
         {field('model', '模型名称', isDefault ? 'glm-4.7' : '留空=用默认')}
       </div>
-      <p className={cn('mt-1.5 truncate text-xs', state === 'err' ? 'text-danger-text' : 'text-tertiary')} title={msg}>
-        {state === 'err' ? msg : isDefault ? '四字段一个请求保存+真实连通探测(换供应商一步到位)' : '保存会用覆盖后的完整配置做真实连通探测; 清除=保存空值回默认'}
-      </p>
+      {state === 'err' && <p className="mt-1.5 truncate text-xs text-danger-text" title={msg}>{msg}</p>}
     </div>
   );
 }
