@@ -386,6 +386,7 @@ export function buildIntelTools(record, caps) {
       // Dangling-reference check (warn-only): a vuln title with no
       // matching vulnerability entity starves downstream kind=vulnerability queries.
       const warnings = [];
+      let vulnResolved = [];  // r24⑤(块外声明——作用域同型第四次的教训)
       if (params.vulns?.length) {
         // R12-F4: 核对标题空间=查询展示空间——折修订取现行标题且滤
         // void(此前读原始事件: 作废漏洞仍算'已发布'悬空不告警; 引用
@@ -396,10 +397,15 @@ export function buildIntelTools(record, caps) {
           .filter(e => entryKind(e.current ?? e) === 'vulnerability'
             && !e.current.void)
           .map(e => normTitle(e.current.title ?? e.title));
+        // r24-backlog⑤: 引用解析透明化——命中也回执映射表(模糊匹配
+        // 从'暗箱'变'可核对', 未命中才告警)
+        vulnResolved = [];
         for (const t of params.vulns) {
           const nt = normTitle(t);
-          const hit = published.some(p => p.includes(nt) || nt.includes(p));
-          if (!hit) {
+          const hit = published.find(p => p.includes(nt) || nt.includes(p));
+          if (hit) vulnResolved.push(`《${t}》→ 命中现行漏洞《${hit}》`);
+          else {
+            vulnResolved.push(`《${t}》→ 未命中`);
             warnings.push(`《${t}》在情报库未找到对应漏洞实体——若尚未发布请用 publish_vulnerability 发布,或从 vulns 中移除该引用`);
           }
         }
@@ -407,10 +413,11 @@ export function buildIntelTools(record, caps) {
       const note = inferred
         ? `(status 由系统推断为 ${status},如有误请再次提交修正)` : '';
       const warnText = warnings.length ? `\n⚠️ ${warnings.join('\n⚠️ ')}` : '';
+      const vulnMapText = vulnResolved.length ? `\n漏洞引用解析:\n${vulnResolved.join('\n')}` : '';
       return {
         content: [{
           type: 'text',
-          text: `任务报告已入库(seq=${ev?.seq ?? '?'})(${status})${note}:《${params.title}》。全项目智能体可经 query_intel 读取,revise_entry 修订请用此 seq。${warnText}`,
+          text: `任务报告已入库(seq=${ev?.seq ?? '?'})(${status})${note}:《${params.title}》。全项目智能体可经 query_intel 读取,revise_entry 修订请用此 seq。${warnText}${vulnMapText}`,
         }],
       };
     },
