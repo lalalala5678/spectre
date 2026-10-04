@@ -71,7 +71,8 @@ export function buildIntelTools(record, caps) {
       'scope (e.g. before writing platform-specific malware, check the ' +
       'recon agent\'s reports), or the full details of a finished child\'s ' +
       'output. Pass `seq` (from a previous result) to fetch ONE entry in ' +
-      'full detail.',
+      'full detail. 注意: 结果超长按字符上限截断, 末尾的分页/末页警示可能被一并截掉' +
+      '——是否翻尽以页眉『匹配 N 条』与续翻提示为准, 存疑时改用小 limit 复查。',
     parameters: Type.Object({
       kind: Type.Optional(Type.Union([
         Type.Literal('task-report'), Type.Literal('vulnerability'),
@@ -869,7 +870,7 @@ export function buildShellTools(record, caps) {
     description:
       '[runs commands; side-effects] 操作 C2 植入产生的 shell 通道(经授权门)。' +
       'action=list 列出可用 shell(含 id/目标/系统指纹/任务数);action=exec 执行命令并返回' +
-      ' stdout/stderr/退出码;action=read_file 读文件;action=status 看 shell 元数据+最近任务;' +
+      ' stdout/stderr/退出码;action=read_file 读文件(web 传输=命令替换式语义——端点须能执行 cat 类命令,拒绝时原样返回端点响应正文;白名单类 webshell 端点读不到文件属预期,非通道故障);action=status 看 shell 元数据+最近任务;' +
       'action=close 关闭。每条命令进平台审计(证据链)。shell 可由 c2 agent 交付或运营注册,' +
       '在智能体间通过 id 传递(情报/任务指令中携带 shellId)。',
     parameters: Type.Object({
