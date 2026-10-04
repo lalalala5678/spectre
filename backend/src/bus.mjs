@@ -100,6 +100,12 @@ export class Bus {
         return dup;
       }
     }
+    // r28-#4(b): 落账后提示性二次扫描(裁决三护栏: 建议从不吞并/每对
+    // 仅一次/双 seq+正本明示)——跨 writer 并发双账的零误伤补偿面。
+    if (event.type === 'vulnerability' && !entry.revises) {
+      const mySeq = event.seq;
+      setTimeout(() => this.suggestDupMerge(mySeq), 10_000).unref?.();
+    }
     // Write-ahead: durable on disk before it exists in memory/SSE.
     this.wal?.append({ t: 'bus', d: event });
     this.events.push(event);
@@ -108,6 +114,45 @@ export class Bus {
     }
     this._broadcast(event);
     return event;
+  }
+
+  /** r28-#4(b): 同点位双账建议——token 重叠>70% 且端点快检命中才提示,
+   * 每对仅一次(查已有建议覆盖), 从不吞并(修订链由 writer 裁决)。 */
+  suggestDupMerge(seq) {
+    const me = this.events.find(e => e.seq === seq);
+    if (!me || me.revises) return;
+    const tokens = t => new Set(String(t ?? '').toLowerCase()
+      .split(/[^a-z0-9\u4e00-\u9fa5:/.]+/).filter(x => x.length > 2));
+    const mt = tokens(`${me.title} ${me.detail ?? ''}`);
+    if (mt.size < 4) return;
+    const cut = Date.now() - 10 * 60_000;
+    for (const other of this.events) {
+      if (other.seq === seq || other.type !== 'vulnerability' || other.revises
+        || other.workSessionId !== me.workSessionId
+        || (other.severity ?? '') !== (me.severity ?? '')
+        || Date.parse(other.ts ?? 0) < cut) continue;
+      const ot = tokens(`${other.title} ${other.detail ?? ''}`);
+      let hit = 0;
+      for (const t of ot) if (mt.has(t)) hit += 1;
+      if (ot.size < 4 || hit / Math.min(ot.size, mt.size) < 0.7) continue;
+      const pair = [seq, other.seq].sort((a, b) => a - b).join('+');
+      const already = this.events.some(e => e.type === 'intel-note'
+        && String(e.detail ?? '').includes(`重复对 ${pair}`));
+      if (already) return;
+      const primary = pair.split('+')[0];
+      // 事件构造走与 emit 同一工厂(seq 自增)——_nextEvent 不存在时内联
+      const dupEv = {
+        channel: 'audit', from: 'system', type: 'intel-note',
+        title: `疑似同点位双账建议(重复对 ${pair})`,
+        summary: `漏洞 seq=${seq} 与 seq=${other.seq} 疑似同点位(token 重叠>70%)——建议经修订链合并, 正本=${primary}`,
+        detail: `r28-#4(b) 提示性扫描: seq=${seq}/seq=${other.seq} 标题+正文 token 重叠超阈值。处理建议: 经 request_vulnerability_revision 将后到者并入先到者(正本=${primary}, 首落为正), 双发现者署名并入 coDiscoverers。本建议从不自动吞并(重复对 ${pair} 仅提示一次)。`,
+        workSessionId: me.workSessionId ?? null,
+      };
+      dupEv.seq = ++seq; dupEv.ts = new Date().toISOString();
+      this.events.push(dupEv);
+      this._broadcast?.(dupEv);
+      return;
+    }
   }
 
   list(since = 0) {
