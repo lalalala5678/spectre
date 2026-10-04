@@ -339,6 +339,9 @@ const caps = {
       `2) 需要时用 query_intel 交叉验证项目内情报,或 read_session 其它相关会话;\n` +
       `3) 判定该线索是否构成真实危害、可提交的漏洞;\n` +
       `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity。` +
+      `若回执以 [mutex-intercepted] 开头=与库内既有条目同点位被拦(未成账): ` +
+      `终报必须如实写「被互斥拦截待归并」, 并 query_intel 回查正本 seq——严禁写「已落账」; ` +
+      `正常落账后也须以回执 seq 回查库内确认再写终报。` +
       `标题必须一行式简洁命名(参考 CVSS/CVE 业界惯例): 资产+端点+漏洞类型(CWE 编号可选), ` +
       `≤40 字, 禁止句子化描述/影响铺陈(那些放正文)。正例:'SpectreTest /api/transfer 无鉴权 BOLA'/'登录页 SQL 注入(CWE-89)'; 反例:'发现某接口存在一个非常重要的未授权访问漏洞可以挪动资金'。` +
       `正文包含发现过程、证据链、危害分析与POC,并注明发现者 ${requesterAuthor.name};\n` +
@@ -365,6 +368,19 @@ const caps = {
     }
     // Declined / failed: relay the writer's final reasoning back.
     const reply = lastReply(writer);
+    // r29e-1: 互斥拦截专属回执——被拦方必须知道「未成账+荣誉路径」。
+    // 通用 declined 前缀「未将此线索立为漏洞」与被拦正文并置, 曾致
+    // 三次「已落账」误报接力(4908→回执→DM), 荣誉面临静默丢失。
+    if (reply && /mutex-intercepted/i.test(reply)) {
+      return {
+        ok: false, mutexIntercepted: true,
+        text: `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截——**未成账**。` +
+          `发现不会丢失: query_intel 按点位查正本 seq, 用 request_vulnerability_revision ` +
+          `将你的证据与署名并入(共同发现者荣誉); 严禁重复 publish。` +
+          `(writer 处理记录摘要: ${reply.slice(0, 220)})`,
+        details: { sessionId: writer.id, mutex: true, waitedMs: Date.now() - tRw },
+      };
+    }
     // r18-1: 半成品检测——草稿/中断文本混入回执两轮未收敛, 判定词缺位
     // 时如实标注(不再把未完成输出当判定说明)。
     // r29b-残留③: 判定词族扩充——writer 以"重复/并入/维持/证据不足"等
