@@ -79,10 +79,22 @@ export class Bus {
     // (receipt 式重发)幂等 no-op。
     if ((entry.type === 'vulnerability' || entry.type === 'intel')
       && entry.title && entry.severity && !entry.revises) {
+      // r15-①: 去重键归一化——并发双 writer 各拟标题曾击穿精确匹配
+      // (3231/3235 同洞双账)。标题去非字母数字+小写, 取前 16 字符;
+      // 附 detail 前 120 字符归一为副证(同资产同端点正文高度相似)。
+      const norm = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '').slice(0, 16);
+      const normD = (t) => String(t ?? '').toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
       const dup = [...this.events].reverse().find(e =>
-        (e.type === 'vulnerability' || e.type === 'intel') && e.from === entry.from
-        && e.title === entry.title && e.severity === entry.severity);
-      if (dup) return dup;
+        (e.type === 'vulnerability' || e.type === 'intel')
+        && e.workSessionId === entry.workSessionId
+        && (e.title === entry.title && e.severity === entry.severity
+          || (norm(e.title) && norm(e.title) === norm(entry.title))
+          || (normD(e.detail) && normD(e.detail) === normD(entry.detail) && norm(e.title).slice(0, 8) === norm(entry.title).slice(0, 8))));
+      if (dup) {
+        // 合并发现者署名(后到者并入既有条目的协作发现记录)
+        dup.coDiscoverers = [...new Set([...(dup.coDiscoverers ?? []), entry.author?.name ?? entry.from].filter(Boolean))];
+        return dup;
+      }
     }
     // Write-ahead: durable on disk before it exists in memory/SSE.
     this.wal?.append({ t: 'bus', d: event });

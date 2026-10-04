@@ -8,7 +8,7 @@
 
 const DEFAULTS = Object.freeze({
   spawnMaxDepth: 3,   // root orchestrator = depth 0; spawned levels ≤ this
-  spawnMaxAgents: 8,  // max sessions per dispatch tree (root included)
+  spawnMaxAgents: 12,  // r15-②: 8→12(全编队 10 代理单战役可并发; 根含)——设置页可调 1..64
 });
 
 let settings = { ...DEFAULTS };

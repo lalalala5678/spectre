@@ -172,8 +172,12 @@ export function buildIntelTools(record, caps) {
             revNote = `\n[注: 现行状态=${e.status}(第 ${e.revisedCount} 次修订生效); 下方正文为历史提交原文, 其首行状态为当时口径]\n`;
           }
         }
+        // r15-⑤: 修订链 reason 在现行版面可见(此前只藏链上)
+        const chainWhy = (e.revisedCount ?? 0) > 0
+          ? `\n[修订史] 共 ${e.revisedCount} 次${e.current?.revision ? `;最近: ${String(e.current.revision.reason ?? '').slice(0, 120)}` : ''}`
+          : '';
         return { content: [{ type: 'text', text:
-          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}${voidNote}${revNote}\n` +
+          `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}${voidNote}${revNote}${chainWhy}\n` +
           `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${e.detail ?? e.summary ?? ''}` }] };
       }
 
