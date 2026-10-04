@@ -191,7 +191,15 @@ const caps = {
   shells: shellRegistry,
   dispatch: (input) => startAutopwn(input),
   signalEngagement,
-  emitBus: (entry) => bus.emit(entry),
+  // r29-#2: vuln 落账互斥——emit 前预检, 短窗高重叠拦截(非吞并),
+  // 返回 {blocked, dupSeq} 供 publish_vulnerability 回执指引 revise。
+  emitBus: (entry) => {
+    if (entry?.type === 'vulnerability' && !entry.revises) {
+      const block = bus.vulnMutexCheck?.(entry);
+      if (block) return block;
+    }
+    return bus.emit(entry);
+  },
   followUp: (sessionId, text) => {
     const record = store.get(sessionId);
     if (!record) {

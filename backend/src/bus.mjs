@@ -116,6 +116,32 @@ export class Bus {
     return event;
   }
 
+  /** r29-#2: 落账前互斥预检——短窗(120s)内同项目同 severity 高重叠
+   * vuln 存在则拦截(非吞并): 返回 {blocked, dupSeq} 由调用方回执指引
+   * revise 并入。与 suggestDupMerge(事后提示)互补, 双保险。 */
+  vulnMutexCheck(entry) {
+    if (entry.type !== 'vulnerability' || entry.revises) return null;
+    const tokens = t => new Set(String(t ?? '').toLowerCase()
+      .split(/[^a-z0-9\u4e00-\u9fa5:/.]+/).filter(x => x.length > 2));
+    const mt = tokens(`${entry.title} ${entry.detail ?? ''}`);
+    if (mt.size < 4) return null;
+    const cut = Date.now() - 120_000;
+    for (const other of this.events) {
+      if (other.type !== 'vulnerability' || other.revises
+        || other.workSessionId !== entry.workSessionId
+        || (other.severity ?? '') !== String(entry.severity ?? '')
+        || Date.parse(other.ts ?? 0) < cut) continue;
+      const ot = tokens(`${other.title} ${other.detail ?? ''}`);
+      if (ot.size < 4) continue;
+      let hit = 0;
+      for (const t of ot) if (mt.has(t)) hit += 1;
+      if (hit / Math.min(ot.size, mt.size) >= 0.7) {
+        return { blocked: true, dupSeq: other.seq, dupTitle: other.title };
+      }
+    }
+    return null;
+  }
+
   /** r28-#4(b): 同点位双账建议——token 重叠>70% 且端点快检命中才提示,
    * 每对仅一次(查已有建议覆盖), 从不吞并(修订链由 writer 裁决)。 */
   suggestDupMerge(seq) {

@@ -123,7 +123,12 @@ export async function autoPwnWorkflow(input) {
   // 'workflow already started' → Promise.all 一败全弃 + 已启动的健康
   // child 被默认 TERMINATE 连坐杀。入口去重。
   const uniqueAgents = [...new Set(agents)];
-  await Promise.all(uniqueAgents.map(async (agentKey) => {
+  // r29-#1: dispatch 自动分波——十键全并发 4/10 席被 429 击杀(上游
+  // ACCOUNT 级限速)。滚动窗口并发≤7(实证安全区), 席位完成即补位,
+  // 对编排器/席位语义零变化(仍同 engagement, 仍全量收报)。
+  const WAVE = 7;
+  const queue = [...uniqueAgents];
+  const runOne = async (agentKey) => {
     await quick.busEmit({
       channel: 'dm', from: 'orchestrator', to: agentKey, type: 'dispatch',
       summary: `任务派发:${instruction.slice(0, 80)}`, engagement,
@@ -157,7 +162,9 @@ export async function autoPwnWorkflow(input) {
     } catch (err) {
       results.set(agentKey, { agentKey, error: String(err) });
     }
-  }));
+  };
+  await Promise.all(Array.from({ length: Math.min(WAVE, queue.length) }, () =>
+    (async () => { while (queue.length) { const k = queue.shift(); await runOne(k); } })()));
 
   open = false;
   await drain;
