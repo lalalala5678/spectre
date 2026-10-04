@@ -437,6 +437,7 @@ const caps = {
    *  Same detached-session + event-driven-wait pattern as reportWriter. */
   revisionWriter: async (requesterRecord, targetSeq, reason, changes) => {
     const tRv = Date.now();  // r14-④
+    const reasonS = String(reason ?? ''); const changesS = String(changes ?? '');  // r20-①: 参数防御
     const target = bus.list().find(e => e.seq === Number(targetSeq)
       && entryKindOf(e) === 'vulnerability' && !e.revises
       && e.workSessionId === (requesterRecord.workSessionId ?? null));  // F33
@@ -450,7 +451,7 @@ const caps = {
       agentKey: 'report',
       ws: requesterRecord.workSessionId ?? null,
       name: `修订:${String(target.title ?? '').slice(0, 20)}`,
-      description: `漏洞修订申请:${reason.slice(0, 60)}`,
+      description: `漏洞修订申请:${reasonS.slice(0, 60)}`,
       requester: { sessionId: requesterRecord.id, author: requesterAuthor },
       revisionTarget: target.seq,
       prompt:
@@ -458,7 +459,7 @@ const caps = {
       `${requesterAuthor.name}(${requesterAuthor.typeLabel})申请修订漏洞:\n` +
       `『${target.title}』(severity=${target.severity ?? '?'},现行版内容如下)\n` +
       `---现行内容---\n${(current ?? target).detail ?? target.summary ?? '(空)'}\n---\n` +
-      `申请理由:${reason}\n要求更改:${changes}\n\n` +
+      `申请理由:${reasonS}\n要求更改:${changesS}\n\n` +
       `你的职责:\n` +
       `1) 判定必要性:该理由是否成立(可用 read_session 读申请者会话 ${requesterRecord.id} 求证);\n` +
       `2) 判定正确性:要求的内容是否准确、不会引入错误;\n` +
@@ -506,6 +507,17 @@ if (replay.records.size || replay.busEvents.length) {
 }
 // ---- sandbox layer boot (driver detect → container/dirs → mounts) ----
 loadSandboxConfig().then(async cfg => {
+  // r20-②: 在役 engagement 中断通知——重启杀死的战役此前零告知(靠
+  // 对账铁则兜底)。activeEngagement 已持久化(FP 批), boot 扫描并 DM。
+  for (const rec of store.list()) {
+    const eng = rec?.activeEngagement?.engagementId;
+    if (!eng) continue;
+    if (rec._bootInterruptNotified) continue;
+    rec._bootInterruptNotified = true;
+    bus.emit({ channel: 'dm', from: 'system', to: rec.agentKey, type: 'watchdog',
+      summary: `平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。`,
+      workSessionId: rec.workSessionId ?? null });
+  }
   const ensured = await ensureSandbox();
   console.log(`[sandbox] driver=${cfg.driver} ok=${ensured.ok}`,
     ensured.error ?? '');

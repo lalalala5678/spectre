@@ -585,10 +585,17 @@ function buildRequestRevisionTool(record, caps) {
         return { content: [{ type: 'text',
           text: '漏洞修订服务不可用(capability 缺失)。' }] };
       }
-      const result = await caps.revisionWriter(record, params.seq,
-        params.reason, params.changes);
-      return { content: [{ type: 'text', text: result.text }],
-        details: result.details ?? {} };
+      // r20-①: 异常防御——revisionWriter 抛错时 pi 会把工具回执吞成
+      // "No result provided"(申请后无可观测裁决的根因面)。
+      try {
+        const result = await caps.revisionWriter(record, params.seq,
+          params.reason, params.changes);
+        return { content: [{ type: 'text', text: result?.text ?? '(修订审核无输出——请 query_intel 复核)' }],
+          details: result?.details ?? {} };
+      } catch (e) {
+        return { content: [{ type: 'text',
+          text: `修订申请处理异常: ${String(e?.message ?? e).slice(0, 300)}——申请未落账; 可重试或稍后 query_intel 复核。` }] };
+      }
     },
   };
 }
