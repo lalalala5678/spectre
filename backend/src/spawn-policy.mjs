@@ -20,7 +20,7 @@ export function makeSpawnPolicy(store) {
       if (childDepth > spawnMaxDepth) {
         return { ok: false, reason:
           `深度上限 ${spawnMaxDepth}(根=L0,最深允许第 ${spawnMaxDepth} 层;当前将到第 ${childDepth} 层被拒)`,
-          depth: childDepth, active, total };
+          depth: childDepth, active, total, spawnMaxDepth };  // r26②: 成功回执带实值
       }
       if (active + 1 > spawnMaxAgents) {
         // r12-UX: 拒绝文案列名计数构成(观察项采纳——树根计入系反推
@@ -31,9 +31,9 @@ export function makeSpawnPolicy(store) {
           `——已提交任务报告的空闲会话不计入名额)。` +
           (names ? `当前活跃构成:${names}(含树根本身)。` : '') +
           `可等待在途任务完成后重试,或经控制台调整 spawnMaxAgents。`,
-          depth: childDepth, active, total };
+          depth: childDepth, active, total, spawnMaxDepth };  // r26②: 成功回执带实值
       }
-      return { ok: true, depth: childDepth, active, total };
+      return { ok: true, depth: childDepth, active, total, spawnMaxDepth };  // r26②: 成功回执带实值
     },
 
     /** Bulk quota check for dispatch_agents (Fix-B/A1): the dispatch

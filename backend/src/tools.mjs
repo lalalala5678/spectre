@@ -656,6 +656,11 @@ function buildSpawnAgentTool(record, caps) {
       }),
     }),
     execute: async (_id, params) => {
+      // r26①: 禁键 report 人话指引——schema enum 原始堆栈两次实证难读
+      if (params.agentKey === 'report') {
+        return { content: [{ type: 'text',
+          text: 'report(报告撰写agent)不可派生——它是平台内置闸门, 由 report_vulnerability / request_vulnerability_revision 自动唤醒。业务子代理请从其余 10 键中选择。' }] };
+      }
       // Fix-H (A3): codename IS provenance (spawnName feeds authorOf,
       // DMs, tree paths) — enforce the documented ≤20/≤60 contract with
       // an actionable refusal instead of the store's silent slice.
@@ -685,7 +690,7 @@ function buildSpawnAgentTool(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 L${verdict.depth}——计数:根=L0,spawnMaxDepth=N 表示最深允许第 N 层),` +
+          text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 L${verdict.depth}——计数:根=L0,当前 spawnMaxDepth=${verdict.spawnMaxDepth ?? '?'} 表示最深允许第 ${verdict.spawnMaxDepth ?? '?'} 层),` +
             '完成后会以 [DM] 向你回报结果。',
         }],
         details: { sessionId: spawned.id, depth: verdict.depth },
