@@ -374,7 +374,7 @@ const caps = {
     if (reply && /mutex-intercepted/i.test(reply)) {
       return {
         ok: false, mutexIntercepted: true,
-        text: `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截——**未成账**(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
+        text: `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截(命中方式: token 重叠或端点指纹)——**未成账**(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
           `发现不会丢失: query_intel(kind=vulnerability, q=点位/标题关键词)查漏洞正本 seq(注意甄别: 任务报告 seq 不算正本), ` +
           `用 request_vulnerability_revision 将你的证据与署名并入(共同发现者荣誉); 严禁重复 publish。` +
           `(writer 处理记录摘要: ${reply.slice(0, 220)})`,
