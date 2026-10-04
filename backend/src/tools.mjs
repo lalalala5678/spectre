@@ -215,7 +215,8 @@ export function buildIntelTools(record, caps) {
       // 但方向直觉易反)
       const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,库内最新 seq=${latestSeq}):`;
       const footLine = olderLeft > 0
-        ? `\n\n↓ 还有更旧 ${olderLeft} 条——续翻下一页(更旧)传 before=${hits[hits.length - 1].seq}; ↑ 回到最新一页去掉 before;单条全文传 seq=…` : '';
+        ? `\n\n↓ 还有更旧 ${olderLeft} 条——续翻下一页(更旧)传 before=${hits[hits.length - 1].seq}; ↑ 回到最新一页去掉 before;单条全文传 seq=…`
+        : (before ? `\n\n↑ 已到 before=${before} 之前的末页。注意:before 是排他上界(只看 seq<before 的更旧条目)——要看最新请去掉 before(库内最新 seq=${latestSeq})。` : '');
 
       if (hits.length === 0) {
         const scope = inWs.filter(e => isEntry(e) && !e.void);
@@ -1044,8 +1045,9 @@ function buildPublishIntelTool(record, caps, mode) {
       return {
         content: [{
           type: 'text',
-          text: `情报已入库: ${params.title}`,
+          text: `情报已入库: ${params.title}(seq=${dm?.seq ?? '?'}——修订/引用直接用此 seq, 与 submit_task_report 回执同口径)`,
         }],
+        details: { seq: dm?.seq ?? null },
       };
     },
   };
