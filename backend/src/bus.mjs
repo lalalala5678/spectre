@@ -138,8 +138,22 @@ export class Bus {
       if (ot.size < 4) continue;
       let hit = 0;
       for (const t of ot) if (mt.has(t)) hit += 1;
-      if (hit / Math.min(ot.size, mt.size) >= 0.7) {
-        return { blocked: true, dupSeq: other.seq, dupTitle: other.title };
+      // r29f-A: 端点指纹 OR 条件——同点位独立撰写(detail 各自扩写,
+      // token 重叠实测仅 0.36)曾穿透双正本(4920/4921)。同端点
+      // (/path 指纹)短窗并发才是同点位竞态的本质特征; 阈值拦同文,
+      // 指纹拦同点位, 二者其一即拦(零吞并, revise 归并保荣誉)。
+      const paths = t => new Set((String(t ?? '').toLowerCase()
+        .match(/\/[a-z0-9_.-]{2,}(?:\/[a-z0-9_.-]{2,})*/g) ?? []));
+      const mp = paths(`${entry.title} ${entry.detail ?? ''}`);
+      const op = paths(`${other.title} ${other.detail ?? ''}`);
+      let phit = 0;
+      for (const t of op) if (mp.has(t)) phit += 1;
+      const overlap = hit / Math.min(ot.size, mt.size);
+      const fpMatch = mp.size > 0 && op.size > 0
+        && phit / Math.min(op.size, mp.size) >= 0.5;
+      if (overlap >= 0.7 || fpMatch) {
+        return { blocked: true, dupSeq: other.seq, dupTitle: other.title,
+          ...(fpMatch && overlap < 0.7 ? { by: 'fingerprint' } : {}) };
       }
     }
     return null;

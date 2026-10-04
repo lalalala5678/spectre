@@ -27,11 +27,29 @@ ck('跨项目放行', bus.vulnMutexCheck({ ...base, workSessionId: 'ws-b' }) ===
 ck('不同 severity 高重叠拦截', bus.vulnMutexCheck({ ...base, severity: 'critical' })?.blocked === true);
 // 修订版放行
 ck('修订版放行', bus.vulnMutexCheck({ ...base, revises: first.seq }) === null);
-// 低重叠(不同漏洞)放行
-ck('低重叠放行', bus.vulnMutexCheck({
-  ...base, title: 'Range29 SSH 弱口令 root/123456',
-  detail: 'weakcred 席爆破命中, POC: sshpass ssh root@target, 危害: 主机沦陷',
+// 低重叠+不同端点(真不同漏洞)放行
+ck('低重叠异端点放行', bus.vulnMutexCheck({
+  ...base, title: 'Range29f /backup/.env 敏感配置文件暴露',
+  detail: 'recon 席目录枚举命中 /backup/.env, POC: curl --path-as-is, 危害: 数据库凭据泄露',
 }) === null);
+
+// r29f-A: 同端点独立撰写(低 token 重叠)也拦——端点指纹条件
+// 场景还原 4920/4921: 先落 /pay-key 独立扩写版, 后报同端点再扩写版
+const payA = bus.emit({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: 'Range29f /pay-key 无鉴权硬编码支付密钥泄露(CWE-798)',
+  detail: 'writer-A 独立取证: 配置文件定位硬编码, 影响面与修复建议, 附抓包复现脚本一份完整行文。',
+});
+const indep = {
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: 'Range29f /pay-key 无鉴权硬编码支付网关密钥泄露',
+  detail: 'writer-B 独立扩写: 从路由代码与部署清单两处交叉取证, 确认泄露点与调用链, 全新行文附网络抓包与复现脚本, 加固建议另附三段。',
+};
+ck('同端点独立撰写拦截', bus.vulnMutexCheck(indep)?.blocked === true);
+ck('指纹命中带 by 标记', bus.vulnMutexCheck(indep)?.by === 'fingerprint');
+ck('dupSeq 指向同端点先账', bus.vulnMutexCheck(indep).dupSeq === payA.seq);
 
 // 窗外放行: 手工把首落 ts 拨回 3 分钟前
 const old = bus.events.find(e => e.seq === first.seq);
