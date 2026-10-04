@@ -661,7 +661,7 @@ function buildSpawnAgentTool(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 ${verdict.depth}),` +
+          text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 L${verdict.depth}——计数:根=L0,spawnMaxDepth=N 表示最深允许第 N 层),` +
             '完成后会以 [DM] 向你回报结果。',
         }],
         details: { sessionId: spawned.id, depth: verdict.depth },

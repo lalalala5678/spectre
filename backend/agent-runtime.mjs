@@ -352,10 +352,16 @@ const caps = {
     }
     // Declined / failed: relay the writer's final reasoning back.
     const reply = lastReply(writer);
+    // r18-1: 半成品检测——草稿/中断文本混入回执两轮未收敛, 判定词缺位
+    // 时如实标注(不再把未完成输出当判定说明)。
+    const looksDraft = reply && !/(不成立|驳回|不予|拒绝|decline|不构成|否决)/.test(reply);
+    const replyShown = looksDraft
+      ? `(writer 最终输出疑似未完成(未见判定词)——全文见 read_session ${writer.id}, 稍后复核):\n${reply.slice(0, 300)}`
+      : (reply || '(无输出)');
     return {
       ok: false,
       text: `报告agent未将此线索立为漏洞(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。其判定说明:\n` +
-        `${(reply || '(无输出)').slice(0, 600)}\n` +
+        `${replyShown.slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,
       details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },

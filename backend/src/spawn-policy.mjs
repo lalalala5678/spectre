@@ -19,7 +19,7 @@ export function makeSpawnPolicy(store) {
       const total = store.countTree(rootId);
       if (childDepth > spawnMaxDepth) {
         return { ok: false, reason:
-          `深度上限 ${spawnMaxDepth}(当前将到第 ${childDepth} 层)`,
+          `深度上限 ${spawnMaxDepth}(根=L0,最深允许第 ${spawnMaxDepth} 层;当前将到第 ${childDepth} 层被拒)`,
           depth: childDepth, active, total };
       }
       if (active + 1 > spawnMaxAgents) {
