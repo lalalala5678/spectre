@@ -514,9 +514,14 @@ loadSandboxConfig().then(async cfg => {
     const eng = rec?.activeEngagement?.engagementId;
     if (!eng) continue;
     if (rec._bootInterruptNotified) continue;
+    // r25-重放根修: 同战役中断通知查重(标题含 engagementId, 命中即跳)
+    // ——_bootInterruptNotified 仅内存态, 此前每次重启对同战役重发
+    // (4198 战役 ×9 重放实证)
+    const dupKey = `平台重启:你的战役 ${eng} 的 Temporal 执行已被中断`;
+    if (bus.list().some(e => (e.summary ?? '').startsWith(dupKey))) continue;
     rec._bootInterruptNotified = true;
     bus.emit({ channel: 'dm', from: 'system', to: rec.agentKey, type: 'watchdog',
-      summary: `平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。`,
+      summary: `${dupKey}——成员产出以情报库为准(query_intel 对账), 失联成员可重派。`,
       workSessionId: rec.workSessionId ?? null });
     // r20v4: bus 事件不进会话——同时 followUp 直接注入编排器(idle 即
     // 触发回合, 看得见才算通知)
