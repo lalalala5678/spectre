@@ -295,7 +295,17 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     return out;
   }
 
-  function get(id) { return shells.get(id) ?? null; }
+  function get(id) {
+    const sh = shells.get(id) ?? null;
+    // r27-D2': 计算态过期——status 单查此前返回陈旧 active(惰性翻标
+    // 只挂 list, 实测同一秒 list 前 active/list 后 expired)
+    if (sh && sh.status === 'active' && sh.expiresAt
+        && sh.expiresAt <= new Date().toISOString()) {
+      sh.status = 'expired';
+      try { persistShells(); } catch { /* best-effort */ }
+    }
+    return sh;
+  }
 
   function close(id) {
     const sh = shells.get(id);
