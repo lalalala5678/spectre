@@ -145,8 +145,17 @@ export class Bus {
       // token 重叠实测仅 0.36)曾穿透双正本(4920/4921)。同端点
       // (/path 指纹)短窗并发才是同点位竞态的本质特征; 阈值拦同文,
       // 指纹拦同点位, 二者其一即拦(零吞并, revise 归并保荣誉)。
-      const paths = t => new Set((String(t ?? '').toLowerCase()
-        .match(/\/[a-z0-9_.-]{2,}(?:\/[a-z0-9_.-]{2,})*/g) ?? []));
+      // loop22: 指纹扩展端口形态——TCP 服务洞(authd 18402)标题无 /path,
+      // 措辞分歧双账曾穿透(5173/5177)。严格边界(两侧非 \w-)排除
+      // CVE-2024 年份等连字数字, 归一为 port:NNNN。
+      const paths = t => {
+        const lo = String(t ?? '').toLowerCase();
+        const out = new Set(lo.match(/\/[a-z0-9_.-]{2,}(?:\/[a-z0-9_.-]{2,})*/g) ?? []);
+        for (const m of lo.matchAll(/(?<![\w-])(\d{4,5})(?![\w-])/g)) {
+          out.add(`port:${m[1]}`);
+        }
+        return out;
+      };
       // loop21-①: 指纹源收窄 title-only——弱口令洞正文连带提及 /api/user
       // (攻击链语境)曾被 BOLA 正本端点字面量误拦三次(5042/5043)。writer
       // 标题规范要求"资产+端点+漏洞类型", 同点位标题必含同端点; 正文

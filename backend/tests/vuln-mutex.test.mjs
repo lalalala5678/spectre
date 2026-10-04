@@ -62,6 +62,27 @@ const weak = {
 };
 ck('正文提及异端点放行(loop21 误拦修复)', bus.vulnMutexCheck(weak) === null);
 
+// loop22: TCP 服务端口形态——措辞分歧同端口(authd 18402 无 /path,
+// 5173/5177 双账穿透)由 port: 指纹拦截; CVE 年份不产生假指纹
+const authA = bus.emit({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'medium', workSessionId: 'ws-a',
+  title: 'r32 authd(18402) 全账户弱口令(CWE-521)',
+  detail: 'writer-A 独立取证: 127.0.0.1:18402 TCP 行协议, 无失败锁定与明文口令日志, 附账号枚举与爆破脚本。',
+});
+ck('同端口措辞分歧拦截(5173/5177 场景)', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: 'r32 authd 18402 三账号弱口令+无锁定(CWE-521/307)',
+  detail: 'writer-B 独立扩写: 靶场 TCP 认证服务三账号弱口令叠加无锁定/无限速, 全新行文。',
+})?.by === 'fingerprint');
+ck('CVE 年份不假撞', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: 'r32 反序列化 RCE(CVE-2024-1234) 利用链披露',
+  detail: '完全不同的漏洞: Java 反序列化 gadget 链, 与 authd 弱口令无任何行文交集, POC 为恶意序列化 payload。',
+}) === null);
+
 // loop21-复测 C/D 案(验收方三角重放)入回归组
 // C: 标题与库内零重叠 + 正文逐字引用先账标题/端点/密钥 → 必须放行
 ck('C案 正文逐字引用也放行', bus.vulnMutexCheck({
