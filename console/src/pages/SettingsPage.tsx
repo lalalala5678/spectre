@@ -178,8 +178,7 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
   const tier = TIER_STYLE[src.tier ?? 'P2'];
   const verifyState = verify;
   return (
-    <div className={cn('overflow-hidden rounded-lg border shadow-xs transition-colors',
-      mounted ? 'border-success-line bg-surface' : 'border-line bg-surface')}>
+    <div className="overflow-hidden transition-colors">  {/* 单框: 源不自带卡 */}
       <button
         onClick={() => setOpen(!open)}
         className="flex min-h-12 w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/40"
