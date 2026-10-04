@@ -1140,7 +1140,7 @@ export function buildDirectTools(record, caps) {
         return {
           content: [{
             type: 'text',
-            text: `已拦截: 与 seq=${ev.dupSeq}《${ev.dupTitle}》疑似同点位双账(短窗互斥, 120s)。` +
+            text: `[mutex-intercepted] 已拦截: 与 seq=${ev.dupSeq}《${ev.dupTitle}》疑似同点位双账(短窗互斥, 120s)。` +
               `同一漏洞请用 request_vulnerability_revision 并入(正本=首落 seq=${ev.dupSeq}); ` +
               `确属不同漏洞请细化 title/detail 差异后重发。`,
           }],

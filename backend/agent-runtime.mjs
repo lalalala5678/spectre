@@ -367,7 +367,9 @@ const caps = {
     const reply = lastReply(writer);
     // r18-1: 半成品检测——草稿/中断文本混入回执两轮未收敛, 判定词缺位
     // 时如实标注(不再把未完成输出当判定说明)。
-    const looksDraft = reply && !/(不成立|驳回|不予|拒绝|decline|不构成|否决)/.test(reply);
+    // r29b-残留③: 判定词族扩充——writer 以"重复/并入/维持/证据不足"等
+    // 清晰结论措辞驳回时曾被误贴"疑似未完成"旗标(验收方实测报)。
+    const looksDraft = reply && !/(不成立|驳回|不予|拒绝|decline|不构成|否决|重复|合并|并入|归并|维持|既有|已存在|已由|另立|证据不足|不足以|duplicate|merge|overlap)/i.test(reply);
     const replyShown = looksDraft
       ? `(writer 最终输出疑似未完成(未见判定词)——全文见 read_session ${writer.id}, 稍后复核):\n${reply.slice(0, 300)}`
       : (reply || '(无输出)');

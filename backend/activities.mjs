@@ -71,6 +71,17 @@ export async function markReportSynthesized(sessionId, meta = {}) {
   return runtime.markReportSynthesized(sessionId, meta);
 }
 
+/** r29b-残留②: 送达时对账段构造(纯函数, 注入式自测面)。 */
+export function buildLateRecon(recheck, children, clock = () => new Date()) {
+  const parts = (Array.isArray(recheck) ? recheck : [])
+    .map(k => children[k]
+      ? `${k}: 终报已落账(${children[k].status ?? '?'})《${String(children[k].title ?? '').slice(0, 50)}》(seq=${children[k].seq})——勿判失败`
+      : `${k}: 快照时点库内仍无终报(投递后落账未覆盖——终局以 query_intel 为准)`)
+    .map(x => `- ${x}`);
+  if (!parts.length) return '';
+  return `\n[排空对账·${clock().toISOString().slice(11, 19)}(投递前快照; 终局以 query_intel 为准)]\n${parts.join('\n')}`;
+}
+
 /** Notify the orchestrator session that its engagement finished. */
 export async function notifyEngagementDone({ orchestratorSessionId,
                                              engagementId, summary, recheck = [] }) {
@@ -79,16 +90,12 @@ export async function notifyEngagementDone({ orchestratorSessionId,
   }
   // r6v3-#10: 送达时对账——workflow 判死与终报落账存在时序窗, 构建时
   // 快照可能恒旧。投递前对 error 成员重查情报库, 追加终局状态。
+  // r29b-残留②: 纯函数化(buildLateRecon)供注入式自测——竞态难实战
+  // 摆拍, 单测正样本(构建后落账→勿判失败/未覆盖→以库为准)。
   let lateRecon = '';
   if (Array.isArray(recheck) && recheck.length) {
     try {
-      const children = await runtime.engagementChildren(engagementId);
-      const parts = recheck
-        .map(k => children[k]
-          ? `${k}: 终报已落账(${children[k].status ?? '?'})《${String(children[k].title ?? '').slice(0, 50)}》(seq=${children[k].seq})——勿判失败`
-          : `${k}: 快照时点库内仍无终报(投递后落账未覆盖——终局以 query_intel 为准)`)
-        .map(x => `- ${x}`);
-      if (parts.length) lateRecon = `\n[排空对账·${new Date().toISOString().slice(11, 19)}(投递前快照; 终局以 query_intel 为准)]\n${parts.join('\n')}`;
+      lateRecon = buildLateRecon(recheck, await runtime.engagementChildren(engagementId));
     } catch { /* 对账尽力——不影响通知本体 */ }
   }
   return runtime.followUp(
