@@ -24,16 +24,16 @@ import { ShieldCheck, Eye, EyeOff } from 'lucide-react';
  * 正文 pre-wrap 满行折行。
  */
 /** 用户令: 配置分组总览(与平台设置页同形态的左侧一级菜单) */
+/* 用户令自查: 内容小块不拆一级菜单——派生限额+大模型合'运行配置',
+ * MCP+技能合'挂载', 专属配置独立 */
 const CFG_SECTIONS = [
-  { id: 'cfg-spawn', label: '派生限额' },
-  { id: 'cfg-llm', label: '大模型' },
-  { id: 'cfg-mcp', label: '挂载 MCP' },
-  { id: 'cfg-skills', label: '挂载技能' },
+  { id: 'cfg-run', label: '运行配置' },
+  { id: 'cfg-mounts', label: '挂载' },
   { id: 'cfg-own', label: '专属配置' },
 ];
 
 export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: boolean }) {
-  const [activeSec, setActiveSec] = useState(CFG_SECTIONS[isAuto ? 0 : 1].id);
+  const [activeSec, setActiveSec] = useState(CFG_SECTIONS[0].id);
   // scroll-spy: 可视比例最大的分组即高亮(IntersectionObserver 轻量)
   useEffect(() => {
     const els = CFG_SECTIONS
@@ -109,90 +109,80 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
           </button>
         ))}
       </nav>
-      <div className="mx-auto flex min-w-0 max-w-4xl flex-1 flex-col gap-3">  {/* 用户令: 与平台设置项统一宽(max-w-4xl) */}
-      {isAuto && (
-        <section id="cfg-spawn" className="scroll-mt-2 [&>div]:shadow-xs">
-          <SpawnLimitSettings />
+      <div className="mx-auto flex min-w-0 max-w-4xl flex-1 flex-col gap-4">  {/* 用户令: 统一宽+按菜单三组 */}
+        {/* 运行配置: 派生限额(仅 autopwn)+大模型 */}
+        <section id="cfg-run" className="flex scroll-mt-2 flex-col gap-3">
+          {isAuto && <div className="[&>div]:shadow-xs"><SpawnLimitSettings /></div>}
+          <Panel title="大模型" className="shadow-xs">
+            <div className="space-y-2">
+              <div className="space-y-1.5">
+                {[
+                  ['格式', fmtLabel],
+                  ['Base URL', cfg(llm.baseUrl, '(未配置)')],
+                  ['模型', cfg(llm.model, '(未配置)')],
+                  ['Thinking Effort', cfg(llm.thinkingLevel, 'low')],
+                  ['最大输出 Tokens', cfg(llm.maxTokens, '32768')],
+                  ['上下文窗口 Tokens', cfg(llm.contextWindow, '786432')],
+                  ['上下文压缩', cfg(comp.enabled, '开启')],
+                  ['API Key', llm.apiKey ? '已配置' : '(未配置)'],
+                ].map(([k, v]) => (
+                  <div key={k} className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-2.5 py-1.5">
+                    <span className="shrink-0 text-xs text-tertiary">{k}</span>
+                    <span className="min-w-0 truncate font-mono text-[13px] text-secondary" title={v}>{v}</span>
+                  </div>
+                ))}
+              </div>
+              <AgentLlmOverride agentId={agentId} formats={llmFormats} ov={agentLlm?.[agentId]} onSaved={reloadLlm}
+                onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
+                  { detail: { src: `agentConfig:${agentId}`, count: d ? 1 : 0 } }))} />
+            </div>
+          </Panel>
         </section>
-      )}
 
-      {/* 生效运行配置 + 本 agent 供应商覆盖(R32D44: 可直接改) */}
-      <section id="cfg-llm" className="scroll-mt-2">
-      <Panel title="大模型" className="shadow-xs">
-        <div className="space-y-2">
-          <div className="space-y-1.5">
-            {[
-              ['格式', fmtLabel],
-              ['Base URL', cfg(llm.baseUrl, '(未配置)')],
-              ['模型', cfg(llm.model, '(未配置)')],
-              ['Thinking Effort', cfg(llm.thinkingLevel, 'low')],
-              ['最大输出 Tokens', cfg(llm.maxTokens, '32768')],
-              ['上下文窗口 Tokens', cfg(llm.contextWindow, '786432')],
-              ['上下文压缩', cfg(comp.enabled, '开启')],
-              ['API Key', llm.apiKey ? '已配置' : '(未配置)'],
-            ].map(([k, v]) => (
-              <div key={k} className="flex items-center justify-between gap-3 rounded-md border border-line bg-surface px-2.5 py-1.5">
-                <span className="shrink-0 text-xs text-tertiary">{k}</span>
-                <span className="min-w-0 truncate font-mono text-[13px] text-secondary" title={v}>{v}</span>
-              </div>
-            ))}
-          </div>
-          <AgentLlmOverride agentId={agentId} formats={llmFormats} ov={agentLlm?.[agentId]} onSaved={reloadLlm}
-            onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
-              { detail: { src: `agentConfig:${agentId}`, count: d ? 1 : 0 } }))} />
-        </div>
-      </Panel>
+        {/* 挂载: MCP+技能(只读, 用户裁定不可增配) */}
+        <section id="cfg-mounts" className="flex scroll-mt-2 flex-col gap-3">
+          <Panel title={`挂载的 MCP(${mine.length})`} className="shadow-xs">
+            {mcps === null ? <div className="space-y-1.5"><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div>
+              : mine.length === 0 ? <EmptyState icon={ShieldCheck} title="该 agent 暂无挂载的 MCP 服务器" />
+              : <div className="space-y-1.5">
+                {mine.map(m => (
+                  <div key={m.name} className="rounded-md border border-line bg-surface px-2.5 py-1.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="min-w-0 truncate font-mono text-[13px] text-secondary">{m.name}</span>
+                      <Dot tone="info" />
+                    </div>
+                    <div className="mt-0.5 truncate font-mono text-xs text-tertiary" title={m.url ?? m.command}>
+                      {m.transport === 'stdio' ? (Array.isArray(m.command) ? m.command.join(' ') : String(m.command ?? 'stdio')) : (m.url ?? m.transport ?? '')}
+                    </div>
+                  </div>
+                ))}
+                <a href="#mcp" className="block pt-1 text-xs text-accent-text underline-offset-2 hover:underline">
+                  在「MCP Server」页管理挂载 →
+                </a>
+              </div>}
+          </Panel>
+          <Panel title="挂载技能" className="min-w-0 shadow-xs">
+            <RealSkillsPanel agentKey={agentId} expandable />
+          </Panel>
+        </section>
 
-      {/* 挂载的 MCP */}
-      </section>
-      <section id="cfg-mcp" className="scroll-mt-2">
-      <Panel title={`挂载的 MCP(${mine.length})`} className="shadow-xs">
-        {mcps === null ? <div className="space-y-1.5"><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div>
-          : mine.length === 0 ? <EmptyState icon={ShieldCheck} title="该 agent 暂无挂载的 MCP 服务器" />
-          : <div className="space-y-1.5">
-            {mine.map(m => (
-              <div key={m.name} className="rounded-md border border-line bg-surface px-2.5 py-1.5">
-                <div className="flex items-center justify-between gap-2">
-                  <span className="min-w-0 truncate font-mono text-[13px] text-secondary">{m.name}</span>
-                  <Dot tone="info" />
-                </div>
-                <div className="mt-0.5 truncate font-mono text-xs text-tertiary" title={m.url ?? m.command}>
-                  {m.transport === 'stdio' ? (Array.isArray(m.command) ? m.command.join(' ') : String(m.command ?? 'stdio')) : (m.url ?? m.transport ?? '')}
-                </div>
-              </div>
-            ))}
-            <a href="#mcp" className="block pt-1 text-xs text-accent-text underline-offset-2 hover:underline">
-              在「MCP Server」页管理挂载 →
-            </a>
-          </div>}
-      </Panel>
-
-      {/* 挂载的技能(点击直接看正文) */}
-      </section>
-      <section id="cfg-skills" className="scroll-mt-2">
-      <Panel title="挂载技能" className="min-w-0 shadow-xs">
-        <RealSkillsPanel agentKey={agentId} expandable />
-      </Panel>
-
-      {/* EQ-2: 专属数据源/参数——直接在本页编辑(与设置页同一保存协议);
-          skill/MCP 仅展示挂载态, 无添加入口(用户裁定: 子智能体不可增配 skill/MCP) */}
-      </section>
-      <section id="cfg-own" className="scroll-mt-2">
-      <Panel title="专属配置" className="shadow-xs">
-        {!myGroup ? <div className="text-[13px] text-tertiary">该智能体没有专属配置, 使用全局通用配置即可。</div>
-          : <div className="space-y-3">
-            {myGroup.sources.map(src => (
-              <SourceInlineEditor key={src.id} src={src} cfg={reconSources[src.id] ?? {}}
-                onSaved={reloadSources} agentKey={agentId} />
-            ))}
-            {/* 用户令: 说明不渲染 */}
-          </div>}
-      </Panel>
-      </section>
+        {/* 专属配置: 数据源/参数(直接编辑, 与设置页同一保存协议) */}
+        <section id="cfg-own" className="scroll-mt-2">
+          <Panel title="专属配置" className="shadow-xs">
+            {!myGroup ? <div className="text-[13px] text-tertiary">该智能体没有专属配置, 使用全局通用配置即可。</div>
+              : <div className="space-y-3">
+                {myGroup.sources.map(src => (
+                  <SourceInlineEditor key={src.id} src={src} cfg={reconSources[src.id] ?? {}}
+                    onSaved={reloadSources} agentKey={agentId} />
+                ))}
+              </div>}
+          </Panel>
+        </section>
       </div>
     </div>
   );
 }
+
 
 
 /** EQ-2: agent 配置页签内的数据源内联编辑器(逐字段保存+密码眼睛,
