@@ -396,9 +396,14 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
   // Conversations sorted by creation → numbered names (会话一/二…),
   // independent per agent inside this work session.
+  // 用户令: 名称=主控取的名字(spawnName/标题); byOrch=主控创建标记
   const namedSessions = [...mySessions]
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map((s, i) => ({ ...s, name: `会话${cnNumber(i + 1)}` }));
+    .map(s => ({
+      ...s,
+      name: s.spawnName ?? s.title ?? `会话${cnNumber(mySessions.indexOf(s) + 1)}`,
+      byOrch: Boolean(s.parentSessionId || s.orchestratorSessionId),
+    }));
   const current = mySessions.find(s => s.id === (drillSession ?? sessionId));
 
   if (!workSession || !uiReady) {

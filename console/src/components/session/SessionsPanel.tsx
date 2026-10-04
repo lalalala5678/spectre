@@ -46,8 +46,13 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
             <Dot tone={session.busy ? 'accent' : 'neutral'} pulse={session.busy} />
             <div className="min-w-0 flex-1">
               <div className="flex items-baseline justify-between gap-2">
-                <span className="truncate text-sm font-medium text-primary">
-                  {session.name ?? session.id}
+                <span className="flex min-w-0 items-center gap-1.5">
+                  {(session as { byOrch?: boolean }).byOrch && (
+                    <span className="shrink-0 rounded bg-accent-subtle px-1 py-px text-[10px] font-medium text-accent-text">主控创建</span>
+                  )}
+                  <span className="truncate text-sm font-medium text-primary">
+                    {session.name ?? session.id}
+                  </span>
                 </span>
                 <span className="shrink-0 text-xs tabular-nums text-tertiary">
                   {session.messages} msgs
