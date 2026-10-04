@@ -51,6 +51,17 @@ ck('同端点独立撰写拦截', bus.vulnMutexCheck(indep)?.blocked === true);
 ck('指纹命中带 by 标记', bus.vulnMutexCheck(indep)?.by === 'fingerprint');
 ck('dupSeq 指向同端点先账', bus.vulnMutexCheck(indep).dupSeq === payA.seq);
 
+// loop21-①: 正文提及异端点不再误拦(title-only 指纹)——弱口令洞
+// 正文连带 /pay-key 攻击链语境曾被 BOLA 正本端点字面量误拦三次
+const weak = {
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: 'Range30 登录接口弱口令 carol/Password1 命中',
+  detail: 'weakcred 席爆破命中; 利用路径: 持该口令可打 /pay-key 支付接口(与既有 BOLA 正本同链), '
+    + 'POC: curl -u carol:Password1 登录后直达 /pay-key, 危害: 资金面完全失守。',
+};
+ck('正文提及异端点放行(loop21 误拦修复)', bus.vulnMutexCheck(weak) === null);
+
 // 窗外放行: 手工把首落 ts 拨回 3 分钟前
 const old = bus.events.find(e => e.seq === first.seq);
 old.ts = new Date(Date.now() - 601_000).toISOString();

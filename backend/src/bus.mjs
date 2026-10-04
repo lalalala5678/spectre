@@ -147,8 +147,12 @@ export class Bus {
       // 指纹拦同点位, 二者其一即拦(零吞并, revise 归并保荣誉)。
       const paths = t => new Set((String(t ?? '').toLowerCase()
         .match(/\/[a-z0-9_.-]{2,}(?:\/[a-z0-9_.-]{2,})*/g) ?? []));
-      const mp = paths(`${entry.title} ${entry.detail ?? ''}`);
-      const op = paths(`${other.title} ${other.detail ?? ''}`);
+      // loop21-①: 指纹源收窄 title-only——弱口令洞正文连带提及 /api/user
+      // (攻击链语境)曾被 BOLA 正本端点字面量误拦三次(5042/5043)。writer
+      // 标题规范要求"资产+端点+漏洞类型", 同点位标题必含同端点; 正文
+      // 提及异端点是攻击链常态, 不构成同点位证据。
+      const mp = paths(entry.title);
+      const op = paths(other.title);
       let phit = 0;
       for (const t of op) if (mp.has(t)) phit += 1;
       const overlap = hit / Math.min(ot.size, mt.size);

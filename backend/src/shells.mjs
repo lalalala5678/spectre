@@ -310,9 +310,16 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
   function close(id) {
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
-    sh.status = 'closed'; persistShells();
+    // loop21-②: 幂等重放区分——重复 close 此前逐字相同(状态机正确但
+    // 回执不可区分), 附 closedAt+alreadyClosed 使两次回执可辨。
+    if (sh.status === 'closed') {
+      return { ok: true, alreadyClosed: true, closedAt: sh.closedAt ?? null };
+    }
+    sh.status = 'closed';
+    sh.closedAt = new Date().toISOString();
+    persistShells();
     audit('shell-close', { id });
-    return { ok: true };
+    return { ok: true, closedAt: sh.closedAt };
   }
 
   /**
