@@ -273,23 +273,27 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
           </>
         )}
 
-        {/* dialog revision */}
+
+      </div>
+      {/* 用户令: 修订对话框固定底部(agent composer 同款样式) */}
         {isOrphan ? (
-          <div className="mt-2 rounded-lg border border-line bg-surface p-3">
+          <div className="shrink-0 rounded-lg border border-line bg-bg p-3">
             <p className="text-xs text-tertiary">修订对话框不可用——原始条目已裁剪, 修订链封存(仅存档审计)</p>
           </div>
         ) : (
-        <div className="mt-2 rounded-lg border border-line bg-surface p-3">
-          <p className="mb-1.5 text-xs font-medium text-secondary">
+        <div className="shrink-0 rounded-lg border border-line bg-bg py-1.5 focus-within:border-line-strong">
+          {/* agent composer 同款(ChatInput 形态): › 前缀+透明输入+右侧提示/发送 */}
+          <p className="px-3 pt-1 text-xs font-medium text-secondary">
             修订对话框 → 报告智能体{isVuln ? '（原撰写者审核）' : ''}
           </p>
-          <div className="flex gap-2">
+          <div className="flex items-center gap-2 px-3">
+            <span className="shrink-0 text-sm text-accent-text">{dialogBusy ? '⇢' : '›'}</span>
             <Input
               value={dialogText}
               onChange={e => setDialogText(e.target.value)}
               onKeyDown={e => { if (e.key === 'Enter' && !e.nativeEvent.isComposing) void submitDialog(); }}
               placeholder="描述如何更改,如:severity 改为 high,补充 PoC 步骤…"
-              className="min-w-0 flex-1"
+              className="min-w-0 flex-1 border-0 bg-transparent px-0 shadow-xs-none focus:border-0 focus:ring-0"
             />
             <Button
               onClick={() => void submitDialog()}
@@ -321,7 +325,6 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
           )}
         </div>
         )}
-      </div>
     </div>
   );
 }
