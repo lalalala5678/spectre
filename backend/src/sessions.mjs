@@ -697,6 +697,16 @@ export class SessionStore {
    * past the cap with finished agents. Re-activation (prompt/followUp)
    * flips `busy` synchronously, putting the session back in the count.
    */
+  /** r20-②: 关键运行时字段即时落 WAL——activeEngagement 此前仅随
+   * 消息 piggyback, dispatch 后无消息则重启回放丢失(boot 中断通知
+   * 因此发不出)。空载体条目, 回放走 _metaOf 恢复路径。 */
+  persistMetaNow(record) {
+    safeWalAppend(this.wal, {
+      t: 'msg',
+      d: { sid: record.id, msg: null, meta: this._metaOf(record) },
+    });
+  }
+
   countTree(rootId, { activeOnly = false } = {}) {
     let n = 0;
     for (const s of this.sessions.values()) {

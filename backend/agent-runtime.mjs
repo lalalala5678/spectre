@@ -185,6 +185,7 @@ function lastReply(s) {
 }
 
 const caps = {
+  persistMetaNow: (record) => store.persistMetaNow?.(record),  // r20-②
   shells: shellRegistry,
   dispatch: (input) => startAutopwn(input),
   signalEngagement,

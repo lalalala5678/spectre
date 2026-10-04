@@ -730,6 +730,7 @@ export function buildOrchestratorTools(record, caps) {
         };
       }
       record.activeEngagement = started;
+      caps.persistMetaNow?.(record);  // r20-②: 即时落 WAL(重启可恢复)
       return {
         content: [{
           type: 'text',
