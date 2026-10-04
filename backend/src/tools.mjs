@@ -396,16 +396,16 @@ export function buildIntelTools(record, caps) {
             && entryKind(e) !== null))
           .filter(e => entryKind(e.current ?? e) === 'vulnerability'
             && !e.current.void)
-          .map(e => normTitle(e.current.title ?? e.title));
+          .map(e => ({ norm: normTitle(e.current.title ?? e.title), title: e.current.title ?? e.title }));
         // r24-backlog⑤: 引用解析透明化——命中也回执映射表(模糊匹配
         // 从'暗箱'变'可核对', 未命中才告警)
         vulnResolved = [];
         for (const t of params.vulns) {
           const nt = normTitle(t);
-          const hit = published.find(p => p.includes(nt) || nt.includes(p));
-          if (hit) vulnResolved.push(`《${t}》→ 命中现行漏洞《${hit}》`);
+          const hit = published.find(p => p.norm.includes(nt) || nt.includes(p.norm));
+          if (hit) vulnResolved.push(`《${t}》→ 命中现行漏洞《${hit.title}》`);
           else {
-            vulnResolved.push(`《${t}》→ 未命中`);
+            vulnResolved.push(`《${t}》→ 未命中(库内 0 匹配)`);
             warnings.push(`《${t}》在情报库未找到对应漏洞实体——若尚未发布请用 publish_vulnerability 发布,或从 vulns 中移除该引用`);
           }
         }

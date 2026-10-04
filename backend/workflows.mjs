@@ -172,7 +172,11 @@ export async function autoPwnWorkflow(input) {
   // r6v2-#10: 情报库终报对账——workflow 失败(心跳丢失/worker 重启的
   // ChildWorkflowFailure)与终报已落账可并存, 以库为准消灭假警报。
   let recon = {};
-  try { recon = await quick.engagementChildren?.(engagementId) ?? {}; } catch { recon = {}; }
+  // r25-5二分: 构建时对账自带查询时刻+命中数——下次快照矛盾可判
+  try {
+    recon = await quick.engagementChildren?.(engagementId) ?? {};
+    recon.__probe = { queriedAt: new Date().toISOString(), found: Object.keys(recon).length };
+  } catch { recon = {}; }
   const summaryLines = [...results.entries()]
     .map(([key, value]) => {
       const t = childTiming.get(key);
@@ -186,11 +190,12 @@ export async function autoPwnWorkflow(input) {
       // 会话消息且无 sessionId, 补全手段不得指 read_session。
       if (value.error) {
         const r = recon[key];
+        const probeNote = recon.__probe ? `[构建对账@${String(recon.__probe.queriedAt).slice(11, 19)} 命中${recon.__probe.found}席]` : '';
         if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
         // r6v3-#10: 构建时对账有固有盲区(终报可能晚于 workflow 判死落账)
         // ——绝对断言"真失败"被实测证伪。降格为时点陈述, 送达时 activity
         // 会再对账一次(见 notifyEngagementDone)。
-        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})——截至通知构建时库内无终报, 送达对账见下, 终局以 query_intel 为准;`;
+        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——截至通知构建时库内无终报, 送达对账见下, 终局以 query_intel 为准;`;
       }
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
