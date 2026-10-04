@@ -195,6 +195,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // 命名规范:<目标>-<面>-<权限> 建议(不强制,但重名/空名拒)
     const nm = String(name || '').trim();
     if (!nm) return { error: 'name 必填(建议格式 目标-面-权限,如 dc8-web-www)' };
+    // r25-①: target 带端口(:数字结尾)注册即拒——此前 exec 才拒, 通道
+    // 以 active 僵尸态滞留(校验时点不一致)
+    if (/:[0-9]+$/.test(String(target || '').trim())) {
+      return { error: `target ${target} 带端口——target 只写目标名(如 127.0.0.1), 端口属于 transportRef(如 http://host:port/…)` };
+    }
     // R6-F3: 过期通道不占名(事实终态, gate 已拒执行)
     const nowIso = isoNow();
     if ([...shells.values()].some(x => x.name === nm && x.status === 'active'

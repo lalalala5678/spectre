@@ -459,6 +459,14 @@ export function buildIntelTools(record, caps) {
       }))),
     }),
     execute: async (_id, params) => {
+      // r25-④: 空修订防御——无可变更字段时后端仍复制出'新修订'并回执
+      // '已入库'(双会话独立复现的假修订)
+      const hasChange = ['title', 'severity', 'text', 'status', 'void', 'vulns']
+        .some(k => params[k] !== undefined);
+      if (!hasChange) {
+        return { content: [{ type: 'text',
+          text: `空修订: seq=${params.seq} 未携带任何可变更字段(title/severity/text/status/void/vulns 至少其一)——纯复制修订已拒绝。` }] };
+      }
       const result = caps.reviseEntry?.(record, params);
       return { content: [{ type: 'text', text: result.text }],
         details: result.details ?? {} };
