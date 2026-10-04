@@ -589,15 +589,17 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         <div className="flex min-h-0 flex-1 gap-3 overflow-hidden px-6 pt-5 pb-0">
           {/* 左：运行流（仅此处滚动） */}
           <section className="animate-enter flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5 shadow-xs">
-            {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id, true)} />
-            ) : drillSession ? (
+            {/* drill 优先于详情渲染——保源(entryView)时进入撰写对话, 此前
+                entryView 在条件链首位挡住 drill 视图, 按钮点了'没反应'(用户实测) */}
+            {drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <Button variant="secondary" size="sm" onClick={closeDrill} className="w-fit">
                   <CornerUpLeft className="h-3.5 w-3.5" /> {entryView ? '返回漏洞报告' : '返回主控会话'}
                 </Button>
-                <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} heading="子任务会话" />
+                <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} heading={entryView ? '撰写对话' : '子任务会话'} />
               </div>
+            ) : entryView ? (
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id, true)} />
             ) : sessionId ? (
               <LiveSession agentKey={liveKey} sessionId={sessionId} onGone={handleSessionGone} heading={isAuto ? '主控会话' : `${agent.name} · 会话`} />
             ) : !bootDoneRef.current ? (

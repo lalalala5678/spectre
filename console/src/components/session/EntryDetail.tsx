@@ -169,7 +169,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             size="sm"
             className="w-fit"
           >
-            查看撰写对话（思考 · 工具调用 · 验证过程）
+            查看撰写对话
           </Button>
         )}
 
