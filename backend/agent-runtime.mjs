@@ -369,7 +369,7 @@ const caps = {
         `${replyShown.slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,
-      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRv },  // r28-#2: tRw→tRv(跨函数复制带错变量——首调 'tRw is not defined' 根因)
+      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },  // r28-#2: 归位——此处属 reportWriter(tRw);500 行属 revisionWriter(tRv)
     };
   },
 
@@ -497,7 +497,7 @@ const caps = {
       text: `撰写agent驳回了该修订申请。其说明:\n` +
         `${(lastReply(writer) || '(无输出)').slice(0, 600)}\n` +
         `(审核对话 ${writer.id})`,
-      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },
+      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRv },  // r28-#2: tRw→tRv(跨函数错带变量)
     };
   },
 };
