@@ -1018,7 +1018,9 @@ function buildPublishIntelTool(record, caps, mode) {
     }),
     execute: async (_id, params) => {
       const engagement = record.engagementId ? `autopwn-${record.engagementId}` : null;
-      caps.emitBus({
+      // r21v2: 接住 emitBus 返回事件(带 seq)——此前未接返回值, 回执
+      // 引用的 dm 是外层旧变量恒 undefined → 'seq=?' 坏件。
+      const published = await caps.emitBus({
         channel: 'dm', from: record.agentKey, to: mode.to,
         type: 'intel-note',
         title: params.title,
@@ -1029,7 +1031,7 @@ function buildPublishIntelTool(record, caps, mode) {
         workSessionId: record.workSessionId ?? null,
         ...(engagement ? { engagement } : {}),
       });
-      if (dm) {
+      if (published) {
         const dmTarget = record.orchestratorSessionId ?? record.parentSessionId;
         if (dmTarget) {
           // r6v5-#9: 中段情报 DM 自带发出时戳——迟到与否与情报库终态
@@ -1045,9 +1047,9 @@ function buildPublishIntelTool(record, caps, mode) {
       return {
         content: [{
           type: 'text',
-          text: `情报已入库: ${params.title}(seq=${dm?.seq ?? '?'}——修订/引用直接用此 seq, 与 submit_task_report 回执同口径)`,
+          text: `情报已入库: ${params.title}(seq=${published?.seq ?? '?'}——修订/引用直接用此 seq, 与 submit_task_report 回执同口径)`,
         }],
-        details: { seq: dm?.seq ?? null },
+        details: { seq: published?.seq ?? null },
       };
     },
   };

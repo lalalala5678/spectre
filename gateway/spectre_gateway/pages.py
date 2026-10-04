@@ -114,7 +114,6 @@ _TEMPLATE = """<!doctype html>
       autocomplete="current-password">
     <button type="submit">登录</button>
     <div class="err">__MSG__</div>
-    <div class="foot">仅用于授权的安全测试作业</div>
   </form>
 </body>
 </html>
