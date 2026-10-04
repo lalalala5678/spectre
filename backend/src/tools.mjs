@@ -636,6 +636,7 @@ function buildSpawnAgentTool(record, caps) {
     parameters: Type.Object({
       agentKey: Type.Union([
         spawnStageEnum,
+        Type.Literal('report'),  // r26①(b): 枚举放行交服务端人话拒(schema 先拒不可达的根修)
         Type.Literal('autopwn'),
       ], {
         description: 'Agent to spawn; "autopwn" = sub-orchestrator ' +
