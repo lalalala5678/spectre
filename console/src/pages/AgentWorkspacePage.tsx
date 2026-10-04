@@ -22,7 +22,7 @@ import { BusView } from './BusView';
 import { cn } from '../utils/cn';
 import {
   deleteWorkSession, ensureWorkSession, listWorkSessions, newWorkSession, switchWorkSession,
-  setLastSession, putPrefsSync, getPrefs, type WorkSession,
+  setLastSession, putPrefsSync, getPrefs, cnNumber, type WorkSession,
 } from '../api/worksession';
 import { takePendingOpen, OPEN_SESSION_EVENT } from '../api/openSessionChannel';
 import { useProjectCounts } from '../api/useProjectCounts';
@@ -168,21 +168,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     (async () => {
       const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(ws.id)}`);
       if (cancelled) return;
-      // 用户令(再改判): 只显示当前主控会话树内的会话——项目历史沉积
-      // (43 条 recon)不再全量入列; 根=项目当前主控会话, 两层派生。
-      const orchId = ws.lastSessions?.autopwn ?? sessionId ?? null;
-      const tree = new Set<string>();
-      if (orchId) {
-        tree.add(orchId);
-        const l1 = all.filter(x => x.parentSessionId === orchId || x.orchestratorSessionId === orchId);
-        for (const x of l1) tree.add(x.id);
-        for (const x of all) {
-          if (x.parentSessionId && l1.some(y => y.id === x.parentSessionId)) tree.add(x.id);
-        }
-      }
       const mine = all.filter(s =>
-        s.agentKey === liveKey && s.workSessionId === ws.id
-        && (tree.size === 0 || tree.has(s.id)),
+        // 用户令(改判): 显示 AutoPwn 派生会话(撤 engagement/parent 过滤)
+        s.agentKey === liveKey && s.workSessionId === ws.id,
       );
       // remembered conversation lives on the project record (server)
       const remembered = ws.lastSessions?.[liveKey] ?? null;
@@ -408,10 +396,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
   // Conversations sorted by creation → numbered names (会话一/二…),
   // independent per agent inside this work session.
-  // 用户令: 会话名显示主控创建取的名字(spawnName/标题), 弃"会话N"编号
   const namedSessions = [...mySessions]
     .sort((a, b) => a.createdAt.localeCompare(b.createdAt))
-    .map(s => ({ ...s, name: s.spawnName ?? s.title ?? s.id.slice(0, 12) }));
+    .map((s, i) => ({ ...s, name: `会话${cnNumber(i + 1)}` }));
   const current = mySessions.find(s => s.id === (drillSession ?? sessionId));
 
   if (!workSession || !uiReady) {
