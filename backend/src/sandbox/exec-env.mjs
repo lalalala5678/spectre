@@ -435,9 +435,17 @@ export function makeExecutionEnv(cfg, wsId) {
     exec: (command, options, _ctx) => {
       const runner = cfg.driver === 'docker'
         ? (cmd, timeout) => spawnShell(execArgv, cmd, timeout, cwdContainer)
-        : (cmd, timeout) => spawnShell([], rewritePathsForLocal(cmd), timeout, cwdContainer,
-          { PATH: `${containerPathToHost(toolPath.split(':')[0])
-            ?? toolPath.split(':')[0]}:${process.env.PATH}` });
+        : (cmd, timeout) => {
+          // r19-1: 重写发生时在回执尾注记(此前静默改写, 代理不知命令
+          // 文本已按本地映射转换)
+          const rewritten = rewritePathsForLocal(cmd);
+          const r = spawnShell([], rewritten, timeout, cwdContainer,
+            { PATH: `${containerPathToHost(toolPath.split(':')[0])
+              ?? toolPath.split(':')[0]}:${process.env.PATH}` });
+          return r.then(res => (rewritten !== cmd && res && typeof res === 'object')
+            ? { ...res, text: res.text + '\n[注: 命令中的容器路径已按本地驱动映射重写(/workspace→' + HOST.workspace + ' 等)]', pathRewritten: true }
+            : res);
+        };
       return runShell(runner, command, { cwd: cwdContainer, ...options });
     },
     cleanup: async _ctx => {},

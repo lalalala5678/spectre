@@ -270,6 +270,16 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         try { persistShells(); } catch { /* best-effort */ }
       }
     }
+    // r19-3: 死靶回收——过期超 48h 的通道从注册表移除(bus 审计链
+    // 永久留痕, 注册表瘦身; 此前死靶永久滞留)。
+    const gcCut = Date.now() - 48 * 3600e3;
+    let gc = 0;
+    for (const [id, sh] of shells) {
+      if (sh.status === 'expired' && sh.expiresAt && Date.parse(sh.expiresAt) < gcCut) {
+        shells.delete(id); gc += 1;
+      }
+    }
+    if (gc) { persistShells(); audit('shell-gc', { removed: gc }); }
     let out = [...shells.values()];
     if (f.target) out = out.filter(x => x.target === f.target);
     if (f.transport) out = out.filter(x => x.transport === String(f.transport).toLowerCase());  // CS26-8/CS27-6: 与 agent 入口(tools.mjs)归一同口径
