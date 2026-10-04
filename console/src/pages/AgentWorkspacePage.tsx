@@ -91,8 +91,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   // CS22-F3/F8: drill 开/关对称——开写 ?s=drill 目标, 关回写主会话。
   // 此前入口一半同步(consumePending/closeDrill)一半裸 setDrillSession
   // (四处页内入口), 且「返回主控会话」按钮绕过 closeDrill。
-  const openDrill = useCallback((id: string) => {
-    setEntryView(null);  // CS23-N18: 收编六入口的前置清场(不对称消除)
+  // keepEntry: 从漏洞详情进入撰写对话时保留来源(返回=回报告页, 用户令)
+  const openDrill = useCallback((id: string, keepEntry = false) => {
+    if (!keepEntry) setEntryView(null);  // CS23-N18: 其余入口照旧清场
     setDrillSession(id);
     history.replaceState(null, '', `${window.location.pathname}#${liveKey}?s=${id}`);
   }, [liveKey]);
@@ -589,11 +590,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {/* 左：运行流（仅此处滚动） */}
           <section className="animate-enter flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5 shadow-xs">
             {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id)} />
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id, true)} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <Button variant="secondary" size="sm" onClick={closeDrill} className="w-fit">
-                  <CornerUpLeft className="h-3.5 w-3.5" /> 返回主控会话
+                  <CornerUpLeft className="h-3.5 w-3.5" /> {entryView ? '返回漏洞报告' : '返回主控会话'}
                 </Button>
                 <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} heading="子任务会话" />
               </div>
