@@ -869,6 +869,7 @@ export function buildShellTools(record, caps) {
         Type.Literal('read_file'), Type.Literal('status'), Type.Literal('close'),
       ], { description: 'list / register(把已验证通道自注册进审计体系) / exec / read_file / status / close' }),
       name: Type.Optional(Type.String({ description: 'register: 通道名(唯一,建议 目标-面-权限 如 dc8-web-www);list 时可作名称子串过滤' })),
+      ttlHours: Type.Optional(Type.Number({ description: 'register:通道有效期小时数(默认 24; 最小 0.02≈72s 供短窗验证)——过期后 list 惰性翻标 expired' })),
       tags: Type.Optional(Type.Array(Type.String(), { description: 'register: 标签(≤8,如 ["web","www","entry"])' })),
       filterTarget: Type.Optional(Type.String({ description: 'list: 按授权目标过滤' })),
       filterTransport: Type.Optional(Type.String({ description: 'list: 按传输过滤(local/ssh/web)' })),
@@ -909,6 +910,7 @@ export function buildShellTools(record, caps) {
             transportRef: p.transportRef,
             tags: p.tags, note: 'agent 自注册(' + (record.agentKey || 'agent') + ')',
             createdBy: record.agentKey || 'agent',
+            ttlHours: Math.max(0.02, Number(p.ttlHours) || 24),  // r16-③: 短窗验证载体的可达性(此前 schema 缺此参, 三连静默丢弃)
           });
           if (sh?.error) return say({ ok: false, error: sh.error });
           await R.fingerprint?.(sh.id).catch?.(() => {});
