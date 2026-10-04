@@ -248,7 +248,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           R32D44: 模型名字样移除——供应商已平台化(默认+单 agent 覆盖),
           单一模型名不再能代表全平台, 模型信息在设置页与各 agent 配置页签可见。 */}
       <div className="flex items-center gap-2 text-xs tabular-nums text-chrome-tertiary">
-        <span className="hidden md:inline">{fmt(now)} 本地</span>
+        <span className="hidden md:inline">{fmt(now)}</span>
         <span aria-hidden="true">·</span>
         {/* 用户令: 顶栏会话/事件计数删除——仅留连通灯 */}
         <div
