@@ -11,7 +11,7 @@ const spawn = buildChildTools(store.create('recon', { workSessionId: 'ws' }), ch
   .find(t => t.name === 'spawn_agent');
 const literals = JSON.stringify(spawn.parameters.properties.agentKey?.anyOf
   ?? spawn.parameters.properties.agentKey);
-ck('spawn 枚举无 report', !literals.includes('"report"') && literals.includes('"recon"'));
+ck('spawn 枚举放行 report(服务端人话拒)', literals.includes('"report"') && literals.includes('"recon"'));  // r26v2①(b): schema 先拒不可达——放行交 handler
 
 // ---------- dispatch enum keeps report (user decision pending) ----------
 const dispatch = buildOrchestratorTools(store.create('autopwn', { workSessionId: 'ws' }), caps)
