@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
-import { Loader2, Check, AlertTriangle, RotateCw, Radar, Sparkles, ShieldCheck, Eye, EyeOff } from 'lucide-react';
+import { Loader2, Check, AlertTriangle, RotateCw, Sparkles, ShieldCheck, Eye, EyeOff } from 'lucide-react';
 import { cn } from '../utils/cn';
 import { AgentLlmOverride } from '../components/AgentLlmOverride';
 import { hasCred } from '../utils/hasCred';
@@ -98,7 +98,7 @@ function FieldRow({ def, value, onSave, onDirtyChange, revealCtx }: {
   }
 
   return (
-    <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 max-md:grid-cols-1 py-2.5 transition-colors hover:bg-surface-2/40">
+    <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 max-md:grid-cols-1 py-2.5 pr-2 transition-colors hover:bg-surface-2/40">
       <div className="min-w-0 pl-1">
         <label htmlFor={`fld-${def.id}`} className="block text-[13px] font-medium text-secondary">{def.label}</label>
         {/* 用户令: 字段说明一律不渲染 */}
@@ -278,7 +278,6 @@ export function SettingsPage() {
     { id: 'sec-common', label: '通用与模型' },
     { id: 'sec-agentllm', label: '按智能体换模型' },
     { id: 'sec-agents', label: '智能体专属配置' },
-    { id: 'sec-recon', label: '资产测绘数据源' },
   ];
   const [activeSec, setActiveSec] = useState('sec-common');
   const scrollHostRef = useRef<HTMLDivElement>(null);
@@ -313,11 +312,8 @@ export function SettingsPage() {
   const comp = (cs.compaction ?? {}) as Record<string, string>;
   const ws = (cs.webSearch ?? {}) as Record<string, string>;
   const groups = data.schema.agents ?? [];
-  const reconAgent = groups.find((a) => a.agentKey === 'recon');
-  const otherAgents = groups.filter((a) => a.agentKey !== 'recon');
-  const sources = reconAgent?.sources ?? [];
-  const mountedCount = sources.filter((s) => hasCred(data.reconSources[s.id], s.id)).length;
-  const byTier = (t: string) => sources.filter((s) => (s.tier ?? 'P2') === t);
+  // 用户令: 资产测绘数据源=资产测绘 agent 专属配置——并入智能体专属分组
+  const otherAgents = groups;
   const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
 
   return (
@@ -431,33 +427,6 @@ export function SettingsPage() {
           )}
         </section>
       ))}
-
-
-      {/* ---------- 资产测绘数据源(按重要性分级) ---------- */}
-      <section id="sec-recon" className="mb-8 scroll-mt-4">
-        <div className="mb-3 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Radar className="h-4 w-4 text-accent-text" />
-            <span className="text-[13px] font-medium text-primary">资产测绘 Agent · 数据源</span>
-          </div>
-          <div className="flex items-center gap-2 text-xs">
-            <span className="text-tertiary">已启用</span>
-            <Badge tone={mountedCount ? 'success' : 'neutral'} className="font-mono tabular-nums">
-              {mountedCount}/{sources.length}
-            </Badge>
-            <Badge tone={mountedCount ? 'accent' : 'neutral'}>
-              MCP {mountedCount ? '已挂载' : '未挂载'}
-            </Badge>
-          </div>
-        </div>
-
-        {/* EQ-6: 与其它智能体配置同构(单一卡片列表, 重要性徽章随卡显示) */}
-        <div className="divide-y divide-line rounded-lg border border-line bg-surface shadow-xs">
-          {[...byTier('P0'), ...byTier('P1'), ...byTier('P2')].map((src) => (
-            <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id)} />
-          ))}
-        </div>
-      </section>
       </div>
     </div>
   );
