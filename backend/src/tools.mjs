@@ -280,7 +280,7 @@ export function buildIntelTools(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: clipMarked(`${countLine}\n\n${lines.join('\n\n---\n\n')}${footLine}`,
+          text: clipMarked(`${countLine}${footLine}\n\n${lines.join('\n\n---\n\n')}`,  // r22: 导航行提前(截断免疫——r21v2 实测大 limit 截断吞页脚致误判)
             CONFIG.intelDigestChars, '可减小 limit 或用 q/author/status 过滤后分批查询'),
         }],
       };
