@@ -661,6 +661,14 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <div className="h-full pb-3.5">
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
+                  {/* 用户令: 主控会话列表(多次主控对话可切换——此前只能
+                      显示恢复的那一个, 无入口切其它) */}
+                  <SessionsPanel
+                    sessions={namedSessions}
+                    currentId={sessionId}
+                    onSelect={switchSession}
+                    onNew={newConversation}
+                  />
                   <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => openDrill(id)} />
                   {/* 用户令: 面板点击进入详情须离开 drill 视图——此前
                       drillSession 残留使渲染链停在会话, 点条目'不跳转' */}
