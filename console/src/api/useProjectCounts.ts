@@ -1,14 +1,14 @@
 /**
- * useProjectCounts — AutoPwn 态势条的项目级计数(漏洞/情报)。
- * 快照一次 /bus?ws= 数原始发布(revises 修订不计, 与面板折叠口径一致),
- * 之后经共享 SSE 单例实时自增——零新增连接, 纯展示用途。
+ * useProjectCounts — AutoPwn 态势条计数(漏洞/情报)。
+ * 用户令: 只统计**当前会话树**成员的产出(payloadRef 指向树内会话),
+ * 不再是项目全量。快照 /bus?ws= + 共享 SSE 实时自增。
  * 'intel' = 改名前遗留事件类型, 与 'vulnerability' 同为漏洞。
  */
 import { useEffect, useState } from 'react';
 
 import { api, subscribeBus, type ApiBusEvent } from './client';
 
-export function useProjectCounts(ws?: string): { vulns: number; intel: number } | null {
+export function useProjectCounts(ws?: string, treeIds?: Set<string>): { vulns: number; intel: number } | null {
   const [counts, setCounts] = useState<{ vulns: number; intel: number } | null>(null);
 
   useEffect(() => {
@@ -18,9 +18,11 @@ export function useProjectCounts(ws?: string): { vulns: number; intel: number } 
       try {
         const all = await api<ApiBusEvent[]>(`/bus?ws=${encodeURIComponent(ws)}`);
         if (stopped) return;
+        const inTree = (e: ApiBusEvent) => !treeIds
+          || (e.payloadRef?.startsWith('sess:') && treeIds.has(e.payloadRef.slice(5)));
         const next = { vulns: 0, intel: 0 };
         for (const e of all) {
-          if (e.revises) continue;
+          if (e.revises || !inTree(e)) continue;
           if (e.type === 'vulnerability' || e.type === 'intel') next.vulns += 1;
           else if (e.type === 'intel-note') next.intel += 1;
         }
@@ -32,6 +34,7 @@ export function useProjectCounts(ws?: string): { vulns: number; intel: number } 
       if (name !== 'bus') return;
       const e = raw as ApiBusEvent;
       if (e.revises || e.workSessionId !== ws) return;
+      if (treeIds && !(e.payloadRef?.startsWith('sess:') && treeIds.has(e.payloadRef.slice(5)))) return;
       if (e.type === 'vulnerability' || e.type === 'intel') {
         setCounts(c => (c ? { ...c, vulns: c.vulns + 1 } : c));
       } else if (e.type === 'intel-note') {
@@ -39,6 +42,6 @@ export function useProjectCounts(ws?: string): { vulns: number; intel: number } 
       }
     });
     return () => { stopped = true; off(); };
-  }, [ws]);
+  }, [ws, treeIds]);
   return counts;
 }

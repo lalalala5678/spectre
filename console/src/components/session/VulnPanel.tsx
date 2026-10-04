@@ -1,4 +1,4 @@
-import { MessageSquareText, ShieldAlert } from 'lucide-react';
+import { ShieldAlert } from 'lucide-react';
 
 import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
@@ -48,11 +48,10 @@ export function StatusBadge({ status }: { status: string }) {
  * `agentKey` scopes the feed to entries authored by that agent only.
  * Clicking opens the full content in the MAIN window (onOpen).
  */
-export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
+export function VulnPanel({ agentKey, workSessionId, onOpen }: {
   agentKey?: string;
   workSessionId?: string;
   onOpen: (event: ApiBusEvent) => void;
-  onOpenSession?: (sessionId: string) => void;
 }) {
   // R3-1: accept 判 ORIGINAL 身份(origin/from)——修订事件在折后才被剔除
   // (先滤后折会把修订全部剥掉, 面板永久显示旧 title/severity)。
@@ -104,17 +103,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen, onOpenSession }: {
                   {title}
                 </span>
               </button>
-              {event.payloadRef?.startsWith('sess:') && onOpenSession && (
-                <button
-                  type="button"
-                  aria-label="查看撰写对话（思考 · 工具调用 · 验证过程）"
-                  title="查看撰写对话（思考 · 工具调用 · 验证过程）"
-                  onClick={e => { e.stopPropagation(); onOpenSession(event.payloadRef!.slice(5)); }}
-                  className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-accent-text hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                >
-                  <MessageSquareText className="h-4 w-4" />
-                </button>
-              )}
+              {/* 用户令: 标题行对话气泡按钮删除——详情态仍可从 payloadRef 进入源会话 */}
               <PanelEntryMeta event={event} />
             </div>
           );

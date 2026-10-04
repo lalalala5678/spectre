@@ -250,16 +250,13 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
       <div className="flex items-center gap-2 text-xs tabular-nums text-chrome-tertiary">
         <span className="hidden md:inline">{fmt(now)} 本地</span>
         <span aria-hidden="true">·</span>
+        {/* 用户令: 顶栏会话/事件计数删除——仅留连通灯 */}
         <div
-          title={health
-            ? `会话 ${health.sessions} · 总线事件 ${health.bus}`
-            : 'runtime 不可达'}
+          title={health ? 'runtime 在线' : 'runtime 不可达'}
           className="hidden items-center gap-1.5 md:flex"
         >
           <Activity className={health ? 'h-3.5 w-3.5 text-success-text' : 'h-3.5 w-3.5 text-danger-text'} />
-          {health
-            ? <span>{health.sessions} 会话 · {health.bus} 事件</span>
-            : <span className="text-danger-text">runtime 不可达</span>}
+          {!health && <span className="text-danger-text">runtime 不可达</span>}
         </div>
       </div>
 

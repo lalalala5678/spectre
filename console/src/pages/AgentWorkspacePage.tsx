@@ -67,7 +67,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
   // 项目态势(AutoPwn 态势条): -1 = 尚未取到, 显示 –
   const [wsStats, setWsStats] = useState({ sessions: -1, running: -1 });
-  const projCounts = useProjectCounts(agent.id === 'autopwn' ? workSession?.id : undefined);
+  // 用户令: 态势条只显当前会话树——主控/L1/L2 链成员集合
+  const [treeIds, setTreeIds] = useState<Set<string>>(new Set());
+  const projCounts = useProjectCounts(agent.id === 'autopwn' ? workSession?.id : undefined,
+    treeIds.size ? treeIds : undefined);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);
   // R26(二十六轮): 全局搜索深链 #<agent>?s=<id>——Topbar 点击直达目标
@@ -225,10 +228,19 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         if (stopped) return;
         const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(wsId)}`);
         // 态势条复用同一响应(零新增请求): 项目全会话数 + 忙会话数
+        // 会话树: 当前会话(或主控缺位时最新主会话)直接/间接派生两层
+        const rootId = sessionId;
+        const childIds = new Set(all.filter(s => s.parentSessionId === rootId
+          || s.orchestratorSessionId === rootId).map(s => s.id));
+        const grandIds = new Set(all.filter(s => s.parentSessionId
+          && childIds.has(s.parentSessionId)).map(s => s.id));
+        const ids = new Set<string>([rootId, ...childIds, ...grandIds].filter(Boolean) as string[]);
+        setTreeIds(prev => prev.size === ids.size
+          && [...ids].every(i => prev.has(i)) ? prev : ids);
         setWsStats(prev => {
-          const running = all.filter(s => s.busy).length;
-          return prev.sessions === all.length && prev.running === running
-            ? prev : { sessions: all.length, running };
+          const running = all.filter(s => s.busy && ids.has(s.id)).length;
+          return prev.sessions === ids.size && prev.running === running
+            ? prev : { sessions: ids.size, running };
         });
         const mine = all.filter(s =>
           s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
@@ -246,7 +258,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     };
     const timer = setInterval(load, 4000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [liveKey, panelWsId]);
+  }, [liveKey, panelWsId, sessionId]);  // sessionId: 会话树根(态势条)
 
   const switchSession = (id: string) => {
     setSessionId(id);
@@ -577,7 +589,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {/* 左：运行流（仅此处滚动） */}
           <section className="animate-enter flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5 shadow-xs">
             {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id)} />
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <Button variant="secondary" size="sm" onClick={closeDrill} className="w-fit">
@@ -641,7 +653,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
                   <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => openDrill(id)} />
-                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} onOpenSession={id => openDrill(id)} />
+                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} />
                   <IntelNotesPanel workSessionId={workSession.id} onOpen={setEntryView} />
                   <TaskReportsPanel workSessionId={workSession.id} onOpen={setEntryView} />
                 </PanelStack>
@@ -657,7 +669,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     agentKey={liveKey}
                     workSessionId={workSession.id}
                     onOpen={setEntryView}
-                    onOpenSession={id => openDrill(id)}
+                   
                   />
                   <IntelNotesPanel
                     agentKey={liveKey}
