@@ -202,6 +202,17 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
     // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
     const tr = String(transportRef || '');
+    // r17-1: 注册路径 scope 硬校验(web/ssh 目的地必须在授权清单——
+    // 此前仅 exec 门校验, evil.example.com 可注册成功(r17 实证))。
+    if (transport === 'web' || transport === 'ssh') {
+      const sc0 = listScope?.() ?? null;
+      const dest0 = destinationHost({ transport, transportRef: tr });
+      const ok0 = sc0 && dest0 && Array.isArray(sc0.targets)
+        && sc0.targets.some(t => targetMatches(t, dest0));
+      if (!ok0) {
+        return { error: `授权门:目标 ${dest0 ?? tr.slice(0, 40)} 不在 scope 清单,拒绝注册(exec 侧同样会拦)。清单内目标示例:${(sc0?.targets ?? []).slice(0, 3).join('/') || '(scope 未配置)'}` };
+      }
+    }
     if (transport === 'web') {
       if (!tr.includes('{CMD}'))
         return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK);自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
