@@ -909,7 +909,7 @@ export function buildShellTools(record, caps) {
       transport: Type.Optional(Type.Union([Type.Literal('local'), Type.Literal('ssh'), Type.Literal('web')],
         { description: 'register: local|ssh|web' })),
       transportRef: Type.Optional(Type.String({
-        description: 'register: 通道定义——local: "容器名[:用户]"; ssh: "user:pass@host:port"; web: URL 模板含 {CMD}(GET 或 POST|url|body),可加 "#MARK" 响应定界(只取 <MARK>..</MARK> 之间,消页面噪声)' })),
+        description: 'register: 通道定义——local: "容器名[:用户]"; ssh: "user:pass@host:port"; web: 裸 URL=GET {CMD} 替换; 带 body 形如 "POST|https://t/x|cmd={CMD}"。正例 GET: "https://t/e?c={CMD}"。可加 "#MARK" 响应定界(只取 <MARK>..</MARK> 之间,消页面噪声)' })),
       shellId: Type.Optional(Type.String({ description: 'shell id(sh-xxx);list 可省' })),
       command: Type.Optional(Type.String({ description: 'exec:要执行的命令' })),
       timeoutMs: Type.Optional(Type.Number({ description: 'exec:硬超时毫秒(默认 30000;web 通道上限 60000,超出按 60000 生效并回执注明)' })),
