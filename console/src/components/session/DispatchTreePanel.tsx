@@ -54,9 +54,9 @@ function Node({ node, depth, activeId, onDrill }: {
   const typeLabel = TYPE_LABELS[session.agentKey] ?? session.agentKey;
   return (
     <div>
-      {/* 用户令: 根/L1/L2 区分强化——竖向层级线+分层徽章+底色分层 */}
-      <div className="relative flex" style={{ marginLeft: depth * 14 }}>
-        {depth > 0 && <span aria-hidden className="absolute -left-3.5 top-0 h-full w-px bg-line-strong" />}
+      {/* 用户令: 层级线改嵌套贯穿边框——多级时上级线不断(原 absolute
+          线随行高, L2 出现时最左列断线) */}
+      <div className="flex">
         <button
           onClick={() => onDrill(session.id)}
           className={cn(
@@ -94,6 +94,8 @@ function Node({ node, depth, activeId, onDrill }: {
         )}
         </button>
       </div>
+      {node.children.length > 0 && (
+        <div className="ml-3.5 border-l border-line-strong pl-2">
       {node.children.map(child => (
         <Node
           key={child.session.id}
@@ -103,6 +105,8 @@ function Node({ node, depth, activeId, onDrill }: {
           onDrill={onDrill}
         />
       ))}
+      </div>
+      )}
     </div>
   );
 }
