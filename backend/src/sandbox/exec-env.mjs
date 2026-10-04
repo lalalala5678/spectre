@@ -371,6 +371,10 @@ function makeFileSystem(cwdContainer) {
  *  commands to their host mounts — agents reason in CONTAINER paths
  *  (/workspace /opt/uploads …) regardless of the driver underneath. */
 export function rewritePathsForLocal(command) {
+  // r19v3-A: /opt/tools 是共享层真实挂载点(local 驱动下原样可用)——
+  // 命令文本里的 /opt/tools 前缀若被映射到 SANDBOX_ROOT/tools 反而
+  // 指向空目录(semgrep 等实装在 /opt/tools/py)。真实路径存在则不映射。
+
   // r9-D2 真根修(幂等化): 宿主前缀(/var/lib/spectre/workspace/x)内含
   // 容器键子串(/workspace/), 此前被二次替换成 /var/lib/spectre/var/
   // lib/spectre/workspace/x——每执行一层加一层前缀(r9 铁证: echo 单
@@ -383,9 +387,11 @@ export function rewritePathsForLocal(command) {
     out = out.split(HOST[key]).join(ph);
     stash.push([ph, HOST[key]]);
   }
+  // fs 已模块级 import
   for (const key of Object.keys(CONTAINER)) {
     const c = CONTAINER[key];
     const h = HOST[key];
+    if (key === 'tools' && fs.existsSync(c)) continue;  // 真实 /opt/tools 在位——保字面量
     out = out.split(c + '/').join(h + '/');
     out = out.split(c + ' ').join(h + ' ');
     out = out.split(c + '\n').join(h + '\n');
