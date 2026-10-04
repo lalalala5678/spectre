@@ -701,9 +701,11 @@ export class SessionStore {
    * 消息 piggyback, dispatch 后无消息则重启回放丢失(boot 中断通知
    * 因此发不出)。空载体条目, 回放走 _metaOf 恢复路径。 */
   persistMetaNow(record) {
+    // r20v3 勘误: 用既有 t:'meta' 载体——t:'msg'+msg:null 会被回放
+    // push 进消息流(毒条目, 可致会话降级重建丢历史)
     safeWalAppend(this.wal, {
-      t: 'msg',
-      d: { sid: record.id, msg: null, meta: this._metaOf(record) },
+      t: 'meta',
+      d: { sid: record.id, meta: this._metaOf(record) },
     });
   }
 
