@@ -87,13 +87,13 @@ export class Bus {
       // query_intel 纪律处置(平台已有惯例)。
       const norm = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '');
       const normD = (t) => String(t ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
-      const near = (ms) => Date.now() - Date.parse(e.ts ?? 0) < ms;
+      const nearEv = (ev, ms) => Date.now() - Date.parse(ev.ts ?? 0) < ms;
       const dup = [...this.events].reverse().find(e =>
         (e.type === 'vulnerability' || e.type === 'intel')
         && e.workSessionId === entry.workSessionId && !e.revises
         && ((e.title === entry.title && e.severity === entry.severity)
           || (norm(e.title) !== '' && norm(e.title) === norm(entry.title) && e.severity === entry.severity)
-          || (e.from === entry.from && near(5 * 60_000)
+          || (e.from === entry.from && nearEv(e, 5 * 60_000)
             && normD(e.detail) !== '' && normD(e.detail) === normD(entry.detail))));
       if (dup) {
         dup.coDiscoverers = [...new Set([...(dup.coDiscoverers ?? []), entry.author?.name ?? entry.from].filter(Boolean))];
