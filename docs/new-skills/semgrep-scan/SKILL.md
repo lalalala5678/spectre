@@ -4,7 +4,7 @@ description: semgrep 规则引擎——3000+ 社区规则白盒扫描
 ---
 
 # semgrep(semgrep 借鉴)
-[read-only] 已装沙箱:/opt/tools/py/semgrep
+[read-only] semgrep——若 /opt/tools/py/semgrep 缺失, 先装:pip install --target /opt/tools/py semgrep(装后经 /opt/tools/py 可用);沙箱容器内同路径
 
 ## 用法
 ```bash
