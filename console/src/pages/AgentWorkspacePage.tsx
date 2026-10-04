@@ -599,18 +599,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                 <LiveSession agentKey="__child__" sessionId={drillSession} onGone={closeDrill} heading={entryView ? '撰写对话' : '子任务会话'} />
               </div>
             ) : entryView ? (
-              /* 用户令: 三面板详情视图底部固定源会话对话区(与编排树 drill
-                 同款 LiveSession+样式)——详情可滚, 对话固定 */
-              <div className="flex min-h-0 flex-1 flex-col gap-3">
-                <div className="flex min-h-0 flex-1 flex-col overflow-y-auto">
-                  <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id, true)} />
-                </div>
-                {entryView.payloadRef?.startsWith('sess:') ? (
-                  <div className="flex h-72 shrink-0 flex-col rounded-lg border border-line bg-surface p-2.5 shadow-xs">
-                    <LiveSession agentKey="__child__" sessionId={entryView.payloadRef.slice(5)} heading={entryView.type === 'vulnerability' || entryView.type === 'intel' ? '撰写对话' : '源会话'} />
-                  </div>
-                ) : null}
-              </div>
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id, true)} />
             ) : sessionId ? (
               <LiveSession agentKey={liveKey} sessionId={sessionId} onGone={handleSessionGone} heading={isAuto ? '主控会话' : `${agent.name} · 会话`} />
             ) : !bootDoneRef.current ? (
