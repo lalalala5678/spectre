@@ -1044,7 +1044,7 @@ export const BRUTE_PROMPT = [
   '',
   '# 字典与工具位',
   '- /opt/tools/seclists/(目录/用户名/密码全套) /opt/tools/wordlists/rockyou.txt',
-  '- /opt/tools/dicts/weakpass.txt(默认口令52) hydra/ffuf/dirsearch 在 PATH',
+  '- /opt/tools/dicts/weakpass.txt(默认口令52) hydra/ffuf/dirsearch 在 PATH(nmap 同)——若个别缺失: apt/pip 补装后仍在此位',
   '- jwt_tool:/opt/tools/jwt_tool/(PYTHONPATH=/opt/tools/py)',
   '',
   '# 落账',
