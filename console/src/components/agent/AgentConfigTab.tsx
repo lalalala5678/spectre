@@ -109,7 +109,7 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
           </button>
         ))}
       </nav>
-      <div className="flex min-w-0 flex-1 flex-col gap-3">
+      <div className="mx-auto flex min-w-0 max-w-4xl flex-1 flex-col gap-3">  {/* 用户令: 与平台设置项统一宽(max-w-4xl) */}
       {isAuto && (
         <section id="cfg-spawn" className="scroll-mt-2 [&>div]:shadow-xs">
           <SpawnLimitSettings />
