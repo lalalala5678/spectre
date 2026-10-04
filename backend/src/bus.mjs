@@ -116,7 +116,7 @@ export class Bus {
     return event;
   }
 
-  /** r29-#2: 落账前互斥预检——短窗(120s)内同项目同 severity 高重叠
+  /** r29-#2: 落账前互斥预检——短窗内同项目高重叠
    * vuln 存在则拦截(非吞并): 返回 {blocked, dupSeq} 由调用方回执指引
    * revise 并入。与 suggestDupMerge(事后提示)互补, 双保险。 */
   vulnMutexCheck(entry) {
@@ -125,7 +125,10 @@ export class Bus {
       .split(/[^a-z0-9\u4e00-\u9fa5:/.]+/).filter(x => x.length > 2));
     const mt = tokens(`${entry.title} ${entry.detail ?? ''}`);
     if (mt.size < 4) return null;
-    const cut = Date.now() - 120_000;
+    // r29f-终判: 窗 120s→10min——writer 同步等待实测 tRw≈131s,
+    // 120s 窗 < writer 耗时, 窗边界洞靠事后安全网兜(4954/4956 实证)。
+    // 10min 与 suggestDupMerge 事后提示窗对齐, 双网同界。
+    const cut = Date.now() - 600_000;
     for (const other of this.events) {
       // r29b-V3': severity 同等条件删除——紧竞态+定级分歧(high vs
       // medium)曾逃逸互斥双落账(4864/4866)。token 重叠≥70%+同项目+

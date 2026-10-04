@@ -53,8 +53,11 @@ ck('dupSeq 指向同端点先账', bus.vulnMutexCheck(indep).dupSeq === payA.seq
 
 // 窗外放行: 手工把首落 ts 拨回 3 分钟前
 const old = bus.events.find(e => e.seq === first.seq);
-old.ts = new Date(Date.now() - 181_000).toISOString();
-ck('120s 窗外放行', bus.vulnMutexCheck({ ...base }) === null);
+old.ts = new Date(Date.now() - 601_000).toISOString();
+ck('10min 窗外放行', bus.vulnMutexCheck({ ...base }) === null);
+// 窗内边界: 9min(540s)仍在窗内——writer 耗时量级竞态必须覆盖
+old.ts = new Date(Date.now() - 540_000).toISOString();
+ck('9min 窗内仍拦', bus.vulnMutexCheck({ ...base })?.blocked === true);
 
 // 窗外+内容演进 → 真入库(既有 detail 全等幂等仍守: 同文重发返回 dup)
 const second = bus.emit({ ...base, title: base.title + ' (窗口外)',
