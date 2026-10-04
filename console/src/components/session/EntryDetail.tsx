@@ -56,6 +56,12 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   // loadChain 每渲染新引用; 语义=根 seq 变化重取修订链
   // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { void loadChain(); }, [rootSeq]);
+  // 用户令: 提交/编辑状态按条目隔离——切换漏洞详情时残留的
+  // dialogText/dialogDone 曾串页显示在另一条目下
+  useEffect(() => {
+    setDialogText(''); setDialogBusy(false); setDialogDone('');
+    setWriterSessionId(null); setEditing(false); setEditBusy(false);
+  }, [event.seq]);
   useEffect(() => subscribeBus((name, raw) => {
     if (name !== 'bus') return;
     const e = raw as ApiBusEvent;

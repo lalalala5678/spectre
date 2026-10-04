@@ -426,7 +426,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <Badge tone="neutral">{agent.codename}</Badge>
             {/* F24: 删假 status/version(mock 硬编码,与真实会话态无关) */}
           </div>
-          <p className="mt-px truncate text-[13px] text-secondary">{agent.desc}</p>
+          {/* 用户令: 标题下描述删除 */}
         </div>
 
         <div className="flex-1" />
@@ -589,7 +589,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           {/* 左：运行流（仅此处滚动） */}
           <section className="animate-enter flex min-h-0 min-w-0 flex-1 flex-col rounded-lg border border-line bg-surface p-2.5 shadow-xs">
             {entryView ? (
-              <EntryDetail event={entryView} onBack={() => setEntryView(null)} />
+              <EntryDetail event={entryView} onBack={() => setEntryView(null)} onOpenSession={id => openDrill(id)} />
             ) : drillSession ? (
               <div className="flex min-h-0 flex-1 flex-col gap-3">
                 <Button variant="secondary" size="sm" onClick={closeDrill} className="w-fit">

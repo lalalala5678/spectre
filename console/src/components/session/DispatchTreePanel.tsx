@@ -54,17 +54,24 @@ function Node({ node, depth, activeId, onDrill }: {
   const typeLabel = TYPE_LABELS[session.agentKey] ?? session.agentKey;
   return (
     <div>
-      <button
-        onClick={() => onDrill(session.id)}
-        style={{ marginLeft: depth * 12 }}
-        className={cn(
-          'mb-0.5 flex min-h-11 w-[calc(100%-8px)] flex-col rounded-md border px-1.5 py-1 text-left',
-          session.id === activeId
-            ? 'border-accent bg-accent-subtle'
-            : 'border-line-strong bg-surface hover:bg-surface-2',
-        )}
-      >
+      {/* 用户令: 根/L1/L2 区分强化——竖向层级线+分层徽章+底色分层 */}
+      <div className="relative flex" style={{ marginLeft: depth * 14 }}>
+        {depth > 0 && <span aria-hidden className="absolute -left-3.5 top-0 h-full w-px bg-line-strong" />}
+        <button
+          onClick={() => onDrill(session.id)}
+          className={cn(
+            'mb-0.5 flex min-h-11 w-full flex-col rounded-md border px-1.5 py-1 text-left',
+            session.id === activeId
+              ? 'border-accent bg-accent-subtle'
+              : depth === 0
+                ? 'border-line-strong bg-surface-2 hover:bg-surface-3'
+                : 'border-line bg-surface hover:bg-surface-2',
+          )}
+        >
         <div className="flex w-full items-center gap-1.5">
+          {depth === 0
+            ? <span className="shrink-0 rounded bg-accent px-1 py-px font-mono text-[10px] font-bold text-white">根</span>
+            : <span className="shrink-0 rounded border border-line-strong px-1 py-px font-mono text-[10px] font-semibold text-secondary">L{depth}</span>}
           <Dot tone={session.busy ? 'accent' : 'neutral'} pulse={session.busy} />
           {isOrch && <Bot className="h-2.5 w-2.5 shrink-0 text-accent-text" />}
           <span className={cn(
@@ -76,9 +83,6 @@ function Node({ node, depth, activeId, onDrill }: {
           <span className="shrink-0 text-xs text-tertiary">
             （{typeLabel}）
           </span>
-          {depth > 0 && (
-            <span className="shrink-0 font-mono text-xs tabular-nums text-tertiary">L{depth}</span>
-          )}
           <span className="ml-auto shrink-0 text-xs text-tertiary">
             {session.busy ? '运行中' : '结束'}
           </span>
@@ -88,7 +92,8 @@ function Node({ node, depth, activeId, onDrill }: {
             {session.spawnDescription}
           </p>
         )}
-      </button>
+        </button>
+      </div>
       {node.children.map(child => (
         <Node
           key={child.session.id}

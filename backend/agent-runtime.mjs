@@ -328,7 +328,9 @@ const caps = {
       `1) 用 read_session 读会话 ${requesterRecord.id}(建议 last=30)还原发现过程与证据;\n` +
       `2) 需要时用 query_intel 交叉验证项目内情报,或 read_session 其它相关会话;\n` +
       `3) 判定该线索是否构成真实危害、可提交的漏洞;\n` +
-      `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity,` +
+      `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity。` +
+      `标题必须一行式简洁命名(参考 CVSS/CVE 业界惯例): 资产+端点+漏洞类型(CWE 编号可选), ` +
+      `≤40 字, 禁止句子化描述/影响铺陈(那些放正文)。正例:'SpectreTest /api/transfer 无鉴权 BOLA'/'登录页 SQL 注入(CWE-89)'; 反例:'发现某接口存在一个非常重要的未授权访问漏洞可以挪动资金'。` +
       `正文包含发现过程、证据链、危害分析与POC,并注明发现者 ${requesterAuthor.name};\n` +
       `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
       `5) 用 submit_task_report 提交任务报告收尾。`,
