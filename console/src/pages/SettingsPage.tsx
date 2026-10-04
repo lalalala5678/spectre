@@ -101,7 +101,7 @@ function FieldRow({ def, value, onSave, onDirtyChange, revealCtx }: {
     <div className="group grid grid-cols-[minmax(150px,230px)_1fr_auto] items-center gap-3 max-md:grid-cols-1 py-2.5 transition-colors hover:bg-surface-2/40">
       <div className="min-w-0 pl-1">
         <label htmlFor={`fld-${def.id}`} className="block text-[13px] font-medium text-secondary">{def.label}</label>
-        {def.hint && <div className="mt-0.5 text-xs leading-tight text-tertiary">{def.hint}</div>}
+        {/* 用户令: 字段说明一律不渲染 */}
       </div>
       <div className="min-w-0">
         {def.type === 'select' ? (
@@ -185,7 +185,7 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
         className="flex min-h-12 w-full items-center gap-2.5 px-4 py-2.5 text-left transition-colors hover:bg-surface-2/40"
       >
         <span className={cn('h-2 w-2 shrink-0 rounded-full', mounted ? 'bg-success-text' : tier.dot)} />
-        <span className="text-[13px] font-medium text-primary">{src.label}</span>
+        <span className="text-[13px] font-medium text-primary">{String(src.label).replace(/\s*[（(][^）)]*[）)]/g, '')}</span>
         <Badge tone={verifyState && !verifyState.ok ? 'danger' : mounted ? 'success' : 'neutral'} className="ml-auto shrink-0">
           {verifyState && !verifyState.ok
             ? 'key 已失效 · 不注入'
@@ -367,7 +367,7 @@ export function SettingsPage() {
       <section id="sec-common" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
         <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
           <ShieldCheck className="h-3.5 w-3.5 text-tertiary" />
-          <span className="text-[13px] font-medium text-primary">{data.schema.common.label}</span>
+          <span className="text-[13px] font-medium text-primary">{String(data.schema.common.label).replace(/\s*[（(][^）)]*[）)]/g, '')}</span>
         </div>
         <div className="divide-y divide-line">
           {/* R32D45-N1: llm 四字段(格式/URL/Key/模型)走原子编辑器——
@@ -420,7 +420,7 @@ export function SettingsPage() {
       {otherAgents.map((agent) => (
         <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
           <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
-            <span className="text-[13px] font-medium text-primary">{agent.label}</span>
+            <span className="text-[13px] font-medium text-primary">{String(agent.label).replace(/\s*[（(][^）)]*[）)]/g, '')}</span>
           </div>
           {agent.hint && <p className="border-b border-line px-4 py-2 text-xs leading-relaxed text-tertiary">{agent.hint}</p>}
           {agent.sources.length === 0 ? (

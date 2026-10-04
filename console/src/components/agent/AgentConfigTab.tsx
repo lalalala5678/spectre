@@ -185,7 +185,7 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
               <SourceInlineEditor key={src.id} src={src} cfg={reconSources[src.id] ?? {}}
                 onSaved={reloadSources} agentKey={agentId} />
             ))}
-            {myGroup.hint && <div className="text-xs leading-relaxed text-tertiary">{myGroup.hint}</div>}
+            {/* 用户令: 说明不渲染 */}
           </div>}
       </Panel>
       </section>
