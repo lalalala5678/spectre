@@ -62,6 +62,22 @@ const weak = {
 };
 ck('正文提及异端点放行(loop21 误拦修复)', bus.vulnMutexCheck(weak) === null);
 
+// loop21-复测 C/D 案(验收方三角重放)入回归组
+// C: 标题与库内零重叠 + 正文逐字引用先账标题/端点/密钥 → 必须放行
+ck('C案 正文逐字引用也放行', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: '支付网关凭据治理失效放大链',
+  detail: '复核确认《Range29f /cfg-leak 无鉴权硬编码支付配置泄露》中 /cfg-leak 的 api_key=sk_live_9f3 有效, 全新行文。',
+}) === null);
+// D: 标题复用泛化词 + 端点全新 + 正文干净 → 必须放行
+ck('D案 泛化标题词放行', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: 'Range31b 硬编码密钥泄露(泛化复用词样例)',
+  detail: '另一全新端点 /vault-backup 的独立取证正文, 与既有条目无行文交集。',
+}) === null);
+
 // 窗外放行: 手工把首落 ts 拨回 3 分钟前
 const old = bus.events.find(e => e.seq === first.seq);
 old.ts = new Date(Date.now() - 601_000).toISOString();
