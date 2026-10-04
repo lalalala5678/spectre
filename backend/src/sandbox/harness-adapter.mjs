@@ -52,8 +52,32 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       // Shared-layer install bookkeeping: bash-side installs bypass the
       // install REST, so record them into the install-log ledger here
       // (idempotent dedupe via last-line check).
-      const out = await tool.execute(toolCallId, finalParams, update,
-        toolContext, stubInvocation(toolCallId), PI_CONTEXT);
+      let out;
+      try {
+        out = await tool.execute(toolCallId, finalParams, update,
+          toolContext, stubInvocation(toolCallId), PI_CONTEXT);
+      } catch (err) {
+        // loop22-#1: 官方 read 对 ENOENT reject undefined(pi 内部吞错,
+        // 零 pi 修改约束)——裸串化成 "[object Object]" 无路径无原因
+        // (缺陷 5136)。adapter 兜底: 人话+路径+码表措辞(FileError
+        // 对齐 not_found/permission_denied), bash/write/edit 同防。
+        const msg = (err && (err.message ?? err.text)) || String(err ?? '');
+        const code = err?.code ?? (msg.includes('ENOENT') ? 'not_found'
+          : msg.includes('EACCES') || msg.includes('permission') ? 'permission_denied'
+          : err == null ? 'not_found(官方通道吞错, 无详情——多为文件不存在/无权限)'
+          : 'unknown');
+        const target = typeof finalParams?.path === 'string' ? finalParams.path
+          : typeof finalParams?.file === 'string' ? finalParams.file : '';
+        return {
+          isError: true,
+          content: [{
+            type: 'text',
+            text: `${tool.name} 失败:${code}${target ? ` ${target}` : ''}` +
+              `${msg && msg !== 'undefined' ? `: ${msg}` : '——官方通道未附错误详情'}` +
+              (String(code).startsWith('not_found') ? '。检查路径是否正确; 需要时先用 bash ls 确认文件在。' : ''),
+          }],
+        };
+      }
       if (tool.name === 'bash' && typeof params.command === 'string'
         && looksLikeInstall(params.command)) {
         appendInstallLog(params.command).catch(() => {});
