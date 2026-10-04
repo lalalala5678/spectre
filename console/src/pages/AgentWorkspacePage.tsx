@@ -224,7 +224,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       if (!cancelled) setWsError(errText(err));
     });
     return () => { cancelled = true; };
-  }, [workSession, liveKey, bootstrapNonce]);
+  }, [workSession, liveKey, bootstrapNonce, sessionId]);  // sessionId: 主控树根
 
   // Keep the sessions panel live: the runtime generates title/brief a few
   // seconds after each exchange — without polling the panel stays on the
@@ -272,7 +272,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
     };
     const timer = setInterval(load, 4000);
     return () => { stopped = true; clearInterval(timer); };
-  }, [liveKey, panelWsId, sessionId]);  // sessionId: 会话树根(态势条)
+  }, [liveKey, panelWsId, sessionId]);  // sessionId: 主控树根(会话列表+态势条)
 
   const switchSession = (id: string) => {
     setSessionId(id);
