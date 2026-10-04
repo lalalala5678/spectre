@@ -80,8 +80,8 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
         <Select value={draft.format} onChange={e => setDraft(d => ({ ...d, format: e.target.value }))}
           className="min-w-0 flex-1">
           {isDefault
-            ? <option value="">openai(默认)</option>
-            : <option value="">(继承默认)</option>}
+            ? <option value="">openai</option>
+            : <option value=""></option>}
           {formats.map(f => <option key={f.id} value={f.id}>{f.label}</option>)}
         </Select>
       ) : k === 'apiKey' ? (
@@ -108,19 +108,18 @@ export function AgentLlmOverride({ agentId, ov, onSaved, mode = 'override', form
         <span className="flex items-center gap-1.5 text-[13px] font-medium text-secondary">
           {isDefault ? '默认大模型供应商' : '本 agent 覆盖'}
           {!isDefault && overridden && <Badge tone="accent">已覆盖</Badge>}
-          {!isDefault && !overridden && <span className="text-xs text-tertiary">当前=默认供应商</span>}
         </span>
         <Button onClick={() => void save()} disabled={!dirty || state === 'saving'} variant="primary" size="sm">
-          {state === 'saving' ? '探测中…' : state === 'ok' ? '✓ 已保存' : '保存并探测'}
+          {state === 'saving' ? '保存中…' : state === 'ok' ? '✓ 已保存' : '保存'}
         </Button>
       </div>
       <div className="space-y-1.5">
         {field('format', '接口格式', '')}
         {/* R32D45-N3/CS19-4: 适配说明按选中格式从 schema 下发的
             单源数据渲染。 */}
-        {field('baseUrl', 'Base URL', isDefault ? 'https://open.bigmodel.cn/api/paas/v4' : '留空=用默认')}
-        {field('apiKey', 'API Key', isDefault ? '' : '留空=用默认', 'password')}
-        {field('model', '模型名称', isDefault ? 'glm-4.7' : '留空=用默认')}
+        {field('baseUrl', 'Base URL', isDefault ? 'https://open.bigmodel.cn/api/paas/v4' : '')}
+        {field('apiKey', 'API Key', '', 'password')}
+        {field('model', '模型名称', isDefault ? 'glm-4.7' : '')}
       </div>
       {state === 'err' && <p className="mt-1.5 truncate text-xs text-danger-text" title={msg}>{msg}</p>}
     </div>

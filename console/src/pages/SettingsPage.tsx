@@ -397,14 +397,11 @@ export function SettingsPage() {
         <div className="divide-y divide-line">
           {(data.schema.agentLlm ?? []).map((g) => {
             const ov = data.agentLlm?.[g.agentKey] ?? {};
-            const overridden = Boolean(ov.baseUrl || ov.apiKey || ov.model || ov.format);
             return (
               <div key={g.agentKey} className="px-4 py-2.5">
                 <div className="mb-1.5 flex items-center gap-2">
                   <span className="text-[13px] font-medium text-secondary">{g.label}</span>
-                  {overridden
-                    ? <Badge tone="accent">已覆盖</Badge>
-                    : <Badge tone="neutral">用默认</Badge>}
+                  {/* 用户令: 状态徽章删(“用默认/已覆盖”) */}
                 </div>
                 {/* CS16-P1: 原子四字段编辑器(与 agent 配置页签同款共享组件)——
                     逐字段保存×整体探测有跨供应商中间态死锁 */}
@@ -422,7 +419,7 @@ export function SettingsPage() {
           <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
             <span className="text-[13px] font-medium text-primary">{String(agent.label).replace(/\s*[（(][^）)]*[）)]/g, '')}</span>
           </div>
-          {agent.hint && <p className="border-b border-line px-4 py-2 text-xs leading-relaxed text-tertiary">{agent.hint}</p>}
+          {/* 用户令: 说明不渲染 */}
           {agent.sources.length === 0 ? (
             <div className="px-4 py-3 text-[13px] text-tertiary">该智能体无独立数据源配置。</div>
           ) : (
