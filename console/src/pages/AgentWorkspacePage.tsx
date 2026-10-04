@@ -243,9 +243,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           return prev.sessions === ids.size && prev.running === running
             ? prev : { sessions: ids.size, running };
         });
+        // 用户令(改判): 左侧进入也显示 AutoPwn 派生的本类智能体会话
+        // ——此前过滤 engagement/parent, 现仅按 agentKey+项目归集
         const mine = all.filter(s =>
-          s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
-          && s.workSessionId === wsId,
+          s.agentKey === liveKey && s.workSessionId === wsId,
         );
         // Dedup: identical content must not create a new array — poll
         // re-renders were the trigger of the scroll-jump class of bugs.
