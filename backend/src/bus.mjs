@@ -79,19 +79,23 @@ export class Bus {
     // (receipt 式重发)幂等 no-op。
     if ((entry.type === 'vulnerability' || entry.type === 'intel')
       && entry.title && entry.severity && !entry.revises) {
-      // r15-①: 去重键归一化——并发双 writer 各拟标题曾击穿精确匹配
-      // (3231/3235 同洞双账)。标题去非字母数字+小写, 取前 16 字符;
-      // 附 detail 前 120 字符归一为副证(同资产同端点正文高度相似)。
-      const norm = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '').slice(0, 16);
-      const normD = (t) => String(t ?? '').toLowerCase().replace(/\s+/g, ' ').slice(0, 120);
+      // r15v2-①: 去重收紧为零误伤——v1 的归一前缀键(16/120 字符)在同
+      // 靶场场景 5 例误吞不同漏洞+假成功回执(吞写比双账更危险, r15 实
+      // 测撤回)。现仅三键全严: ①精确 title+severity(原逻辑) ②标题全串
+      // 归一后完全相等(标点/大小写差异) ③同发现者 5 分钟内 detail 全串
+      // 归一相等(重复提交)。跨 writer 相似标题不自动合并——由 writer
+      // query_intel 纪律处置(平台已有惯例)。
+      const norm = (t) => String(t ?? '').toLowerCase().replace(/[^a-z0-9\u4e00-\u9fa5]/g, '');
+      const normD = (t) => String(t ?? '').toLowerCase().replace(/\s+/g, ' ').trim();
+      const near = (ms) => Date.now() - Date.parse(e.ts ?? 0) < ms;
       const dup = [...this.events].reverse().find(e =>
         (e.type === 'vulnerability' || e.type === 'intel')
-        && e.workSessionId === entry.workSessionId
-        && (e.title === entry.title && e.severity === entry.severity
-          || (norm(e.title) && norm(e.title) === norm(entry.title))
-          || (normD(e.detail) && normD(e.detail) === normD(entry.detail) && norm(e.title).slice(0, 8) === norm(entry.title).slice(0, 8))));
+        && e.workSessionId === entry.workSessionId && !e.revises
+        && ((e.title === entry.title && e.severity === entry.severity)
+          || (norm(e.title) !== '' && norm(e.title) === norm(entry.title) && e.severity === entry.severity)
+          || (e.from === entry.from && near(5 * 60_000)
+            && normD(e.detail) !== '' && normD(e.detail) === normD(entry.detail))));
       if (dup) {
-        // 合并发现者署名(后到者并入既有条目的协作发现记录)
         dup.coDiscoverers = [...new Set([...(dup.coDiscoverers ?? []), entry.author?.name ?? entry.from].filter(Boolean))];
         return dup;
       }
