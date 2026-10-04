@@ -44,10 +44,20 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
   // past the 120px threshold — thinking panel first appearance is 224px
   // capped — detached the follow permanently with no way back).
   const stickToBottom = useRef(true);
+  // 用户令: 拖到上方阅读时几秒后被拉回底部——程序性 pin(布局补偿/RO
+  // re-pin)会触发 scroll 事件, 该事件里 nearBottom 误判为真把 stick
+  // 翻回 true, 下一次内容提交即强拉底部。pin 后 300ms 内的 scroll 事
+  // 件一律视为程序回声, 不评估意图。
+  const pinGuard = useRef(0);
+  const pinToBottom = (el: HTMLElement) => {
+    pinGuard.current = Date.now();
+    el.scrollTop = el.scrollHeight;
+  };
 
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
+    if (Date.now() - pinGuard.current < 300) return;  // 程序回声不改意图
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     stickToBottom.current = nearBottom;
     // Freeze the window start the moment the user leaves the bottom:
@@ -68,7 +78,7 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
   useLayoutEffect(() => {
     if (!stickToBottom.current) return;
     const el = scrollRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el) pinToBottom(el);
   }, [messages, busy, loaded, error]);
 
   // FE-B1(用户报): 思考流期间拖到底部会"抽搐"——每次 delta 提交先 pin
@@ -83,7 +93,7 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
     // (verify 实测 +300px 不回钉)——改 MutationObserver 跟 childList
     // 变化重挂尾子, 与 RO 组合。
     const ro = new ResizeObserver(() => {
-      if (stickToBottom.current) el.scrollTop = el.scrollHeight;
+      if (stickToBottom.current) pinToBottom(el);
     });
     const observeTail = () => {
       const cur = el.lastElementChild as HTMLElement | null;

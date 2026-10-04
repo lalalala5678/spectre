@@ -656,9 +656,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               {isAuto ? (
                 <PanelStack storageKey="spectre.panel.stackRatios.auto">
                   <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => openDrill(id)} />
-                  <VulnPanel workSessionId={workSession.id} onOpen={setEntryView} />
-                  <IntelNotesPanel workSessionId={workSession.id} onOpen={setEntryView} />
-                  <TaskReportsPanel workSessionId={workSession.id} onOpen={setEntryView} />
+                  {/* 用户令: 面板点击进入详情须离开 drill 视图——此前
+                      drillSession 残留使渲染链停在会话, 点条目'不跳转' */}
+                  <VulnPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
+                  <IntelNotesPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
+                  <TaskReportsPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
                 </PanelStack>
               ) : (
                 <PanelStack storageKey="spectre.panel.stackRatios.stage">
@@ -671,13 +673,13 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                   <VulnPanel
                     agentKey={liveKey}
                     workSessionId={workSession.id}
-                    onOpen={setEntryView}
+                    onOpen={e => { setEntryView(e); setDrillSession(null); }}
                    
                   />
                   <IntelNotesPanel
                     agentKey={liveKey}
                     workSessionId={workSession.id}
-                    onOpen={setEntryView}
+                    onOpen={e => { setEntryView(e); setDrillSession(null); }}
                   />
                   {agent.id === 'phish' && <PhishCampaignsPanel />}
                 </PanelStack>
