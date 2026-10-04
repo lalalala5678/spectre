@@ -110,10 +110,11 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
         ))}
       </nav>
       <div className="mx-auto flex min-w-0 max-w-4xl flex-1 flex-col gap-4">  {/* 用户令: 统一宽+按菜单三组 */}
-        {/* 运行配置: 派生限额(仅 autopwn)+大模型 */}
-        <section id="cfg-run" className="flex scroll-mt-2 flex-col gap-3">
-          {isAuto && <div className="[&>div]:shadow-xs"><SpawnLimitSettings /></div>}
-          <Panel title="大模型" className="shadow-xs">
+        {/* 运行配置: 单框(用户令——一级菜单一张卡) */}
+        <section id="cfg-run" className="scroll-mt-2">
+          <Panel title="运行配置" className="shadow-xs" bodyClassName="divide-y divide-line">
+          {isAuto && <div className="pb-3 [&>div]:border-0 [&>div]:shadow-none"><SpawnLimitSettings /></div>}
+          <div className="pt-3">
             <div className="space-y-2">
               <div className="space-y-1.5">
                 {[
@@ -136,12 +137,14 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
                 onDirtyChange={d => window.dispatchEvent(new CustomEvent('spectre:dirty-set',
                   { detail: { src: `agentConfig:${agentId}`, count: d ? 1 : 0 } }))} />
             </div>
+          </div>
           </Panel>
         </section>
 
-        {/* 挂载: MCP+技能(只读, 用户裁定不可增配) */}
-        <section id="cfg-mounts" className="flex scroll-mt-2 flex-col gap-3">
-          <Panel title={`挂载的 MCP(${mine.length})`} className="shadow-xs">
+        {/* 挂载: 单框(MCP+技能同卡 divide 分隔) */}
+        <section id="cfg-mounts" className="scroll-mt-2">
+          <Panel title="挂载" className="shadow-xs" bodyClassName="divide-y divide-line">
+          <div className="pb-3">
             {mcps === null ? <div className="space-y-1.5"><Skeleton className="h-9 w-full" /><Skeleton className="h-9 w-full" /></div>
               : mine.length === 0 ? <EmptyState icon={ShieldCheck} title="该 agent 暂无挂载的 MCP 服务器" />
               : <div className="space-y-1.5">
@@ -160,9 +163,10 @@ export function AgentConfigTab({ agentId, isAuto }: { agentId: string; isAuto: b
                   在「MCP Server」页管理挂载 →
                 </a>
               </div>}
-          </Panel>
-          <Panel title="挂载技能" className="min-w-0 shadow-xs">
+          </div>
+          <div className="pt-3">
             <RealSkillsPanel agentKey={agentId} expandable />
+          </div>
           </Panel>
         </section>
 
