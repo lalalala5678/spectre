@@ -58,11 +58,15 @@ export function SessionsPanel({ sessions, currentId, onSelect, onNew }: {
                   {session.messages} msgs
                 </span>
               </div>
-              {(session.brief || session.title) && (
+              {(session as { derivedFrom?: string | null }).derivedFrom ? (
+                <p className="mt-px truncate text-[13px] leading-tight text-accent-text/80">
+                  来自主控「{(session as { derivedFrom?: string }).derivedFrom}」
+                </p>
+              ) : (session.brief || session.title) ? (
                 <p className="mt-px truncate text-[13px] leading-tight text-tertiary">
                   {session.brief ?? session.title}
                 </p>
-              )}
+              ) : null}
             </div>
           </button>
         ))}

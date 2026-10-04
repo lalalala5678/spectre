@@ -131,6 +131,12 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   }, [deepLink, consumePending]);
   const [entryView, setEntryView] = useState<ApiBusEvent | null>(null);
   const [switcherOpen, setSwitcherOpen] = useState(false);
+  const [orchSwitcherOpen, setOrchSwitcherOpen] = useState(false);  // 主控会话下拉
+  const [orchNameMap, setOrchNameMap] = useState<Map<string, string>>(new Map());  // 主控会话 id→名
+  const orchSessions = mySessions
+    .filter(s => s.agentKey === 'autopwn' && !s.parentSessionId && !s.orchestratorSessionId)
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .map(s => ({ ...s, name: s.spawnName ?? s.title ?? s.id.slice(0, 12) }));
   const [projectName, setProjectName] = useState('');
 
   const [naming, setNaming] = useState(false);
@@ -173,6 +179,12 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         s.agentKey === liveKey && s.workSessionId === ws.id,
       );
       // remembered conversation lives on the project record (server)
+      // 主控会话名映射(子 agent 页"由哪个主控创建"标注)
+      const orchMap = new Map<string, string>();
+      for (const x of all) {
+        if (x.agentKey === 'autopwn') orchMap.set(x.id, x.spawnName ?? x.title ?? x.id.slice(0, 12));
+      }
+      setOrchNameMap(orchMap);
       const remembered = ws.lastSessions?.[liveKey] ?? null;
       const restored = remembered && mine.find(s => s.id === remembered);
       if (restored) {
@@ -403,6 +415,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       ...s,
       name: s.spawnName ?? s.title ?? `会话${cnNumber(mySessions.indexOf(s) + 1)}`,
       byOrch: Boolean(s.parentSessionId || s.orchestratorSessionId),
+      derivedFrom: (s.parentSessionId || s.orchestratorSessionId)
+        ? (orchNameMap.get(s.parentSessionId ?? s.orchestratorSessionId ?? '') ?? null)
+        : null,
     }));
   const current = mySessions.find(s => s.id === (drillSession ?? sessionId));
 
@@ -469,6 +484,47 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           </div>
         )}
         <div className="flex-1" />
+
+        {/* 用户令: 主控会话切换下拉(与项目下拉同款)——显示本项目其它主控对话 */}
+        {isAuto && (
+          <div className="relative">
+            <button
+              onClick={() => setOrchSwitcherOpen(v => !v)}
+              className="flex h-8 items-center gap-2 rounded-md border border-line-strong bg-surface px-2.5 text-sm text-secondary hover:bg-surface-2 hover:text-primary"
+            >
+              <Dot tone={current?.busy ? 'accent' : 'neutral'} pulse={current?.busy} />
+              <span className="max-w-48 truncate font-medium">{orchSessions.find(o => o.id === sessionId)?.name ?? '主控会话'}</span>
+              <ChevronDown className="h-4 w-4 text-faint" />
+            </button>
+            {orchSwitcherOpen && (
+              <div className="animate-enter absolute right-0 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
+                <button
+                  onClick={() => { void newConversation(); setOrchSwitcherOpen(false); }}
+                  className="mb-1 flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-sm font-medium text-secondary hover:bg-surface-2 hover:text-primary"
+                >
+                  <Plus className="h-4 w-4" /> 新对话
+                </button>
+                <div className="max-h-64 overflow-y-auto">
+                  {orchSessions.map(o => (
+                    <button
+                      key={o.id}
+                      onClick={() => { switchSession(o.id); setOrchSwitcherOpen(false); }}
+                      className={cn(
+                        'flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm hover:bg-surface-2 hover:text-primary',
+                        o.id === sessionId ? 'text-primary' : 'text-secondary',
+                      )}
+                    >
+                      <span className="truncate">{o.name}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-tertiary">
+                        {o.messages} msgs
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </div>
+        )}
 
         {/* 大会话(项目)切换 */}
         <div className="relative">
