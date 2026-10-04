@@ -127,9 +127,12 @@ export class Bus {
     if (mt.size < 4) return null;
     const cut = Date.now() - 120_000;
     for (const other of this.events) {
+      // r29b-V3': severity 同等条件删除——紧竞态+定级分歧(high vs
+      // medium)曾逃逸互斥双落账(4864/4866)。token 重叠≥70%+同项目+
+      // 短窗已足够强; 定级分歧恰是同点位双账的常见形态, 应拦而引
+      // revise 归并(定级由修订链裁决), 不该因等级不同放行双正本。
       if (other.type !== 'vulnerability' || other.revises
         || other.workSessionId !== entry.workSessionId
-        || (other.severity ?? '') !== String(entry.severity ?? '')
         || Date.parse(other.ts ?? 0) < cut) continue;
       const ot = tokens(`${other.title} ${other.detail ?? ''}`);
       if (ot.size < 4) continue;

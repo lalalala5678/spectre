@@ -23,8 +23,8 @@ ck('拦截不落账', bus.list().length === 1);
 
 // 跨项目放行
 ck('跨项目放行', bus.vulnMutexCheck({ ...base, workSessionId: 'ws-b' }) === null);
-// 不同 severity 放行
-ck('不同 severity 放行', bus.vulnMutexCheck({ ...base, severity: 'critical' }) === null);
+// r29b-V3': 不同 severity 高重叠亦拦截——定级分歧逃逸曾致 4864/4866 双正本
+ck('不同 severity 高重叠拦截', bus.vulnMutexCheck({ ...base, severity: 'critical' })?.blocked === true);
 // 修订版放行
 ck('修订版放行', bus.vulnMutexCheck({ ...base, revises: first.seq }) === null);
 // 低重叠(不同漏洞)放行
