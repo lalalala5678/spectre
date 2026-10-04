@@ -169,8 +169,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(ws.id)}`);
       if (cancelled) return;
       const mine = all.filter(s =>
-        s.agentKey === liveKey && !s.engagementId && !s.parentSessionId
-        && s.workSessionId === ws.id,
+        // 用户令(改判): 显示 AutoPwn 派生会话(撤 engagement/parent 过滤)
+        s.agentKey === liveKey && s.workSessionId === ws.id,
       );
       // remembered conversation lives on the project record (server)
       const remembered = ws.lastSessions?.[liveKey] ?? null;
