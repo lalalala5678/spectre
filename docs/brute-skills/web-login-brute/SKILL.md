@@ -18,7 +18,7 @@ description: 需要对 Web 登录面做弱口令爆破(含传输算法逆向:哈
 
 ## 2. 验证码策略(阶梯)
 无验证码 > 纯前端校验(直接绕)> 答案可读接口(如 pay session.jsp)>
-验证码一律 ddddocr(见 §9 禁令——tesseract 已禁用)> 声明边界放弃
+tesseract OCR(若缺: pip install --target /opt/tools/py pytesseract + 系统 tesseract-ocr;44x18 小图先二值化)> 声明边界放弃
 
 ## 3. 防锁定与预言机
 - 先单账号错 3-5 次观察锁定/验证码升级;锁定阈值内行动

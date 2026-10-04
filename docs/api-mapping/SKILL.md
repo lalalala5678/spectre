@@ -18,7 +18,7 @@ description: 接口测绘(线一武器化)
    /{N} 子资源两级;ffuf -w 模板词表,校准 404 基线(软 404:全路径 200+等长)。
 5. 历史面:gau/waybackurls 域名→grep api。
 
-## 隐藏参数挖掘(Arjun 法,已装 /opt/tools/py)
+## 隐藏参数挖掘(Arjun 法;Arjun 若缺先装:pip install --target /opt/tools/py arjun)
 `PYTHONPATH=/opt/tools/py arjun -u URL -m GET` 响应差分三通道:状态码/长度/
 延时。手工版:对照组发 debug=1/admin=true/internal=1/callback=URL/
 page_size=9999,任一通道跳变即登记。
