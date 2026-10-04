@@ -329,7 +329,7 @@ const caps = {
       `2) 需要时用 query_intel 交叉验证项目内情报,或 read_session 其它相关会话;\n` +
       `3) 判定该线索是否构成真实危害、可提交的漏洞;\n` +
       `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity,` +
-      `正文包含发现过程、证据链、危害分析与复现要点,并注明发现者 ${requesterAuthor.name};\n` +
+      `正文包含发现过程、证据链、危害分析与POC,并注明发现者 ${requesterAuthor.name};\n` +
       `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
       `5) 用 submit_task_report 提交任务报告收尾。`,
     });

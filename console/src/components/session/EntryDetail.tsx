@@ -202,7 +202,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
                 </summary>
                 <div className="mt-1 whitespace-pre-wrap rounded-md border border-line bg-surface-2 px-2.5 py-1.5 text-[13px] leading-relaxed text-tertiary">
                   《{event.title ?? event.summary}》
-                  {event.detail ? `\n\n${event.detail}` : ''}
+                  {event.detail ? `\n\n${String(event.detail).replace(/^复现要点/gm, 'POC')}` : ''}
                 </div>
               </details>
             </div>
@@ -246,7 +246,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
         ) : (
           <>
             {current.detail
-              ? <Markdown>{current.detail}</Markdown>
+              ? <Markdown>{String(current.detail).replace(/^复现要点/gm, 'POC')}</Markdown>
               : (
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary">
                   {current.summary}

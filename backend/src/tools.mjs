@@ -178,7 +178,7 @@ export function buildIntelTools(record, caps) {
           : '';
         return { content: [{ type: 'text', text:
           `${note}[seq=${e.seq}] [${entryLabel(e)}] ${prov}${voidNote}${revNote}${chainWhy}\n` +
-          `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${e.detail ?? e.summary ?? ''}` }] };
+          `《${e.title ?? e.summary}》${e.payloadRef ? `\npayloadRef=${e.payloadRef}(read_session 可读源会话)` : ''}\n\n${String(e.detail ?? e.summary ?? '').replace(/^复现要点/gm, 'POC')}` }] };  // 用户令: 存量'复现要点'章节显示为 POC
       }
 
       const matched = inWs
@@ -1091,7 +1091,7 @@ export function buildDirectTools(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       title: Type.String({ description: 'One-line vulnerability title' }),
-      text: Type.String({ description: 'Full vulnerability write-up: 发现过程、证据链、危害分析、复现要点 (markdown)' }),
+      text: Type.String({ description: 'Full vulnerability write-up: 发现过程、证据链、危害分析、POC (markdown)' }),
       severity: Type.Union([
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
