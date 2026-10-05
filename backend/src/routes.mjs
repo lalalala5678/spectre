@@ -233,9 +233,15 @@ function realRouter({ store, bus, caps, wal }) {
     if (path.startsWith('/api/engagements/') && path.endsWith('/children') && method === 'GET') {
       if (!isInternalCaller(req)) return bad(res, 401, '仅限内部调用');
       const engId = path.split('/')[3];
+      // r42-F-J: 前缀归一——bus 事件 engagement 带 'autopwn-' 前缀
+      // (workflows L86), 通知 recheck 传裸 id, 精确匹配曾永不命中
+      // (6016/6027 落账早于快照仍被称"无终报")。双向归一后 join 同源
+      // 同谓词。
+      const engIds = new Set([engId, `autopwn-${engId}`,
+        engId.replace(/^autopwn-/, '')]);
       const out = {};
       for (const e of bus.list()) {
-        if (e.engagement !== engId || e.type !== 'task-report') continue;
+        if (!engIds.has(e.engagement) || e.type !== 'task-report') continue;
         const key = e.from;
         if (!out[key] || e.seq > out[key].seq) {
           out[key] = { seq: e.seq, status: e.status, title: e.title };
@@ -249,7 +255,7 @@ function realRouter({ store, bus, caps, wal }) {
       const seen = new Set(Object.keys(out));
       const members = new Set();
       for (const e of bus.list()) {
-        if (e.engagement === engId && e.type === 'dispatch') {
+        if (engIds.has(e.engagement) && e.type === 'dispatch') {
           for (const k of e.to ?? []) members.add(k);
         }
       }
