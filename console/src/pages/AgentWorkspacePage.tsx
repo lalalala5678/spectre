@@ -250,10 +250,15 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         const ids = new Set<string>([rootId, ...childIds, ...grandIds].filter(Boolean) as string[]);
         setTreeIds(prev => prev.size === ids.size
           && [...ids].every(i => prev.has(i)) ? prev : ids);
+        // 用户令(口径改判): "会话"计数=本项目**干过活的智能体数**
+        // (树内 distinct agentKey)——总会话数(一个 agent 多会话)与直觉
+        // 不符, 编排树维度按 agent 计。
+        const agentsWorked = new Set(
+          all.filter(s => ids.has(s.id)).map(s => s.agentKey)).size;
         setWsStats(prev => {
           const running = all.filter(s => s.busy && ids.has(s.id)).length;
-          return prev.sessions === ids.size && prev.running === running
-            ? prev : { sessions: ids.size, running };
+          return prev.sessions === agentsWorked && prev.running === running
+            ? prev : { sessions: agentsWorked, running };
         });
         // 用户令(改判): 左侧进入也显示 AutoPwn 派生的本类智能体会话
         // ——此前过滤 engagement/parent, 现仅按 agentKey+项目归集
