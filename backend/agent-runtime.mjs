@@ -493,7 +493,14 @@ const caps = {
     // 附新旧长度对比, 骤降>30% 显式警告(不是拦, 是让替换可见可悔)。
     let lenNote = '';
     if (params.text !== undefined) {
-      const oldLen = String(target.detail ?? '').length;
+      // r45-N8b: 基线取现行版(修订链最新)而非 bus 索引的原始版——
+      // 回执 2565→4608 vs 实测现行 4118 的三证歧义根因(target 恒指首落)。
+      let cur = target;
+      for (const e2 of bus.list()) {
+        if (e2.revises === target.seq
+          && (e2.revision?.n ?? 0) > (cur.revision?.n ?? 0)) cur = e2;
+      }
+      const oldLen = String(cur.detail ?? '').length;
       const newLen = String(params.text).length;
       const drop = oldLen > 0 ? (oldLen - newLen) / oldLen : 0;
       lenNote = ` 正文长度 ${oldLen}→${newLen}` +

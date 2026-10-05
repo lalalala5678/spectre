@@ -845,11 +845,11 @@ export function buildOrchestratorTools(record, caps) {
         // via describeWorkflow instead of matching Temporal's server-side
         // English error string (unstable across versions). No more
         // "已结束" lies about workflows that were never created.
-        let why = '已结束,子智能体均已停止。';
+        let why = '工作流已收束(席位会话可能仍在收尾/终报在途——终局以 query_intel 为准, 勿据此判死)';
         try {
           const desc = await caps.describeEngagement?.(engagement);
           if (!desc) {
-            why = '已结束,子智能体均已停止。';
+            why = '工作流已收束(席位会话可能仍在收尾/终报在途——终局以 query_intel 为准, 勿据此判死)';
           } else if (desc.status === 'RUNNING') {
             why = '投递信号失败(engagement 仍在运行,可重试)。';
           }
