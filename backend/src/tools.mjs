@@ -932,8 +932,11 @@ export function buildShellTools(record, caps) {
       p.action = String(p.action ?? '').toLowerCase();
       try {
         if (p.action === 'list') {
+          // r36-O2: 不再强制 status:'active'——过期条目被过滤曾使
+          // "过期后 list 翻标 expired" 的文档语义落空(实测直接消失)。
+          // expired 一并展示(带 status 字段), GC(>1h)仍由注册表管。
           const list = R.list({ target: p.filterTarget, transport: p.filterTransport,
-            tag: p.filterTag, name: p.name, status: 'active' })
+            tag: p.filterTag, name: p.name })
             .map(x => ({ id: x.id, name: x.name, target: x.target, transport: x.transport,
               tags: x.tags ?? [], status: x.status, user: x.user, os: (x.os || '').slice(0, 60),
               cmdCount: x.cmdCount, expiresAt: x.expiresAt }));

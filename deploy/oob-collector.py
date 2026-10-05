@@ -9,6 +9,7 @@ F12 加固(2026-09-27 QA 循环6,公网 IP 已实际触达):
 - 单连接 64KB 不变;0.0.0.0 绑定不变(靶机回连必需)
 """
 import socket, sys, threading, time, os, datetime
+from datetime import timezone
 from collections import defaultdict, deque
 OUT = os.path.join(os.environ.get('SPECTRE_DATA_DIR', '/var/lib/spectre'), 'oob')
 if not os.environ.get('SPECTRE_DATA_DIR'):
@@ -71,7 +72,7 @@ def handle(c, addr):
             if not acked:
                 acked = True
                 try:
-                    c.sendall(f'OK {datetime.datetime.now().isoformat(timespec="seconds")}\n'.encode())
+                    c.sendall(f'OK {datetime.datetime.now(timezone.utc).isoformat(timespec="seconds")}Z\n'.encode())
                 except Exception:
                     pass
     except Exception:
@@ -87,7 +88,9 @@ def handle(c, addr):
         if dir_bytes() + len(data) > QUOTA_BYTES:
             print(f'[oob][QUOTA] 目录超限 {QUOTA_BYTES//(1024*1024)}MB,丢弃 {addr[0]} 的 {len(data)}B', flush=True)
             return
-        ts = datetime.datetime.now().strftime('%Y%m%d-%H%M%S-%f')
+        # r36-O3: 文件名 UTC+Z——本地 CST 文件名与平台 UTC 回执对照
+        # 曾致两例时区误读(编排者实测)。统一到与工具回执同时区源。
+        ts = datetime.datetime.now(timezone.utc).strftime('%Y%m%d-%H%M%S-%f') + 'Z'
         path = f'{OUT}/{ts}-{addr[0]}.txt'
         with open(path, 'ab') as f:
             f.write(data)
