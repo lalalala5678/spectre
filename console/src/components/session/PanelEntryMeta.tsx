@@ -24,15 +24,19 @@ export function PanelEntryMeta({ event, voidable }: {
         </Badge>
       )}
       <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />
-      {a && (
-        <p className="truncate pl-1 text-xs leading-tight text-tertiary">
-          {/* 用户令: 标注创建者所属主控会话(treePath 首段=根主控名) */}
-          {a.treePath && a.treePath.includes(' › ') && (
-            <span className="text-accent-text/80">{a.treePath.split(' › ')[0]} · </span>
-          )}
-          {a.name}（{a.typeLabel}{a.parent ? ` · 父:${a.parent.name}` : ''} · L{a.depth}）
-        </p>
-      )}
+      {(() => {
+        /* 用户令(补全): 全部条目标注所属主控会话——含主控直发; 漏洞
+         * 正本由 writer 会话发布(无上级链), 归属取 requester(发现者)
+         * 的 treePath 首段——此前漏洞列表零标注正因 writer 单段链。 */
+        const root = (event.requester?.treePath ?? a?.treePath ?? '').split(' › ')[0];
+        if (!root) return null;
+        return (
+          <p className="truncate pl-1 text-xs leading-tight text-tertiary">
+            <span className="text-accent-text/80">{root} · </span>
+            {a?.name ?? event.requester?.name ?? ''}{a ? `（${a.typeLabel}${a.parent ? ` · 父:${a.parent.name}` : ''} · L${a.depth}）` : ''}
+          </p>
+        );
+      })()}
     </>
   );
 }
