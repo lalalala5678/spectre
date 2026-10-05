@@ -84,7 +84,7 @@ export const CONFIG = Object.freeze({
   // CS23-N13: dmReportMaxChars 已删(全仓零引用; 实际生效的 DM 裁剪
   // 是 dmDigestChars=400, sessions.mjs 消费)。
   /** Bus vulnerability detail cap (漏洞 panel expand view), marker-clipped. */
-  busDetailMaxChars: 4_000,
+  busDetailMaxChars: 24_000,  // r47-D6
   /** Completion-DM digest cap (full text lives in the task report). */
   dmDigestChars: 400,
 
