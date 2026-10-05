@@ -451,10 +451,28 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           let txt = await r.text();
           clearTimeout(t);
           if (marker) {
-            const m1 = txt.indexOf('<' + marker + '>');
-            const m2 = txt.indexOf('</' + marker + '>');
+            // r37-O5: 定界形态扩展——部分 webshell 回显用井号行(#WS-START/
+            // #WS-END)而非角括号标签, 此前剥壳不匹配原样透传(sh-869f64cf
+            // 实证, 样本包 seq=5687)。命中次序: 角括号对 → #M…#M(重复)
+            // → #M-START…#M-END(START 后缀惯例)。
+            let m1 = txt.indexOf('<' + marker + '>');
+            let m2 = txt.indexOf('</' + marker + '>');
+            let tagLen = marker.length + 2;  // '<MARK>' 形态缺省
+            if (m1 < 0) {
+              const hashStart = txt.indexOf('#' + marker);
+              if (hashStart >= 0) {
+                const endSame = txt.indexOf('#' + marker, hashStart + marker.length + 1);
+                const endSuffixed = txt.indexOf('#' + marker.replace(/START$/i, 'END'));
+                // 取两者中更近的合法终点
+                const cands = [endSame, endSuffixed].filter(x => x > hashStart);
+                if (cands.length) {
+                  m1 = hashStart; tagLen = marker.length + 1;  // '#MARK' 形态
+                  m2 = Math.min(...cands);
+                }
+              }
+            }
             if (m1 >= 0) {
-              txt = m2 > m1 ? txt.slice(m1 + marker.length + 2, m2) : txt.slice(m1 + marker.length + 2);
+              txt = m2 > m1 ? txt.slice(m1 + tagLen, m2) : txt.slice(m1 + tagLen);
               // r8-D4: 残余开/闭包装标签一并剥净(stdout 不再回显标签)
               const safe = marker.replace(/[^\w]/g, ch => '\\' + ch);
               txt = txt.replace(new RegExp('</?' + safe + '>', 'g'), '').replace(/^\n+/, '');  // r8v4 足注: 标签位前导换行一并清
