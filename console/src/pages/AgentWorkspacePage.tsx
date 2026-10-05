@@ -692,7 +692,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             inert={rightIsDrawer && !rightOpen}
             onKeyDown={e => { if (e.key === 'Escape') setRightOpen(false); }}
             className={cn(
-              'relative z-30 h-full shrink-0 bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',
+              'relative z-30 h-full shrink-0 min-w-0 bg-bg shadow-lg transition-transform lg:static lg:z-auto lg:translate-x-0 lg:shadow-none max-lg:fixed max-lg:inset-y-0 max-lg:right-0',  /* min-w-0: min-content 曾顶死 438px 溢出盖主区(拖窄重叠根因) */
               // FEAESTH4-P1-2/FEUX5-P2: 抽屉态固定 min(85vw,360px)(此前
               // ratio*vw 在 375px 屏仅 90px)+关闭态 inert 移出 Tab 序+Esc 关闭;
               // 静态态宽度=ratio·vw 无 clamp(用户裁定: 拖动零限制,
