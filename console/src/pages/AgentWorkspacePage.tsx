@@ -251,8 +251,10 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         setTreeIds(prev => prev.size === ids.size
           && [...ids].every(i => prev.has(i)) ? prev : ids);
         // 用户令(口径再判): "会话"计数=**本项目全部**干过活的智能体数
-        // (全量 distinct agentKey, 非当前树——当前树只有 2 是限错了)。
-        const agentsWorked = new Set(all.map(s => s.agentKey)).size;
+        // (全量 distinct agentKey, 非当前树)。配置三键(skill/mcp/cli-config)
+        // 是配置会话不算"干活 agent", 剔除——纯作战/撰写面计数。
+        const agentsWorked = new Set(
+          all.map(s => s.agentKey).filter(k => !['skill-config', 'mcp-config', 'cli-config'].includes(k))).size;
         setWsStats(prev => {
           const running = all.filter(s => s.busy && ids.has(s.id)).length;
           return prev.sessions === agentsWorked && prev.running === running
