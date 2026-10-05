@@ -95,16 +95,28 @@ function Node({ node, depth, activeId, onDrill }: {
         </button>
       </div>
       {node.children.length > 0 && (
-        <div className="ml-3.5 border-l border-line-strong pl-2">
-      {node.children.map(child => (
-        <Node
-          key={child.session.id}
-          node={child}
-          depth={depth + 1}
-          activeId={activeId}
-          onDrill={onDrill}
-        />
-      ))}
+        <div className="ml-3.5 pl-2">
+      {node.children.map((child, idx) => {
+        const last = idx === node.children.length - 1;
+        return (
+          /* 用户令(r47): 经典树形连接线——竖线画到本行中点止, 圆角右转
+           * 横线接条目左中闭合; 非 last 行竖线贯穿(下续兄弟)。 */
+          <div key={child.session.id} className="relative">
+            <span aria-hidden className={cn(
+              'absolute -left-2 w-2 border-line-strong',
+              last
+                ? 'top-0 h-[22px] rounded-bl-md border-b border-l'
+                : 'bottom-0 top-0 border-l',
+            )} />
+            <Node
+              node={child}
+              depth={depth + 1}
+              activeId={activeId}
+              onDrill={onDrill}
+            />
+          </div>
+        );
+      })}
       </div>
       )}
     </div>
