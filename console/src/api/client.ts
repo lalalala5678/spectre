@@ -119,15 +119,39 @@ export async function api<T>(
   init?: RequestInit & { json?: unknown },
 ): Promise<T> {
   const { json, ...rest } = init ?? {};
-  const res = await fetch(`${API_BASE}${path}`, {
-    // r50j: /bus 快照同步进全局缓存(面板初值用)
-    ...rest,
-    headers: {
-      ...(json !== undefined && { 'Content-Type': 'application/json' }),
-      ...(rest.headers),
-    },
-    body: json !== undefined ? JSON.stringify(json) : rest.body,
-  });
+  // r50k: 全链路观测+8s 超时+一次重试——切换后面板骨架挂起(用户必现,
+  // 我端不复现)需拿决定性证据: __apiLog 记录每请求(挂起>8s 自动 abort
+  // 重发一次)。复现后 F12 console 输入 __apiLog 查看。
+  const t0 = Date.now();
+  (globalThis as { __apiLog?: unknown[] }).__apiLog ??= [];
+  const log = ((globalThis as unknown) as { __apiLog?: Array<Record<string, unknown>> }).__apiLog!;
+  const doFetch = async (signal?: AbortSignal) =>
+    fetch(`${API_BASE}${path}`, {
+      ...rest,
+      headers: {
+        ...(json !== undefined && { 'Content-Type': 'application/json' }),
+        ...(rest.headers),
+      },
+      body: json !== undefined ? JSON.stringify(json) : rest.body,
+      signal,
+    });
+  let res: Response;
+  const ctl = new AbortController();
+  const killer = setTimeout(() => ctl.abort('spectre-timeout-8s'), 8000);
+  try {
+    res = await doFetch(ctl.signal);
+  } catch (e) {
+    clearTimeout(killer);
+    const aborted = String(e).includes('spectre-timeout') || (e as Error)?.name === 'AbortError';
+    log.push({ at: new Date().toISOString().slice(11, 19), path, ms: Date.now() - t0, err: aborted ? 'TIMEOUT8s' : String(e), retried: true });
+    if (log.length > 80) log.shift();
+    if (!aborted) throw e;
+    res = await doFetch();  // 超时重试一次(无 signal, 兜底)
+  } finally {
+    clearTimeout(killer);
+  }
+  log.push({ at: new Date().toISOString().slice(11, 19), path, status: res.status, ms: Date.now() - t0 });
+  if (log.length > 80) log.shift();
   // Gateway redirects expired sessions to the login page — stop the
   // silent retry loops and send the user to re-authenticate.
   if (res.redirected && res.url.includes('/login')) {
