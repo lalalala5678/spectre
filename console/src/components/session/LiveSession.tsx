@@ -93,7 +93,11 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
     // FEVERIFY-C2: 旧重挂链在尾子被 React 替换(而非追加)时断裂
     // (verify 实测 +300px 不回钉)——改 MutationObserver 跟 childList
     // 变化重挂尾子, 与 RO 组合。
+    let lastH = el.scrollHeight;
     const ro = new ResizeObserver(() => {
+      // r50c: 高度环自激保险——变化 <2px(如滚动条互扰)不 re-pin
+      if (Math.abs(el.scrollHeight - lastH) < 2) return;
+      lastH = el.scrollHeight;
       if (stickToBottom.current) pinToBottom(el);
     });
     const observeTail = () => {
@@ -375,7 +379,7 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
       <div
         ref={scrollRef}
         onScroll={handleScroll}
-        className="min-h-0 flex-1 space-y-2 overflow-y-auto rounded-lg border border-line bg-bg p-3 [overflow-anchor:none]"
+        className="min-h-0 flex-1 space-y-2 overflow-y-auto overflow-x-hidden rounded-lg border border-line bg-bg p-3 [overflow-anchor:none]"  /* r50c: 横向禁滚——横条出现/消失改 clientHeight 与 RO re-pin 自激(滚动条秒级抖动) */
       >
         {!loaded && !error && (
           <div className="flex flex-col items-center gap-2 py-10">

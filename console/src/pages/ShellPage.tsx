@@ -113,7 +113,8 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
 
       {err && <div className="mb-3 rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[13px] text-danger-text">{err}</div>}
 
-      <div className="mb-3 grid grid-cols-2 gap-2 overflow-x-auto md:grid-cols-4">
+      {/* r50c: 限高滚动——多 shell 时 exec 面板不被挤出视口 */}
+      <div className="mb-3 grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto md:grid-cols-4">
         {shells.length === 0 && (
           <div className="col-span-full">
             <EmptyState icon={TerminalSquare} title="无 shell"
