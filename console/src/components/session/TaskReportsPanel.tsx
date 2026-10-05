@@ -2,6 +2,7 @@ import { ClipboardList } from 'lucide-react';
 
 import type { ApiBusEvent } from '../../api/client';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
+import { Badge } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
 import { PanelEntryMeta } from './PanelEntryMeta';
@@ -54,6 +55,9 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
                   cur.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {cur.title ?? cur.summary}
                 </span>
+                {event.revisedCount > 0 && (
+                  <Badge tone="info" className="shrink-0 tabular-nums">⟳{event.revisedCount}</Badge>
+                )}
               </div>
               <PanelEntryMeta event={event} voidable />
             </button>

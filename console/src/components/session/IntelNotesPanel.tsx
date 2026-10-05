@@ -64,6 +64,9 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
                   event.current.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {title}
                 </span>
+                {event.revisedCount > 0 && (
+                  <Badge tone="info" className="shrink-0 tabular-nums">⟳{event.revisedCount}</Badge>
+                )}
                 {/* CS41-C2→r45: 溯源行移出标题行——标题独占一行永远完整
                     (用户令: 同行竞争曾致标题被挡), 溯源独立第二行。 */}
               </div>

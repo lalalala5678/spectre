@@ -102,6 +102,9 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
                   event.current.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {title}
                 </span>
+                {event.revisedCount > 0 && (
+                  <Badge tone="info" className="shrink-0 tabular-nums">⟳{event.revisedCount}</Badge>
+                )}
               </button>
               {/* 用户令(r45): 溯源行独立第二行——标题独占一行永远完整 */}
               <PanelEntryMeta event={event} />

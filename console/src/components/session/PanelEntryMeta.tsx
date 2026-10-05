@@ -20,11 +20,6 @@ export function PanelEntryMeta({ event, voidable }: {
       {voidable && event.current.void && (
         <Badge tone="neutral" className="shrink-0 line-through">已作废</Badge>
       )}
-      {event.revisedCount > 0 && (
-        <Badge tone="info" className="shrink-0 tabular-nums">
-          ⟳{event.revisedCount}
-        </Badge>
-      )}
       <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />
       {(() => {
         /* 用户令(补全): 全部条目标注所属主控会话——含主控直发; 漏洞
