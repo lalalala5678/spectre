@@ -72,10 +72,10 @@ export function CliPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.cli-v2" initial={0.4}>
-      <div className="flex min-h-0 flex-col gap-3">
+    <SplitPane storageKey="spectre.split.cli-v3" initial={0.42}>
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
 
-      <Panel title="安装到沙箱" bodyClassName="p-3 space-y-2">
+      <Panel title="安装到沙箱" className="shrink-0" bodyClassName="p-3 space-y-2">
         {status && (
           <p className="flex items-center gap-1.5 text-xs text-tertiary">
             <Package className="h-3.5 w-3.5 text-accent-text/80" />
@@ -109,7 +109,7 @@ export function CliPage({ wsId }: { wsId: string }) {
           安装一次，全部项目的全部 agent 共享（环境能力）；项目间的隔离靠各自工作目录，CLI 层刻意共享。
         </p>
       </Panel>
-      <ToolingChat agentKey="cli-config" workSessionId={wsId} />
+      <div className="flex min-h-0 flex-1 flex-col"><ToolingChat agentKey="cli-config" workSessionId={wsId} /></div>
       </div>
 
       <Panel

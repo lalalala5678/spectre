@@ -116,10 +116,10 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.mcp-v2" initial={0.4}>
-      <div className="flex min-h-0 flex-col gap-3">
+    <SplitPane storageKey="spectre.split.mcp-v3" initial={0.42}>
+      <div className="flex min-h-0 min-w-0 flex-col gap-3">
 
-      <Panel title="注册新 Server" bodyClassName="p-3 space-y-2">
+      <Panel title="注册新 Server" className="shrink-0" bodyClassName="p-3 space-y-2">
         <Input
           value={form.name} onChange={e => setForm({ ...form, name: e.target.value })}
           placeholder="名称（如 shodan）"
@@ -187,7 +187,7 @@ export function McpPage({ wsId }: { wsId: string }) {
         </Button>
         {msg && <p className="text-xs text-warning-text">{msg}</p>}
       </Panel>
-      <ToolingChat agentKey="mcp-config" workSessionId={wsId} />
+      <div className="flex min-h-0 flex-1 flex-col"><ToolingChat agentKey="mcp-config" workSessionId={wsId} /></div>
       </div>
 
       <Panel title="已注册 MCP Servers" className="h-full min-h-0" bodyClassName="flex min-h-0 flex-col p-0">

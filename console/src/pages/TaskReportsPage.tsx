@@ -1,3 +1,4 @@
+import { SplitPane } from '../components/ui/SplitPane';
 import { useEffect, useState } from 'react';
 import { ClipboardList } from 'lucide-react';
 
@@ -25,12 +26,12 @@ export function TaskReportsPage() {
   }, []);
 
   return (
-    <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
-      <div className="flex min-h-0 flex-col gap-3 xl:order-1">
+    <SplitPane storageKey="spectre.split.taskreports" initial={0.42}>
+      <div className="flex min-w-0 min-h-0 flex-col gap-3">
         {selected
-          ? <EntryDetail event={selected} onBack={() => setSelected(null)} />
+          ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden"><EntryDetail event={selected} onBack={() => setSelected(null)} /></div>
           : (
-            <Panel title="报告详情" bodyClassName="p-6">
+            <Panel title="报告详情" className="flex-1" bodyClassName="p-6">
               <EmptyState icon={ClipboardList} title="选择右侧报告查看详情"
                 hint="状态、行动、证据、验证会话、修订历史" />
             </Panel>
@@ -45,7 +46,7 @@ export function TaskReportsPage() {
             安装/卸载/渗透任务的闭环交付记录
           </span>
         }
-        className="min-h-0 xl:col-span-2 xl:order-2"
+        className="h-full min-h-0 min-w-0"
         bodyClassName="p-0"
       >
         <div className="h-full max-h-[calc(100vh-180px)] overflow-y-auto">
@@ -65,6 +66,6 @@ export function TaskReportsPage() {
           )}
         </div>
       </Panel>
-    </div>
+    </SplitPane>
   );
 }
