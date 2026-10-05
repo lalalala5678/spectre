@@ -623,7 +623,10 @@ function buildAllToolingTools(caps, sessionRecord) {
       } catch (e) {
         // r33-D6: 负路径回执对齐 read 标杆——原因分类+补救指引
         // (此前仅 "fetch failed", DNS/超时/TLS/4xx 不可辨)。
-        const msg = String(e?.message ?? e ?? '');
+        // r33-D6b: undici 真实错误在 e.cause(message 恒 'fetch failed'),
+        // 四类探针曾逐字同型——msg 优先取 cause.code/message。
+        const c = e?.cause;
+        const msg = String(c?.code ?? c?.message ?? e?.message ?? e ?? '');
         const why = /ENOTFOUND|getaddrinfo/i.test(msg) ? '域名解析失败(host 不存在或本环境无外联 DNS)'
           : /ETIMEDOUT|timeout/i.test(msg) ? '连接超时(目标无响应或被墙)'
           : /certificate|SSL|TLS/i.test(msg) ? 'TLS 证书校验失败'
