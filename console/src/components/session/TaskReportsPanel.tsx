@@ -54,8 +54,8 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
                   cur.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {cur.title ?? cur.summary}
                 </span>
-                <PanelEntryMeta event={event} voidable />
               </div>
+              <PanelEntryMeta event={event} voidable />
             </button>
           );
         })}

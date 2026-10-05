@@ -89,7 +89,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
           return (
             <div
               key={event.seq}
-              className="@container flex min-h-11 w-full items-center gap-1 rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
+              className="@container flex min-h-11 w-full flex-col gap-px rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
             >
               {/* P3-12/nested-interactive: 行内不再嵌 interactive——主点击区
                   与"查看撰写对话"为兄弟节点(外层改 div)。 */}
@@ -103,7 +103,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
                   {title}
                 </span>
               </button>
-              {/* 用户令: 标题行对话气泡按钮删除——详情态仍可从 payloadRef 进入源会话 */}
+              {/* 用户令(r45): 溯源行独立第二行——标题独占一行永远完整 */}
               <PanelEntryMeta event={event} />
             </div>
           );

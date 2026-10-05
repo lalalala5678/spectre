@@ -64,10 +64,10 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
                   event.current.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {title}
                 </span>
-                {/* CS41-C2: 收敛 PanelEntryMeta(⟳ 徽标+溯源行——此前
-                    内联逐字双胞胎, 同族三面板两收敛一分叉) */}
-                <PanelEntryMeta event={event} />
+                {/* CS41-C2→r45: 溯源行移出标题行——标题独占一行永远完整
+                    (用户令: 同行竞争曾致标题被挡), 溯源独立第二行。 */}
               </div>
+              <PanelEntryMeta event={event} />
             </button>
           );
         })}
