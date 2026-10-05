@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import {Activity, ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, Lightbulb, MessagesSquare, PanelRight, Play, Plus, ShieldAlert, Trash2} from 'lucide-react';
+import { ArrowRightLeft, ChevronDown, CornerUpLeft, Cpu, History, PanelRight, Play, Plus, Trash2 } from 'lucide-react';
 import type { AgentMeta } from '../types';
 import { api, type ApiBusEvent, type ApiSessionSummary } from '../api/client';
 import { Badge, Dot } from '../components/ui/Badge';
@@ -25,7 +25,6 @@ import {
   setLastSession, putPrefsSync, getPrefs, cnNumber, type WorkSession,
 } from '../api/worksession';
 import { takePendingOpen, OPEN_SESSION_EVENT } from '../api/openSessionChannel';
-import { useProjectCounts } from '../api/useProjectCounts';
 // CS44-F17: 三组件拆出 components/agent/(905 行四职责收敛, 先例 nav.ts)
 import { AgentConfigTab } from '../components/agent/AgentConfigTab';
 
@@ -67,11 +66,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
   const [mySessions, setMySessions] = useState<ApiSessionSummary[]>([]);
   // 项目态势(AutoPwn 态势条): -1 = 尚未取到, 显示 –
-  const [wsStats, setWsStats] = useState({ sessions: -1, running: -1 });
-  // 用户令: 态势条只显当前会话树——主控/L1/L2 链成员集合
-  const [treeIds, setTreeIds] = useState<Set<string>>(new Set());
-  const projCounts = useProjectCounts(agent.id === 'autopwn' ? workSession?.id : undefined,
-    treeIds.size ? treeIds : undefined);
   const [sessionId, setSessionId] = useState<string | null>(null);
   const [drillSession, setDrillSession] = useState<string | null>(null);
   // R26(二十六轮): 全局搜索深链 #<agent>?s=<id>——Topbar 点击直达目标
@@ -241,24 +235,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
       try {
         if (stopped) return;
         const all = await api<ApiSessionSummary[]>(`/sessions?workSessionId=${encodeURIComponent(wsId)}`);
-        // 态势条复用同一响应(零新增请求): 项目全会话数 + 忙会话数
-        // 会话树: 当前会话(或主控缺位时最新主会话)直接/间接派生两层
-        const rootId = sessionId;
-        const childIds = new Set(all.filter(s => s.parentSessionId === rootId
-          || s.orchestratorSessionId === rootId).map(s => s.id));
-        const grandIds = new Set(all.filter(s => s.parentSessionId
-          && childIds.has(s.parentSessionId)).map(s => s.id));
-        const ids = new Set<string>([rootId, ...childIds, ...grandIds].filter(Boolean) as string[]);
-        setTreeIds(prev => prev.size === ids.size
-          && [...ids].every(i => prev.has(i)) ? prev : ids);
-        // 用户令(终裁): "会话"=**项目会话总数**(all.length——所有主控
-        // 循环×全部派生子席累计; 配置三键会话同样计入, 纯总数口径)。
-        const agentsWorked = all.length;
-        setWsStats(prev => {
-          const running = all.filter(s => s.busy && ids.has(s.id)).length;
-          return prev.sessions === agentsWorked && prev.running === running
-            ? prev : { sessions: agentsWorked, running };
-        });
         // 用户令(改判): 左侧进入也显示 AutoPwn 派生的本类智能体会话
         // ——此前过滤 engagement/parent, 现仅按 agentKey+项目归集
         const mine = all.filter(s =>
@@ -457,36 +433,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
 
         <div className="flex-1" />
         {/* 项目态势条(AutoPwn 视觉锚点): 既有 API 聚合的纯展示轻卡片 */}
-        {isAuto && (
-          <div className="hidden items-center gap-2 xl:flex" aria-label="项目态势">
-            <span className="flex items-center gap-1.5 rounded-md bg-surface-2/60 px-2.5 py-1 text-[13px]">
-              <MessagesSquare className="h-3.5 w-3.5 text-tertiary" />
-              <span className="font-semibold tabular-nums text-primary">{wsStats.sessions < 0 ? '–' : wsStats.sessions}</span>
-              <span className="text-tertiary">会话</span>
-            </span>
-            <span className="flex items-center gap-1.5 rounded-md bg-surface-2/60 px-2.5 py-1 text-[13px]">
-              <ShieldAlert className="h-3.5 w-3.5 text-tertiary" />
-              <span className="font-semibold tabular-nums text-primary">{projCounts ? projCounts.vulns : '–'}</span>
-              <span className="text-tertiary">漏洞</span>
-            </span>
-            <span className="flex items-center gap-1.5 rounded-md bg-surface-2/60 px-2.5 py-1 text-[13px]">
-              <Lightbulb className="h-3.5 w-3.5 text-tertiary" />
-              <span className="font-semibold tabular-nums text-primary">{projCounts ? projCounts.intel : '–'}</span>
-              <span className="text-tertiary">情报</span>
-            </span>
-            <span className={cn('flex items-center gap-1.5 rounded-md px-2.5 py-1 text-[13px]',
-              wsStats.running > 0 ? 'bg-accent-subtle' : 'bg-surface-2/60')}>
-              {wsStats.running > 0
-                ? <Dot tone="accent" pulse />
-                : <Activity className="h-3.5 w-3.5 text-tertiary" />}
-              <span className={cn('font-semibold tabular-nums',
-                wsStats.running > 0 ? 'text-accent-text' : 'text-primary')}>
-                {wsStats.running < 0 ? '–' : wsStats.running}
-              </span>
-              <span className="text-tertiary">运行中</span>
-            </span>
-          </div>
-        )}
+        {/* 用户令: 态势四计数(会话/漏洞/情报/运行中)删除——口径曾与面板不一致且切窗偶发归零 */}
         <div className="flex-1" />
 
         {/* 项目切换 + 从属主控会话下拉(纵向堆叠: 项目上/会话下; 独立"新项目"按钮删——与下拉内入口重复) */}
