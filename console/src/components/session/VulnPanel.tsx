@@ -98,7 +98,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
                 className="flex min-h-8 min-w-0 flex-1 items-center gap-2 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 <SeverityBadge severity={severity} />
-                <span className={cn('min-w-0 flex-1 truncate text-sm font-medium',
+                <span className={cn('min-w-0 flex-1 basis-28 truncate text-sm font-medium',
                   event.current.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {title}
                 </span>
