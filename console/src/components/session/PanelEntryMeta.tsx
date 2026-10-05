@@ -14,7 +14,9 @@ export function PanelEntryMeta({ event, voidable }: {
 }) {
   const a = event.author;
   return (
-    <>
+    /* 用户令: 窄屏标题优先——meta 收缩优先级高于标题(basis auto +
+       shrink, 标题 flex-1), 溯源行窄时截断而非挤掉标题。 */
+    <div className="flex min-w-0 shrink items-center gap-1">
       {voidable && event.current.void && (
         <Badge tone="neutral" className="shrink-0 line-through">已作废</Badge>
       )}
@@ -35,11 +37,11 @@ export function PanelEntryMeta({ event, voidable }: {
         if (!label) return null;
         return (
           <p className="truncate pl-1 text-xs leading-tight text-tertiary">
-            <span className={root ? 'text-accent-text/80' : ''}>{label} · </span>
+            <span className="text-accent-text/80">{label} · </span>
             {a?.name ?? event.requester?.name ?? ''}{a ? `（${a.typeLabel}${a.parent ? ` · 父:${a.parent.name}` : ''} · L${a.depth}）` : ''}
           </p>
         );
       })()}
-    </>
+    </div>
   );
 }
