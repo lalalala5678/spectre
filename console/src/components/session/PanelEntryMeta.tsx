@@ -26,6 +26,10 @@ export function PanelEntryMeta({ event, voidable }: {
       <ChevronRight className="h-3 w-3 shrink-0 text-tertiary" />
       {a && (
         <p className="truncate pl-1 text-xs leading-tight text-tertiary">
+          {/* 用户令: 标注创建者所属主控会话(treePath 首段=根主控名) */}
+          {a.treePath && a.treePath.includes(' › ') && (
+            <span className="text-accent-text/80">{a.treePath.split(' › ')[0]} · </span>
+          )}
           {a.name}（{a.typeLabel}{a.parent ? ` · 父:${a.parent.name}` : ''} · L{a.depth}）
         </p>
       )}
