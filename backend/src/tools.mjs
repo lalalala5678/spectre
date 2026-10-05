@@ -932,7 +932,7 @@ export function buildOrchestratorTools(record, caps) {
         // "最后启动"战役, 取消后不清空曾把默认 DM 投给已取消战役。
         if (r.cancelled) record.activeEngagement = null;
         return { content: [{ type: 'text', text: r.cancelled
-          ? `已请求取消: engagement ${params.engagementId}(当前 RUNNING——取消信号已发出; 若此战役此前已被取消则为重复请求, 幂等无害)。已落账产出保留; 在飞席位收到取消信号收尾, 终态以 query_intel 为准。`
+          ? `已请求取消: engagement ${params.engagementId}(取消信号已发出; 重复取消幂等无害, 终态以 query_intel 为准)。已落账产出保留; 在飞席位收到取消信号收尾。`
           : `无需取消: engagement ${params.engagementId} 状态 ${r.status}(非 RUNNING, 幂等 no-op)。` }] };
       } catch (e) {
         return { content: [{ type: 'text', text: `取消失败:${String(e?.message ?? e)}(id 有误或 runtime 停机)` }] };
