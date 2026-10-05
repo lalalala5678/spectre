@@ -226,7 +226,10 @@ export class SessionStore {
     const mount = mountForSession(record.agentKey, record.workSessionId);
     // Shell channel: c2 (deliver/handoff), persistence & postex (operate),
     // autopwn (relay/verify) — one instance per session (independence axiom).
-    if (['c2', 'persistence', 'postex', 'autopwn'].includes(record.agentKey)) {
+    // r39-O2: exploit 席补挂——指令铁则要求"已验证通道必须 register",
+    // 但 exploit 无 shell 工具, 打 webshell 通道只能读平台源码定位
+    // 挂载缺失(r39 唯一 partial 的根因)。授权门 scope 照常拦截。
+    if (['c2', 'persistence', 'postex', 'autopwn', 'exploit'].includes(record.agentKey)) {
       base.push(...buildShellTools(record, this.caps));
     }
     const tools = [...base, ...mount.tools];

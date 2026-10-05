@@ -351,14 +351,22 @@ export function buildIntelTools(record, caps) {
         // 仅当失败词出现在任务定性位置(开头 40 字符或带"任务/执行/整体"前缀)才判 failed。
         const o = `${params.outcome ?? ''}\n${params.title ?? ''}`.toLowerCase();
         const outcomeHead = (params.outcome ?? '').trim().slice(0, 40).toLowerCase();
+        // r39-O4: 结论位(尾部 40 字)强成功词优先——正文描述"部分覆盖"
+        // 的全程成功报告曾被推断 partial(编排者终报实测复现)。描述性
+        // "部分"不再压倒显式结论。
+        const outcomeTail = (params.outcome ?? '').trim().slice(-40).toLowerCase();
+        const strongSuccess = /全部通过|全部完成|全数通过|完全成功|整体成功|总体成功|全程成功|^success|success$/.test(outcomeTail)
+          || /\bsuccess\b/.test(String(params.title ?? '').toLowerCase());
         status = (/^(任务|执行|整体)?(失败|failed)|超时|timeout/.test(outcomeHead)
             || /任务失败|执行失败|整体失败|operation failed/.test(o))
           ? 'failed'
-          : /部分|partial|未完成/.test(o)
-            ? 'partial'
-            : (params.outcome ?? '').trim()
-              ? 'success'
-              : 'partial';
+          : strongSuccess
+            ? 'success'
+            : /部分|partial|未完成/.test(o)
+              ? 'partial'
+              : (params.outcome ?? '').trim()
+                ? 'success'
+                : 'partial';
       }
       // Markdown document: blank-line-separated sections so multi-line
       // field values (tables/lists/code) never run into the next section.
