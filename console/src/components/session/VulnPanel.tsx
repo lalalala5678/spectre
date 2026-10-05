@@ -67,7 +67,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
       && e.origin === 'direct'
       && e.workSessionId === workSessionId;
   };
-  const { events, loaded } = useBusPanelEntries(accept, { ws: workSessionId });
+  const { events, loaded, total, more } = useBusPanelEntries(accept, { ws: workSessionId });
 
   return (
     <div className="animate-enter flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface shadow-xs">
@@ -75,7 +75,11 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
         <h3 className="text-[13px] font-semibold text-secondary">
           漏洞
         </h3>
-        <span className="text-xs tabular-nums text-tertiary">{events.length}</span>
+        <span className="text-xs tabular-nums text-tertiary">
+          {events.length}/{total}{total > events.length && (
+            <button onClick={more} className="ml-1 rounded px-1 text-accent-text hover:bg-surface-2">更多</button>
+          )}
+        </span>
       </header>
       <div className="flex-1 space-y-1 overflow-y-auto p-2" tabIndex={0} aria-label="漏洞列表">
         {events.length === 0 && (!loaded

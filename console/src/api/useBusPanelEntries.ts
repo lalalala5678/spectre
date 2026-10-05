@@ -16,9 +16,12 @@ export type { FoldedEntry };  // CS3-N23: PanelEntryMeta 消费
 export function useBusPanelEntries(
   accept: (e: ApiBusEvent) => boolean,
   o?: { ws?: string; limit?: number },
-): { events: FoldedEntry[]; loaded: boolean } {
-  const { ws, limit = 20 } = o ?? {};
+): { events: FoldedEntry[]; loaded: boolean; total: number; more: () => void } {
+  // 用户令(数据一致性): limit 只是显示窗——total 披露全量, more 翻倍扩窗
+  const { ws } = o ?? {};
+  const [limit, setLimit] = useState(o?.limit ?? 20);
   const [events, setEvents] = useState<FoldedEntry[]>([]);
+  const [total, setTotal] = useState(0);
   // Distinguish LOADING (fetch in flight) from EMPTY (loaded, nothing
   // published) — stale content must never linger after a project switch,
   // and '暂无' must never flash first.
@@ -32,7 +35,9 @@ export function useBusPanelEntries(
     const snapshot = async () => {
       const all = await api<ApiBusEvent[]>('/bus' + (ws ? `?ws=${ws}` : ''));
       if (stopped) return;
-      setEvents(foldEntries(all).filter(accept).slice(-limit).reverse());
+      const folded = foldEntries(all).filter(accept);
+      setTotal(folded.length);
+      setEvents(folded.slice(-limit).reverse());
       setLoaded(true);
       cursor.v = all.at(-1)?.seq ?? 0;
     };
@@ -59,5 +64,5 @@ export function useBusPanelEntries(
     });
     return () => { stopped = true; off(); };
   }, [ws, limit]);  // eslint-disable-line react-hooks/exhaustive-deps -- accept 是调用方每次渲染的闭包; 面板语义要求 ws 变化即重置, accept 内部读的是 props 同步值
-  return { events, loaded };
+  return { events, loaded, total, more: () => setLimit(l => l * 2) };
 }
