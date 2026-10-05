@@ -250,11 +250,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         const ids = new Set<string>([rootId, ...childIds, ...grandIds].filter(Boolean) as string[]);
         setTreeIds(prev => prev.size === ids.size
           && [...ids].every(i => prev.has(i)) ? prev : ids);
-        // 用户令(口径改判): "会话"计数=本项目**干过活的智能体数**
-        // (树内 distinct agentKey)——总会话数(一个 agent 多会话)与直觉
-        // 不符, 编排树维度按 agent 计。
-        const agentsWorked = new Set(
-          all.filter(s => ids.has(s.id)).map(s => s.agentKey)).size;
+        // 用户令(口径再判): "会话"计数=**本项目全部**干过活的智能体数
+        // (全量 distinct agentKey, 非当前树——当前树只有 2 是限错了)。
+        const agentsWorked = new Set(all.map(s => s.agentKey)).size;
         setWsStats(prev => {
           const running = all.filter(s => s.busy && ids.has(s.id)).length;
           return prev.sessions === agentsWorked && prev.running === running
