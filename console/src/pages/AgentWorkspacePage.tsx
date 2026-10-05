@@ -560,48 +560,6 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         </div>
         </div>
       </div>
-      {/* 会话下拉移 header 之下(横线下方), 项目在线上方(用户令) */}
-      {isAuto && (
-      <div className="relative flex shrink-0 items-center justify-end px-6 pt-1.5">
-          <div className="relative">
-            <button
-              onClick={() => setOrchSwitcherOpen(v => !v)}
-              className="flex h-7 items-center gap-2 rounded-md border border-line bg-surface px-2 text-[13px] text-tertiary hover:bg-surface-2 hover:text-primary"
-            >
-              <Dot tone={current?.busy ? 'accent' : 'neutral'} pulse={current?.busy} />
-              <span className="max-w-48 truncate">{orchSessions.find(o => o.id === sessionId)?.name ?? '主控会话'}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-faint" />
-            </button>
-            {orchSwitcherOpen && (
-              <div className="animate-enter absolute right-0 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
-                <button
-                  onClick={() => { void newConversation(); setOrchSwitcherOpen(false); }}
-                  className="mb-1 flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-sm font-medium text-secondary hover:bg-surface-2 hover:text-primary"
-                >
-                  <Plus className="h-4 w-4" /> 新对话
-                </button>
-                <div className="max-h-64 overflow-y-auto">
-                  {orchSessions.map(o => (
-                    <button
-                      key={o.id}
-                      onClick={() => { switchSession(o.id); setOrchSwitcherOpen(false); }}
-                      className={cn(
-                        'flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm hover:bg-surface-2 hover:text-primary',
-                        o.id === sessionId ? 'text-primary' : 'text-secondary',
-                      )}
-                    >
-                      <span className="truncate">{o.name}</span>
-                      <span className="shrink-0 font-mono text-xs tabular-nums text-tertiary">
-                        {o.messages} msgs
-                      </span>
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-      </div>
-      )}
 
       {wsError && (
         <div className="flex shrink-0 items-center gap-2 border-b border-danger-line bg-danger-bg px-6 py-1.5">
@@ -642,6 +600,48 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             <Icon className="h-4 w-4" /> {label}
           </button>
         ))}
+        {/* 用户令(改判): 会话下拉与 tab 同水平(行尾), 不再独立占行 */}
+        <div className="relative ml-auto flex items-center pr-1">
+      {isAuto && (
+          <>
+            <button
+              onClick={() => setOrchSwitcherOpen(v => !v)}
+              className="flex h-7 items-center gap-2 rounded-md border border-line bg-surface px-2 text-[13px] text-tertiary hover:bg-surface-2 hover:text-primary"
+            >
+              <Dot tone={current?.busy ? 'accent' : 'neutral'} pulse={current?.busy} />
+              <span className="max-w-48 truncate">{orchSessions.find(o => o.id === sessionId)?.name ?? '主控会话'}</span>
+              <ChevronDown className="h-3.5 w-3.5 text-faint" />
+            </button>
+            {orchSwitcherOpen && (
+              <div className="animate-enter absolute right-1 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
+                <button
+                  onClick={() => { void newConversation(); setOrchSwitcherOpen(false); }}
+                  className="mb-1 flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 text-sm font-medium text-secondary hover:bg-surface-2 hover:text-primary"
+                >
+                  <Plus className="h-4 w-4" /> 新对话
+                </button>
+                <div className="max-h-64 overflow-y-auto">
+                  {orchSessions.map(o => (
+                    <button
+                      key={o.id}
+                      onClick={() => { switchSession(o.id); setOrchSwitcherOpen(false); }}
+                      className={cn(
+                        'flex min-h-9 w-full items-center justify-between gap-2 rounded-md px-2.5 text-left text-sm hover:bg-surface-2 hover:text-primary',
+                        o.id === sessionId ? 'text-primary' : 'text-secondary',
+                      )}
+                    >
+                      <span className="truncate">{o.name}</span>
+                      <span className="shrink-0 font-mono text-xs tabular-nums text-tertiary">
+                        {o.messages} msgs
+                      </span>
+                    </button>
+                  ))}
+                </div>
+              </div>
+            )}
+          </>
+      )}
+        </div>
       </div>
 
       {/* 内容：session tab 用固定骨架（运行流独立滚动 + 右栏固定），config/history 外层滚动 */}
