@@ -1,3 +1,4 @@
+import { ScopeAuthCard } from './ScopeAuthCard';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, ChevronDown, Loader2, User, X, TriangleAlert } from 'lucide-react';
 
@@ -406,6 +407,8 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
         ) : (
           <ToolTimeline key={`t-${item.steps[0]?.key}-${i}`} steps={item.steps} />
         ))}
+        {/* 用户令(r47c): 授权确认卡=会话消息流内的交互消息(非页面横幅) */}
+        {agentKey === 'autopwn' && <ScopeAuthCard />}
         {busy && (
           <div className="flex items-center gap-2 px-1 text-[13px] text-tertiary">
             <Bot className="h-4 w-4 animate-pulse" />
