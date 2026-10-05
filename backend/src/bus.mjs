@@ -65,6 +65,12 @@ export class Bus {
       workSessionId: entry.workSessionId ?? null,
       status: entry.status ?? null,
       author: entry.author ?? null,
+      // r47b: 授权请求流字段(此前白名单静默丢弃 target→去重失效, agent
+      // 侧 15:36 每秒一条爆发实锤)。
+      target: entry.target ?? null,
+      reason: entry.reason ?? null,
+      requester: entry.requester ?? null,
+      resolves: entry.resolves ?? null,
       // revision chain (append-only: a revision is a NEW event pointing
       // at the original seq) + discoverer attribution on writer-published
       // vulnerabilities — previously silently dropped by this whitelist.

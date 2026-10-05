@@ -518,7 +518,10 @@ function realRouter({ store, bus, caps, wal }) {
       // pending = auth-request 且无后续 approved/rejected 事件 resolves 它
       const evs = bus.list().filter(e => e.type === 'auth-request');
       const settled = new Set(evs.filter(e => e.resolves).map(e => e.resolves));
-      const pending = evs.filter(e => !e.resolves && !settled.has(e.seq))
+      // r47b: 白名单修复前的脏事件(target 为空)过滤——24 条历史垃圾
+      // pending 隐去(不删链, 审计可考古)。
+      const pending = evs.filter(e => !e.resolves && !settled.has(e.seq)
+        && e.target)
         .map(e => ({ seq: e.seq, target: e.target, reason: e.reason,
           from: e.from, requester: e.requester, ts: e.ts }));
       return json(res, 200, pending);
