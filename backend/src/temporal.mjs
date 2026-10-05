@@ -60,13 +60,17 @@ export async function signalEngagement(workflowId, signalName, args) {
  * cancel 触发 Temporal 优雅取消(child activity 收 CANCELLED); 已完成
  * 战役 cancel 为 no-op(幂等)。 */
 export async function cancelEngagement(workflowId) {
+  // r46-D2/H1: 键归一——workflow 实际 id 是 `autopwn-${id}`(startAutopwn
+  // L45), 编排者从回执拿的是裸 engagementId('eng-…'), getHandle 曾静默
+  // 找不到→cancel 从未真正执行(席位侧零可观测效果, 三探针定谳)。
+  const wid = /^autopwn-/.test(workflowId) ? workflowId : `autopwn-${workflowId}`;
   const client = await temporalClient();
-  const handle = client.workflow.getHandle(workflowId);
+  const handle = client.workflow.getHandle(wid);
   const desc = await handle.describe();
   const status = desc.status?.name ?? 'RUNNING';
-  if (status !== 'RUNNING') return { workflowId, status, cancelled: false };
+  if (status !== 'RUNNING') return { workflowId: wid, status, cancelled: false };
   await handle.cancel();
-  return { workflowId, status, cancelled: true };
+  return { workflowId: wid, status, cancelled: true };
 }
 export async function describeWorkflow(workflowId) {
   const client = await temporalClient();
