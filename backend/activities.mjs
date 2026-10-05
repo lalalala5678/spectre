@@ -75,7 +75,7 @@ export async function markReportSynthesized(sessionId, meta = {}) {
 export function buildLateRecon(recheck, children, clock = () => new Date()) {
   const parts = (Array.isArray(recheck) ? recheck : [])
     .map(k => children[k]
-      ? `${k}: 终报已落账(${children[k].status ?? '?'})《${String(children[k].title ?? '').slice(0, 50)}》(seq=${children[k].seq})——勿判失败`
+      ? `${k}: 终报已落账(${children[k].status ?? '?'})《${String(children[k].title ?? '').slice(0, 50)}》(seq=${children[k].seq})${children[k].crossEngagement ? `[补位/重派席位, 报告挂其原战役 ${children[k].crossEngagement}]` : ''}——勿判失败`
       : `${k}: 快照时点库内仍无终报(投递后落账未覆盖——终局以 query_intel 为准)`)
     .map(x => `- ${x}`);
   if (!parts.length) return '';

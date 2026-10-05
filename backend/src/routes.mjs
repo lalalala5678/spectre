@@ -241,6 +241,24 @@ function realRouter({ store, bus, caps, wal }) {
           out[key] = { seq: e.seq, status: e.status, title: e.title };
         }
       }
+      // r35-D7b: 重派/补位席位的终报带的是其原会话的 engagement(实测
+      // 5557: engagement=旧战役 id), 精确匹配曾把已落账终报判"库内无
+      // 终报"(假警报最后一环)。未命中的席位 key 补按 agentKey 的最新
+      // task-report(标 crossEngagement——recheck 语义是"该席位完成没",
+      // 不是"这场战役的字面归属")。
+      const seen = new Set(Object.keys(out));
+      const members = new Set();
+      for (const e of bus.list()) {
+        if (e.engagement === engId && e.type === 'dispatch') {
+          for (const k of e.to ?? []) members.add(k);
+        }
+      }
+      for (const e of [...bus.list()].reverse()) {
+        if (e.type !== 'task-report' || !members.has(e.from) || seen.has(e.from)) continue;
+        out[e.from] = { seq: e.seq, status: e.status, title: e.title,
+          crossEngagement: e.engagement ?? null };
+        seen.add(e.from);
+      }
       return json(res, 200, out);
     }
     if (path === '/api/sessions' && method === 'POST') {
