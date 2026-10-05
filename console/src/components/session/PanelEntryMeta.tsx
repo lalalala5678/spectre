@@ -31,7 +31,7 @@ export function PanelEntryMeta({ event, voidable }: {
         const label = root || (a && a.key === 'system' ? '平台系统' : '');
         if (!label) return null;
         return (
-          <p className="min-w-0 shrink truncate pl-1 text-xs leading-tight text-tertiary max-w-[200px]">
+          <p className="min-w-0 shrink pl-1 text-xs leading-snug text-tertiary">
             <span className="text-accent-text/80">{label} · </span>
             {a?.name ?? event.requester?.name ?? ''}{a ? `（${a.typeLabel}${a.parent ? ` · 父:${a.parent.name}` : ''} · L${a.depth}）` : ''}
           </p>
