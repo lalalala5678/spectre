@@ -11,15 +11,24 @@ import { getPrefs, putPrefsSync } from '../../api/worksession';
  */
 const DIVIDER_PX = 6;
 
-export function PanelStack({ storageKey, children }: {
+export function PanelStack({ storageKey, defaultRatios, children }: {
   storageKey: string;
+  /** 用户令: 垂直配比默认值(如漏洞面板需 ≥4.5 条可见)——localStorage/
+   *  服务端已保存的用户拖动仍优先。 */
+  defaultRatios?: number[];
   children: ReactNode[];
 }) {
   const n = children.length;
   const stackRef = useRef<HTMLDivElement>(null);
   // Server-side persistence (prefs.ui.stackRatios[storageKey]) — the
   // browser keeps nothing. Loads async; even split until then.
-  const [ratios, setRatios] = useState<number[]>(() => Array(n).fill(1 / n));
+  const [ratios, setRatios] = useState<number[]>(() => {
+    if (defaultRatios?.length === n) {
+      const sum = defaultRatios.reduce((a, b) => a + b, 0);
+      if (sum > 0.98 && sum < 1.02) return [...defaultRatios];
+    }
+    return Array(n).fill(1 / n);
+  });
   useEffect(() => {
     let cancelled = false;
     getPrefs().then(prefs => {
