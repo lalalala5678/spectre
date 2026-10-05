@@ -16,7 +16,7 @@ export function PanelEntryMeta({ event, voidable }: {
   return (
     /* 用户令: 窄屏标题优先——meta 收缩优先级高于标题(basis auto +
        shrink, 标题 flex-1), 溯源行窄时截断而非挤掉标题。 */
-    <div className="flex min-w-0 shrink items-center gap-1 @max-[260px]:hidden">
+    <div className="relative z-10 flex min-w-0 shrink items-center gap-1 @max-[260px]:hidden">
       {voidable && event.current.void && (
         <Badge tone="neutral" className="shrink-0 line-through">已作废</Badge>
       )}
