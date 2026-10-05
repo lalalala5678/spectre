@@ -29,10 +29,13 @@ export function PanelEntryMeta({ event, voidable }: {
          * 正本由 writer 会话发布(无上级链), 归属取 requester(发现者)
          * 的 treePath 首段——此前漏洞列表零标注正因 writer 单段链。 */
         const root = (event.requester?.treePath ?? a?.treePath ?? '').split(' › ')[0];
-        if (!root) return null;
+        // 系统事件(运行时重启/看门狗)不属任何主控会话——标注"平台系统"
+        // 而非留空(用户令: 每条都须有归属)。
+        const label = root || (a && a.key === 'system' ? '平台系统' : '');
+        if (!label) return null;
         return (
           <p className="truncate pl-1 text-xs leading-tight text-tertiary">
-            <span className="text-accent-text/80">{root} · </span>
+            <span className={root ? 'text-accent-text/80' : ''}>{label} · </span>
             {a?.name ?? event.requester?.name ?? ''}{a ? `（${a.typeLabel}${a.parent ? ` · 父:${a.parent.name}` : ''} · L${a.depth}）` : ''}
           </p>
         );
