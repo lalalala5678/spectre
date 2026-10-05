@@ -246,6 +246,9 @@ const caps = {
   engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
   cancelEngagement: (workflowId) => cancelEngagement(workflowId),
+  /** r46-D4: engagement 成员会话名单(取消信号传导注入用)。 */
+  listEngagementSessions: (engagementId) => [...store.sessions.values()].filter(x =>
+    x.engagementId === engagementId.replace(/^autopwn-/, '') && x.busy),
 
   /**
    * Runtime-side recursive spawn: creates the child session inside the
