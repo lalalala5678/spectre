@@ -530,11 +530,19 @@ function realRouter({ store, bus, caps, wal }) {
       const reqEv = bus.list().find(e => e.seq === seq && e.type === 'auth-request' && !e.resolves);
       if (!reqEv) return bad(res, 404, `授权请求 seq=${seq} 不存在或已处理`);
       if (act === 'approve') {
+        const b2 = await readJson(req).catch(() => ({}));
         const sc = readScope() ?? { targets: [], exercise: '', window: {} };
         if (!sc.targets.includes(reqEv.target)) {
           sc.targets.push(reqEv.target);
-          writeScope(sc);
         }
+        // r47b: 确认卡带时间期限(默认一周由前端给; 后端兜底 now+7d)
+        if (typeof b2.windowStart === 'string' && typeof b2.windowEnd === 'string') {
+          sc.window = { start: b2.windowStart, end: b2.windowEnd };
+        } else if (!sc.window) {
+          sc.window = { start: new Date().toISOString(),
+            end: new Date(Date.now() + 7 * 86400e3).toISOString() };
+        }
+        writeScope(sc);
         bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
           resolves: seq, status: 'approved', target: reqEv.target,
           title: `授权已批准: ${reqEv.target}`, summary: `用户批准了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求——目标已入清单。`,

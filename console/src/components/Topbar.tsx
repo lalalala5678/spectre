@@ -50,65 +50,6 @@ function noticeOf(e: BusEvt): Notice | null {
 }
 
 
-/* r47: 授权请求铃铛——agent 对清单外目标发起的授权申请, 一键批/驳
- * (用户令: 不再上服务器改 scope json)。批准即写清单+自动回执通知发起会话。 */
-function AuthBell() {
-  const [pending, setPending] = useState<{ seq: number; target: string; reason: string; from: string; requester?: string; ts: string }[]>([]);
-  const [open, setOpen] = useState(false);
-  const [busy, setBusy] = useState<number | null>(null);
-  const load = () => api<typeof pending>('/scope/auth-requests').then(setPending).catch(() => {});
-  useEffect(() => {
-    void load();
-    const t = setInterval(load, 10_000);
-    return () => clearInterval(t);
-  }, []);
-  const act = async (seq: number, kind: 'approve' | 'reject') => {
-    setBusy(seq);
-    try {
-      await api(`/scope/auth-requests/${seq}/${kind}`, { method: 'POST' });
-      await load();
-    } finally { setBusy(null); }
-  };
-  if (pending.length === 0 && !open) return null;
-  return (
-    <div className="relative">
-      <button
-        onClick={() => setOpen(v => !v)}
-        title="渗透授权请求"
-        className="relative flex h-8 items-center gap-1.5 rounded-md px-2 text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary"
-      >
-        <Bell className="h-4 w-4" />
-        {pending.length > 0 && (
-          <span className="absolute -right-0.5 -top-0.5 flex h-4 min-w-4 items-center justify-center rounded-full bg-danger px-1 text-[10px] font-bold text-white">
-            {pending.length}
-          </span>
-        )}
-      </button>
-      {open && (
-        <div className="animate-enter absolute right-0 top-full z-50 mt-1 w-96 rounded-lg border border-chrome-line bg-chrome-surface p-2 shadow-lg">
-          <p className="px-1 pb-1 text-xs font-medium text-chrome-secondary">渗透授权请求({pending.length} 待批)</p>
-          {pending.length === 0 && <p className="px-1 py-3 text-xs text-chrome-tertiary">暂无待批请求。</p>}
-          {pending.map(r => (
-            <div key={r.seq} className="mb-1 rounded-md border border-chrome-line p-2">
-              <div className="flex items-center gap-2">
-                <span className="min-w-0 flex-1 truncate font-mono text-[13px] font-semibold text-chrome-primary">{r.target}</span>
-                <span className="shrink-0 text-[11px] text-chrome-tertiary">{r.requester ?? r.from}</span>
-              </div>
-              {r.reason && <p className="mt-0.5 text-xs leading-snug text-chrome-tertiary">{r.reason}</p>}
-              <div className="mt-1.5 flex justify-end gap-1.5">
-                <Button size="sm" variant="ghostChrome" disabled={busy === r.seq}
-                  onClick={() => act(r.seq, 'reject')}>驳回</Button>
-                <Button size="sm" variant="primary" disabled={busy === r.seq}
-                  onClick={() => act(r.seq, 'approve')}>批准</Button>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
-    </div>
-  );
-}
-
 export function Topbar({ onMenu }: { onMenu?: () => void }) {
   const [now, setNow] = useState(() => new Date());
   const [health, setHealth] = useState<HealthInfo | null>(null);
@@ -318,7 +259,6 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           <Activity className={health ? 'h-3.5 w-3.5 text-success-text' : 'h-3.5 w-3.5 text-danger-text'} />
           {!health && <span className="text-danger-text">runtime 不可达</span>}
         </div>
-        <AuthBell />
       </div>
 
       <div className="flex-1" />
