@@ -173,6 +173,10 @@ function sanitizedEnv(extraEnv) {
   for (const k of SAFE_ENV_KEYS) {
     if (process.env[k] !== undefined) env[k] = process.env[k];
   }
+  // r46-D3 终局: HOME 空值时强制 /root——HOME=[](空串)曾使 nuclei 的
+  // os.UserConfigDir 失败 fallback 相对路径 .nuclei-config(工作区),
+  // provider 解析噪声(席位取证定谳, 与 exec-env 通道差在 env 传递)。
+  if (!env.HOME) env.HOME = '/root';
   return Object.assign(env, extraEnv ?? {});
 }
 
