@@ -51,9 +51,25 @@ export function makeSpawnPolicy(store) {
         return { ok: false, reason:
           `活跃智能体上限 ${spawnMaxAgents}(当前活跃 ${active}/历史 ${total}。` +
           `本批需 ${count} 个名额,超出 ${active + count - spawnMaxAgents}。` +
-          (names ? `当前活跃构成:${names}(含树根本身)。` : '') +
+          (names ? `当前活跃构成:${names}(含树本身)。` : '') +
           `可分批派发、等待在途任务完成,或经控制台调高 spawnMaxAgents。`,
           active, total };
+      }
+      // r42-F-G: 同项目多主控并发警告闸——另一 busy 主控会话在指挥时
+      // 各自 ≤7 滚动波会叠加(实测 12-15 并发致 429 五连杀)。软警告
+      // 不拒(多主控合法场景存在), 单飞纪律由编排侧执行。
+      const wsId = parentRecord.workSessionId ?? null;
+      if (wsId) {
+        const others = [...store.sessions.values()].filter(x =>
+          x.agentKey === 'autopwn' && x.id !== parentRecord.id && x.busy
+          && (x.workSessionId ?? null) === wsId);
+        if (others.length) {
+          return { ok: true, active, total, warn:
+            `⚠ 单飞警告: 本项目另有 ${others.length} 个主控会话正在忙碌运行` +
+            `(${others.map(x => x.spawnName ?? x.rawTitle ?? x.id.slice(0, 12)).slice(0, 3).join('、')})——` +
+            `双主控并发派发会叠加席位并发(实测曾 429 五连杀)。` +
+            `除非确系有意并行, 请先等它收口(单飞纪律), 或 relay 协调后由单方派发。` };
+        }
       }
       return { ok: true, active, total };
     },

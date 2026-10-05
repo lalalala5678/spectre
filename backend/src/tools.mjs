@@ -775,7 +775,8 @@ export function buildOrchestratorTools(record, caps) {
           text: `Engagement ${started.engagementId} started; agents ` +
             `${started.agents.join(', ')} running. Results will be ` +
             `reported to you as [DM] messages — relay them with ` +
-            `relay_to_agents when other agents need to know. 并发建议: 上游 LLM 有限速, 单波 5-7 席为实证安全区(10 并发曾 3 席被 429 击杀——更大编队分波派发)。`,
+            `relay_to_agents when other agents need to know. 并发建议: 上游 LLM 有限速, 单波 5-7 席为实证安全区(10 并发曾 3 席被 429 击杀——更大编队分波派发)。` +
+            (verdict.warn ? `\n${verdict.warn}` : ''),
         }],
         details: started,
       };
