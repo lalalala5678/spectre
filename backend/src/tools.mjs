@@ -917,23 +917,13 @@ export function buildOrchestratorTools(record, caps) {
         // **会话**收不到任何通知(实测席位照跑到自然完)。对 engagement
         // 成员会话逐个注入收尾指令(先交报再停, 产出留痕)。
         const members2 = caps.listEngagementSessions?.(params.engagementId) ?? [];
-        // r47-D4 终版: 先掐流(协作式 abort+唤醒 waiters)再注入——注入即时入队
-        try { caps.abortEngagementSessions?.(members2.map(r => r.id)); } catch { /* best-effort */ }
-        for (const rec of members2) {
-          // r47-D4 注入半链: abort 时席位仍 isStreaming, followUp 只入
-          // pi 队列(run 结束无人 pump——21min 慢队列本体)。二段注入:
-          // 3s 后 abort 已生效(isStreaming=false), followUp 走 prompt
-          // 新回合分支, 收尾指令即时驱动。
-          const inject = () => {
-            try {
-              caps.followUp?.(rec.id,
-                `[战役取消] ${params.engagementId} 已被编排者取消(原因:${params.reason ?? '未注明'})。` +
-                `请立即收尾: 把已有产出/发现整理提交(submit_task_report 先交报), 未完成部分如实标注后停止。已落账内容保留。`);
-            } catch { /* 单席注入失败不阻断 */ }
-          };
-          inject();  // 立即一次(若已空闲直接驱动)
-          setTimeout(inject, 3000).unref?.();  // 3s 二段(abort 生效后兜底驱动)
-        }
+        // r47-D4 终修: 掐流+等流停(awaitCompletion)+注入 一体化(runtime)——
+        // 固定 3s 曾被在飞工具击穿; 等待真实工具边界后 followUp 必走
+        // prompt 新回合分支, 收尾回合即时驱动。
+        try {
+          caps.abortEngagementSessions?.(members2.map(r => r.id),
+            { engagementId: params.engagementId, reason: params.reason });
+        } catch { /* best-effort */ }
         return { content: [{ type: 'text', text: r.cancelled
           ? `已取消: engagement ${params.engagementId}(RUNNING→CANCELED)。已落账产出保留; 在飞席位收到取消信号收尾, 终态以 query_intel 为准。`
           : `无需取消: engagement ${params.engagementId} 状态 ${r.status}(非 RUNNING, 幂等 no-op)。` }] };

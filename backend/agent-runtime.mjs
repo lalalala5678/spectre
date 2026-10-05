@@ -249,9 +249,18 @@ const caps = {
   /** r47-D4 终版: 编排器进程直接掐席位(绕开 activity 链——Temporal
    * cancel→activity Context.cancelled 在 worker 活体未触发, 实测零
    * abort 迹象; 编排器侧 cancel 时同步执行, 注入即时)。 */
-  abortEngagementSessions: (ids) => ids.map(id => {
+  abortEngagementSessions: (ids, meta = {}) => ids.map(id => {
     const rec = store.get(id);
-    return rec ? store.abortSession(rec) : false;
+    if (!rec) return false;
+    const ok = store.abortSession(rec);
+    // r47-D4 终修: 等流真停(awaitCompletion, 工具边界)再注入——固定
+    // 3s 曾被在飞工具时长击穿(实测 #2 注入时 isStreaming 仍真又入队)。
+    void store.awaitCompletion(rec, 120_000).then(() => {
+      store.followUp(rec,
+        `[战役取消] ${meta.engagementId ?? ''} 已被编排者取消(原因:${meta.reason ?? '未注明'})。` +
+        `请立即收尾: 把已有产出/发现整理提交(submit_task_report 先交报), 未完成部分如实标注后停止。已落账内容保留。`);
+    }).catch(() => { /* 上限兜底: 队列版仍在 */ });
+    return ok;
   }),
   /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
   scanAuthRequests: (record, target) => {
