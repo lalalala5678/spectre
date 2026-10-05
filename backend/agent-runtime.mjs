@@ -22,7 +22,7 @@ import { emitRevision } from './src/revision.mjs';
 import { buildPi, textOf, applyLlmPrefs } from './src/pi.mjs';
 import { createShellRegistry, shellBusAdapter } from './src/shells.mjs';  // CS24-F1: 合并双 import
 import { effectiveCommon, migrateLegacyLlmEnv } from './src/agent-settings.mjs';
-import { describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
+import { cancelEngagement, describeWorkflow, signalEngagement, startAutopwn } from './src/temporal.mjs';
 import { Summarizer } from './src/summarizer.mjs';
 import { rebuildMounts } from './src/sandbox/mount.mjs';
 import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
@@ -245,6 +245,7 @@ const caps = {
   /** Fix-E (P7): member roster for explicit-engagementId relay calls. */
   engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
+  cancelEngagement: (workflowId) => cancelEngagement(workflowId),
 
   /**
    * Runtime-side recursive spawn: creates the child session inside the
@@ -484,6 +485,13 @@ const caps = {
     // Writer reviewing a REQUEST carries the requester's provenance on its
     // record (revisionWriter sets it) — credit the requester, not the pen.
     const requestedBy = callerRecord.requester?.author ?? authorOfCaller;
+    // r46-D1: 现行版快照必须在 emitRevision **之前**(r45-N8b 放在后面
+    // 时本次修订事件已在链上, 回溯命中自身→oldLen==newLen 恒等回执)。
+    let preCurrent = target;
+    for (const e2 of bus.list()) {
+      if (e2.revises === target.seq
+        && (e2.revision?.n ?? 0) > (preCurrent.revision?.n ?? 0)) preCurrent = e2;
+    }
     const event = emitRevision(bus, {
       target, fields: params, reason: params.reason,
       requestedBy, approvedBy: authorOfCaller,
@@ -493,14 +501,8 @@ const caps = {
     // 附新旧长度对比, 骤降>30% 显式警告(不是拦, 是让替换可见可悔)。
     let lenNote = '';
     if (params.text !== undefined) {
-      // r45-N8b: 基线取现行版(修订链最新)而非 bus 索引的原始版——
-      // 回执 2565→4608 vs 实测现行 4118 的三证歧义根因(target 恒指首落)。
-      let cur = target;
-      for (const e2 of bus.list()) {
-        if (e2.revises === target.seq
-          && (e2.revision?.n ?? 0) > (cur.revision?.n ?? 0)) cur = e2;
-      }
-      const oldLen = String(cur.detail ?? '').length;
+      // r46-D1: 用 emit 前快照(r45 版回溯命中本次修订自身→恒等回执)
+      const oldLen = String(preCurrent.detail ?? '').length;
       const newLen = String(params.text).length;
       const drop = oldLen > 0 ? (oldLen - newLen) / oldLen : 0;
       lenNote = ` 正文长度 ${oldLen}→${newLen}` +

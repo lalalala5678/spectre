@@ -889,7 +889,39 @@ export function buildOrchestratorTools(record, caps) {
 
   const spawnAgent = buildSpawnAgentTool(record, caps);
 
-  return [dispatchAgents, relayToAgents, spawnAgent];
+  // r46-D2: 取消原语——三轮点名后落地。冗余/失控战役显式终止, 幂等。
+  const cancelEngagementTool = {
+    name: 'cancel_engagement',
+    label: '取消战役',
+    description:
+      '[cancels engagement] Cancel a RUNNING engagement by id (from dispatch_agents receipt). ' +
+      'Use for redundant/rogue campaigns——席位子代理收到取消信号收尾, 已落账产出保留。' +
+      '已完成战役为幂等 no-op。r46 前冗余席位只能放跑到超时。',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      engagementId: Type.String({ description: 'Engagement id from the dispatch receipt' }),
+      reason: Type.Optional(Type.String({ description: 'Why cancelling (audited)' })),
+    }),
+    execute: async (_id, params) => {
+      try {
+        const r = await caps.cancelEngagement?.(params.engagementId);
+        if (!r) return { content: [{ type: 'text', text: '取消失败:runtime 未接取消通道' }] };
+        caps.emitBus?.({
+          channel: 'announce', from: 'orchestrator', type: 'context',
+          title: `战役已取消: ${params.engagementId}`,
+          summary: `取消原因:${params.reason ?? '(未注明)'}——已落账产出保留, 在飞席位收尾。`,
+          engagement: params.engagementId,
+          workSessionId: record.workSessionId ?? null,
+        });
+        return { content: [{ type: 'text', text: r.cancelled
+          ? `已取消: engagement ${params.engagementId}(RUNNING→CANCELED)。已落账产出保留; 在飞席位收到取消信号收尾, 终态以 query_intel 为准。`
+          : `无需取消: engagement ${params.engagementId} 状态 ${r.status}(非 RUNNING, 幂等 no-op)。` }] };
+      } catch (e) {
+        return { content: [{ type: 'text', text: `取消失败:${String(e?.message ?? e)}(id 有误或 runtime 停机)` }] };
+      }
+    },
+  };
+  return [dispatchAgents, relayToAgents, spawnAgent, cancelEngagementTool];
 }
 
 /**

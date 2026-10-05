@@ -56,6 +56,18 @@ export async function signalEngagement(workflowId, signalName, args) {
   const handle = client.workflow.getHandle(workflowId);
   await handle.signal(signalName, args);
 }
+/** r46-D2: 取消原语——编排者对冗余/失控战役的显式终止(三轮点名)。
+ * cancel 触发 Temporal 优雅取消(child activity 收 CANCELLED); 已完成
+ * 战役 cancel 为 no-op(幂等)。 */
+export async function cancelEngagement(workflowId) {
+  const client = await temporalClient();
+  const handle = client.workflow.getHandle(workflowId);
+  const desc = await handle.describe();
+  const status = desc.status?.name ?? 'RUNNING';
+  if (status !== 'RUNNING') return { workflowId, status, cancelled: false };
+  await handle.cancel();
+  return { workflowId, status, cancelled: true };
+}
 export async function describeWorkflow(workflowId) {
   const client = await temporalClient();
   const handle = client.workflow.getHandle(workflowId);
