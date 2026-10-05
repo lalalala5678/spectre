@@ -176,8 +176,15 @@ export class Bus {
       let phit = 0;
       for (const t of op) if (mp.has(t)) phit += 1;
       const overlap = hit / Math.min(ot.size, mt.size);
+      // r47-D5: 跨资产铁判——双方都含 port: 指纹但无交集(8025 vs
+      // 18370)必为不同资产实例, 路径撞(/api/v1/users)不得并(真洞三拦
+      // 实证 6916/6917/6918)。path 单证仅在双方均无 port 指纹时成立。
+      const myPorts = [...mp].filter(t => t.startsWith('port:'));
+      const oPorts = [...op].filter(t => t.startsWith('port:'));
+      const portsCompatible = myPorts.length === 0 || oPorts.length === 0
+        || myPorts.some(pt => oPorts.includes(pt));
       const fpMatch = mp.size > 0 && op.size > 0
-        && phit / Math.min(op.size, mp.size) >= 0.5;
+        && phit / Math.min(op.size, mp.size) >= 0.5 && portsCompatible;
       // r43-②: token 高重叠仅短窗; 指纹命中不限窗
       if ((overlap >= 0.7 && otherTs >= cut) || fpMatch) {
         return { blocked: true, dupSeq: other.seq, dupTitle: other.title,

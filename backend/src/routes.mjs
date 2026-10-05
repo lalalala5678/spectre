@@ -243,6 +243,13 @@ function realRouter({ store, bus, caps, wal }) {
     // r6v2-#10: engagement 成员终报对账面——完成通知/状态判定用情报库
     // 作事实源(ChildWorkflowFailure 可能与已落账终报并存, 直接报失败
     // 即假警报)。内部调用。
+    if (path.startsWith('/api/sessions/') && path.endsWith('/abort') && method === 'POST') {
+      const sid2 = path.split('/')[3];
+      const rec2 = store.get(sid2);
+      if (!rec2) return bad(res, 404, '会话不存在');
+      store.abortSession(rec2);
+      return json(res, 200, { ok: true });
+    }
     if (path.startsWith('/api/engagements/') && path.endsWith('/children') && method === 'GET') {
       if (!isInternalCaller(req)) return bad(res, 401, '仅限内部调用');
       const engId = path.split('/')[3];

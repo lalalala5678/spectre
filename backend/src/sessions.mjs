@@ -762,6 +762,16 @@ export class SessionStore {
    *  stuck/error paths; CS82-2: 同机制第三处同步) — used by the
    *  synchronous report_vulnerability tool to wait for its writer
    *  session. Resolves immediately if idle. */
+  /** r47-D4: 终止席位进行中回合(pi agent.abort())——Temporal activity
+   * 被 cancel 后调用, 取消注入不再等回合自然完(实测 21min 恶化)。 */
+  abortSession(record) {
+    try {
+      record.agent.abort?.();
+      this._journal(record, 'agent_abort', { via: 'cancel' });
+      return true;
+    } catch { return false; }
+  }
+
   awaitCompletion(record, timeoutMs) {
     if (!record.busy) return Promise.resolve();
     return new Promise(resolve => {

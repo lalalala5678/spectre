@@ -63,6 +63,9 @@ export const runtime = {
     call('POST', '/api/bus', entry),
 
   /** r6v2-#10: engagement 成员终报对账(情报库事实源)。 */
+  abortSession: (sessionId) =>
+    call('POST', `/api/sessions/${encodeURIComponent(sessionId)}/abort`),
+
   engagementChildren: (engagementId) =>
     call('GET', `/api/engagements/${encodeURIComponent(engagementId)}/children`),
 

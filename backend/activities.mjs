@@ -23,6 +23,15 @@ export async function createSession(agentKey, opts = {}) {
  * @returns {Promise<{sessionId: string, reply: string}>}
  */
 export async function promptAndWait(sessionId, text) {
+  // r47-D4: Temporal cancel→runtime.abortSession(pi agent.abort)——
+  // 此前 activity 优雅取消不终止席位 LLM 流, 取消注入等回合自然完
+  // (实测 21min 且逐轮恶化)。cancel 到达即掐流, 注入即时可入。
+  let cancelFn = null;
+  try {
+    const { Context } = await import('@temporalio/activity');
+    cancelFn = () => { try { runtime.abortSession(sessionId); } catch { /* best-effort */ } };
+    Context.current().cancelled.then(cancelFn).catch(() => {});
+  } catch { /* activity context 不可用(直调/测试)——维持原行为 */ }
   await runtime.prompt(sessionId, text);
   return runtime.waitIdle(sessionId);
 }

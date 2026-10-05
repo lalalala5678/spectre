@@ -138,4 +138,25 @@ const dupAgain = bus.emit({ ...base, title: base.title + ' (窗口外)',
   detail: base.detail + '; 复检补证: 新增 999 号租户命中' });
 ck('同文重发幂等返回原 seq', dupAgain.seq === second.seq);
 
+
+// r47-D5: 跨资产(port 不同)不并——8025 正本不得拦 18370 同路径洞
+const p8025 = bus.emit({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-d5',
+  title: 'NewFace r26 (127.0.0.1:8025) GET /api/v1/users/{id} 未鉴权全量用户记录泄露',
+  detail: 'MailHog 面的用户记录泄露, 独立资产实例 A。',
+});
+ck('跨资产同路径放行(8025 vs 18370)', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-d5',
+  title: 'r47 18370 /api/v1/users 无鉴权 SSN 暴露(独立资产实例)',
+  detail: '靶场 18370 的同路径漏洞, 独立资产实例 B, 措辞全新。',
+}) === null);
+ck('同资产同端口仍拦', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-d5',
+  title: '(127.0.0.1:8025) /api/v1/users 重报(同资产)',
+  detail: '同资产同端口的重复上报, 应被指纹拦下。',
+})?.by === 'fingerprint');
+
 finish();
