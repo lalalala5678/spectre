@@ -558,8 +558,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             </div>
           )}
         </div>
-        {/* 用户令: 主控会话下拉(用户令: 从属于项目下拉——纵向堆叠次级位)——显示本项目其它主控对话 */}
-        {isAuto && (
+        </div>
+      </div>
+      {/* 会话下拉移 header 之下(横线下方), 项目在线上方(用户令) */}
+      {isAuto && (
+      <div className="relative flex shrink-0 items-center justify-end px-6 pt-1.5">
           <div className="relative">
             <button
               onClick={() => setOrchSwitcherOpen(v => !v)}
@@ -597,9 +600,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
               </div>
             )}
           </div>
-        )}
-        </div>
       </div>
+      )}
 
       {wsError && (
         <div className="flex shrink-0 items-center gap-2 border-b border-danger-line bg-danger-bg px-6 py-1.5">
