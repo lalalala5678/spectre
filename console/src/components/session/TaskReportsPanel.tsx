@@ -50,7 +50,7 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
             >
               <div className="@container flex w-full items-center gap-2">
                 <StatusBadge status={cur.status ?? 'no-result'} />
-                <span className={cn('relative z-20 min-w-0 flex-1 basis-28 truncate text-sm font-medium',
+                <span className={cn('relative z-20 min-w-0 flex-1 truncate text-sm font-medium',
                   cur.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {cur.title ?? cur.summary}
                 </span>

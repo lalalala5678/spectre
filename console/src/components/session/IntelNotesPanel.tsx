@@ -60,7 +60,7 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
                 <Badge tone="info" className="shrink-0">
                   情报
                 </Badge>
-                <span className={cn('relative z-20 min-w-0 flex-1 basis-28 truncate text-sm font-medium',
+                <span className={cn('relative z-20 min-w-0 flex-1 truncate text-sm font-medium',
                   event.current.void ? 'text-tertiary line-through' : 'text-primary')}>
                   {title}
                 </span>
