@@ -17,6 +17,9 @@ interface ShellHandle {
    * 此前声明 string[] 并 join, 渲染 '[object Object]' 乱码。 */
   tasks?: { n: number; command: string; code: number | string; ms: number; at: string | null }[];
   note?: string | null;
+  tags?: string[];
+  createdBy?: string | null;
+  host?: string | null;
 }
 interface ExecResult { ok: boolean; stdout?: string; stderr?: string; code?: number; error?: string; ms?: number }
 
@@ -142,9 +145,18 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
               s.id === active ? 'bg-accent-subtle' : 'hover:bg-surface-2')}>
             <Radio className={cn('h-3 w-3 shrink-0', s.status === 'active' ? 'text-success-text' : 'text-faint')} />
             <button onClick={() => { setActive(s.id); setLines([]); }}
-              className="flex min-w-0 flex-1 items-center gap-2 text-left">
-              <span className="shrink-0 text-sm font-medium text-primary">{s.name || s.id}</span>
-              <span className="truncate font-mono text-xs text-tertiary">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · ${s.lastActiveAt.slice(5, 16)}` : ''}</span>
+              className="flex min-w-0 flex-1 flex-col items-start gap-0.5 py-0.5 text-left">
+              <span className="flex w-full items-center gap-2">
+                <span className="shrink-0 text-sm font-medium text-primary">{s.name || s.id}</span>
+                {s.tags?.map(t => (
+                  <span key={t} className="shrink-0 rounded bg-surface-2 px-1 py-px font-mono text-[10px] text-secondary">{t}</span>
+                ))}
+                <span className="ml-auto shrink-0 text-[11px] text-tertiary">by {s.createdBy ?? '?'}</span>
+              </span>
+              <span className="flex w-full items-center gap-2 truncate">
+                <span className="shrink-0 font-mono text-xs text-tertiary">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · ${s.lastActiveAt.slice(5, 16)}` : ''}</span>
+                {s.note && <span className="min-w-0 truncate text-xs text-tertiary/80">— {s.note}</span>}
+              </span>
             </button>
             {s.status === 'active' && (
               <ConfirmButton label="关闭" confirmLabel="确认关闭" variant="ghost" size="sm"
@@ -156,10 +168,25 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
 
       {cur && (
         <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-lg border border-line bg-bg shadow-xs">
-          <div className="flex items-center gap-2 border-b border-line bg-surface px-3 py-1.5 text-xs text-secondary">
-            <span className="text-success-text">●</span>
-            <span className="tabular-nums">{cur.user || '?'}@{cur.target}</span>
-            <span className="truncate text-tertiary">{(cur.os || '').slice(0, 60)}</span>
+          <div className="flex flex-col gap-1 border-b border-line bg-surface px-3 py-1.5 text-xs text-secondary">
+            <div className="flex items-center gap-2">
+              <span className="text-success-text">●</span>
+              <span className="font-medium text-primary">{cur.name || cur.id}</span>
+              <span className="tabular-nums text-tertiary">{cur.user || '?'}@{cur.target}</span>
+              {cur.tags?.map(t => (
+                <span key={t} className="rounded bg-surface-2 px-1 py-px font-mono text-[10px] text-secondary">{t}</span>
+              ))}
+              <span className="ml-auto shrink-0 text-[11px] text-tertiary">by {cur.createdBy ?? '?'}</span>
+            </div>
+            <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-[11px] text-tertiary">
+              <span className="truncate" title={cur.os ?? ''}>{(cur.os || '指纹未采集').slice(0, 72)}</span>
+              {cur.host && <span className="font-mono">host: {cur.host}</span>}
+              <span>创建 {cur.createdAt?.slice(5, 16)}</span>
+              <span>{cur.cmdCount} cmd</span>
+              {cur.note && <span className="min-w-0 truncate">备注: {cur.note}</span>}
+            </div>
+          </div>
+          <div className="flex items-center gap-2 px-3 py-1 text-xs text-secondary border-b border-line bg-surface">
             <span className="ml-auto text-tertiary tabular-nums">{cur.transport} · 到期 {cur.expiresAt.slice(5, 16)}{cur.lastActiveAt ? ` · 活跃 ${cur.lastActiveAt.slice(11, 16)}` : ''}</span>
             <Button size="sm" variant="ghost" className="ml-2"
               onClick={() => void api<{ shell: Record<string, unknown> }>(`/shells/${cur.id}`)
