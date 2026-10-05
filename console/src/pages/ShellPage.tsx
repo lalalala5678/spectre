@@ -32,16 +32,26 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
   const activeRef = useRef<string | null>(null);  // FEBUGS-P2-2: await 后读现值(闭包 active 是旧值)
   activeRef.current = active;
 
-  const reload = () => api<{ shells: ShellHandle[] }>(`/shells?workSessionId=${encodeURIComponent(wsId ?? '')}`)
-    .then(d => { setShells(d.shells ?? []); setErr(''); })  // P3-9: 成功即清除陈旧错误
-    .catch(e => setErr(e instanceof Error ? e.message : String(e)));
+  const reload = () => {
+    if (!wsId) return Promise.resolve();  // r50b: 无项目不拉(空串曾拉全量)
+    return api<{ shells: ShellHandle[] }>(`/shells?workSessionId=${encodeURIComponent(wsId)}`)
+      .then(d => { setShells(d.shells ?? []); setErr(''); })  // P3-9: 成功即清除陈旧错误
+      .catch(e => setErr(e instanceof Error ? e.message : String(e)));
+  };
   useEffect(() => {
     void reload();
     // R32D50-F7: 10s 轮询——shell 由 agent 侧异步注册/过期, 此前只在
-    // 手动刷新/操作后重拉, 列表常年陈旧。
+    // 手动刷新/操作后重拉, 列表常年陈旧。r50b: deps [wsId]——App 层
+    // wsId 异步就绪后旧闭包(首帧 null)曾持续拉全量。
     const iv = setInterval(() => void reload(), 10_000);
     return () => clearInterval(iv);
-  }, []);
+  }, [wsId]);  // eslint-disable-line react-hooks/exhaustive-deps
+  // r50b: 过滤集变化后 active 失效回落(跳回列表根因之一)
+  useEffect(() => {
+    if (active && shells.length && !shells.some(s => s.id === active)) {
+      setActive(shells[0].id); setLines([]);
+    }
+  }, [shells, active]);
   useEffect(() => { if (!active && shells.length) setActive(shells[0].id); }, [shells, active]);
   useEffect(() => { scrollRef.current?.scrollTo({ top: 1e9 }); }, [lines]);
 

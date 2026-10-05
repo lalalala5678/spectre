@@ -115,10 +115,10 @@ function realRouter({ store, bus, caps, wal }) {
     // ---------- shells (C2 implant handles: list/register/exec/close) ----------
     if (path === '/api/shells' && method === 'GET') {
       // r50: 控制台按项目过滤(url.workspaceId?); 无参=全量(兼容)
-      const qs = new URL(req.url, 'http://x').searchParams;
-      const wsf = qs.get('workSessionId');
+      const qs = new URL(req.url, 'http://x').searchParams.get('workSessionId');
       const all1 = caps.shells.list();
-      return json(res, 200, { shells: wsf ? all1.filter(s => s.workSessionId === wsf) : all1 });
+      // r50b: 显式带参(含空串)即过滤——空串曾回落全量 141 条(首屏一堆 shell 根因)
+      return json(res, 200, { shells: qs === null ? all1 : all1.filter(s => s.workSessionId === qs) });
     }
     if (path === '/api/shells' && method === 'POST') {
       const body = await readJson(req);
