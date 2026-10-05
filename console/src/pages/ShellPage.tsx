@@ -186,7 +186,7 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
               {cur.note && <span className="min-w-0 truncate">备注: {cur.note}</span>}
             </div>
           </div>
-          <div className="flex items-center gap-2 px-3 py-1 text-xs text-secondary border-b border-line bg-surface">
+          <div className="flex items-center gap-2 px-3 pb-1.5 text-xs text-secondary">
             <span className="ml-auto text-tertiary tabular-nums">{cur.transport} · 到期 {cur.expiresAt.slice(5, 16)}{cur.lastActiveAt ? ` · 活跃 ${cur.lastActiveAt.slice(11, 16)}` : ''}</span>
             <Button size="sm" variant="ghost" className="ml-2"
               onClick={() => void api<{ shell: Record<string, unknown> }>(`/shells/${cur.id}`)
