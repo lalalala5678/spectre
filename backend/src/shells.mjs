@@ -177,7 +177,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     const tr = String(shell.transportRef || '');
     try {
       if (shell.transport === 'web') {
-        const [spec0] = tr.split('#');
+        const [spec0raw] = tr.split('#');
+        // r35-N2b: 同款 GET 前缀剥离(授权门 host 提取曾误析)
+        const spec0 = /^GET[ |]/i.test(spec0raw) ? spec0raw.replace(/^GET[ |]/i, '') : spec0raw;
         const tpl = spec0.startsWith('POST|') ? spec0.slice(5) : spec0;
         const urlPart = tpl.split('|')[0];
         return new URL(urlPart).hostname;
@@ -223,7 +225,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK);自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
       // r6v2-观测12: 注册预验与执行解析同规(此前 GET|前缀注册不拒、
       // 执行才爆)。全段跑一遍: POST 段形态/GET 禁 |/头段合法。
-      const spec0 = tr.split('#')[0].replace(/\s+$/, '');
+      // r35-N2b: GET 显式前缀先剥(与 exec 解析同规)——register 预验
+      // 曾拒 "GET http://…" 形态, 复测一活一死的红灯根因。
+      let spec0 = tr.split('#')[0].replace(/\s+$/, '');
+      const hadGetPrefix = /^GET[ |]/i.test(spec0);
+      if (hadGetPrefix) spec0 = spec0.replace(/^GET[ |]/i, '');
       if (!spec0.startsWith('POST|') && spec0.includes('|'))
         return { error: 'GET 形态不含 "|"(检测到 GET| 前缀误写——POST 才用 | 分隔)' };
       const headerRe = /^\s*H:\s*([!#$%&'*+.^`|~0-9A-Za-z-]+):\s*(.*)$/;
