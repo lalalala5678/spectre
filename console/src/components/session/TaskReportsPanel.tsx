@@ -48,7 +48,7 @@ export function TaskReportsPanel({ workSessionId, onOpen }: {
               onClick={() => onOpen(event)}
               className="flex min-h-11 w-full flex-col gap-px rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <div className="flex w-full items-center gap-2">
+              <div className="@container flex w-full items-center gap-2">
                 <StatusBadge status={cur.status ?? 'no-result'} />
                 <span className={cn('min-w-0 flex-1 truncate text-sm font-medium',
                   cur.void ? 'text-tertiary line-through' : 'text-primary')}>

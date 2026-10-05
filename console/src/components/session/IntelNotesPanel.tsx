@@ -56,7 +56,7 @@ export function IntelNotesPanel({ agentKey, workSessionId, onOpen }: {
               onClick={() => onOpen(event)}
               className="flex min-h-11 w-full flex-col gap-px rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
             >
-              <div className="flex w-full items-center gap-2">
+              <div className="@container flex w-full items-center gap-2">
                 <Badge tone="info" className="shrink-0">
                   情报
                 </Badge>

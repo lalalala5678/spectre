@@ -89,7 +89,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
           return (
             <div
               key={event.seq}
-              className="flex min-h-11 w-full items-center gap-1 rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
+              className="@container flex min-h-11 w-full items-center gap-1 rounded-md border border-line-strong bg-surface px-2 py-1.5 text-left hover:bg-surface-2"
             >
               {/* P3-12/nested-interactive: 行内不再嵌 interactive——主点击区
                   与"查看撰写对话"为兄弟节点(外层改 div)。 */}
