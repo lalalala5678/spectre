@@ -803,7 +803,7 @@ export function buildOrchestratorTools(record, caps) {
       }),
       text: Type.String({ description: 'Message to relay' }),
       engagementId: Type.Optional(Type.String({
-        description: 'Defaults to the engagement started last',
+        description: 'Defaults to your active engagement (auto-cleared once cancelled)',
       })),
     }),
     execute: async (_id, params) => {
@@ -928,8 +928,11 @@ export function buildOrchestratorTools(record, caps) {
           caps.abortEngagementSessions?.(members2.map(r => r.id),
             { engagementId: params.engagementId, reason: params.reason });
         } catch { /* best-effort */ }
+        // loop35-QA: 取消成功后清 activeEngagement——relay 默认指向
+        // "最后启动"战役, 取消后不清空曾把默认 DM 投给已取消战役。
+        if (r.cancelled) record.activeEngagement = null;
         return { content: [{ type: 'text', text: r.cancelled
-          ? `已取消: engagement ${params.engagementId}(RUNNING→CANCELED)。已落账产出保留; 在飞席位收到取消信号收尾, 终态以 query_intel 为准。`
+          ? `已请求取消: engagement ${params.engagementId}(当前 RUNNING——取消信号已发出; 若此战役此前已被取消则为重复请求, 幂等无害)。已落账产出保留; 在飞席位收到取消信号收尾, 终态以 query_intel 为准。`
           : `无需取消: engagement ${params.engagementId} 状态 ${r.status}(非 RUNNING, 幂等 no-op)。` }] };
       } catch (e) {
         return { content: [{ type: 'text', text: `取消失败:${String(e?.message ?? e)}(id 有误或 runtime 停机)` }] };
@@ -968,6 +971,7 @@ export function buildShellTools(record, caps) {
       filterTarget: Type.Optional(Type.String({ description: 'list: 按授权目标过滤' })),
       filterTransport: Type.Optional(Type.String({ description: 'list: 按传输过滤(local/ssh/web)' })),
       filterTag: Type.Optional(Type.String({ description: 'list: 按标签过滤' })),
+      filterStatus: Type.Optional(Type.String({ description: 'list: 按状态过滤(active/closed/expired/dead-sandbox-recreated——常用 active 只看活通道)' })),
       target: Type.Optional(Type.String({ description: 'register: 授权目标名(须在 scope 清单)' })),
       transport: Type.Optional(Type.Union([Type.Literal('local'), Type.Literal('ssh'), Type.Literal('web')],
         { description: 'register: local|ssh|web' })),
@@ -992,7 +996,7 @@ export function buildShellTools(record, caps) {
           // "过期后 list 翻标 expired" 的文档语义落空(实测直接消失)。
           // expired 一并展示(带 status 字段), GC(>1h)仍由注册表管。
           const list = R.list({ target: p.filterTarget, transport: p.filterTransport,
-            tag: p.filterTag, name: p.name })
+            tag: p.filterTag, name: p.name, status: p.filterStatus })
             .map(x => ({ id: x.id, name: x.name, target: x.target, transport: x.transport,
               tags: x.tags ?? [], status: x.status, user: x.user, os: (x.os || '').slice(0, 60),
               cmdCount: x.cmdCount, expiresAt: x.expiresAt }));

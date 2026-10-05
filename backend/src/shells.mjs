@@ -347,7 +347,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
   async function exec(id, command, { timeoutMs = 30_000 } = {}) {  // CS71-5: box 死参删(零调用方, 同类 wal 已按 CS20-11 删)
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
-    if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}` };
+    if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}——dead/expired 通道不会自动重探, 端点若已恢复请 register 重新注册(同 target 新 id), 历史命令记录仍可查` };
     const g = gate(sh);
     if (!g.ok) {
       // R32D50-F5/CS35-5: shell 授权门拒绝落本侧 audit(与 c2 工具的
