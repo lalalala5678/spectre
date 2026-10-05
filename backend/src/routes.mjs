@@ -11,6 +11,7 @@ import { SPAWNABLE_KEYS, STAGE_KEYS, entryKind as entryKindOf } from './tools.mj
 import { CONFIG } from './config.mjs';
 import { hasInternalToken, isInternalCaller, json, readJson, readRawBody, parseMultipart, sse } from './http.mjs';
 import * as path_mod from 'node:path';
+import fs from 'node:fs';
 import { describeWorkflow, startAutopwn } from './temporal.mjs';
 import { getSpawnSettings, setSpawnSettings } from './settings.mjs';
 import { SESSION_NAME_MAX, SESSION_DESC_MAX, injectionOriginOf, dmNextSeq } from './sessions.mjs';
@@ -485,6 +486,74 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, { deleted: true, id: pid });
     }
 
+    // ── 渗透授权面(r47): scope 前端可配置 + agent 授权请求一键批驳 ──
+    const scopePath = path_mod.join(CONFIG.dataDir, 'tools/c2/scope.json');
+    const readScope = () => {
+      try { return JSON.parse(fs.readFileSync(scopePath, 'utf8')); } catch { return null; }
+    };
+    const writeScope = (sc) => {
+      fs.mkdirSync(path_mod.dirname(scopePath), { recursive: true });
+      fs.writeFileSync(scopePath, JSON.stringify(sc, null, 2) + '\n');
+    };
+    if (path === '/api/scope' && method === 'GET') {
+      return json(res, 200, readScope() ?? { targets: [], exercise: '', window: null });
+    }
+    if (path === '/api/scope' && method === 'PUT') {
+      const b = await readJson(req);
+      const targets = Array.isArray(b.targets) ? [...new Set(b.targets.map(String).filter(t => t.trim()))] : null;
+      if (!targets) return bad(res, 400, 'targets 须为字符串数组');
+      const sc = readScope() ?? { targets: [], exercise: '', window: {} };
+      sc.targets = targets;
+      if (typeof b.exercise === 'string') sc.exercise = b.exercise;
+      if (b.window && typeof b.window.start === 'string' && typeof b.window.end === 'string') {
+        sc.window = { start: b.window.start, end: b.window.end };
+      }
+      writeScope(sc);
+      bus.emit({ channel: 'audit', from: 'system', type: 'context',
+        title: `渗透授权清单已更新(用户直改): targets=${targets.join('/')}`,
+        summary: `窗口:${sc.window?.start ?? '?'}→${sc.window?.end ?? '?'}`, workSessionId: null });
+      return json(res, 200, sc);
+    }
+    if (path === '/api/scope/auth-requests' && method === 'GET') {
+      // pending = auth-request 且无后续 approved/rejected 事件 resolves 它
+      const evs = bus.list().filter(e => e.type === 'auth-request');
+      const settled = new Set(evs.filter(e => e.resolves).map(e => e.resolves));
+      const pending = evs.filter(e => !e.resolves && !settled.has(e.seq))
+        .map(e => ({ seq: e.seq, target: e.target, reason: e.reason,
+          from: e.from, requester: e.requester, ts: e.ts }));
+      return json(res, 200, pending);
+    }
+    if (path.startsWith('/api/scope/auth-requests/') && (method === 'POST')) {
+      // /api/scope/auth-requests/<seq>/approve|reject
+      const parts = path.split('/');
+      const seq = Number(parts[4]); const act = parts[5];
+      const reqEv = bus.list().find(e => e.seq === seq && e.type === 'auth-request' && !e.resolves);
+      if (!reqEv) return bad(res, 404, `授权请求 seq=${seq} 不存在或已处理`);
+      if (act === 'approve') {
+        const sc = readScope() ?? { targets: [], exercise: '', window: {} };
+        if (!sc.targets.includes(reqEv.target)) {
+          sc.targets.push(reqEv.target);
+          writeScope(sc);
+        }
+        bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
+          resolves: seq, status: 'approved', target: reqEv.target,
+          title: `授权已批准: ${reqEv.target}`, summary: `用户批准了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求——目标已入清单。`,
+          workSessionId: reqEv.workSessionId ?? null });
+        caps.followUp?.(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
+          `[授权已批准] 你请求的渗透目标 ${reqEv.target} 已被用户加入授权清单——现在可正常对该目标执行(register/exec 等将放行)。`);
+        return json(res, 200, { ok: true, targets: sc.targets });
+      }
+      if (act === 'reject') {
+        bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
+          resolves: seq, status: 'rejected', target: reqEv.target,
+          title: `授权被驳回: ${reqEv.target}`, summary: `用户驳回了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求。`,
+          workSessionId: reqEv.workSessionId ?? null });
+        caps.followUp?.(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
+          `[授权被驳回] 用户驳回了你对 ${reqEv.target} 的授权请求——请勿再尝试该目标, 调整方案或汇报。`);
+        return json(res, 200, { ok: true });
+      }
+      return bad(res, 400, '未知 action(approve|reject)');
+    }
     if (path === '/api/prefs' && method === 'GET') {
       return json(res, 200, maskPrefs(getPrefs()));
     }

@@ -17,7 +17,7 @@ import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
-import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
+import { buildAuthRequestTool, buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
 // CS1-A4: 单源常量(此前与 workflows.mjs 双胞胎漂移, workflows 侧曾把 status 说成必填)。
 import { REPORT_NUDGE_TEXT } from './nudge-text.mjs';
@@ -218,9 +218,10 @@ export class SessionStore {
         ? buildToolingTools(record, this.caps)
         : hasParent
           ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps),
-            ...buildToolingTools(record, this.caps)]
+            ...buildToolingTools(record, this.caps), buildAuthRequestTool(record, this.caps)]
           : [...buildDirectTools(record, this.caps),
-            ...buildIntelTools(record, this.caps)];
+            ...buildIntelTools(record, this.caps),
+            buildAuthRequestTool(record, this.caps)];
     // Sandbox layer: official bash/read/write/edit (ExecutionEnv-bound,
     // project cwd) + per-agent MCP tools + per-agent skill index.
     const mount = mountForSession(record.agentKey, record.workSessionId);

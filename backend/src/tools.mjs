@@ -1153,7 +1153,8 @@ export function buildChildTools(record, caps) {
   const spawnAgent = buildSpawnAgentTool(record, caps);
 
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
-    buildRequestRevisionTool(record, caps), spawnAgent];
+    buildRequestRevisionTool(record, caps), spawnAgent,
+    buildAuthRequestTool(record, caps)];
 }
 
 /**
@@ -1165,6 +1166,44 @@ export function buildChildTools(record, caps) {
  * @param {object} record  direct session record
  * @param {object} caps    { emitBus, reportWriter, authorOf }
  */
+/** r47: 授权请求工具——agent 对清单外目标发起授权申请, 用户前端一键批/驳。
+ * 全业务面挂载(编排器/席位): shell gate 被拒时按回执指引调用本工具。 */
+export function buildAuthRequestTool(record, caps) {
+  return {
+    name: 'request_authorization',
+    label: '申请渗透授权',
+    description:
+      '[creates event] 目标不在渗透授权清单(scope targets)被拦时, 向**用户**发起授权申请——' +
+      '用户在前端看到弹窗, 点击批准后目标立即入清单(register/exec 放行)并回执通知你。' +
+      '非滥用通道: 每个目标申请一次, 附清晰理由(任务必要性/目标归属)。',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      target: Type.String({ description: '目标名(与 shell target/transportRef 目的地一致, 如 10.0.0.5 或 host.example.com)' }),
+      reason: Type.String({ description: '为什么需要授权该目标(一句话任务理由)' }),
+    }),
+    execute: async (_id, params) => {
+      // 同目标去重: 已 pending 或已批准则不重复发
+      const dup = caps.scanAuthRequests?.(record, params.target);
+      if (dup === 'pending') {
+        return { content: [{ type: 'text', text: `已有对 ${params.target} 的待批授权请求(用户未处理)——请等待, 勿重复申请。` }] };
+      }
+      if (dup === 'approved') {
+        return { content: [{ type: 'text', text: `${params.target} 已在授权清单中——直接执行即可, 无需申请。` }] };
+      }
+      const ev = caps.emitBus({
+        channel: 'dm', from: record.agentKey, to: 'user', type: 'auth-request',
+        target: params.target, reason: params.reason,
+        requester: record.spawnName ?? record.agentKey,
+        payloadRef: `sess:${record.id}`,
+        title: `授权请求: ${params.target}`,
+        summary: `${record.spawnName ?? record.agentKey} 申请渗透授权——${String(params.reason).slice(0, 80)}`,
+        workSessionId: record.workSessionId ?? null,
+      });
+      return { content: [{ type: 'text', text: `授权请求已提交用户(target=${params.target}, seq=${ev?.seq ?? '?'}): 用户批准后目标立即入清单, 你会收到 [授权已批准] 回执通知, 届时重试被拦操作即可。` }] };
+    },
+  };
+}
+
 export function buildDirectTools(record, caps) {
   const publishVuln = {
     name: 'publish_vulnerability',
@@ -1228,7 +1267,7 @@ export function buildDirectTools(record, caps) {
     // R31: report(writer)原 early-return 无 tooling 实例——撰写引用/
     // CVE 背景核验需要各持独立 search_web/fetch_url(共享工具铁律;
     // report 席位实测"search_web 终审缺席")。
-    return [publishVuln, publishIntel,
+    return [publishVuln, publishIntel, buildAuthRequestTool(record, caps),
       ...buildToolingTools({ agentKey: record.agentKey }, caps)];
   }
   // 共享工具铁律(AGENTS.md): 多智能体都需要的能力(如联网搜索/抓取)

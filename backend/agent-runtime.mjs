@@ -246,6 +246,17 @@ const caps = {
   engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
   cancelEngagement: (workflowId) => cancelEngagement(workflowId),
+  /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
+  scanAuthRequests: (record, target) => {
+    try {
+      const sc = shellScope();
+      if (sc?.targets?.includes(target)) return 'approved';
+    } catch { /* scope 读失败按无批准处理 */ }
+    const evs = bus.list().filter(e => e.type === 'auth-request' && e.target === target);
+    const settled = new Set(bus.list().filter(e => e.resolves).map(e => e.resolves));
+    if (evs.some(e => !e.resolves && !settled.has(e.seq))) return 'pending';
+    return null;
+  },
   /** r46-D4: engagement 成员会话名单(取消信号传导注入用)。 */
   listEngagementSessions: (engagementId) => [...store.sessions.values()].filter(x =>
     x.engagementId === engagementId.replace(/^autopwn-/, '') && x.busy),
