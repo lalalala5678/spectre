@@ -246,6 +246,13 @@ const caps = {
   engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
   cancelEngagement: (workflowId) => cancelEngagement(workflowId),
+  /** r47-D4 终版: 编排器进程直接掐席位(绕开 activity 链——Temporal
+   * cancel→activity Context.cancelled 在 worker 活体未触发, 实测零
+   * abort 迹象; 编排器侧 cancel 时同步执行, 注入即时)。 */
+  abortEngagementSessions: (ids) => ids.map(id => {
+    const rec = store.get(id);
+    return rec ? store.abortSession(rec) : false;
+  }),
   /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
   scanAuthRequests: (record, target) => {
     try {

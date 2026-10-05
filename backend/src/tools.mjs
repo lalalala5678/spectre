@@ -916,7 +916,10 @@ export function buildOrchestratorTools(record, caps) {
         // r46-D4: 取消信号传导——workflow cancel 只断 activity, 席位
         // **会话**收不到任何通知(实测席位照跑到自然完)。对 engagement
         // 成员会话逐个注入收尾指令(先交报再停, 产出留痕)。
-        for (const rec of caps.listEngagementSessions?.(params.engagementId) ?? []) {
+        const members2 = caps.listEngagementSessions?.(params.engagementId) ?? [];
+        // r47-D4 终版: 先掐流(协作式 abort+唤醒 waiters)再注入——注入即时入队
+        try { caps.abortEngagementSessions?.(members2.map(r => r.id)); } catch { /* best-effort */ }
+        for (const rec of members2) {
           try {
             caps.followUp?.(rec.id,
               `[战役取消] ${params.engagementId} 已被编排者取消(原因:${params.reason ?? '未注明'})。` +
