@@ -28,7 +28,9 @@ interface SkillRow {
 
 /** Skill 管理页 — per-agent 挂载（目录即仓库，SKILL.md 官方格式；
  *  会话创建时官方索引注入，模型按需 read 全文）。 */
+
 export function SkillsPage({ wsId }: { wsId: string }) {
+  const [arm, setArm] = useState<string | null>(null);
   usePageTitle('技能管理'); // FEVERIFY-N3
   const [skills, setSkills] = useState<SkillRow[]>([]);
   const [filter, setFilter] = useState('');
@@ -64,7 +66,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
   };
 
   const remove = async (agentKey: string, name: string) => {
-    if (!window.confirm(`卸载技能 ${name}（从 ${agentKey}，对其新会话生效）？`)) return;
+    // r50e: 两击确认(禁原生弹窗)
     try {
       await api(`/sandbox/skills?agentKey=${encodeURIComponent(agentKey)}&name=${encodeURIComponent(name)}`,  // CS67-6: 两参同编码
         { method: 'DELETE' });
@@ -155,7 +157,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
                   <Button
                     variant="ghost"
                     size="icon"
-                    onClick={() => void remove(s.agentKey, s.name)}
+                    onClick={() => { if (arm !== s.name) { setArm(s.name); setTimeout(() => setArm(a => a === s.name ? null : a), 2500); return; } setArm(null); void remove(s.agentKey, s.name); }}
                     title="卸载"
                   >
                     <Trash2 className="h-4 w-4" />

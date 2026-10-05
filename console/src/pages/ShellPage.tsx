@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { api } from '../api/client';
 import { Loader2, Radio, RefreshCw, TerminalSquare } from 'lucide-react';
+import { ConfirmButton } from '../components/ui/ConfirmButton';
 import { Button } from '../components/ui/Button';
 import { EmptyState } from '../components/ui/EmptyState';
 import { cn } from '../utils/cn';
@@ -28,6 +29,8 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
   const [lines, setLines] = useState<{ dir: 'in' | 'out' | 'err' | 'sys'; text: string }[]>([]);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
+  const [readOpen, setReadOpen] = useState(false);
+  const [readPath, setReadPath] = useState('');
   const scrollRef = useRef<HTMLDivElement>(null);
   const activeRef = useRef<string | null>(null);  // FEBUGS-P2-2: await 后读现值(闭包 active 是旧值)
   activeRef.current = active;
@@ -71,6 +74,17 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
   const [hist, setHist] = useState<string[]>([]);
   const [histIdx, setHistIdx] = useState(-1);
   const draftRef = useRef('');  // FEVERIFY-P3-9: ↑前进时丢草稿  // R32D84-N3: ↑/↓ 命令历史
+  async function doRead() {
+    const f = readPath.trim();
+    if (!f || !cur) return;
+    try {
+      const r = await api<{ stdout?: string; error?: string }>(`/shells/${cur.id}/read-file`, { method: 'POST', json: { path: f } });
+      setLines(l => [...l, { dir: r.error ? 'err' : 'out', text: `── read ${f} ──\n${r.error ?? r.stdout ?? '(空)'}` }]);
+    } catch (e) {
+      setLines(l => [...l, { dir: 'err', text: `read 失败: ${e instanceof Error ? e.message : String(e)}` }]);
+    }
+    setReadOpen(false);
+  }
   async function run() {
     if (!cur || !cmd.trim() || busy) return;
     const shellId = cur.id;  // FEBUGS-P2-2: 捕获执行时 shell——await 后
@@ -114,36 +128,27 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
       {err && <div className="mb-3 rounded-md border border-danger-line bg-danger-bg px-3 py-2 text-[13px] text-danger-text">{err}</div>}
 
       {/* r50c: 限高滚动——多 shell 时 exec 面板不被挤出视口 */}
-      <div className="mb-3 grid max-h-[46vh] grid-cols-2 gap-2 overflow-y-auto md:grid-cols-4">
+      {/* r50e: 行式列表(每个关闭按钮可见) */}
+      <div className="mb-3 max-h-[42vh] divide-y divide-line overflow-y-auto rounded-lg border border-line">
         {shells.length === 0 && (
-          <div className="col-span-full">
+          <div className="p-4">
             <EmptyState icon={TerminalSquare} title="无 shell"
               hint="C2 agent 交付验收通过后注册;或经 POST /api/shells 注册(缺省 web 传输; local 用于 benchmark)。" />
           </div>
         )}
         {shells.map(s => (
           <div key={s.id}
-            className={cn('min-h-20 rounded-lg border px-3 py-2 text-left transition shadow-xs hover:shadow-sm',
-              s.id === active ? 'border-accent-text bg-accent-subtle' : 'border-line-strong bg-surface hover:bg-surface-2')}>
-            {/* P3-12/nested-interactive: 卡片改 div, 主点击区与关闭钮为兄弟 */}
+            className={cn('flex items-center gap-2 px-3 py-1.5',
+              s.id === active ? 'bg-accent-subtle' : 'hover:bg-surface-2')}>
+            <Radio className={cn('h-3 w-3 shrink-0', s.status === 'active' ? 'text-success-text' : 'text-faint')} />
             <button onClick={() => { setActive(s.id); setLines([]); }}
-              className="flex w-full flex-col text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring">
-              <div className="flex items-center gap-1.5">
-                <Radio className={cn('h-3 w-3', s.status === 'active' ? 'text-success-text' : 'text-faint')} />
-                <span className="text-sm font-medium text-primary">{s.name || s.id}</span>
-              </div>
-              <div className="mt-0.5 font-mono text-xs text-tertiary">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · 活跃 ${s.lastActiveAt.slice(5, 16)}` : ''}</div>
-              {(s.tasks?.length ?? 0) > 0 && (
-                <div className="mt-0.5 truncate font-mono text-[13px] text-info-text" title={s.tasks!.map(t => t.command).join(', ')}>任务: {s.tasks!.map(t => t.command).join(', ')}</div>
-              )}
+              className="flex min-w-0 flex-1 items-center gap-2 text-left">
+              <span className="shrink-0 text-sm font-medium text-primary">{s.name || s.id}</span>
+              <span className="truncate font-mono text-xs text-tertiary">{s.target} · {s.cmdCount} cmd{s.lastActiveAt ? ` · ${s.lastActiveAt.slice(5, 16)}` : ''}</span>
             </button>
             {s.status === 'active' && (
-              <button
-                type="button"
-                onClick={() => closeShell(s)}
-                className="mt-1 inline-flex min-h-8 items-center rounded-md border border-danger-line px-2.5 text-xs text-danger-text hover:border-danger-line/70 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                title="关闭通道(一次性纪律下的即时终止)"
-              >关闭</button>
+              <ConfirmButton label="关闭" confirmLabel="确认关闭" variant="ghost" size="sm"
+                className="shrink-0 text-xs text-danger-text" onConfirm={() => void closeShell(s)} />
             )}
           </div>
         ))}
@@ -160,15 +165,7 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
               onClick={() => void api<{ shell: Record<string, unknown> }>(`/shells/${cur.id}`)
                 .then(r => { setLines(l => [...l, { dir: 'sys', text: '── status ──\n' + JSON.stringify(r.shell, null, 1) }]); })}>
               状态</Button>
-            <Button size="sm" variant="ghost" className="ml-1"
-              onClick={() => {
-                const f = window.prompt('要读取的远端文件绝对路径:');
-                if (!f) return;
-                void api<{ stdout?: string; error?: string }>(`/shells/${cur.id}/read-file`, { method: 'POST', json: { path: f } })
-                  .then(r => setLines(l => [...l, { dir: r.error ? 'err' : 'out', text: `── read ${f} ──
-${r.error ?? r.stdout ?? '(空)'}` }]));
-              }}>
-              读文件</Button>
+            <Button size="sm" variant="ghost" className="ml-1" onClick={() => setReadOpen(v => !v)}>读文件</Button>
           </div>
           <div ref={scrollRef} tabIndex={0} aria-label="终端输出" className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[13px] leading-6">
             {lines.map((l, i) => (
@@ -177,6 +174,16 @@ ${r.error ?? r.stdout ?? '(空)'}` }]));
             ))}
             {lines.length === 0 && <div className="text-tertiary">— 在下方输入命令(经服务端授权门) —</div>}
           </div>
+          {readOpen && (
+            <div className="flex items-center gap-2 border-t border-line bg-surface-2/40 px-3 py-1.5">
+              <span className="shrink-0 text-xs text-tertiary">读取远端文件</span>
+              <input value={readPath} onChange={e => setReadPath(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter' && readPath.trim()) void doRead(); }}
+                placeholder="/绝对/路径"
+                className="h-7 min-w-0 flex-1 rounded-md border border-line bg-surface px-2 font-mono text-xs" />
+              <Button size="sm" variant="primary" disabled={!readPath.trim()} onClick={() => void doRead()}>读取</Button>
+            </div>
+          )}
           <div className="flex h-12 items-center gap-2 border-t border-line px-3">
             <span className="font-mono text-[13px] text-accent-text">$</span>
             <input value={cmd} onChange={e => { setCmd(e.target.value); setHistIdx(-1); }}

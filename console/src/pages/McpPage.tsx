@@ -31,7 +31,9 @@ interface McpServer {
 
 /** MCP Server 管理页 — 双传输：远程 HTTP（用户自建机器直连）与本地
  *  stdio（宿主或沙箱内进程）。按 agent 挂载；工具在会话创建时合并。 */
+
 export function McpPage({ wsId }: { wsId: string }) {
+  const [arm, setArm] = useState<string | null>(null);
   usePageTitle('MCP 服务器'); // FEVERIFY-N3
   const [servers, setServers] = useState<McpServer[]>([]);
   const [form, setForm] = useState({
@@ -105,7 +107,7 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   const remove = async (name: string) => {
-    if (!window.confirm(`注销 MCP server ${name}（对新会话生效，后台连接将关闭）？`)) return;
+    // r50e: 两击确认(禁原生弹窗)
     try {
       await api(`/sandbox/mcp?name=${encodeURIComponent(name)}`, { method: 'DELETE' });
       setMsg(`已注销 ${name}`);
@@ -167,7 +169,7 @@ export function McpPage({ wsId }: { wsId: string }) {
                 </td>
                 <td className="px-3 py-2.5 text-right">
                   <button
-                    onClick={() => void remove(s.name)}
+                    onClick={() => { if (arm !== s.name) { setArm(s.name); setTimeout(() => setArm(a => a === s.name ? null : a), 2500); return; } setArm(null); void remove(s.name); }}
                     aria-label={`注销 ${s.name}`}
                     title={`注销 ${s.name}`}
                     className="inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary hover:bg-surface-2 hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"

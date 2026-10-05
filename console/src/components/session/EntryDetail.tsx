@@ -34,6 +34,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   const isVuln = !isReport && !isNote;
 
   // Live revision chain: refetch on any bus event that revises this seq.
+  const [saveError, setSaveError] = useState('');
   const [chain, setChain] = useState<ApiBusEvent[]>([]);
   const [dialogText, setDialogText] = useState('');
   const [dialogBusy, setDialogBusy] = useState(false);
@@ -215,8 +216,9 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
           </details>
         )}
 
+        {saveError && <p className="mb-1 text-[13px] text-danger-text">{saveError}</p>}
         {editing ? (
-          <EditForm
+        <EditForm
             kind={isReport ? 'report' : isNote ? 'note' : 'vuln'}
             current={current}
             busy={editBusy}
@@ -235,7 +237,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
                 const latest = freshChain.reduce((m: number, e: ApiBusEvent) =>
                   Math.max(m, e.revision?.n ?? 0), 0);
                 if (latest > baseN) {
-                  alert(`该条目已被并发修订(当前 v${latest}, 你基于 v${baseN})——关闭编辑重新打开后再改`);
+                  setSaveError(`该条目已被并发修订(当前 v${latest}, 你基于 v${baseN})——关闭编辑重新打开后再改`);
                   setEditing(false);
                   return;
                 }
@@ -243,7 +245,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
                   '用户直接编辑', current.workSessionId ?? null);
                 setEditing(false);
               } catch (err) {
-                alert(`保存失败:${String(err)}`);
+                setSaveError(`保存失败:${String(err)}`);
               } finally {
                 setEditBusy(false);
               }

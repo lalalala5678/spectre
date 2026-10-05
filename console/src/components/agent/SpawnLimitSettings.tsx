@@ -12,6 +12,7 @@ interface SpawnSettings {
 
 /** 调度限制(spawn policy)— runtime-enforced, console-edited. */
 export function SpawnLimitSettings() {
+  const [msg, setMsg] = useState('');
   const [settings, setSettings] = useState<SpawnSettings | null>(null);
   const [saved, setSaved] = useState(false);
 
@@ -35,12 +36,13 @@ export function SpawnLimitSettings() {
       setTimeout(() => setSaved(false), 1500);
     } catch (e) {  // FEVERIFY-P3-10: 保存失败此前裸抛(无提示)
       setSaved(false);
-      alert(`保存失败: ${e instanceof Error ? e.message : String(e)}`);
+      setMsg(`保存失败: ${e instanceof Error ? e.message : String(e)}`);
     }
   };
 
   return (
     <Panel title="调度限制">
+      {msg && <p className="text-[13px] text-danger-text">{msg}</p>}
       <div className="space-y-3">
         <label className="block">
           <Label className="mb-1 block">
@@ -76,3 +78,4 @@ export function SpawnLimitSettings() {
     </Panel>
   );
 }
+

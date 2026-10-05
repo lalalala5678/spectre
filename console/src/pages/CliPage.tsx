@@ -20,7 +20,9 @@ interface SandboxStatus {
 
 /** CLI 工具页 — 共享工具层：安装一次，全部 agent（全部项目）可用。
  *  安装命令在沙箱内执行并经挂载卷持久化。 */
+
 export function CliPage({ wsId }: { wsId: string }) {
+  const [arm, setArm] = useState<string | null>(null);
   usePageTitle('CLI 工具'); // FEVERIFY-N3
   const [status, setStatus] = useState<SandboxStatus | null>(null);
   const [tools, setTools] = useState<string[]>([]);
@@ -54,7 +56,7 @@ export function CliPage({ wsId }: { wsId: string }) {
 
   const uninstall = async (name: string) => {
     if (busy) return;
-    if (!window.confirm(`卸载 ${name}?(删除共享层文件并清除安装记录)`)) return;
+
     setBusy(true); setMsg(`正在卸载 ${name}…`);
     try {
       const r = await api<{ removed: string[]; clearedLog: string[] }>(
@@ -97,9 +99,9 @@ export function CliPage({ wsId }: { wsId: string }) {
                 {t.name}
                 <span className="text-xs text-tertiary">{t.layer}</span>
                 <button
-                  onClick={() => void uninstall(t.name)}
+                  onClick={() => { if (arm !== t.name) { setArm(t.name); setTimeout(() => setArm(a => a === t.name ? null : a), 2500); return; } setArm(null); void uninstall(t.name); }}
                   aria-label={`卸载 ${t.name}`}
-                  title={`卸载 ${t.name}`}
+                  title="再点一次确认卸载"
                   className="inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                 >
                   <Trash2 className="h-3.5 w-3.5" />
