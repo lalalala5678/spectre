@@ -349,12 +349,44 @@ const caps = {
       `5) 用 submit_task_report 提交任务报告收尾。`,
     });
     if (timeout) {
+      // r43-U1: 完成回投——writer 后台完成落账时 DM 通知发现者会话,
+      // 编排回合不再干等(同步预算 300s 内长任务曾钉死 263s)。
+      const wRec = store.get(writer.id);
+      Promise.resolve(wRec ? store.awaitCompletion(wRec, 600_000) : null).then(() => {
+        const hit = bus.list().find(e => e.seq > baseSeq
+          && e.type === 'vulnerability' && e.author?.sessionId === writer.id);
+        caps.followUp(requesterRecord.id,
+          `[writer 完成] 你上报的线索${hit
+            ? `已落账:《${hit.title}》(seq=${hit.seq}, severity=${hit.severity})`
+            : '终审未立为漏洞(writer 最终输出见下)'}` +
+          `${hit ? '' : `\n${(lastReply(writer) || '(无输出)').slice(0, 300)}`}\n(撰写对话 ${writer.id}, read_session 可复盘)`);
+      }).catch(() => {});
       return { ok: false, timeout: true,
         text: `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
-          `可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查是否落账` };
+          `其完成后我会自动 DM 通知你(无需轮询); 也可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查` };
     }
     const published = bus.list().find(e => e.seq > baseSeq
       && e.type === 'vulnerability' && e.author?.sessionId === writer.id);
+    // r43-O1: 幂等归并透明化——writer 的 publish 撞 emit 幂等(同文重发/
+    // 同 title+severity)时 bus 无新事件, 此前走 declined 分支回执
+    // "未立为漏洞", 归并事实要靠编排者自行回查才发现。落账没发生≠
+    // 线索无效: 查 writer 期内最近 3min 的同项目 vuln(无 author 过滤)——
+    // 命中即归并回执。
+    if (!published) {
+      const dupHit = [...bus.list()].reverse().find(e =>
+        e.type === 'vulnerability' && !e.revises
+        && e.workSessionId === (requesterRecord.workSessionId ?? null)
+        && Date.parse(e.ts ?? 0) > tRw - 60_000);
+      if (dupHit) {
+        return {
+          ok: true, merged: true,
+          text: `线索已归并:《${dupHit.title}》(正本 seq=${dupHit.seq}, severity=${dupHit.severity})——` +
+            `writer 判定与既有条目为同点位重复, 未另立正本(零双账)。你的发现者身份经 coDiscoverers/` +
+            `修订链保留, read_session ${writer.id} 可复盘其查重论证。`,
+          details: { sessionId: writer.id, mergedInto: dupHit.seq, waitedMs: Date.now() - tRw },
+        };
+      }
+    }
     if (published) {
       return {
         ok: true,
