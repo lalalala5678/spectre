@@ -29,6 +29,7 @@ import {
   defineSignal,
   proxyActivities,
   setHandler,
+  sleep,
   startChild,
 } from '@temporalio/workflow';
 // CS1-A4: 单源常量——nudge-text.mjs 纯字符串模块(零副作用), Temporal determinism 安全。
@@ -207,6 +208,11 @@ export async function autoPwnWorkflow(input) {
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
     .join('\n');
+  // r35-D7: 投递前宽限——完成通知快照曾 6/6 假警报(ChildWorkflowFailure
+  // 快照时点早于长尾席位终报落账, 确定性错位而非随机故障)。5min 宽限
+  // 让落账赶在 recheck 之前, 假警报面结构性收敛(投延 +5min, 相对
+  // 实测 24-35min 投延不可感)。
+  await sleep(5 * 60 * 1000);
   try {
     await quick.notifyEngagementDone({
       orchestratorSessionId,
