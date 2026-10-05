@@ -40,7 +40,7 @@ export function useBusPanelEntries(
       const folded = foldEntries(all).filter(accept);
       // r50i: 空结果一次免费重试(瞬时竞态不落"暂无"态)
       if (folded.length === 0 && retry) {
-        await new Promise(r => setTimeout(r, 350));
+        await new Promise(r => setTimeout(r, 120));
         if (!stopped) return snapshot(false);
       }
       setEvents(limit ? folded.slice(-limit).reverse() : folded.reverse());
@@ -48,7 +48,10 @@ export function useBusPanelEntries(
       cursor.v = all.at(-1)?.seq ?? 0;
     };
     (async () => {
-      try { await snapshot(); } catch { /* SSE reconnect will heal */ }
+      try { await snapshot(); } catch {
+        // r50i: 首拉异常不再静默恒骨架——1.2s 后重拉一次(网络抖动/瞬断)
+        setTimeout(() => { if (!stopped) void snapshot().catch(() => {}); }, 1200);
+      }
     })();
     const off = subscribeBus((name, raw) => {
       if (name !== 'bus') return;
