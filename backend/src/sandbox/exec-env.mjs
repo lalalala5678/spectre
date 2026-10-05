@@ -214,9 +214,13 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
     }
   }
   return new Promise(resolve => {
+    // r46-③根治: stdin=ignore(=/dev/null)——默认 pipe 下 stdin 探测型工具
+    // (nuclei 对非 tty stdin 走管道读目标路径)永久阻塞等 EOF, rc=124
+    // 三轮假说后由席位侧决胜实验定谳(6396)。detached bg 分支已 ignore。
     const child = spawn(argvv[0], argvv.slice(1), {
       env: sanitizedEnv(extraEnv),
       cwd: cwdHost,
+      stdio: ['ignore', 'pipe', 'pipe'],
     });
     let text = '';
     let done = false;
