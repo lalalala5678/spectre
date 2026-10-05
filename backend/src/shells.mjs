@@ -209,6 +209,16 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       return { error: `同名活跃通道已存在: ${nm}(先 close 或换名)` };
     // transportRef 格式校验(register 时拦截,不留到 exec 才爆)
     const tr = String(transportRef || '');
+    // r38-P2: target 标签本身也早校验(local 通道无 transportRef 目的
+    // 地, 此前 local 注册完全绕过 scope, exec 才拦——晚失败实测)。
+    {
+      const sc0 = listScope?.() ?? null;
+      const t0 = String(target || '').trim();
+      if (sc0?.targets?.length && t0
+        && !sc0.targets.some(t => targetMatches(t, t0))) {
+        return { error: `授权门:target ${t0} 不在 scope 清单,拒绝注册(早校验——exec 侧同样会拦)。清单内目标示例:${sc0.targets.slice(0, 3).join('/')}` };
+      }
+    }
     // r17-1: 注册路径 scope 硬校验(web/ssh 目的地必须在授权清单——
     // 此前仅 exec 门校验, evil.example.com 可注册成功(r17 实证))。
     if (transport === 'web' || transport === 'ssh') {
@@ -347,7 +357,8 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     }
     const t0 = Date.now();
     let stdout = '', stderr = '', code = 0;
-    let degradedNote;  // r9v2-D10回归: 提升到函数顶(local 分支内声明曾致 web/ssh 路径引用未定义——exec 全瘫)
+    let degradedNote;  // r9v2-D10回归: 提升到函数顶
+    let layerNote;  // r38-P1: web 通道 code 语义注记(local 分支内声明曾致 web/ssh 路径引用未定义——exec 全瘫)
     try {
       if (sh.transport === 'ssh') {
         // transportRef: "user:pass@host:port" — VM range channel (post-creds).
@@ -479,6 +490,10 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
             }
           }
           stdout = txt.slice(0, MAX_OUT); stderr = ''; code = r.ok ? 0 : 1;
+          // r38-P1: web 回执 code=HTTP 传输层(200→0), 不反映端点命令
+          // 退出码——dash 内层失败静默曾致假成功误导实战决策。载荷需
+          // 自带回显(如 `; echo rc=$?`)才有真实 rc。
+          layerNote = 'code=传输层(HTTP), 非端点命令 rc——需载荷回显 rc=$? 判定命令成败';
           if (cappedAt) stdout += `\n(timeoutMs 已按 web 通道上限裁剪为 ${cappedAt}ms)`;
         } catch (e) {
           clearTimeout(t);
@@ -549,7 +564,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     persistShells();  // R6-F2: every-mutation 契约
     if (sh.tasks.length > 100) sh.tasks.splice(0, sh.tasks.length - 100);
     audit('shell-exec', { id, target: sh.target, cmd: command.slice(0, 120), code, ms: task.ms });
-    return { ok: code === 0, stdout: stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task, ...(degradedNote ? { degradedNote } : {}) };
+    return { ok: code === 0, stdout: stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task, ...(degradedNote ? { degradedNote } : {}), ...(layerNote ? { layerNote } : {}) };
   }
 
   /** Auto-fingerprint the host once (whoami/uname) — Sliver-style session meta. */
