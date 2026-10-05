@@ -72,7 +72,46 @@ export function CliPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.cli" initial={0.62}>
+    <SplitPane storageKey="spectre.split.cli-v2" initial={0.4}>
+      <div className="flex min-h-0 flex-col gap-3">
+
+      <Panel title="安装到沙箱" bodyClassName="p-3 space-y-2">
+        {status && (
+          <p className="flex items-center gap-1.5 text-xs text-tertiary">
+            <Package className="h-3.5 w-3.5 text-accent-text/80" />
+            driver={status.driver}
+            {status.driver === 'docker' && ` container=${status.container} image=${status.image}`}
+            {status.driver !== 'docker' && ' local 驱动=安装到宿主机(包管理器命令须服务端 SPECTRE_ALLOW_HOST_BOOTSTRAP=1)'}
+          </p>
+        )}
+        <Textarea
+          value={cmd} onChange={e => setCmd(e.target.value)}
+          rows={3}
+          placeholder={'安装命令（shell），例如：\napt-get update && apt-get install -y nmap\n或 pip install httpx'}
+          className="font-mono"
+        />
+        <Button
+          onClick={() => void install()}
+          disabled={busy}
+          variant="primary"
+          size="sm"
+          className="w-full"
+        >
+          <Terminal className="h-3.5 w-3.5" /> {busy ? '执行中…' : '执行安装'}
+        </Button>
+        {msg && <p className={cn('text-[13px]', msg.includes('完成') ? 'text-success-text' : 'text-warning-text')}>{msg}</p>}
+        {output && (
+          <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md border border-line bg-bg p-2 font-mono text-[13px] leading-6 text-secondary">
+            {output}
+          </pre>
+        )}
+        <p className="text-[13px] leading-relaxed text-tertiary">
+          安装一次，全部项目的全部 agent 共享（环境能力）；项目间的隔离靠各自工作目录，CLI 层刻意共享。
+        </p>
+      </Panel>
+      <ToolingChat agentKey="cli-config" workSessionId={wsId} />
+      </div>
+
       <Panel
         title="已安装 CLI（共享层）"
         right={
@@ -126,46 +165,6 @@ export function CliPage({ wsId }: { wsId: string }) {
           </div>
         </div>
       </Panel>
-
-      
-      <div className="flex min-h-0 flex-col gap-3">
-
-      <Panel title="安装到沙箱" bodyClassName="p-3 space-y-2">
-        {status && (
-          <p className="flex items-center gap-1.5 text-xs text-tertiary">
-            <Package className="h-3.5 w-3.5 text-accent-text/80" />
-            driver={status.driver}
-            {status.driver === 'docker' && ` container=${status.container} image=${status.image}`}
-            {status.driver !== 'docker' && ' local 驱动=安装到宿主机(包管理器命令须服务端 SPECTRE_ALLOW_HOST_BOOTSTRAP=1)'}
-          </p>
-        )}
-        <Textarea
-          value={cmd} onChange={e => setCmd(e.target.value)}
-          rows={3}
-          placeholder={'安装命令（shell），例如：\napt-get update && apt-get install -y nmap\n或 pip install httpx'}
-          className="font-mono"
-        />
-        <Button
-          onClick={() => void install()}
-          disabled={busy}
-          variant="primary"
-          size="sm"
-          className="w-full"
-        >
-          <Terminal className="h-3.5 w-3.5" /> {busy ? '执行中…' : '执行安装'}
-        </Button>
-        {msg && <p className={cn('text-[13px]', msg.includes('完成') ? 'text-success-text' : 'text-warning-text')}>{msg}</p>}
-        {output && (
-          <pre className="max-h-48 overflow-y-auto whitespace-pre-wrap rounded-md border border-line bg-bg p-2 font-mono text-[13px] leading-6 text-secondary">
-            {output}
-          </pre>
-        )}
-        <p className="text-[13px] leading-relaxed text-tertiary">
-          安装一次，全部项目的全部 agent 共享（环境能力）；项目间的隔离靠各自工作目录，CLI 层刻意共享。
-        </p>
-      </Panel>
-      <ToolingChat agentKey="cli-config" workSessionId={wsId} />
-      </div>
     </SplitPane>
   );
 }

@@ -26,6 +26,17 @@ export function TaskReportsPage() {
 
   return (
     <div className="grid h-full grid-cols-1 gap-3 xl:grid-cols-3">
+      <div className="flex min-h-0 flex-col gap-3 xl:order-1">
+        {selected
+          ? <EntryDetail event={selected} onBack={() => setSelected(null)} />
+          : (
+            <Panel title="报告详情" bodyClassName="p-6">
+              <EmptyState icon={ClipboardList} title="选择右侧报告查看详情"
+                hint="状态、行动、证据、验证会话、修订历史" />
+            </Panel>
+          )}
+      </div>
+
       <Panel
         title="任务报告"
         right={
@@ -34,7 +45,7 @@ export function TaskReportsPage() {
             安装/卸载/渗透任务的闭环交付记录
           </span>
         }
-        className="min-h-0 xl:col-span-2"
+        className="min-h-0 xl:col-span-2 xl:order-2"
         bodyClassName="p-0"
       >
         <div className="h-full max-h-[calc(100vh-180px)] overflow-y-auto">
@@ -54,16 +65,6 @@ export function TaskReportsPage() {
           )}
         </div>
       </Panel>
-      <div className="flex min-h-0 flex-col gap-3">
-        {selected
-          ? <EntryDetail event={selected} onBack={() => setSelected(null)} />
-          : (
-            <Panel title="报告详情" bodyClassName="p-6">
-              <EmptyState icon={ClipboardList} title="选择左侧报告查看详情"
-                hint="状态、行动、证据、验证会话、修订历史" />
-            </Panel>
-          )}
-      </div>
     </div>
   );
 }

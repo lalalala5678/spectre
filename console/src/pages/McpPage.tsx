@@ -116,80 +116,7 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.mcp" initial={0.62}>
-      <Panel title="已注册 MCP Servers" className="h-full min-h-0" bodyClassName="flex min-h-0 flex-col p-0">
-        <div className="min-h-0 flex-1 overflow-auto"><table className="w-full text-left">
-          <thead>
-            <tr className="text-xs font-medium text-tertiary">
-              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">名称</th>
-              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">传输</th>
-              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">挂载 Agent</th>
-              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">连接</th>
-              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2" />
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-line">
-            {servers.map(s => (
-              <tr key={s.name} className="odd:bg-surface-2/50 hover:bg-surface-2">
-                <td className="px-3 py-2.5">
-                  <div className="font-mono text-[13px] text-primary">{s.name}</div>
-                  <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-tertiary">
-                    {s.transport === 'http'
-                      ? <><Globe className="h-3 w-3" />{s.url}</>
-                      : <><Terminal className="h-3 w-3" />{(s.command ?? []).join(' ')} @{s.where}</>}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <Badge tone={s.transport === 'http' ? 'info' : 'neutral'}>
-                    {s.transport}
-                  </Badge>
-                </td>
-                <td className="px-3 py-2.5">
-                  <div className="flex flex-wrap gap-1">
-                    {(s.agents ?? []).map(a => (
-                      <Badge key={a} tone="accent">{a}</Badge>
-                    ))}
-                  </div>
-                </td>
-                <td className="px-3 py-2.5">
-                  <Button
-                    onClick={() => void test(s.name)}
-                    disabled={testing[s.name]}
-                    variant="secondary"
-                    size="sm"
-                  >
-                    <PlugZap className="h-3.5 w-3.5" /> {testing[s.name] ? '测试中' : '连通测试'}
-                  </Button>
-                  {results[s.name] && (
-                    <div className={cn('mt-1 max-w-56 break-all text-xs leading-snug',
-                      results[s.name].startsWith('✓') ? 'text-success-text' : 'text-danger-text')} title={results[s.name]}>
-                      {results[s.name]}
-                    </div>
-                  )}
-                </td>
-                <td className="px-3 py-2.5 text-right">
-                  <button
-                    onClick={() => { if (arm !== s.name) { setArm(s.name); setTimeout(() => setArm(a => a === s.name ? null : a), 2500); return; } setArm(null); void remove(s.name); }}
-                    aria-label={`注销 ${s.name}`}
-                    title={`注销 ${s.name}`}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary hover:bg-surface-2 hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
-                  >
-                    <Trash2 className="h-4 w-4" />
-                  </button>
-                </td>
-              </tr>
-            ))}
-            {servers.length === 0 && (
-              <tr><td colSpan={5} className="px-3 py-8">
-                <EmptyState icon={PlugZap} title="暂无注册"
-                  hint="远程 server 填 URL 直连；本地 server 填启动命令" />
-              </td></tr>
-            )}
-          </tbody>
-        </table></div>
-      </Panel>
-
-      
+    <SplitPane storageKey="spectre.split.mcp-v2" initial={0.4}>
       <div className="flex min-h-0 flex-col gap-3">
 
       <Panel title="注册新 Server" bodyClassName="p-3 space-y-2">
@@ -262,6 +189,78 @@ export function McpPage({ wsId }: { wsId: string }) {
       </Panel>
       <ToolingChat agentKey="mcp-config" workSessionId={wsId} />
       </div>
+
+      <Panel title="已注册 MCP Servers" className="h-full min-h-0" bodyClassName="flex min-h-0 flex-col p-0">
+        <div className="min-h-0 flex-1 overflow-auto"><table className="w-full text-left">
+          <thead>
+            <tr className="text-xs font-medium text-tertiary">
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">名称</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">传输</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">挂载 Agent</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2 text-left font-medium">连接</th>
+              <th className="sticky top-0 z-10 border-b border-line bg-surface px-3 py-2" />
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-line">
+            {servers.map(s => (
+              <tr key={s.name} className="odd:bg-surface-2/50 hover:bg-surface-2">
+                <td className="px-3 py-2.5">
+                  <div className="font-mono text-[13px] text-primary">{s.name}</div>
+                  <div className="mt-0.5 flex items-center gap-1 font-mono text-xs text-tertiary">
+                    {s.transport === 'http'
+                      ? <><Globe className="h-3 w-3" />{s.url}</>
+                      : <><Terminal className="h-3 w-3" />{(s.command ?? []).join(' ')} @{s.where}</>}
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <Badge tone={s.transport === 'http' ? 'info' : 'neutral'}>
+                    {s.transport}
+                  </Badge>
+                </td>
+                <td className="px-3 py-2.5">
+                  <div className="flex flex-wrap gap-1">
+                    {(s.agents ?? []).map(a => (
+                      <Badge key={a} tone="accent">{a}</Badge>
+                    ))}
+                  </div>
+                </td>
+                <td className="px-3 py-2.5">
+                  <Button
+                    onClick={() => void test(s.name)}
+                    disabled={testing[s.name]}
+                    variant="secondary"
+                    size="sm"
+                  >
+                    <PlugZap className="h-3.5 w-3.5" /> {testing[s.name] ? '测试中' : '连通测试'}
+                  </Button>
+                  {results[s.name] && (
+                    <div className={cn('mt-1 max-w-56 break-all text-xs leading-snug',
+                      results[s.name].startsWith('✓') ? 'text-success-text' : 'text-danger-text')} title={results[s.name]}>
+                      {results[s.name]}
+                    </div>
+                  )}
+                </td>
+                <td className="px-3 py-2.5 text-right">
+                  <button
+                    onClick={() => { if (arm !== s.name) { setArm(s.name); setTimeout(() => setArm(a => a === s.name ? null : a), 2500); return; } setArm(null); void remove(s.name); }}
+                    aria-label={`注销 ${s.name}`}
+                    title={`注销 ${s.name}`}
+                    className="inline-flex h-8 w-8 items-center justify-center rounded-md text-tertiary hover:bg-surface-2 hover:text-danger-text focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </td>
+              </tr>
+            ))}
+            {servers.length === 0 && (
+              <tr><td colSpan={5} className="px-3 py-8">
+                <EmptyState icon={PlugZap} title="暂无注册"
+                  hint="远程 server 填 URL 直连；本地 server 填启动命令" />
+              </td></tr>
+            )}
+          </tbody>
+        </table></div>
+      </Panel>
     </SplitPane>
   );
 }

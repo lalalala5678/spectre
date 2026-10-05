@@ -76,7 +76,19 @@ export function SkillsPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.skills" initial={0.62}>
+    <SplitPane storageKey="spectre.split.skills-v2" initial={0.4}>
+      <div className="flex min-h-0 flex-col gap-3">
+
+      <Panel title="机制说明" bodyClassName="space-y-2 text-[13px] leading-relaxed text-secondary">
+        <p className="flex items-start gap-1.5"><FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary" />
+          存储为 agentskills.io 官方格式（SKILL.md + frontmatter），由 pi 官方加载器解析。</p>
+        <p><span className="font-medium text-primary">按需加载：</span>会话创建时仅注入索引（名称+触发条件），模型判断匹配后自行 read 全文——不撑爆上下文。</p>
+        <p><span className="font-medium text-primary">角色挂载：</span>每个 agent 只看到挂给自己的技能目录。</p>
+        {msg && <p className={cn('text-[13px]', msg.includes('已') ? 'text-success-text' : 'text-danger-text')}>{msg}</p>}
+      </Panel>
+      <ToolingChat agentKey="skill-config" workSessionId={wsId} />
+      </div>
+
       <Panel
         title="已挂载 Skills（按 Agent）"
         right={
@@ -179,19 +191,6 @@ export function SkillsPage({ wsId }: { wsId: string }) {
           </tbody>
         </table></div>
       </Panel>
-
-      
-      <div className="flex min-h-0 flex-col gap-3">
-
-      <Panel title="机制说明" bodyClassName="space-y-2 text-[13px] leading-relaxed text-secondary">
-        <p className="flex items-start gap-1.5"><FileCode2 className="mt-0.5 h-3.5 w-3.5 shrink-0 text-tertiary" />
-          存储为 agentskills.io 官方格式（SKILL.md + frontmatter），由 pi 官方加载器解析。</p>
-        <p><span className="font-medium text-primary">按需加载：</span>会话创建时仅注入索引（名称+触发条件），模型判断匹配后自行 read 全文——不撑爆上下文。</p>
-        <p><span className="font-medium text-primary">角色挂载：</span>每个 agent 只看到挂给自己的技能目录。</p>
-        {msg && <p className={cn('text-[13px]', msg.includes('已') ? 'text-success-text' : 'text-danger-text')}>{msg}</p>}
-      </Panel>
-      <ToolingChat agentKey="skill-config" workSessionId={wsId} />
-      </div>
     </SplitPane>
   );
 }
