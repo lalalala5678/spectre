@@ -120,6 +120,7 @@ export async function api<T>(
 ): Promise<T> {
   const { json, ...rest } = init ?? {};
   const res = await fetch(`${API_BASE}${path}`, {
+    // r50j: /bus 快照同步进全局缓存(面板初值用)
     ...rest,
     headers: {
       ...(json !== undefined && { 'Content-Type': 'application/json' }),
@@ -180,6 +181,7 @@ function busConnect() {
     try {
       const payload = JSON.parse(ev.data as string);
       if (typeof payload.seq === 'number') busCursor = payload.seq;
+      busCacheMerge([payload]);  // r50j: 全局缓存累积
       for (const h of busSubs) h('bus', payload);
     } catch { /* malformed */ }
   });
@@ -196,6 +198,18 @@ function busConnect() {
       setTimeout(busConnect, delay);
     }
   };
+}
+
+/** r50j: 全局 bus 内存缓存——切 agent/页回来时面板初值同步取缓存,
+ * 不再重新等网络(用户实测切回后骨架屏挂住, 需等待才自愈)。 */
+let busCache: import('./client').ApiBusEvent[] = [];
+export function getBusCache() { return busCache; }
+function busCacheMerge(evs: ApiBusEvent[]) {
+  if (!Array.isArray(evs) || evs.length === 0) return;
+  const map = new Map(busCache.map(e => [e.seq, e]));
+  for (const e of evs) if (e && typeof e.seq === 'number') map.set(e.seq, e);
+  busCache = [...map.values()].sort((a, b) => a.seq - b.seq);
+  if (busCache.length > 6000) busCache = busCache.slice(-5000);
 }
 
 export function subscribeBus(onEvent: BusHandler): Unsubscribe {

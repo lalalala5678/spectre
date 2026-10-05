@@ -8,7 +8,7 @@
  * R20-F2: stopped 守卫——旧项目在途 refetch 不得覆盖新项目清场。
  */
 import { useEffect, useState } from 'react';
-import { api, foldEntries, subscribeBus, type ApiBusEvent, type FoldedEntry } from './client';
+import { getBusCache, api, foldEntries, subscribeBus, type ApiBusEvent, type FoldedEntry } from './client';
 
 export type { FoldedEntry };  // CS3-N23: PanelEntryMeta 消费
 
@@ -20,7 +20,9 @@ export function useBusPanelEntries(
   // 用户令(改判): 默认全量(不再截 20)——渲染侧用 content-visibility
   // 跳过屏外条目, 700+ 条不卡; o.limit 仅显式传入时生效。
   const { ws, limit } = o ?? {};
-  const [events, setEvents] = useState<FoldedEntry[]>([]);
+  // r50j: 初值同步取全局缓存——切 agent 回来即时有数据(不等网络)
+  const [events, setEvents] = useState<FoldedEntry[]>(() =>
+    ws ? foldEntries(getBusCache()).filter(accept).reverse() : []);
   // Distinguish LOADING (fetch in flight) from EMPTY (loaded, nothing
   // published) — stale content must never linger after a project switch,
   // and '暂无' must never flash first.
