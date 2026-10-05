@@ -247,8 +247,9 @@ function realRouter({ store, bus, caps, wal }) {
       const sid2 = path.split('/')[3];
       const rec2 = store.get(sid2);
       if (!rec2) return bad(res, 404, '会话不存在');
-      store.abortSession(rec2);
-      return json(res, 200, { ok: true });
+      const ok2 = store.abortSession(rec2);
+      console.log('[r47-D4] abort 调用:', sid2, '→', ok2);
+      return json(res, 200, { ok: ok2 });
     }
     if (path.startsWith('/api/engagements/') && path.endsWith('/children') && method === 'GET') {
       if (!isInternalCaller(req)) return bad(res, 401, '仅限内部调用');

@@ -765,9 +765,15 @@ export class SessionStore {
   /** r47-D4: 终止席位进行中回合(pi agent.abort())——Temporal activity
    * 被 cancel 后调用, 取消注入不再等回合自然完(实测 21min 恶化)。 */
   abortSession(record) {
+    // r47-D4: pi abort + 完成等待者唤醒——abort 只停流, waitIdle/
+    // completionWaiters 若不被唤醒, activity 层仍挂到超时。
     try {
       record.agent.abort?.();
       this._journal(record, 'agent_abort', { via: 'cancel' });
+      for (const fn of record.completionWaiters ?? []) {
+        try { fn(); } catch { /* best-effort */ }
+      }
+      record.completionWaiters = [];
       return true;
     } catch { return false; }
   }
