@@ -238,18 +238,10 @@ function ScopeSection() {
     setDraftTarget('');
     void save({ ...scope, targets: [...scope.targets, t] });
   };
-  const [nowTs, setNowTs] = useState(() => Date.now());
-  useEffect(() => { const t = setInterval(() => setNowTs(Date.now()), 60_000); return () => clearInterval(t); }, []);
-  const inWindow = scope?.window
-    ? Date.parse(scope.window.start) <= nowTs && nowTs <= Date.parse(scope.window.end)
-    : false;
   return (
     <section className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
       <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
         <span className="text-[13px] font-medium text-primary">渗透授权清单</span>
-        <span className={cn('rounded px-1.5 py-px text-[11px]', inWindow ? 'bg-success-bg text-success-text' : 'bg-danger-bg text-danger-text')}>
-          {inWindow ? '窗口内' : '窗口外'}
-        </span>
         {saving && <span className="text-[11px] text-tertiary">保存中…</span>}
       </div>
       <div className="space-y-3 px-4 py-3">
@@ -285,7 +277,6 @@ function ScopeSection() {
               className="h-7 rounded-md border border-line bg-surface px-2 text-xs" />
           </div>
         )}
-        <p className="text-xs text-tertiary">shell 通道硬门按本清单实时校验; agent 对清单外目标会向你发起授权请求(顶栏铃铛)。</p>
       </div>
     </section>
   );
@@ -484,9 +475,6 @@ export function SettingsPage() {
         </div>
       </section>
 
-      <div id="sec-scope" className="scroll-mt-4" />
-      <ScopeSection />
-
       {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
       <div id="sec-agents" className="scroll-mt-4" />
       {otherAgents.map((agent) => (
@@ -506,6 +494,8 @@ export function SettingsPage() {
           )}
         </section>
       ))}
+      <div id="sec-scope" className="scroll-mt-4" />
+      <ScopeSection />
       </div>
     </div>
   );
