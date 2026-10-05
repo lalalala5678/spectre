@@ -82,7 +82,10 @@ export function PanelStack({ storageKey, children }: {
             />
           )}
           <div
-            className="flex min-h-0 flex-col"
+            /* 用户令(拖窄失效终根因): 列缺 min-w-0——min-content(条目
+               溯源 200px+标题)曾把列顶死 418px, 侧栏压 180 列不缩,
+               整条 truncate 链失效且列溢出盖内容。 */
+            className="flex min-h-0 min-w-0 flex-col"
             style={{ flex: `0 0 calc((100% - ${(n - 1) * DIVIDER_PX}px) * ${ratios[i]})` }}
           >
             {child}
