@@ -355,8 +355,10 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           // 命令替换产物成为外层赋值, bash 实际执行字面量"o"(恒空)。
           // 修复: remote command 合成单参数并 shell-quote 整体包裹。
           const rq = "'" + command.replace(/'/g, `'\\''`) + "'";
+          // r35-N6: LogLevel=ERROR 消 stderr 的 known_hosts 噪声(每发
+          // 一条 Warning, 覆盖真实错误线索)
           execFile('sshpass', ['-p', pw, 'ssh', '-o', 'StrictHostKeyChecking=no',
-            '-o', 'UserKnownHostsFile=/dev/null', '-p', port || '22',
+            '-o', 'UserKnownHostsFile=/dev/null', '-o', 'LogLevel=ERROR', '-p', port || '22',
             `${u}@${h}`, `timeout -k 5 ${tSecS} bash -lc ${rq}`],
             { timeout: timeoutMs, maxBuffer: MAX_OUT }, (err, so, se) =>
             resolve({ err, so: String(so ?? ''), se: String(se ?? ''), code: err ? (err.code ?? 1) : 0 }));
@@ -377,8 +379,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         const marker = markerRaw ? markerRaw.replace(/^<+|>+$/g, '') : markerRaw;
         // r6-#3: {CMD} 与 #MARK 之间的尾随空白不进请求(击碎精确白名单)
         const spec0 = spec0raw.replace(/\s+$/, '');
-        const isPost = spec0.startsWith('POST|');
-        const tpl = isPost ? spec0.slice(5) : spec0;
+        // r35-N2: "GET " 前缀形态兼容——agent 常把 GET 写成显式前缀,
+        // 此前整段当 URL 使授权门 host 误析+拒绝文案截断(#W 半截)。
+        const isPost = spec0.startsWith('POST|') || spec0.startsWith('POST ');
+        let spec0n = spec0;
+        if (!isPost && /^GET[ |]/i.test(spec0)) spec0n = spec0.replace(/^GET[ |]/i, '');
+        const tpl = isPost ? spec0.slice(5) : spec0n;
         // F26: POST 模板形如 "url|c={CMD}" —— url 与 form 段用 | 分隔;
         // 此前整段 tpl 当 fetch url 且 parseFormBody 吃进完整 URL 导致
         // 命令字段丢失(实测 post-ok: 空)。拆开:url 部分 fetch,form 部分
@@ -452,9 +458,18 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
           if (cappedAt) stdout += `\n(timeoutMs 已按 web 通道上限裁剪为 ${cappedAt}ms)`;
         } catch (e) {
           clearTimeout(t);
+          // r35-N1: undici 真实错误在 e.cause(message 恒 fetch failed)——
+          // 与 tooling D6b 同款分类, web 通道探针曾只回通用文案。
+          const c = e?.cause;
+          const msg = String(c?.code ?? c?.message ?? e?.message ?? e ?? '');
+          const why = /ENOTFOUND|getaddrinfo/i.test(msg) ? '域名解析失败(host 不存在或无外联 DNS)'
+            : /ETIMEDOUT|timeout|aborted/i.test(msg) ? '连接超时(目标无响应或被墙)'
+            : /certificate|SSL|TLS|wrong version number/i.test(msg) ? 'TLS 握手失败(协议不匹配或证书问题)'
+            : /ECONNREFUSED/i.test(msg) ? '连接被拒(端口未开)'
+            : msg || '未知网络错误';
           const capNote = cappedAt
             ? `(timeoutMs 超出 web 通道上限, 已按 ${cappedAt}ms 硬杀)` : '';
-          return { ok: false, error: `webshell 通道异常(已硬杀${capNote}): ${e.message}` };
+          return { ok: false, error: `webshell 通道异常:${why}${capNote}。目标 ${String(url).slice(0, 100)}` };
         }
       } else if (sh.transport === 'local') {
         // transportRef binds the shell to ONE exec box — commands land in

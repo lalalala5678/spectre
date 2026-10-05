@@ -60,10 +60,20 @@ def handle(c, addr):
         # R17-F3: 总死线——单次 recv 超时挡不住 1B/9s 慢连接永久占用
         # 线程(永不满足 64KB/EOF 退出条件), FD/内存耗尽殃及合法回连。
         deadline = time.monotonic() + 60
+        acked = False
         while len(data) < 65536 and time.monotonic() < deadline:
             chunk = c.recv(4096)
             if not chunk: break
             data += chunk
+            # r35-OOB-ACK: 首个有效块即回写单行 ACK(不等收流结束——
+            # 客户端等响应时收流不会终止)。裸 TCP 汇不回响应, 探针
+            # 超时曾被误读为"监听器下线"(r35 对账#14 整类误读消解)。
+            if not acked:
+                acked = True
+                try:
+                    c.sendall(f'OK {datetime.datetime.now().isoformat(timespec="seconds")}\n'.encode())
+                except Exception:
+                    pass
     except Exception:
         pass
     finally:

@@ -448,7 +448,10 @@ export function buildIntelTools(record, caps) {
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
       ], { description: 'New severity, vulnerabilities only (omit = keep)' })),
-      text: Type.Optional(Type.String({ description: 'New full content (omit = keep)' })),
+      text: Type.Optional(Type.String({ description:
+        'New FULL content (REPLACES the whole entry body, omit = keep). ' +
+        '⚠ 整体替换陷阱(r35-N8, 三层实证): 只传新段落会把原有正文其余部分一并抹掉——' +
+        '先 read 现行版全文, 改后整篇回传; 回执会附新旧长度对比与骤降警告' })),
       status: Type.Optional(Type.Union([
         Type.Literal('success'), Type.Literal('partial'), Type.Literal('failed'),
         Type.Literal('no-result'),
@@ -934,8 +937,13 @@ export function buildShellTools(record, caps) {
             .map(x => ({ id: x.id, name: x.name, target: x.target, transport: x.transport,
               tags: x.tags ?? [], status: x.status, user: x.user, os: (x.os || '').slice(0, 60),
               cmdCount: x.cmdCount, expiresAt: x.expiresAt }));
-          return say(list.length ? { ok: true, count: list.length, shells: list }
-            : { ok: true, count: 0, shells: [], note: '无匹配 shell——放宽过滤或查情报库 shell-ready;注册用 register' });
+          // r35-N4/N7: 条目带端点探测提示(status=active 仅注册态, 不证明
+          // 端点活着——存活验证需 exec/status); 空结果诊断附全量计数。
+          const note4 = 'active=注册态(TTL 内), 不证明端点存活——验证用 status/exec';
+          return say(list.length ? { ok: true, count: list.length, shells: list, note: note4 }
+            : { ok: true, count: 0, shells: [],
+              note: `过滤(${[p.filterTarget, p.filterTransport, p.filterTag].filter(Boolean).join('/') || 'active'})下无匹配。` +
+                `全注册表 ${R.list({}).length} 条(含 closed/expired)——放宽过滤或用 status 按 id 直查; 新通道用 register` });
         }
         if (p.action === 'register') {
           if (!p.transportRef || !p.target) return say({ ok: false, error: 'register 需 transportRef+target' });

@@ -457,9 +457,19 @@ const caps = {
       requestedBy, approvedBy: authorOfCaller,
       origin: callerRecord.agentKey === 'report' ? 'writer' : 'agent',
     });
+    // r35-N8: text 整体替换的三层实证陷阱(L0/L1/L2 各咬一次)——回执
+    // 附新旧长度对比, 骤降>30% 显式警告(不是拦, 是让替换可见可悔)。
+    let lenNote = '';
+    if (params.text !== undefined) {
+      const oldLen = String(target.detail ?? '').length;
+      const newLen = String(params.text).length;
+      const drop = oldLen > 0 ? (oldLen - newLen) / oldLen : 0;
+      lenNote = ` 正文长度 ${oldLen}→${newLen}` +
+        (drop > 0.3 ? ` ⚠骤降 ${Math.round(drop * 100)}%——text 是整体替换, 疑似误抹原文; 若是误操作请立即再修订补回(修订链完整保留)。` : '');
+    }
     return {
       text: `修订已入库(seq=${target.seq} 第 ${event.revision.n} 次修订):` +
-        `《${event.title ?? ''}》。原版保留在链上,query_intel 显示现行版。`,
+        `《${event.title ?? ''}》。原版保留在链上,query_intel 显示现行版。${lenNote}`,
       details: { revises: target.seq, n: event.revision.n },
     };
   },
