@@ -214,7 +214,11 @@ export function buildIntelTools(record, caps) {
       const before = Number(params.before) || null;
       const paged = before ? matched.filter(e => e.seq < before) : matched;
       const hits = paged.slice(0, limit);
-      const latestSeq = inWs.length ? Math.max(...inWs.map(e => e.seq)) : 0;
+      // loop34-QA: 库内最新 seq 此前把非条目事件(回执/纠偏等)也算进
+      // "最新 seq"——LLM 拿它判断"是否全部完成"会误判空窗。改为条目域
+      // 最新(与列表同谓词 isEntry), 事件 seq 不再混入。
+      const entrySeqs = inWs.filter(isEntry).map(e => e.seq);
+      const latestSeq = entrySeqs.length ? Math.max(...entrySeqs) : 0;
       const olderLeft = paged.length - hits.length;
       // r10-UX: 翻页提示置底+方向箭头(before 曾两轮被误用——语义正确
       // 但方向直觉易反)
