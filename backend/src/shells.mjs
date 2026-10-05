@@ -192,7 +192,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     return null;
   }
 
-  function register({ name, target, transport = 'web', transportRef = '', note = '', tags = [], createdBy = 'operator', ttlHours = 24 }) {  // CS24-F4: 缺省统一 'web'(routes/tools 同口径)
+  function register({ name, target, transport = 'web', transportRef = '', note = '', tags = [], createdBy = 'operator', ttlHours = 24, meta = {} }) {  // CS24-F4: 缺省统一 'web'(routes/tools 同口径)
     const id = 'sh-' + randomUUID().slice(0, 8);
     // 命名规范:<目标>-<面>-<权限> 建议(不强制,但重名/空名拒)
     const nm = String(name || '').trim();
@@ -265,6 +265,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       tags: Array.isArray(tags) ? tags.slice(0, 8).map(String) : [],
       createdBy, createdAt: new Date().toISOString(),
       expiresAt: new Date(Date.now() + ttlHours * 3600e3).toISOString(),
+      workSessionId: meta?.workSessionId ?? null,  // r50: 项目归属(控制台按项目过滤)
       cmdCount: 0, lastActiveAt: null, status: 'active',
       tasks: [],          // tasking history (Mythic): {n, command, code, ms, at}
       host: null, user: null, os: null,  // auto-fingerprint (Sliver session meta)

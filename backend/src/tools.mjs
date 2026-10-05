@@ -1008,7 +1008,7 @@ export function buildShellTools(record, caps) {
             tags: p.tags, note: 'agent 自注册(' + (record.agentKey || 'agent') + ')',
             createdBy: record.agentKey || 'agent',
             ttlHours: Math.max(0.02, Number(p.ttlHours) || 24),  // r16-③: 短窗验证载体的可达性(此前 schema 缺此参, 三连静默丢弃)
-          });
+            meta: { workSessionId: record.workSessionId ?? null } });
           if (sh?.error) return say({ ok: false, error: sh.error });
           await R.fingerprint?.(sh.id).catch?.(() => {});
           return say({ ok: true, shell: sh, note: '已注册并进审计体系;后续 exec/read_file 用 shellId=' + sh.id });

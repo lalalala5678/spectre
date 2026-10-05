@@ -207,7 +207,7 @@ export default function App() {
                   : <p className="py-10 text-center text-[13px] text-tertiary">无当前项目,请先在顶栏选择</p>}
             </div>
           ) : route === 'shells' ? (
-            <ShellPage />
+            <ShellPage wsId={wsId} />
           ) : route === 'settings' ? (
             <div className="h-full overflow-y-auto"><SettingsPage /></div>
           ) : route === 'reports' ? (

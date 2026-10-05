@@ -114,7 +114,11 @@ function realRouter({ store, bus, caps, wal }) {
 
     // ---------- shells (C2 implant handles: list/register/exec/close) ----------
     if (path === '/api/shells' && method === 'GET') {
-      return json(res, 200, { shells: caps.shells.list() });
+      // r50: 控制台按项目过滤(url.workspaceId?); 无参=全量(兼容)
+      const qs = new URL(req.url, 'http://x').searchParams;
+      const wsf = qs.get('workSessionId');
+      const all1 = caps.shells.list();
+      return json(res, 200, { shells: wsf ? all1.filter(s => s.workSessionId === wsf) : all1 });
     }
     if (path === '/api/shells' && method === 'POST') {
       const body = await readJson(req);
@@ -137,8 +141,16 @@ function realRouter({ store, bus, caps, wal }) {
         note: String(body.note || ''), tags: Array.isArray(body.tags) ? body.tags : [],
         createdBy: String(body.createdBy || 'operator'),
         ttlHours: Number(body.ttlHours) || 24,
+        meta: { workSessionId: body.workSessionId ?? null },
       });
       return json(res, sh.error ? 400 : 200, sh);
+    }
+    if (path.startsWith('/api/shells/') && path.endsWith('/read-file') && method === 'POST') {
+      const id = path.split('/')[3];
+      const b3 = await readJson(req);
+      if (!b3.path) return bad(res, 400, 'path 必填');
+      const r3 = await caps.shells.readFile(id, String(b3.path));
+      return json(res, r3?.error ? 400 : 200, r3 ?? { error: 'shell 不存在' });
     }
     if (path.startsWith('/api/shells/') && path.endsWith('/exec') && method === 'POST') {
       const id = path.split('/')[3];

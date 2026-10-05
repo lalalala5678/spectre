@@ -20,7 +20,7 @@ interface ShellHandle {
 interface ExecResult { ok: boolean; stdout?: string; stderr?: string; code?: number; error?: string; ms?: number }
 
 /** Shell 控制台 — C2 植入通道的运维终端(SSH 式) */
-export function ShellPage() {
+export function ShellPage({ wsId }: { wsId: string | null }) {
   usePageTitle('Shell 控制台'); // FEVERIFY-N3
   const [shells, setShells] = useState<ShellHandle[]>([]);
   const [active, setActive] = useState<string | null>(null);
@@ -32,7 +32,7 @@ export function ShellPage() {
   const activeRef = useRef<string | null>(null);  // FEBUGS-P2-2: await 后读现值(闭包 active 是旧值)
   activeRef.current = active;
 
-  const reload = () => api<{ shells: ShellHandle[] }>('/shells')
+  const reload = () => api<{ shells: ShellHandle[] }>(`/shells?workSessionId=${encodeURIComponent(wsId ?? '')}`)
     .then(d => { setShells(d.shells ?? []); setErr(''); })  // P3-9: 成功即清除陈旧错误
     .catch(e => setErr(e instanceof Error ? e.message : String(e)));
   useEffect(() => {
@@ -145,6 +145,19 @@ export function ShellPage() {
             <span className="tabular-nums">{cur.user || '?'}@{cur.target}</span>
             <span className="truncate text-tertiary">{(cur.os || '').slice(0, 60)}</span>
             <span className="ml-auto text-tertiary tabular-nums">{cur.transport} · 到期 {cur.expiresAt.slice(5, 16)}{cur.lastActiveAt ? ` · 活跃 ${cur.lastActiveAt.slice(11, 16)}` : ''}</span>
+            <Button size="sm" variant="ghost" className="ml-2"
+              onClick={() => void api<{ shell: Record<string, unknown> }>(`/shells/${cur.id}`)
+                .then(r => { setLines(l => [...l, { dir: 'sys', text: '── status ──\n' + JSON.stringify(r.shell, null, 1) }]); })}>
+              状态</Button>
+            <Button size="sm" variant="ghost" className="ml-1"
+              onClick={() => {
+                const f = window.prompt('要读取的远端文件绝对路径:');
+                if (!f) return;
+                void api<{ stdout?: string; error?: string }>(`/shells/${cur.id}/read-file`, { method: 'POST', json: { path: f } })
+                  .then(r => setLines(l => [...l, { dir: r.error ? 'err' : 'out', text: `── read ${f} ──
+${r.error ?? r.stdout ?? '(空)'}` }]));
+              }}>
+              读文件</Button>
           </div>
           <div ref={scrollRef} tabIndex={0} aria-label="终端输出" className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[13px] leading-6">
             {lines.map((l, i) => (
