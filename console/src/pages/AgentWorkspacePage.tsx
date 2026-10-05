@@ -712,7 +712,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             />
             <div className="h-full pb-3.5">
               {isAuto ? (
-                <PanelStack storageKey="spectre.panel.stackRatios.auto-v2" defaultRatios={[0.18, 0.30, 0.26, 0.26]}>
+                <PanelStack storageKey="spectre.panel.stackRatios.auto-v2" defaultRatios={[0.17, 0.33, 0.25, 0.25]}>
                   <DispatchTreePanel rootId={sessionId} activeId={drillSession} onDrill={id => openDrill(id)} />
                   {/* 用户令: 面板点击进入详情须离开 drill 视图——此前
                       drillSession 残留使渲染链停在会话, 点条目'不跳转' */}

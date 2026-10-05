@@ -95,7 +95,7 @@ export function VulnPanel({ agentKey, workSessionId, onOpen }: {
                   与"查看撰写对话"为兄弟节点(外层改 div)。 */}
               <button
                 onClick={() => onOpen(event)}
-                className="relative z-20 flex min-h-8 w-full items-center gap-2 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                className="relative z-20 flex min-h-7 w-full items-center gap-2 rounded-md text-left focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
               >
                 <SeverityBadge severity={severity} />
                 <span className={cn('relative z-20 min-w-0 flex-1 truncate text-sm font-medium',
