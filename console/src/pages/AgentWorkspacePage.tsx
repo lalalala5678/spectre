@@ -250,11 +250,9 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         const ids = new Set<string>([rootId, ...childIds, ...grandIds].filter(Boolean) as string[]);
         setTreeIds(prev => prev.size === ids.size
           && [...ids].every(i => prev.has(i)) ? prev : ids);
-        // 用户令(口径再判): "会话"计数=**本项目全部**干过活的智能体数
-        // (全量 distinct agentKey, 非当前树)。配置三键(skill/mcp/cli-config)
-        // 是配置会话不算"干活 agent", 剔除——纯作战/撰写面计数。
-        const agentsWorked = new Set(
-          all.map(s => s.agentKey).filter(k => !['skill-config', 'mcp-config', 'cli-config'].includes(k))).size;
+        // 用户令(终裁): "会话"=**项目会话总数**(all.length——所有主控
+        // 循环×全部派生子席累计; 配置三键会话同样计入, 纯总数口径)。
+        const agentsWorked = all.length;
         setWsStats(prev => {
           const running = all.filter(s => s.busy && ids.has(s.id)).length;
           return prev.sessions === agentsWorked && prev.running === running
