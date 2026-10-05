@@ -102,7 +102,30 @@ ck('D案 泛化标题词放行', bus.vulnMutexCheck({
 // 窗外放行: 手工把首落 ts 拨回 3 分钟前
 const old = bus.events.find(e => e.seq === first.seq);
 old.ts = new Date(Date.now() - 601_000).toISOString();
-ck('10min 窗外放行', bus.vulnMutexCheck({ ...base }) === null);
+// r43-②: 同端点/同文窗外现在被指纹永久窗拦(合理——同点位终身一正本);
+// 真正的窗外放行须指纹也异(不同端点不同文)
+ck('窗外同端点被永久窗拦', bus.vulnMutexCheck({ ...base })?.blocked === true);
+ck('窗外异端点异文放行', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'high', workSessionId: 'ws-a',
+  title: '内网横向段 10.20.0.0/16 SMB 永久蓝屏 CVE-2017 残留',
+  detail: '完全不同点位与行文: SMB 协议层缺陷, 与 Web 端点零交集。',
+}) === null);
+
+// r43-②: 同端点(host:port)窗外双报——永久窗拦截(6172→6197 复原, 43min 差)
+const rce1 = bus.emit({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'critical', workSessionId: 'ws-a',
+  title: '127.0.0.1:18361 GET c= 无鉴权命令执行',
+  detail: 'writer-A: webshell 通道 GET c= 直接命令执行, 附 5 发差分与 rc 回显证据。',
+});
+bus.events.find(e => e.seq === rce1.seq).ts = new Date(Date.now() - 43 * 60_000).toISOString();
+ck('同端点 43min 后双报拦截', bus.vulnMutexCheck({
+  channel: 'dm', from: 'report', to: 'user', type: 'vulnerability',
+  severity: 'critical', workSessionId: 'ws-a',
+  title: '127.0.0.1:18361 GET 参数 c 无鉴权 root RCE',
+  detail: 'writer-B: 全新独立行文, 措辞/结构与首报零共享模板。',
+})?.by === 'fingerprint');
 // 窗内边界: 9min(540s)仍在窗内——writer 耗时量级竞态必须覆盖
 old.ts = new Date(Date.now() - 540_000).toISOString();
 ck('9min 窗内仍拦', bus.vulnMutexCheck({ ...base })?.blocked === true);

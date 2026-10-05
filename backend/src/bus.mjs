@@ -129,14 +129,19 @@ export class Bus {
     // 120s 窗 < writer 耗时, 窗边界洞靠事后安全网兜(4954/4956 实证)。
     // 10min 与 suggestDupMerge 事后提示窗对齐, 双网同界。
     const cut = Date.now() - 600_000;
+    // r43-②: 指纹永久窗——同端点双报实测差 43min(6172→6197), 10min
+    // 互斥窗全程未参与, 双正本靠 writer 纪律手动归并兜底。指纹命中不
+    // 限时窗(同端点同项目终身一正本); token 重叠保持短窗。
+    const fpCut = Date.now() - 365 * 24 * 3600e3;
     for (const other of this.events) {
       // r29b-V3': severity 同等条件删除——紧竞态+定级分歧(high vs
       // medium)曾逃逸互斥双落账(4864/4866)。token 重叠≥70%+同项目+
       // 短窗已足够强; 定级分歧恰是同点位双账的常见形态, 应拦而引
       // revise 归并(定级由修订链裁决), 不该因等级不同放行双正本。
+      const otherTs = Date.parse(other.ts ?? 0);
       if (other.type !== 'vulnerability' || other.revises
         || other.workSessionId !== entry.workSessionId
-        || Date.parse(other.ts ?? 0) < cut) continue;
+        || otherTs < fpCut) continue;
       const ot = tokens(`${other.title} ${other.detail ?? ''}`);
       if (ot.size < 4) continue;
       let hit = 0;
@@ -167,7 +172,8 @@ export class Bus {
       const overlap = hit / Math.min(ot.size, mt.size);
       const fpMatch = mp.size > 0 && op.size > 0
         && phit / Math.min(op.size, mp.size) >= 0.5;
-      if (overlap >= 0.7 || fpMatch) {
+      // r43-②: token 高重叠仅短窗; 指纹命中不限窗
+      if ((overlap >= 0.7 && otherTs >= cut) || fpMatch) {
         return { blocked: true, dupSeq: other.seq, dupTitle: other.title,
           ...(fpMatch && overlap < 0.7 ? { by: 'fingerprint' } : {}) };
       }
