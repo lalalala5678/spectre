@@ -105,7 +105,7 @@ function Node({ node, depth, activeId, onDrill }: {
             <span aria-hidden className={cn(
               'absolute -left-2 w-2 border-line-strong',
               last
-                ? 'top-0 h-[22px] rounded-bl-md border-b border-l'
+                ? 'top-0 h-1/2 rounded-bl-md border-b border-l'
                 : 'bottom-0 top-0 border-l',
             )} />
             <Node
