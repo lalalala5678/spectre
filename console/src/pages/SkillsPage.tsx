@@ -76,7 +76,7 @@ export function SkillsPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.skills-v3" initial={0.42}>
+    <SplitPane storageKey="spectre.split.skills-v4" initial={0.5}>
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
 
       <Panel title="机制说明" className="shrink-0" bodyClassName="space-y-2 text-[13px] leading-relaxed text-secondary">

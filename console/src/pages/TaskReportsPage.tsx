@@ -26,7 +26,7 @@ export function TaskReportsPage() {
   }, []);
 
   return (
-    <SplitPane storageKey="spectre.split.taskreports" initial={0.42}>
+    <SplitPane storageKey="spectre.split.taskreports" initial={0.5}>
       <div className="flex min-w-0 min-h-0 flex-col gap-3">
         {selected
           ? <div className="flex min-h-0 flex-1 flex-col overflow-hidden"><EntryDetail event={selected} onBack={() => setSelected(null)} /></div>

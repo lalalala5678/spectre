@@ -72,7 +72,7 @@ export function CliPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.cli-v3" initial={0.42}>
+    <SplitPane storageKey="spectre.split.cli-v4" initial={0.5}>
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
 
       <Panel title="安装到沙箱" className="shrink-0" bodyClassName="p-3 space-y-2">

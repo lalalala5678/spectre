@@ -116,7 +116,7 @@ export function McpPage({ wsId }: { wsId: string }) {
   };
 
   return (
-    <SplitPane storageKey="spectre.split.mcp-v3" initial={0.42}>
+    <SplitPane storageKey="spectre.split.mcp-v4" initial={0.5}>
       <div className="flex min-h-0 min-w-0 flex-col gap-3">
 
       <Panel title="注册新 Server" className="shrink-0" bodyClassName="p-3 space-y-2">

@@ -27,14 +27,22 @@ export function useBusPanelEntries(
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
+    // r50i: ws 未就绪(空串/undefined)不请求——带错参查询返回空+loaded
+    // 曾致"暂无漏洞/情报"闪现(切页/项目瞬间); 就绪后 effect 重跑拉真数据。
+    if (!ws) { setEvents([]); setLoaded(false); return; }
     let stopped = false;
     const cursor = { v: 0 };
     setEvents([]);
     setLoaded(false);
-    const snapshot = async () => {
-      const all = await api<ApiBusEvent[]>('/bus' + (ws ? `?ws=${ws}` : ''));
+    const snapshot = async (retry = true) => {
+      const all = await api<ApiBusEvent[]>(`/bus?ws=${ws}`);
       if (stopped) return;
       const folded = foldEntries(all).filter(accept);
+      // r50i: 空结果一次免费重试(瞬时竞态不落"暂无"态)
+      if (folded.length === 0 && retry) {
+        await new Promise(r => setTimeout(r, 350));
+        if (!stopped) return snapshot(false);
+      }
       setEvents(limit ? folded.slice(-limit).reverse() : folded.reverse());
       setLoaded(true);
       cursor.v = all.at(-1)?.seq ?? 0;
