@@ -165,7 +165,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         const ok = (sc.targets || []).some(t => targetMatches(t, dest));
         if (!ok) {
           return { ok: false, error:
-            `授权门:通道目的地 ${dest} 不在目标清单(拒绝)——target 标签与 transportRef 端点不一致` };
+            `授权门:通道目的地 ${dest} 不在目标清单(拒绝)——target 标签与 transportRef 端点不一致。目标确需渗透时: 调用 request_authorization(target, 理由) 向用户申请授权, 批准后自动放行` };
         }
       }
     }
@@ -216,7 +216,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       const t0 = String(target || '').trim();
       if (sc0?.targets?.length && t0
         && !sc0.targets.some(t => targetMatches(t, t0))) {
-        return { error: `授权门:target ${t0} 不在 scope 清单,拒绝注册(早校验——exec 侧同样会拦)。清单内目标示例:${sc0.targets.slice(0, 3).join('/')}` };
+        return { error: `授权门:target ${t0} 不在 scope 清单,拒绝注册(早校验)。示例:${sc0.targets.slice(0, 3).join('/')}。确需渗透: request_authorization(${t0}, 理由) 申请授权` };
       }
     }
     // r17-1: 注册路径 scope 硬校验(web/ssh 目的地必须在授权清单——
@@ -227,7 +227,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       const ok0 = sc0 && dest0 && Array.isArray(sc0.targets)
         && sc0.targets.some(t => targetMatches(t, dest0));
       if (!ok0) {
-        return { error: `授权门:目标 ${dest0 ?? tr.slice(0, 40)} 不在 scope 清单,拒绝注册(exec 侧同样会拦)。清单内目标示例:${(sc0?.targets ?? []).slice(0, 3).join('/') || '(scope 未配置)'}` };
+        return { error: `授权门:目标 ${dest0 ?? tr.slice(0, 40)} 不在 scope 清单,拒绝注册。示例:${(sc0?.targets ?? []).slice(0, 3).join('/') || '(未配置)'}。确需渗透: request_authorization(该目标, 理由) 申请授权` };
       }
     }
     if (transport === 'web') {
