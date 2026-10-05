@@ -88,7 +88,7 @@ export function buildIntelTools(record, caps) {
       })),
       agentType: Type.Optional(Type.Union([
         stageEnum, Type.Literal('autopwn'),
-      ], { description: 'Filter by stage agentKey (recon/api/c2/…), 不含派生代号' })),
+      ], { description: 'Filter by stage agentKey (recon/api/c2/…), 不含派生代号。autopwn=编排器本人(depth 0), 不含其 spawn 的深度链子会话——派生谱系请用 author=派生代号' })),
       status: Type.Optional(Type.Union([
         Type.Literal('success'), Type.Literal('partial'),
         Type.Literal('failed'), Type.Literal('no-result'),
@@ -186,7 +186,11 @@ export function buildIntelTools(record, caps) {
         .filter(isEntry)
         .filter(e => !e.void || params.includeVoid)  // r12: includeVoid=true 审计面含作废条目
         .filter(e => kind === 'both' || entryKind(e) === kind)
-        .filter(e => !params.agentType || e.from === params.agentType)
+        // r33-D5: agentType=autopwn 语义收窄——from 匹配曾把 spawn 深度
+        // 链的 autopwn 子会话(L1/L2, author.depth>0)全算进来(308 条过
+        // 宽); 深度 0=编排器本人。stage 键无此歧义(派生链同键罕见)。
+        .filter(e => !params.agentType || (e.from === params.agentType
+          && (params.agentType !== 'autopwn' || !e.author || e.author.depth === 0)))
         .filter(e => !status || e.status === status)
         .filter(e => !severity || (e.severity ?? '').toLowerCase() === severity)
         .filter(e => {

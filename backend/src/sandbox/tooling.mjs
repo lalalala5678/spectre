@@ -621,7 +621,15 @@ function buildAllToolingTools(caps, sessionRecord) {
           : (offset > 0 ? `\n\n(本段至正文末尾, 共 ${body.length} 字符)` : '');
         return okText(`${url}\n\n${page}${more}`);
       } catch (e) {
-        return errText(`抓取失败:${e.message}`);
+        // r33-D6: 负路径回执对齐 read 标杆——原因分类+补救指引
+        // (此前仅 "fetch failed", DNS/超时/TLS/4xx 不可辨)。
+        const msg = String(e?.message ?? e ?? '');
+        const why = /ENOTFOUND|getaddrinfo/i.test(msg) ? '域名解析失败(host 不存在或本环境无外联 DNS)'
+          : /ETIMEDOUT|timeout/i.test(msg) ? '连接超时(目标无响应或被墙)'
+          : /certificate|SSL|TLS/i.test(msg) ? 'TLS 证书校验失败'
+          : /ECONNREFUSED/i.test(msg) ? '连接被拒(端口未开)'
+          : msg || '未知网络错误';
+        return errText(`抓取失败:${why}。URL: ${String(url).slice(0, 120)}。可尝试: 换 http/https、去尾斜杠、确认目标在线; 需要搜索改用 search_web。`);
       }
     },
   };
