@@ -66,7 +66,11 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
     // history being read (tail-window drift fix). Returning to the
     // bottom re-enters tail-follow mode (null state is a no-op there).
     setStartIdx(prev => {
-      if (nearBottom) return null;
+      // r50d 断环: 底部**不重置**窗口——nearBottom 曾把冻结起点清回
+      // null(尾 30), 顶部 sentinel 随即链式补载回全量, scroll 再触发
+      // 重置……滚动条五阶梯循环(用户实测 1-2s/轮)的闭环即此。向上
+      // 滚动才冻结; 回到底部保持已加载的历史不动。
+      if (nearBottom) return prev;
       if (prev !== null) return prev;
       return Math.max(0, messagesLenRef.current - 30);
     });
