@@ -629,7 +629,7 @@ function buildAllToolingTools(caps, sessionRecord) {
         const msg = String(c?.code ?? c?.message ?? e?.message ?? e ?? '');
         const why = /ENOTFOUND|getaddrinfo/i.test(msg) ? '域名解析失败(host 不存在或本环境无外联 DNS)'
           : /ETIMEDOUT|timeout/i.test(msg) ? '连接超时(目标无响应或被墙)'
-          : /certificate|SSL|TLS/i.test(msg) ? 'TLS 证书校验失败'
+          : /certificate|SSL|TLS|wrong version number/i.test(msg) ? 'TLS 握手失败(协议不匹配——https 打了明文口, 或证书问题)'
           : /ECONNREFUSED/i.test(msg) ? '连接被拒(端口未开)'
           : msg || '未知网络错误';
         return errText(`抓取失败:${why}。URL: ${String(url).slice(0, 120)}。可尝试: 换 http/https、去尾斜杠、确认目标在线; 需要搜索改用 search_web。`);
