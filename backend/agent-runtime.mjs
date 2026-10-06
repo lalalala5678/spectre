@@ -158,6 +158,18 @@ const shellRegistry = createShellRegistry({ bus: shellBusAdapter(bus), listScope
  * 业务判定(事件扫描/回执文案)留在各调用方。
  * @returns {{session: object, timeout: boolean}}
  */
+// loop42: reportWriter 并发槽(≤2)——≥4 并行曾全静默丢失(429)。
+let _rwActive = 0;
+const _rwQ = [];
+function acquireWriterSlot() {
+  if (_rwActive < 2) { _rwActive++; return Promise.resolve(); }
+  return new Promise(r => _rwQ.push(r));
+}
+function releaseWriterSlot() {
+  const next = _rwQ.shift();
+  if (next) next(); else _rwActive = Math.max(0, _rwActive - 1);
+}
+
 async function runDetachedAgent(o) {
   const s = store.create(o.agentKey, {
     workSessionId: o.ws,
@@ -457,7 +469,14 @@ const caps = {
    */
 
   reportWriter: async (requesterRecord, hint) => {
-    const requesterAuthor = store.authorOf(requesterRecord);
+    // loop42-新缺陷: ≥4 并行 writer 全静默丢失(429 击杀, 失败不在回执
+    // 浮现)——进程内信号量 ≤2 并发, 超出排队(回执附排队时长)。
+    const qStart = Date.now();
+    await acquireWriterSlot();
+    const queuedMs = Date.now() - qStart;
+    try {
+      return await (async () => {
+        const queuedMs = Date.now() - qStart;
     const baseSeq = bus.list().at(-1)?.seq ?? 0;
     const tRw = Date.now();  // r14-④: 同步等待可观测(回执附 waitedMs)
     const { session: writer, timeout } = await runDetachedAgent({
@@ -578,8 +597,17 @@ const caps = {
         `${replyShown.slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,
-      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw },  // r28-#2: 归位——此处属 reportWriter(tRw);500 行属 revisionWriter(tRv)
+      details: { sessionId: writer.id, declined: true, waitedMs: Date.now() - tRw, queuedMs },  // r28-#2: 归位——此处属 reportWriter(tRw);500 行属 revisionWriter(tRv)
     };
+      })().then(r => {
+        // loop42-诚实回执: 上游"无判定输出"(429 击杀形态)不得伪装成
+        // 驳回——如实标注线索未被处理+重试指引。
+        if (r && typeof r.text === 'string' && /No result provided|无输出/.test(r.text)) {
+          r.text = `[writer 无判定输出(疑似上游限速/会话被击杀)——线索未被处理, 稍后原样重试即可] ` + r.text;
+        }
+        return r;
+      });
+    } finally { releaseWriterSlot(); }
   },
 
   /** wake_agent tool backing — the mandatory post-config verification

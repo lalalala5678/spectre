@@ -254,7 +254,9 @@ export function buildIntelTools(record, caps) {
         const a = e.author;
         const prov = a
           ? `${a.name}(${a.typeLabel}${a.parent ? `,父:${a.parent.name}` : ''}${Number.isInteger(a.depth) ? `,L${a.depth}` : ''})`
-          : `${e.from}(溯源缺失)`;
+          // loop42-②外观: payloadRef 已挂编排者会话的代拟条目不再标
+          // "溯源缺失"(与实际可溯自相矛盾)——仅真无溯源时标注。
+          : (e.payloadRef ? `${e.from}` : `${e.from}(溯源缺失)`);
         const head = e.type === 'task-report'
           ? `[seq=${e.seq}][任务报告|${e.status ?? '?'}] ${prov}`
           : entryKind(e) === 'vulnerability'
