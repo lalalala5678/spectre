@@ -134,9 +134,12 @@ export function targetMatches(t, target) {
   // 端口形态(127.0.0.1:30080); 一次授权全端口放行, 否则每端口都要
   // 批一次(7852 案: 批了裸 IP 仍被带端口条目拦, 授权问题反复污染)。
   const stripPort = x => x.replace(/:\d{1,5}$/, '');
+  // loop-auth-7896: localhost 与 127.0.0.1 同机等价(席位按域名形态
+  // 注册曾再被拦——授权问题反复污染的最后一个变体)。
+  const norm = x => { const h = stripPort(x); return h === 'localhost' ? '127.0.0.1' : h; };
   return tt === dt
     || (tt.startsWith('*.') && dt.endsWith(tt.slice(1)))
-    || (stripPort(tt) === stripPort(dt) && !stripPort(tt).includes('*'));
+    || (norm(tt) === norm(dt) && !norm(tt).includes('*'));
 }
 
 export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 死参数删(仅 persistShells 快照持久化)
