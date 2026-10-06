@@ -133,7 +133,7 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       // 决策交给模型)。
       if (authWarnHit && out && Array.isArray(out.content)) {
         const first = out.content.find(c => c.type === 'text');
-        if (first) first.text = `[授权提示] 本命令含未授权目标 ${authWarnHit}(不在渗透授权清单)——请自行判断: request_authorization 申请 / 停止 / 或确认为授权资产后继续。\n---\n${first.text ?? ''}`;
+        if (first) first.text = `[授权提示] 本命令含未授权目标 ${authWarnHit}——请自行判断: request_authorization 申请 / 停止 / 或确认为授权资产后继续。当前清单实况: [${(scopeTargetsOf() ?? []).join(', ')}]。\n---\n${first.text ?? ''}`;
       }
       return out;
     },

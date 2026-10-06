@@ -195,7 +195,10 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
         });
         setBusy(d.busy);
         lastSeq.current = Math.max(lastSeq.current, d.lastSeq ?? 0);
-        scrollToBottom();
+        // 用户令(10s 重置): 断流重连对账曾无条件拉底——EventSource 周期
+        // 重连(~10s)即周期性拽回, 拖上去看历史每十秒被打断一次。
+        // 只在用户仍处于跟随模式时钉底。
+        if (stickToBottom.current) scrollToBottom();
       } catch { /* 对账失败: 下次重连再试 */ }
     };
     const off = subscribeSse(
