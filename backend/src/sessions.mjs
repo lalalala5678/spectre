@@ -540,8 +540,8 @@ export class SessionStore {
     // 文本, 故在此预判: 若当前回合已持续>5min, 该消息大概率在收官后
     // 送达, 预打 [迟到中段消息] 头供编排器对账(终报可能已含全部信息)。
     const turnMs = record.turnStartedAt ? Date.now() - record.turnStartedAt : 0;
-    const tagged = turnMs > 5 * 60_000 && !text.startsWith('[迟到')
-      ? `[迟到中段消息](排队 ${Math.round(turnMs / 60_000)}min, 注意与情报库终态对账)\n${text}` : text;
+    const tagged = turnMs > 5 * 60_000 && !text.startsWith('[排队到达')
+      ? `[排队到达·主控回合已进行 ${Math.round(turnMs / 60_000)}min(排队属常态, 与情报库终态对账即可)]\n${text}` : text;
     record.agent.steer(source
       ? { role: 'user', content: tagged, timestamp: Date.now(), source }
       : { role: 'user', content: tagged, timestamp: Date.now() });
@@ -568,14 +568,23 @@ export class SessionStore {
     // 后才注入, 预打 [迟到中段消息] 头(r6 验证轮实测 9-10min 仍裸头)。
     const turnMs = record.turnStartedAt ? Date.now() - record.turnStartedAt : 0;
     const tagged = agent.state.isStreaming && turnMs > 5 * 60_000
-      && !text.startsWith('[迟到')
-      ? `[迟到中段消息](排队时回合已进行 ${Math.round(turnMs / 60_000)}min, 注意与情报库终态对账)\n${text}` : text;
+      && !text.startsWith('[排队到达')
+      ? `[排队到达·主控回合已进行 ${Math.round(turnMs / 60_000)}min(排队属常态, 与情报库终态对账即可)]\n${text}` : text;
     const msg = { role: 'user', content: tagged, timestamp: Date.now(), source };
-    const queue = () => {
-      agent.followUp(msg);
+    // loop-DM(A+B): 平台自管 DM 队列——忙时不再 agent.followUp(pi 队列
+    // 在 run 结束后无人 pump, r47-D4 洞), 改入 _dmQueue; 回合结束→
+    // 3s 去抖窗合批→单条注入(prompt 新回合, 心智上下文还热)。
+    const enqueue = () => {
+      (record._dmQueue ??= []).push(msg);
       this._journal(record, 'followup_queued', { text: truncateText(tagged, 200) });
+      this._scheduleDmPump(record);
     };
-    if (agent.state.isStreaming) {
+    const queue = enqueue;
+    // loop-DM 修正: isStreaming 仅覆盖 LLM 流式期——工具执行期(长 bash/
+    // 长工具)isStreaming=false 而 record.busy=true, DM 曾走空闲直注→
+    // pi 队列逐条消化(每条一回合, 合批失效)。以 busy 为门: 整个回合
+    // 期间全入 _dmQueue, 回合边界合批注入。
+    if (agent.state.isStreaming || record.busy) {
       queue();
       return;
     }
@@ -592,6 +601,50 @@ export class SessionStore {
       }
       queue();
     });
+  }
+
+  /** loop-DM(A+B): 回合边界泵+合批去抖——DM 到达时忙→入队+挂完成
+   * 等待; run 结束→3s 去抖(窗内续到的 DM 并入同批)→合并单条注入。
+   * 注入失败(竞态再忙)→重新入队续等。 */
+  _scheduleDmPump(record) {
+    if (record._dmPumpScheduled) return;
+    record._dmPumpScheduled = true;
+    const pumpWhenIdle = async () => {
+      // 等 run 结束(回合边界即时泵; 上限防 wedge)
+      await this.awaitCompletion(record, 30 * 60_000);
+      // 去抖窗: 3s 内续到的 DM 合并同批
+      await new Promise(r => setTimeout(r, 3000).unref?.());
+      const q = record._dmQueue ?? [];
+      if (!q.length) { record._dmPumpScheduled = false; return; }
+      // 竞态: 窗内又忙(其它注入先跑)→重排
+      if (record.agent?.state?.isStreaming || record.busy) {
+        record._dmPumpScheduled = false;
+        this._scheduleDmPump(record);
+        return;
+      }
+      record._dmQueue = [];
+      record._dmPumpScheduled = false;
+      const merged = q.length === 1
+        ? q[0].content
+        : `[DM 批×${q.length}(排队到达已合批——一轮处理, 逐条勿重复对账)]\n` + q.map(m => `---\n${m.content}`).join('\n');
+      this._journal(record, 'followup_batch_injected', { n: q.length });
+      record.busy = true;
+      this._journal(record, 'agent_start', { via: 'followup-batch' });
+      Promise.resolve(record.agent.prompt({
+        role: 'user', content: merged, timestamp: Date.now(),
+        source: q[0].source,
+      })).catch(() => {
+        if (!record.agent.state.isStreaming) {
+          record.busy = false;
+          for (const fn of record.completionWaiters ?? []) { try { fn(); } catch { /* best-effort */ } }
+          record.completionWaiters = [];
+        }
+        // 输给竞态: 重新入队续等
+        (record._dmQueue ??= []).unshift({ role: 'user', content: merged, timestamp: Date.now(), source: q[0].source });
+        this._scheduleDmPump(record);
+      });
+    };
+    void pumpWhenIdle().catch(() => { record._dmPumpScheduled = false; });
   }
 
   async waitIdle(record) {

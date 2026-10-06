@@ -214,10 +214,13 @@ export async function autoPwnWorkflow(input) {
   // 实测 24-35min 投延不可感)。
   await sleep(5 * 60 * 1000);
   try {
+    // loop-DM(C·通知分级): 全员 success 且零异常=零增量批次——前缀
+    // 引导编排者对账从简(不再逐条表演性对账, 提示词侧同步)。
+    const allClean = [...results.values()].every(v => !v.error);
     await quick.notifyEngagementDone({
       orchestratorSessionId,
       engagementId,
-      summary: summaryLines,
+      summary: (allClean ? '[零异常批次·对账从简——各席终报已各自落账, 逐条核对仅在有疑点时做]\n' : '') + summaryLines,
       // r6v3-#10: 送达时对账原料——activity 投递前重查情报库, 对这些
       // 成员追加最新终报状态(构建与送达之间的落账不再漏报)。
       recheck: [...results.entries()]
