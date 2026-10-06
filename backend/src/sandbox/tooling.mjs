@@ -17,12 +17,15 @@ import { loadMcpConfig, testMcpServer } from './mcp.mjs';
 import { listInstalledTools, sandboxConfig, uninstallCliTool, readInstallLog } from './container.mjs';
 import { AGENT_KEYS, CONFIG_AGENT_KEYS } from '../agents.mjs';
 import { getPrefs } from '../projects.mjs';
+import { CONFIG } from '../config.mjs';
 // CS1-R12: 信封单源 pi.mjs(errText 曾与 okText 逐字同——双胞胎漂移过)
 import { sayText as okText, sayError as errText } from '../pi.mjs';
 import { applyMcpAndMounts } from './apply-config.mjs';
 import { providerFetch } from './provider-specs.mjs';
 import { access } from 'node:fs/promises';
 import { HOST, CONTAINER } from './exec-env.mjs';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 // ------------------------------------------------------------- helpers
 
@@ -406,6 +409,13 @@ function buildAllToolingTools(caps, sessionRecord) {
   // candidate oriented) and recon's OSINT instance (same axiom as the
   // config trio: a capability needed by multiple agents = one instance
   // each, never a shared singleton).
+
+function shellScopeTargets() {
+  // 同源 agent-runtime shellScope(scope.json; 逐次读——授权窗口实时开闭)
+  try { return JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets ?? []; }
+  catch { return []; }
+}
+
   const runSearch = async (_id, p) => {
     const receipt = ['渠道分解:'];
     const hits = [];
@@ -432,6 +442,15 @@ function buildAllToolingTools(caps, sessionRecord) {
       }
       receipt[receipt.length - 1] += ` [下发: ${String(ch.query ?? p.query).slice(0, 80)}]`;
     }
+    // loop36-QA: 越界提示(信息性, 不拦)——query 含 IPv4 且不在授权
+    // 清单时附注(搜索/OSINT 不受限; 对该目标主动探测前需授权)。
+    let scopeNote = '';
+    try {
+      const ips = String(p.query).match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g) ?? [];
+      const targets = shellScopeTargets();
+      const out = [...new Set(ips.filter(x => !targets.includes(x)))];
+      if (out.length) scopeNote = `\n[越界提示] query 含 ${out.join(', ')} 不在渗透授权清单——OSINT/检索不受限, 但对其主动探测/扫描前需 request_authorization。`;
+    } catch { /* scope 读失败静默(提示为增强非门禁) */ }
     const cfg = await getPrefs();
     // U2: 唯一来源=设置面板 common.webSearch(旧顶层 webSearchProvider
     // 从未被任何部署设置过,零迁移直接切换)
@@ -459,7 +478,7 @@ function buildAllToolingTools(caps, sessionRecord) {
       receipt.push('- 通用web:未配置 provider(当前=none,仅以上垂直结果;不假装搜过)');
     }
     if (!hits.length) {
-      return okText(receipt.join('\n') + '\n\n无结果。建议换关键词或明确目标渠道。');
+      return okText(receipt.join('\n') + '\n\n无结果。建议换关键词或明确目标渠道。' + scopeNote);
     }
     // cross-channel dedupe (same url/title) — registry pagination
     // once listed the same server 3x in a row (round-3 review)
@@ -552,7 +571,7 @@ function buildAllToolingTools(caps, sessionRecord) {
     const dedupeNote = mirrorMerged > 0
       ? `\n镜像合并: ${mirrorMerged} 条 — ${mirrorExamples.slice(0, 3).join('; ')}`
         + (mirrorMerged > 3 ? ` 等` : '') : '';
-    return okText(receipt.join('\n') + dedupeNote
+    return okText(receipt.join('\n') + scopeNote + dedupeNote
       + `\n\n候选(去重后 ${uniqList.length} 条,显示 ${pStart + 1}-${pStart + shown.length}${moreHint ? ' ' + moreHint : ''}):\n`
       + shown.map((h, i) =>
         `${pStart + i + 1}. [${h.channel ?? '?'}] ${h.title}${h.mirrorCount > 1 ? `(镜像 ×${h.mirrorCount})` : ''}\n   ${h.url}\n   ${(h.snippet ?? '').slice(0, 120)}`)

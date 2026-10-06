@@ -262,6 +262,15 @@ const caps = {
     }).catch(() => { /* 上限兜底: 队列版仍在 */ });
     return ok;
   }),
+  /** loop36-QA: 全部待批授权请求(编排者侧挂起查询——此前只能被动等
+   * dup 提示或看前端确认卡, 无查询入口)。 */
+  listPendingAuthRequests: () => {
+    const settled = new Set(bus.list().filter(e => e.resolves).map(e => e.resolves));
+    return bus.list()
+      .filter(e => e.type === 'auth-request' && !e.resolves && !settled.has(e.seq))
+      .map(e => ({ seq: e.seq, target: e.target, requester: e.requester,
+        reason: String(e.reason ?? '').slice(0, 120) }));
+  },
   /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
   scanAuthRequests: (record, target) => {
     try {

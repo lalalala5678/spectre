@@ -1187,10 +1187,17 @@ export function buildAuthRequestTool(record, caps) {
       '非滥用通道: 每个目标申请一次, 附清晰理由(任务必要性/目标归属)。',
     executionMode: 'sequential',
     parameters: Type.Object({
-      target: Type.String({ description: '目标名(与 shell target/transportRef 目的地一致, 如 10.0.0.5 或 host.example.com)' }),
+      target: Type.String({ description: "目标名(与 shell target/transportRef 目的地一致, 如 10.0.0.5 或 host.example.com); 传 '*' 列出当前全部待批授权请求(只读查询, 不发新请求)" }),
       reason: Type.String({ description: '为什么需要授权该目标(一句话任务理由)' }),
     }),
     execute: async (_id, params) => {
+      // loop36-QA: target='*' 只读查询全部待批(此前挂起请求无查询入口)
+      if (params.target === '*') {
+        const pend = caps.listPendingAuthRequests?.() ?? [];
+        return { content: [{ type: 'text', text: pend.length
+          ? `当前待批授权请求 ${pend.length} 条(用户未处理):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
+          : '当前无待批授权请求。' }] };
+      }
       // 同目标去重: 已 pending 或已批准则不重复发
       const dup = caps.scanAuthRequests?.(record, params.target);
       if (dup === 'pending') {
