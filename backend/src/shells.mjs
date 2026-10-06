@@ -100,6 +100,10 @@ function boundedExecResult(err, so, se, timeoutNote, runtimeTool) {
   if (err?.code === 'ERR_CHILD_PROCESS_STDIO_MAXBUFFER') {
     stderr += `\n[输出超 ${MAX_OUT}B 截断——管道 head/tail/grep 缩小范围后重取]`;
   }
+  // loop39-P1: maxBuffer 截断同样标注(ssh/local 通道)。
+  if (stdout && stdout.length >= MAX_OUT) {
+    stdout += `\n[已达单次输出上限 ${MAX_OUT}B——如需更多用 head/tail 分段]`;
+  }
   return { stdout, stderr, code };
 }
 
@@ -344,7 +348,27 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
    * configured exec box (docker container) — benchmark-grade fidelity.
    * Returns { ok, stdout, stderr, code, ms }.
    */
+  // loop39-P0: 共享 web 通道并发串台——8990 桥共享 stdout, 并发调用
+  // 命令交错注入互相收到对方输出(postex↔persistence md5 交叉实证)。
+  // per-shell 串行队列: 同 shell 的 exec 排队执行, 消除交错窗。
+  const shellLocks = new Map();
+
   async function exec(id, command, opts = {}) {
+    const prev = shellLocks.get(id) ?? Promise.resolve();
+    let release;
+    const gate = new Promise(r => { release = r; });
+    const chained = prev.then(() => gate);
+    shellLocks.set(id, chained);
+    await prev.catch(() => {});
+    try {
+      return await execRaw(id, command, opts);
+    } finally {
+      release();
+      if (shellLocks.get(id) === chained) shellLocks.delete(id);
+    }
+  }
+
+  async function execRaw(id, command, opts = {}) {
     let { timeoutMs = 30_000, verifyMark = false } = opts;  // CS71-5: box 死参删(零调用方, 同类 wal 已按 CS20-11 删)
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
@@ -390,7 +414,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // 自动重发一次; 仍不含则原样返回+滞后警告。
         const nonce = `WM${Date.now().toString(36)}`;
         const wrapped = `printf '${nonce}S'; ${command}; printf '${nonce}E'`;
-        const runOnce = async () => exec(id, wrapped, { timeoutMs });
+        const runOnce = async () => execRaw(id, wrapped, { timeoutMs });  // loop39: 锁内递归用 raw(死锁防护)
         let r1 = await runOnce();
         const grab = txt => {
           const a = txt.indexOf(nonce + 'S'); const b = txt.indexOf(nonce + 'E');
@@ -515,7 +539,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
               txt = txt.replace(new RegExp('</?' + safe + '>', 'g'), '').replace(/^\n+/, '');  // r8v4 足注: 标签位前导换行一并清
             }
           }
-          stdout = txt.slice(0, MAX_OUT); stderr = ''; code = r.ok ? 0 : 1;
+          // loop39-P1: 静默截断→显式标注(已显示/总长+补全手段)。
+          stdout = txt.length > MAX_OUT
+            ? txt.slice(0, MAX_OUT) + `\n[已截断:${MAX_OUT}/${txt.length} 字符——head/tail/grep 缩小范围后重取]`
+            : txt;
+          stderr = ''; code = r.ok ? 0 : 1;
           // r38-P1: web 回执 code=HTTP 传输层(200→0), 不反映端点命令
           // 退出码——dash 内层失败静默曾致假成功误导实战决策。载荷需
           // 自带回显(如 `; echo rc=$?`)才有真实 rc。

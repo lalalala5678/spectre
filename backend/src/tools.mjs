@@ -1020,6 +1020,8 @@ export function buildShellTools(record, caps) {
       filterTransport: Type.Optional(Type.String({ description: 'list: 按传输过滤(local/ssh/web)' })),
       filterTag: Type.Optional(Type.String({ description: 'list: 按标签过滤' })),
       filterStatus: Type.Optional(Type.String({ description: 'list: 按状态过滤(active/closed/expired/dead-sandbox-recreated——常用 active 只看活通道)' })),
+      limit: Type.Optional(Type.Number({ description: 'list: 分页大小(默认 50, 上限 200)' })),
+      offset: Type.Optional(Type.Number({ description: 'list: 分页偏移(默认 0; total>offset+limit 时回执给 nextPage)' })),
       target: Type.Optional(Type.String({ description: 'register: 授权目标名(须在 scope 清单)' })),
       transport: Type.Optional(Type.Union([Type.Literal('local'), Type.Literal('ssh'), Type.Literal('web')],
         { description: 'register: local|ssh|web' })),
@@ -1044,15 +1046,20 @@ export function buildShellTools(record, caps) {
           // r36-O2: 不再强制 status:'active'——过期条目被过滤曾使
           // "过期后 list 翻标 expired" 的文档语义落空(实测直接消失)。
           // expired 一并展示(带 status 字段), GC(>1h)仍由注册表管。
-          const list = R.list({ target: p.filterTarget, transport: p.filterTransport,
-            tag: p.filterTag, name: p.name, status: p.filterStatus })
+          const all = R.list({ target: p.filterTarget, transport: p.filterTransport,
+            tag: p.filterTag, name: p.name, status: p.filterStatus });
+          // loop39-P2: list 分页(184 条直出曾致回执膨胀)——总数真披露。
+          const lim = Math.min(Math.max(1, Number(p.limit) || 50), 200);
+          const off = Math.max(0, Number(p.offset) || 0);
+          const list = all.slice(off, off + lim)
             .map(x => ({ id: x.id, name: x.name, target: x.target, transport: x.transport,
               tags: x.tags ?? [], status: x.status, user: x.user, os: (x.os || '').slice(0, 60),
               cmdCount: x.cmdCount, expiresAt: x.expiresAt }));
           // r35-N4/N7: 条目带端点探测提示(status=active 仅注册态, 不证明
           // 端点活着——存活验证需 exec/status); 空结果诊断附全量计数。
           const note4 = 'active=注册态(TTL 内), 不证明端点存活——验证用 status/exec';
-          return say(list.length ? { ok: true, count: list.length, shells: list, note: note4 }
+          return say(list.length ? { ok: true, count: list.length, total: all.length,
+            ...(all.length > off + lim ? { nextPage: `offset=${off + lim}` } : {}), shells: list, note: note4 }
             : { ok: true, count: 0, shells: [],
               note: `过滤(${[p.filterTarget, p.filterTransport, p.filterTag].filter(Boolean).join('/') || 'active'})下无匹配。` +
                 `全注册表 ${R.list({}).length} 条(含 closed/expired)——放宽过滤或用 status 按 id 直查; 新通道用 register` });
