@@ -236,7 +236,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     let hostCtxNote = null;
     if (String(transport).toLowerCase() === 'local') {
       const cname = String(transportRef || '').split(':')[0];
-      const haveDocker0 = dockerLiveProbe();
+      const haveDocker0 = sandboxConfig().driver === 'docker' && dockerLiveProbe();
       const hostAlias = /^(localhost|host|host.docker.internal)$/i.test(cname);
       if (hostAlias) {
         hostCtxNote = '本通道将在宿主执行(localhost 特例)——与 bash/write 的容器文件系统不互通, 跨上下文工件经 /workspace 或情报库传递';
