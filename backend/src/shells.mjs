@@ -158,8 +158,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // R32D50-F8/CS27-7: targets 语义=模块级 targetMatches(详见其 doc 注释)。
     const inTargets = Array.isArray(sc.targets)
       && sc.targets.some(t => targetMatches(t, shell.target));
-    if (!sc.targets?.length || !inWindow) return { ok: false, error: '授权门:窗口外或无目标(拒绝)' };
-    if (!inTargets) return { ok: false, error: `授权门:目标 ${shell.target} 不在清单(拒绝)。target 只写目标名(如 127.0.0.1), 不带端口——端口属于 transportRef` };
+    // 用户令(授权自治): 授权不做硬件拦截, 全靠大模型自主判断——
+    // 不在清单→警告放行(回执头部注入, 模型自行决定申请/停止/继续)。
+    if (!sc.targets?.length || !inWindow) return { ok: true,
+      warn: `[授权提示] 授权窗口外或清单为空——当前对 ${shell.target} 的操作未经用户授权确认, 请自行判断是否应继续(建议 request_authorization 申请或仅做被动观测)` };
+    if (!inTargets) return { ok: true,
+      warn: `[授权提示] 目标 ${shell.target} 不在授权清单(注意 target 只写主机名, 端口属于 transportRef)——请自行判断: 申请授权(request_authorization)/停止/或确认为授权资产后继续` };
     if (shell.expiresAt && now > shell.expiresAt) {
       // R6-F3: 过期是事实终态——懒翻 status 让查重/list 反映真值
       // (此前僵尸 status=active 永久占名, 卡死同名重注册)。
@@ -177,8 +181,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       if (dest) {
         const ok = (sc.targets || []).some(t => targetMatches(t, dest));
         if (!ok) {
-          return { ok: false, error:
-            `授权门:通道目的地 ${dest} 不在目标清单(拒绝)——target 标签与 transportRef 端点不一致。目标确需渗透时: 调用 request_authorization(target, 理由) 向用户申请授权, 批准后自动放行` };
+          execWarn = `[授权提示] 通道目的地 ${dest} 不在授权清单(target 标签与端点不一致)——请自行判断是否应继续(request_authorization 可申请)`;
         }
       }
     }
@@ -224,12 +227,13 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     const tr = String(transportRef || '');
     // r38-P2: target 标签本身也早校验(local 通道无 transportRef 目的
     // 地, 此前 local 注册完全绕过 scope, exec 才拦——晚失败实测)。
+    let scopeWarn = null;
     {
       const sc0 = listScope?.() ?? null;
       const t0 = String(target || '').trim();
       if (sc0?.targets?.length && t0
         && !sc0.targets.some(t => targetMatches(t, t0))) {
-        return { error: `授权门:target ${t0} 不在 scope 清单,拒绝注册(早校验)。示例:${sc0.targets.slice(0, 3).join('/')}。确需渗透: request_authorization(${t0}, 理由) 申请授权` };
+        scopeWarn = `[授权提示] target ${t0} 不在授权清单(已放行——授权自治模式)。请自行判断: 申请授权(request_authorization)/停止/或确认为授权资产后继续`;
       }
     }
     // r17-1: 注册路径 scope 硬校验(web/ssh 目的地必须在授权清单——
@@ -240,7 +244,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       const ok0 = sc0 && dest0 && Array.isArray(sc0.targets)
         && sc0.targets.some(t => targetMatches(t, dest0));
       if (!ok0) {
-        return { error: `授权门:目标 ${dest0 ?? tr.slice(0, 40)} 不在 scope 清单,拒绝注册。示例:${(sc0?.targets ?? []).slice(0, 3).join('/') || '(未配置)'}。确需渗透: request_authorization(该目标, 理由) 申请授权` };
+        scopeWarn = `[授权提示] 通道目的地 ${dest0 ?? tr.slice(0, 40)} 不在授权清单(已放行——授权自治模式)。请自行判断: 申请授权(request_authorization)/停止/或确认为授权资产后继续`;
       }
     }
     if (transport === 'web') {
@@ -280,6 +284,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       expiresAt: new Date(Date.now() + ttlHours * 3600e3).toISOString(),
       workSessionId: meta?.workSessionId ?? null,  // r50: 项目归属(控制台按项目过滤)
       cmdCount: 0, lastActiveAt: null, status: 'active',
+      ...(scopeWarn ? { scopeWarn } : {}),
       tasks: [],          // tasking history (Mythic): {n, command, code, ms, at}
       host: null, user: null, os: null,  // auto-fingerprint (Sliver session meta)
     };
@@ -383,13 +388,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     if (!sh) return { ok: false, error: 'shell 不存在' };
     if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}——dead/expired 通道不会自动重探, 端点若已恢复请 register 重新注册(同 target 新 id), 历史命令记录仍可查` };
     const g = gate(sh);
-    if (!g.ok) {
-      // R32D50-F5/CS35-5: shell 授权门拒绝落本侧 audit(与 c2 工具的
-      // 审计纪律对齐——c2 侧仅正常操作+qa 的 EDUSRC 拒绝落行, 见
-      // scope-gate SKILL 审计表)。
-      audit('shell-gate-reject', { id, target: sh.target, reason: g.error });
-      return { ok: false, error: g.error };
-    }
+    // 授权自治: gate 不再拒绝——warn 注入 stdout 头部(模型自主判断)。
+    let execWarn = g.warn ?? null;
+    if (execWarn) audit('shell-gate-warn', { id, target: sh.target, warn: execWarn });
     const t0 = Date.now();
     let stdout = '', stderr = '', code = 0;
     let degradedNote;  // r9v2-D10回归: 提升到函数顶
@@ -631,7 +632,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     persistShells();  // R6-F2: every-mutation 契约
     if (sh.tasks.length > 100) sh.tasks.splice(0, sh.tasks.length - 100);
     audit('shell-exec', { id, target: sh.target, cmd: command.slice(0, 120), code, ms: task.ms });
-    return { ok: code === 0, stdout: stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task, ...(degradedNote ? { degradedNote } : {}), ...(layerNote ? { layerNote } : {}) };
+    // 授权自治: 未授权警告注入 stdout 头(不拦, 模型自主判断)。
+    const outHead = execWarn ? execWarn + '\n---\n' : '';
+    return { ok: code === 0, stdout: outHead + stdout.slice(0, MAX_OUT), stderr: stderr.slice(0, MAX_OUT), code, ms: task.ms, task, ...(degradedNote ? { degradedNote } : {}), ...(layerNote ? { layerNote } : {}) };
   }
 
   /** Auto-fingerprint the host once (whoami/uname) — Sliver-style session meta. */

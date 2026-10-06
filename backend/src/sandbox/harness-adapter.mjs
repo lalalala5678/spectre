@@ -73,19 +73,10 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       // 通道, bash 里 curl/nmap 直连目标全放行(实测 crAPI 30080 裸跑)。
       // 内网段+localhost 目标不在 scope → 拦+申请指引(公网域名/CDN
       // 不拦——pip/npm 装包不受影响)。
-      if (tool.name === 'bash' && typeof params.command === 'string') {
-        const gateHit = bashScopeGate(params.command);
-        if (gateHit) {
-          return {
-            isError: true,
-            content: [{ type: 'text', text:
-              `[授权拦截] 命令含未授权目标 ${gateHit}(内网/本机段, 不在渗透授权清单)——` +
-              `对目标发起任何主动探测/攻击前必须先获授权。` +
-              `请调用 request_authorization(target=${gateHit}, reason=任务必要性) 向用户申请; ` +
-              `批准后重试本命令即可。清单内目标不受影响。` }],
-          };
-        }
-      }
+      // 用户令(授权自治): 不做硬件拦截——命中未授权目标时照常执行,
+      // 结果头部注入警告, 大模型自主判断(申请/停止/继续)。
+      const authWarnHit = (tool.name === 'bash' && typeof params.command === 'string')
+        ? bashScopeGate(params.command) : null;
       // Shared-layer install bookkeeping: bash-side installs bypass the
       // install REST, so record them into the install-log ledger here
       // (idempotent dedupe via last-line check).
@@ -137,6 +128,12 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       if (tool.name === 'bash' && typeof params.command === 'string'
         && looksLikeInstall(params.command)) {
         appendInstallLog(params.command).catch(() => {});
+      }
+      // 授权自治: 未授权目标的警告注入输出头(命令已执行——回执如实,
+      // 决策交给模型)。
+      if (authWarnHit && out && Array.isArray(out.content)) {
+        const first = out.content.find(c => c.type === 'text');
+        if (first) first.text = `[授权提示] 本命令含未授权目标 ${authWarnHit}(不在渗透授权清单)——请自行判断: request_authorization 申请 / 停止 / 或确认为授权资产后继续。\n---\n${first.text ?? ''}`;
       }
       return out;
     },
