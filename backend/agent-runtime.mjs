@@ -257,7 +257,11 @@ const caps = {
     const running = [];
     for (const id of ids) {
       try {
-        const d = await describeWorkflow(id);
+        // r46-D2 同款前缀归一: workflow 实际 id 是 autopwn-eng-…,
+        // describeWorkflow 不做归一(cancelEngagement 做), 裸 eng-…
+        // 查询必 404→回落恒 null(D1 三轮未生效的根因)。
+        const wid = /^autopwn-/.test(id) ? id : `autopwn-${id}`;
+        const d = await describeWorkflow(wid);
         if (d.status === 'RUNNING') running.push(id);
       } catch { /* 已终结/不可达=非 RUNNING */ }
     }
