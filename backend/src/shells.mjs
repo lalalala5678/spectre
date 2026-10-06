@@ -21,7 +21,7 @@ import { randomUUID } from 'node:crypto';
 import { sandboxConfig } from './sandbox/container.mjs';
 import { mkdirSync, writeFileSync, readFileSync } from 'node:fs';
 import { dirname as pdirname, join as pathJoin } from 'node:path';
-import { execFile } from 'node:child_process';
+import { execFile, execFileSync } from 'node:child_process';
 
 
 function parseFormBody(tpl) {
@@ -228,6 +228,25 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // r38-P2: target 标签本身也早校验(local 通道无 transportRef 目的
     // 地, 此前 local 注册完全绕过 scope, exec 才拦——晚失败实测)。
     let scopeWarn = null;
+    // loop40-③: local 通道注册前校验容器存在——伪 success(exec 才炸,
+    // 且容器名沙箱内无法自省)。校验失败即拒, 不留僵尸注册。
+    if (String(transport).toLowerCase() === 'local') {
+      const cname = String(transportRef || '').split(':')[0];
+      const haveDocker0 = sandboxConfig().driver === 'docker';
+      if (haveDocker0 && cname) {
+        // 同步校验(register 为同步函数): execFile 已在顶部 import, 用
+        // spawnSync 等价物——execFileSync 经 node:child_process 具名导入。
+        let okBox = false;
+        try {
+          const names = execFileSync('docker', ['ps', '--format', '{{.Names}}'],
+            { timeout: 5000, encoding: 'utf8' });
+          okBox = String(names ?? '').split('\n').includes(cname);
+        } catch { okBox = false; }
+        if (!okBox) {
+          return { error: `local 通道校验失败: 容器 ${cname} 不存在(docker ps 无此名)——请先确认容器名; 宿主侧可用 shell list 查历史通道对照` };
+        }
+      }
+    }
     {
       const sc0 = listScope?.() ?? null;
       const t0 = String(target || '').trim();

@@ -145,7 +145,11 @@ export class Bus {
       // 短窗已足够强; 定级分歧恰是同点位双账的常见形态, 应拦而引
       // revise 归并(定级由修订链裁决), 不该因等级不同放行双正本。
       const otherTs = Date.parse(other.ts ?? 0);
-      if (other.type !== 'vulnerability' || other.revises
+      // loop40-①: 作废条目退出互斥——已作废正本的端点指纹 6/6 确定性
+      // 拦截新漏洞落账(CWE-338 writer 复核成立仍入不了账, 证据被错并
+      // 进作废条目修订链)。作废=审计存档, 不再占用"同端点终身一正本"
+      // 的指纹名额。
+      if (other.type !== 'vulnerability' || other.revises || other.void
         || other.workSessionId !== entry.workSessionId
         || otherTs < fpCut) continue;
       const ot = tokens(`${other.title} ${other.detail ?? ''}`);
