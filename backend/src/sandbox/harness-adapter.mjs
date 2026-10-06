@@ -5,6 +5,9 @@
  * keeping the official schema, description, truncation and spill
  * semantics byte-for-byte. Zero pi modifications.
  */
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
+import { CONFIG } from '../config.mjs';
 import { looksLikeInstall, appendInstallLog } from './container.mjs';
 import {
   createBashTool, createReadTool, createWriteTool, createEditTool,
@@ -37,12 +40,17 @@ function stubInvocation(toolCallId) {
 /** loop-auth: 内网/localhost 目标提取+scope 校验(与 shell 门同源
  * scope.json, 逐次读)。命中未授权目标返回该目标串, 否则 null。 */
 function scopeTargetsOf() {
+  // loop-auth 取证修复: 读失败曾静默返回 [](空清单=任何目标都误报
+  // "不在", 与 request_authorization 同时刻矛盾——用户实测)。fail-open:
+  // null=不可读, 调用方跳过提示。
   try {
-    return JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets ?? [];
-  } catch { return []; }
+    const t = JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets;
+    return Array.isArray(t) ? t : null;
+  } catch { return null; }
 }
 function bashScopeGate(command) {
   const targets = scopeTargetsOf();
+  if (targets === null) return null;  // scope 不可读: 不提示(fail-open)
   const ipRe = /\b(127(?:\.\d{1,3}){3}|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})\b/g;
   const cands = new Set([...String(command).matchAll(ipRe)].map(m => m[1]));
   if (/\blocalhost\b/i.test(command)) cands.add('localhost');
