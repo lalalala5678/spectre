@@ -438,7 +438,9 @@ function shellScopeTargets() {
         hits.push(...ch.items.map(it => ({ ...it, channel: ch.channel })));
         othersHaveHits = true;
       } else {
-        receipt.push(`- ${ch.channel}:0 命中${othersHaveHits ? '(该通道可能异常或无此类目)' : ''}`);
+        // loop37-D5: 0 命中不再歧义——通道无错=正常空(该词确无此目),
+        // 有错=异常。两者分开表述。
+        receipt.push(`- ${ch.channel}:0 命中(通道正常, 该查询词无此结果${othersHaveHits ? '' : '——若预期必有结果, 换更精确词或指定渠道'})`);
       }
       receipt[receipt.length - 1] += ` [下发: ${String(ch.query ?? p.query).slice(0, 80)}]`;
     }

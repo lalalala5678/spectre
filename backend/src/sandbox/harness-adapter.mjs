@@ -62,6 +62,22 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
         // (缺陷 5136)。adapter 兜底: 人话+路径+码表措辞(FileError
         // 对齐 not_found/permission_denied), bash/write/edit 同防。
         const msg = (err && (err.message ?? err.text)) || String(err ?? '');
+        // loop37-D3: 官方 bash 对非零退出码 throw(stderr=unknown 样本),
+        // 整条标失败吞掉完整 stdout。有输出/退出码证据时降级为正常
+        // 回执(标 rc, 保留输出)——exit 3; echo done 应标 rc=3 而非失败。
+        if (tool.name === 'bash') {
+          const rc = err?.exitCode ?? (typeof err?.code === 'number' ? err.code : null);
+          const outText = typeof err?.text === 'string' ? err.text : '';
+          if (outText || rc != null) {
+            return {
+              content: [{
+                type: 'text',
+                text: (outText || '(无输出)')
+                  + `\n[rc=${rc ?? '?'} 非零退出码——命令已执行, 以上为完整输出; 非 harness 故障]`,
+              }],
+            };
+          }
+        }
         const code = err?.code ?? (msg.includes('ENOENT') ? 'not_found'
           : msg.includes('EACCES') || msg.includes('permission') ? 'permission_denied'
           : err == null ? 'not_found(官方通道吞错, 无详情——多为文件不存在/无权限)'

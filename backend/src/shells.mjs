@@ -344,7 +344,8 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
    * configured exec box (docker container) — benchmark-grade fidelity.
    * Returns { ok, stdout, stderr, code, ms }.
    */
-  async function exec(id, command, { timeoutMs = 30_000 } = {}) {  // CS71-5: box 死参删(零调用方, 同类 wal 已按 CS20-11 删)
+  async function exec(id, command, opts = {}) {
+    let { timeoutMs = 30_000, verifyMark = false } = opts;  // CS71-5: box 死参删(零调用方, 同类 wal 已按 CS20-11 删)
     const sh = shells.get(id);
     if (!sh) return { ok: false, error: 'shell 不存在' };
     if (sh.status !== 'active') return { ok: false, error: `shell 状态 ${sh.status}——dead/expired 通道不会自动重探, 端点若已恢复请 register 重新注册(同 target 新 id), 历史命令记录仍可查` };
@@ -383,6 +384,30 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         });
         ({ stdout, stderr, code } = boundedExecResult(
           r.err, r.so, r.se, '[timeout: 远端进程已被 timeout(1) 终止]', 'sshpass(ssh 传输宿主侧依赖)'));
+      } else if (sh.transport === 'web' && verifyMark) {
+        // loop37-D2: 一拍滞后自愈(8990 桥端点实证 stdout=上一条命令
+        // 输出)。包装唯一 nonce 定界, 响应不含本条 nonce=读到旧输出,
+        // 自动重发一次; 仍不含则原样返回+滞后警告。
+        const nonce = `WM${Date.now().toString(36)}`;
+        const wrapped = `printf '${nonce}S'; ${command}; printf '${nonce}E'`;
+        const runOnce = async () => exec(id, wrapped, { timeoutMs });
+        let r1 = await runOnce();
+        const grab = txt => {
+          const a = txt.indexOf(nonce + 'S'); const b = txt.indexOf(nonce + 'E');
+          return (a >= 0 && b > a) ? txt.slice(a + nonce.length + 1, b) : null;
+        };
+        const core = grab(String(r1.stdout ?? ''));
+        if (core != null) {
+          return { ...r1, stdout: core, note: 'verifyMark:回显 nonce 自洽(本条输出)' };
+        }
+        const r2 = await runOnce();
+        const core2 = grab(String(r2.stdout ?? ''));
+        if (core2 != null) {
+          return { ...r2, stdout: core2,
+            note: 'verifyMark:首次回显为旧输出(一拍滞后), 已自动重发取本条输出' };
+        }
+        return { ...r2,
+          note: 'verifyMark:两次回显均不含本条 nonce——端点可能不支持 printf 包装(白名单类)或深度粘滞; 输出未经验证, 勿直接用于决策(双发规避见 seq=7311)' };
       } else if (sh.transport === 'web') {
         // transportRef: full URL template with {CMD} placeholder, e.g.
         //   http://h/p.php?c={CMD}        (GET; CMD urlencoded)
@@ -626,8 +651,10 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // 点); cat 退出码经 PIPESTATUS 传播——读失败不再被 head 的恒 0
     // 吞掉, 错误文本仍在 stdout 可诊断。
     const q = "'" + String(path).replace(/'/g, `'\\''`) + "'";
+    // loop37-D2: verifyMark 透传(web 通道 read_file 与 exec 同管道,
+    // 一拍滞后行为一致——seq=7329 补证)。
     const r = await exec(id,
-      `o=$(cat -- ${q} 2>&1); c=$?; printf %s "$o" | head -c 65536; exit $c`);
+      `o=$(cat -- ${q} 2>&1); c=$?; printf %s "$o" | head -c 65536; exit $c`, opts);
     return r;
   }
 

@@ -807,9 +807,15 @@ export function buildOrchestratorTools(record, caps) {
       })),
     }),
     execute: async (_id, params) => {
-      const engagement = params.engagementId
+      let engagement = params.engagementId
         ? `autopwn-${params.engagementId.replace(/^autopwn-/, '')}`
         : record.activeEngagement?.workflowId;
+      // loop37-D1: 无参且无 activeEngagement 时回落最新 RUNNING 战役
+      // (cancel 清指针后多战役场景旧战役仍在跑, 此前直接报'无进行中')。
+      if (!engagement && !params.engagementId) {
+        const lr = await caps.latestRunningEngagement?.();
+        if (lr) engagement = `autopwn-${lr.engagementId}`;
+      }
       if (!engagement) {
         // CS41-B6: 结构化可行动回执(同函数其余失败分支制式——此前裸
         // throw 产原始异常栈); CS42-F7: details 对齐(按 details.relayed
@@ -980,6 +986,7 @@ export function buildShellTools(record, caps) {
       shellId: Type.Optional(Type.String({ description: 'shell id(sh-xxx);list 可省' })),
       command: Type.Optional(Type.String({ description: 'exec:要执行的命令' })),
       timeoutMs: Type.Optional(Type.Number({ description: 'exec:硬超时毫秒(默认 30000;web 通道上限 60000,超出按 60000 生效并回执注明)' })),
+      verifyMark: Type.Optional(Type.Boolean({ description: 'exec/read_file(web 通道): 一拍滞后自愈——平台自动包装唯一 nonce 定界, 回显不含本条标记则自动重发一次取真实输出(8990 桥端点实证 stdout 曾恒为上一条; 端点不支持 printf 时如实报未验证)' })),
       path: Type.Optional(Type.String({ description: 'read_file:绝对路径' })),
     }),
     execute: async (_id, p) => {
@@ -1025,14 +1032,15 @@ export function buildShellTools(record, caps) {
         if (!p.shellId) return say({ ok: false, error: 'shellId 必填' });
         if (p.action === 'exec') {
           if (!p.command) return say({ ok: false, error: 'command 必填' });  // R12-F2
-          const r = await R.exec(p.shellId, p.command, { timeoutMs: Math.min(p.timeoutMs || 30_000, 120_000) });
+          const r = await R.exec(p.shellId, p.command,
+            { timeoutMs: Math.min(p.timeoutMs || 30_000, 120_000), verifyMark: p.verifyMark === true });
           return say({ ...r,
             stdout: markClipped(r.stdout, 8000, '管道 head/tail/grep 缩小后重取'),
             stderr: markClipped(r.stderr, 2000, '重定向到文件后分段读') });  // R12-F3
         }
         if (p.action === 'read_file') {
           if (!p.path) return say({ ok: false, error: 'path 必填' });  // R12-F2
-          const r = await R.readFile(p.shellId, p.path);
+          const r = await R.readFile(p.shellId, p.path, { verifyMark: p.verifyMark === true });
           // r9-D9: 错误路径透传(closed/过期此前被吞成空 content 无说明)
           if (!r.ok && r.error) return say({ ok: false, error: r.error });
           return say({ ok: r.ok,
@@ -1193,19 +1201,21 @@ export function buildAuthRequestTool(record, caps) {
     execute: async (_id, params) => {
       // loop36-QA: target='*' 只读查询全部待批(此前挂起请求无查询入口)
       if (params.target === '*') {
-        const pend = caps.listPendingAuthRequests?.() ?? [];
+        const pr = caps.listPendingAuthRequests?.() ?? { live: [] };
+        const pend = Array.isArray(pr) ? pr : (pr.live ?? []);
         return { content: [{ type: 'text', text: pend.length
-          ? `当前待批授权请求 ${pend.length} 条(用户未处理):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
-          : '当前无待批授权请求。' }] };
+          ? `当前待批授权请求 ${pend.length} 条(用户未处理; 7 天自动过期):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
+          : '当前无待批授权请求(7 天 TTL 内)。' }] };
       }
       // loop36-QA: reason 仅申请路径必填(查询模式 '*' 豁免被 schema 拦)
       if (!params.reason || !params.reason.trim()) {
         return { content: [{ type: 'text', text: 'reason 必填(申请授权需一句话任务理由; 若只想查待批清单, 传 target=* 可省 reason)。' }] };
       }
       // 同目标去重: 已 pending 或已批准则不重复发
-      const dup = caps.scanAuthRequests?.(record, params.target);
+      const dupRaw = caps.scanAuthRequests?.(record, params.target);
+      const dup = dupRaw && typeof dupRaw === 'object' ? dupRaw.state : dupRaw;
       if (dup === 'pending') {
-        return { content: [{ type: 'text', text: `已有对 ${params.target} 的待批授权请求(用户未处理)——请等待, 勿重复申请。` }] };
+        return { content: [{ type: 'text', text: `已有对 ${params.target} 的待批授权请求(seq=${dupRaw.seq}, 用户未处理, 7 天自动过期)——请等待, 勿重复申请。` }] };
       }
       if (dup === 'approved') {
         return { content: [{ type: 'text', text: `${params.target} 已在授权清单中——直接执行即可, 无需申请。` }] };

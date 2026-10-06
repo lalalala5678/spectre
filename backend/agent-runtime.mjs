@@ -244,6 +244,25 @@ const caps = {
 
   /** Fix-E (P7): member roster for explicit-engagementId relay calls. */
   engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
+  /** loop37-D1: 编排者最新 RUNNING 战役(relay 无参时回落——cancel 清
+   * activeEngagement 后此前直接报'无进行中', 多战役时旧 RUNNING 仍在)。 */
+  latestRunningEngagement: async () => {
+    // 按 busy 席位所属 engagement 聚合, 取启动最近者
+    const ids = new Map();
+    for (const rec of store.sessions.values()) {
+      if (rec.engagementId && rec.busy) ids.set(rec.engagementId, (ids.get(rec.engagementId) ?? 0) + 1);
+    }
+    if (!ids.size) return null;
+    for (const id of ids.keys()) {
+      try {
+        const d = await describeWorkflow(id);
+        if (d.status !== 'RUNNING') ids.delete(id);
+      } catch { ids.delete(id); }
+    }
+    if (!ids.size) return null;
+    const best = [...ids.keys()].sort().pop();
+    return { engagementId: best, busySeats: ids.get(best) };
+  },
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
   cancelEngagement: (workflowId) => cancelEngagement(workflowId),
   /** r47-D4 终版: 编排器进程直接掐席位(绕开 activity 链——Temporal
@@ -266,12 +285,15 @@ const caps = {
    * dup 提示或看前端确认卡, 无查询入口)。 */
   listPendingAuthRequests: () => {
     const settled = new Set(bus.list().filter(e => e.resolves).map(e => e.resolves));
-    return bus.list()
-      .filter(e => e.type === 'auth-request' && !e.resolves && !settled.has(e.seq))
-      .map(e => ({ seq: e.seq,
+    const TTL2 = 7 * 24 * 3600e3;  // loop37-D4: 与 scanAuthRequests 同 TTL
+    const live2 = bus.list()
+      .filter(e => e.type === 'auth-request' && !e.resolves && !settled.has(e.seq)
+        && Date.now() - Date.parse(e.ts ?? 0) < TTL2);
+    return { live: live2.map(e => ({ seq: e.seq,
         target: e.target ?? '(未记录——历史条目, 字段早于白名单)',
         requester: e.requester ?? '(未记录)',
-        reason: String(e.reason ?? '(未记录)').slice(0, 120) }));
+        reason: String(e.reason ?? '(未记录)').slice(0, 120),
+        ts: e.ts })), expired: bus.list().length ? undefined : undefined };
   },
   /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
   scanAuthRequests: (record, target) => {
@@ -281,7 +303,12 @@ const caps = {
     } catch { /* scope 读失败按无批准处理 */ }
     const evs = bus.list().filter(e => e.type === 'auth-request' && e.target === target);
     const settled = new Set(bus.list().filter(e => e.resolves).map(e => e.resolves));
-    if (evs.some(e => !e.resolves && !settled.has(e.seq))) return 'pending';
+    // loop37-D4: pending 携带 seq(重复申请返回既有条目)+ TTL 7 天
+    // (挂起无生命周期曾积压 28 条 legacy)。
+    const TTL = 7 * 24 * 3600e3;
+    const live = evs.filter(e => !e.resolves && !settled.has(e.seq)
+      && Date.now() - Date.parse(e.ts) < TTL);
+    if (live.length) return { state: 'pending', seq: live[live.length - 1].seq };
     return null;
   },
   /** r46-D4: engagement 成员会话名单(取消信号传导注入用)。 */
