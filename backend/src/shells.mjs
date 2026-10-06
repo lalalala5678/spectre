@@ -232,10 +232,15 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // 且容器名沙箱内无法自省)。校验失败即拒, 不留僵尸注册。
     // loop40-复测补: 'localhost'/'host' 特例=宿主直跑语义(r7v 通道
     // sh-5ef8fee2 实证), 放行; 拒绝时回显 docker ps 可用名列表(发现性)。
+    // loop46-①补: 宿主直跑形态 register 即警示上下文割裂(回执落地)。
+    let hostCtxNote = null;
     if (String(transport).toLowerCase() === 'local') {
       const cname = String(transportRef || '').split(':')[0];
-      const haveDocker0 = sandboxConfig().driver === 'docker';
+      const haveDocker0 = dockerLiveProbe();
       const hostAlias = /^(localhost|host|host.docker.internal)$/i.test(cname);
+      if (hostAlias) {
+        hostCtxNote = '本通道将在宿主执行(localhost 特例)——与 bash/write 的容器文件系统不互通, 跨上下文工件经 /workspace 或情报库传递';
+      }
       if (haveDocker0 && cname && !hostAlias) {
         let names = '';
         try {
@@ -304,6 +309,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       workSessionId: meta?.workSessionId ?? null,  // r50: 项目归属(控制台按项目过滤)
       cmdCount: 0, lastActiveAt: null, status: 'active',
       ...(scopeWarn ? { scopeWarn } : {}),
+      ...(hostCtxNote ? { hostCtxNote } : {}),
       tasks: [],          // tasking history (Mythic): {n, command, code, ms, at}
       host: null, user: null, os: null,  // auto-fingerprint (Sliver session meta)
     };
@@ -656,7 +662,7 @@ function dockerLiveProbe() {
             res.err, res.so, res.se, '[timeout: 宿主侧进程已被 timeout(1) 终止]', 'sh 降级(docker 缺席, 宿主直跑——无容器隔离)'));
           // r9-D10: 降级注记是元数据——进独立字段, 不再混入 stdout 载荷
           // (read_file 的 content 曾被污染)。
-          degradedNote = 'docker 缺席, 实际跑在宿主而非 ' + cbox + ' 容器';
+          if (!degradedNote) degradedNote = 'docker 缺席, 实际跑在宿主而非 ' + cbox + ' 容器——与 bash/write 的容器文件系统不互通, 跨上下文工件经 /workspace 或情报库传递';
         }
       } else {
         return { ok: false, error: `transport ${sh.transport} 未接入(真实植入通道后续挂)` };
