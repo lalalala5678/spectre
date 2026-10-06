@@ -212,7 +212,7 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
       bg.unref();
       // FLv2: 与 spawnShell 正常 resolve 形状对齐({exitCode,text})——
       // 上版给 {ok,stdout} 被官方 bash 工具的 text.split 路径炸(undefined)
-      return Promise.resolve({ exitCode: 0, text: `(后台任务已启动, 不等待输出。兜底输出日志: ${bgLog}(命令内部显式重定向优先); 稍后 bash 检查进度/标记文件)`, timedOut: false, background: true, bgLog });
+      return Promise.resolve({ exitCode: 0, text: `(后台任务已启动, 不等待输出——注意: 后台进程随本回合结束可能被回收, 不保证持久; 兜底日志: ${bgLog}(命令内部显式重定向优先); 持久任务建议 nohup/setsid+工作区落盘)`, timedOut: false, background: true, bgLog });
     } catch (e) {
       return Promise.resolve({ exitCode: -1, text: String(e?.message ?? e), timedOut: false, spawnError: String(e?.message ?? e) });
     }

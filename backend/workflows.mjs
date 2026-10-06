@@ -211,15 +211,24 @@ export async function autoPwnWorkflow(input) {
     })
     .join('\n');
   // loop41-#9: 无终报中断席位的主侧代拟落账(5min 宽限后, 与通知同步)
+  // loop42-①: 落账前复查——宽限窗内迟到的真实终报已落账的席位跳过
+  // 代拟(recon/api 曾被误代拟 failed 后真终报 success 才到, 统计口径
+  // 被污染); ②溯源: payloadRef 挂编排者会话+engagement 全程携带。
   if (pendingGhost.length) {
+    let recon2 = {};
+    try { recon2 = await quick.engagementChildren?.(engagementId) ?? {}; } catch { recon2 = {}; }
+    for (const key of [...pendingGhost]) {
+      if (recon2[key]) pendingGhost.splice(pendingGhost.indexOf(key), 1);
+    }
     for (const key of pendingGhost) {
       try {
         await quick.busEmit({
           channel: 'share', from: key, type: 'task-report', status: 'failed',
           title: `[系统代拟·中断] ${key} 任务报告`,
           summary: '子工作流中断且无终报, 主战役侧代拟(报告无空洞承诺兜底)',
-          detail: '**状态**:failed(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总时库内无该席位终报, 由主战役代拟本报告消灭空洞。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
+          detail: '**状态**:failed(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总+5min 复查时库内无该席位终报, 由主战役代拟本报告消灭空洞。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
           engagement: `autopwn-${engagementId}`,
+          payloadRef: orchestratorSessionId ? `sess:${orchestratorSessionId}` : null,
           workSessionId: workSessionId ?? null,
         });
       } catch { /* 单席代拟失败不阻断汇总 */ }
