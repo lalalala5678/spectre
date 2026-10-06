@@ -543,7 +543,8 @@ function realRouter({ store, bus, caps, wal }) {
       const pending = evs.filter(e => !e.resolves && !settled.has(e.seq)
         && e.target)
         .map(e => ({ seq: e.seq, target: e.target, reason: e.reason,
-          from: e.from, requester: e.requester, ts: e.ts }));
+          from: e.from, requester: e.requester, ts: e.ts,
+          workSessionId: e.workSessionId ?? null }));
       return json(res, 200, pending);
     }
     if (path.startsWith('/api/scope/auth-requests/') && (method === 'POST')) {

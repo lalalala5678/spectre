@@ -8,12 +8,19 @@ import { useEffect, useState } from 'react';
 import { api } from '../../api/client';
 import { Button } from '../ui/Button';
 
-export function ScopeAuthCard() {
-  const [pending, setPending] = useState<{ seq: number; target: string; reason: string; from: string; requester?: string }[]>([]);
+/**
+ * 项目隔离: 只显示当前项目(workSessionId)的授权请求——授权信息与其
+ * 它信息一样是项目内信息, 切换项目即不可见(用户令: 新建项目曾被
+ * 全局 pending 弹卡)。
+ */
+export function ScopeAuthCard({ wsId }: { wsId: string | null }) {
+  const [pending, setPending] = useState<{ seq: number; target: string; reason: string; from: string; requester?: string; workSessionId?: string | null }[]>([]);
   const [busy, setBusy] = useState(false);
   const [start, setStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [end, setEnd] = useState(() => new Date(Date.now() + 7 * 86400e3).toISOString().slice(0, 10));
-  const load = () => api<typeof pending>('/scope/auth-requests').then(setPending).catch(() => {});
+  const load = () => api<typeof pending>('/scope/auth-requests')
+    .then(list => setPending(list.filter(r => (r.workSessionId ?? null) === (wsId ?? null))))
+    .catch(() => {});
   useEffect(() => {
     void load();
     const t = setInterval(load, 10_000);
