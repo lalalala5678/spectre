@@ -129,6 +129,16 @@ bus.load(replay.busEvents);
 
 // Shell registry (C2 植入通道句柄; transport 缺省 'web'——CS24-F4 统一口径)。
 // Scope reader mirrors /opt/tools/c2/scope.json — server-side hard gate.
+// loop37-D7: cancel 竞态窗口标记——cancelEngagement 发出信号到 Temporal
+// Terminate 完成之间 describe 仍报 RUNNING(秒~十秒级), 该窗口内"取最新
+// RUNNING"会选中垂死战役→signal 静默黑洞(回执 ok 实无人消费)。
+// relay 回落聚合时排除带标记战役, 不依赖 Temporal 传播时序。
+const pendingCancel = new Set();
+setInterval(() => {
+  // 防泄漏: 标记 10 分钟后自动失效(Temporal Terminate 必已完成)
+  if (pendingCancel.size) pendingCancel.clear();
+}, 10 * 60_000).unref?.();
+
 const shellScope = () => {
   // Read-per-call: benchmark windows open/close live; a boot-cached scope
   // would reject freshly authorized exercises.
@@ -253,6 +263,7 @@ const caps = {
     for (const rec of store.sessions.values()) {
       if (rec.engagementId) ids.add(rec.engagementId);
     }
+    for (const pc of pendingCancel) ids.delete(pc);  // loop37-D7 竞态排除
     if (!ids.size) return null;
     const running = [];
     for (const id of ids) {
@@ -282,7 +293,10 @@ const caps = {
     return { engagementId: best, seats };
   },
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
-  cancelEngagement: (workflowId) => cancelEngagement(workflowId),
+  cancelEngagement: (workflowId) => {
+    pendingCancel.add(workflowId.replace(/^autopwn-/, ''));
+    return cancelEngagement(workflowId);
+  },
   /** r47-D4 终版: 编排器进程直接掐席位(绕开 activity 链——Temporal
    * cancel→activity Context.cancelled 在 worker 活体未触发, 实测零
    * abort 迹象; 编排器侧 cancel 时同步执行, 注入即时)。 */
