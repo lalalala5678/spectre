@@ -641,7 +641,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
   }
 
   /** Convenience: read one file through the shell (cat), for agent tool. */
-  async function readFile(id, path) {
+  async function readFile(id, path, opts = {}) {
     // r9-D9: 状态前置检查与 exec 同文案——closed/expired 通道此前返回
     // {"ok":false,"content":""} 无说明, 首测即被坑(形态不一致)。
     const sh0 = shells.get(id);

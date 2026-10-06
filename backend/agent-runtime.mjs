@@ -247,21 +247,24 @@ const caps = {
   /** loop37-D1: 编排者最新 RUNNING 战役(relay 无参时回落——cancel 清
    * activeEngagement 后此前直接报'无进行中', 多战役时旧 RUNNING 仍在)。 */
   latestRunningEngagement: async () => {
-    // 按 busy 席位所属 engagement 聚合, 取启动最近者
-    const ids = new Map();
+    // loop37-D1 修正: 待命席位非 busy(busy 聚合实测漏 RUNNING 战役——
+    // report 席静默待命时回落失败)。改为全量会话聚合+describe 校验。
+    const ids = new Set();
     for (const rec of store.sessions.values()) {
-      if (rec.engagementId && rec.busy) ids.set(rec.engagementId, (ids.get(rec.engagementId) ?? 0) + 1);
+      if (rec.engagementId) ids.add(rec.engagementId);
     }
     if (!ids.size) return null;
-    for (const id of ids.keys()) {
+    const running = [];
+    for (const id of ids) {
       try {
         const d = await describeWorkflow(id);
-        if (d.status !== 'RUNNING') ids.delete(id);
-      } catch { ids.delete(id); }
+        if (d.status === 'RUNNING') running.push(id);
+      } catch { /* 已终结/不可达=非 RUNNING */ }
     }
-    if (!ids.size) return null;
-    const best = [...ids.keys()].sort().pop();
-    return { engagementId: best, busySeats: ids.get(best) };
+    if (!running.length) return null;
+    const best = running.sort().pop();
+    const seats = [...store.sessions.values()].filter(x => x.engagementId === best).length;
+    return { engagementId: best, seats };
   },
   describeEngagement: (workflowId) => describeWorkflow(workflowId),
   cancelEngagement: (workflowId) => cancelEngagement(workflowId),

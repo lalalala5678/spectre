@@ -66,14 +66,17 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
         // 整条标失败吞掉完整 stdout。有输出/退出码证据时降级为正常
         // 回执(标 rc, 保留输出)——exit 3; echo done 应标 rc=3 而非失败。
         if (tool.name === 'bash') {
-          const rc = err?.exitCode ?? (typeof err?.code === 'number' ? err.code : null);
-          const outText = typeof err?.text === 'string' ? err.text : '';
-          if (outText || rc != null) {
+          // loop37-D3 实证: 官方 bash 对 exitCode!==0 直接 throw Error(
+          // message=输出+尾行 'Command exited with code N'——err.exitCode
+          // 不存在), 此前判据拿不到结构化字段从未触发。
+          const m = /\nCommand exited with code (\d+)$/.exec(String(err?.message ?? ''));
+          if (m) {
+            const outText = String(err.message).slice(0, m.index);
             return {
               content: [{
                 type: 'text',
                 text: (outText || '(无输出)')
-                  + `\n[rc=${rc ?? '?'} 非零退出码——命令已执行, 以上为完整输出; 非 harness 故障]`,
+                  + `\n[rc=${m[1]} 非零退出码——命令已执行, 以上为完整输出; 非 harness 故障]`,
               }],
             };
           }
