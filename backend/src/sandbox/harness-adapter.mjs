@@ -141,7 +141,12 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       // 决策交给模型)。
       if (authWarnHit && out && Array.isArray(out.content)) {
         const first = out.content.find(c => c.type === 'text');
-        if (first) first.text = `[授权提示] 本命令含未授权目标 ${authWarnHit}——请自行判断: request_authorization 申请 / 停止 / 或确认为授权资产后继续。当前清单实况: [${(scopeTargetsOf() ?? []).join(', ')}]。\n---\n${first.text ?? ''}`;
+        // 终版(用户令): 平台零判定——不输出"在/不在", 只贴目标+清单
+        // 实况, 比对交给模型(判定逻辑仅内部决定是否提示)。
+        if (first) first.text = `[授权参考] 命令涉及内网目标 ${authWarnHit}。
+当前授权清单实况: [${(scopeTargetsOf() ?? ['(清单暂不可读)']).join(', ')}]
+请自行比对核实: 已获授权可继续; 未含且不确定时建议 request_authorization 向用户确认。
+\n---\n${first.text ?? ''}`;
       }
       return out;
     },

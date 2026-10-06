@@ -644,7 +644,7 @@ function shellScopeTargets() {
         if (priv) {
           const targets = shellScopeTargets();
           if (!targets.includes(h) && !(h === 'localhost' && targets.includes('127.0.0.1'))) {
-            authNote = `[授权提示] fetch_url 目标 ${h} 不在渗透授权清单——请自行判断是否应继续。\n`;
+            authNote = `[授权参考] fetch_url 涉及内网目标 ${h}。当前授权清单实况: [${targets.join(', ')}]——请自行比对核实(未含且不确定时建议 request_authorization 向用户确认)。\n`;
           }
         }
       } catch { /* URL 解析失败由既有路径处理 */ }

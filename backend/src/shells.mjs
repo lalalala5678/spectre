@@ -161,9 +161,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     // 用户令(授权自治): 授权不做硬件拦截, 全靠大模型自主判断——
     // 不在清单→警告放行(回执头部注入, 模型自行决定申请/停止/继续)。
     if (!sc.targets?.length || !inWindow) return { ok: true,
-      warn: `[授权提示] 授权窗口外或清单为空——当前对 ${shell.target} 的操作未经用户授权确认, 请自行判断是否应继续(建议 request_authorization 申请或仅做被动观测)` };
+      warn: `[授权参考] 目标 ${shell.target}: 授权窗口外或清单为空。清单是参考数据, 是否继续由你判断(不确定时建议 request_authorization 向用户确认)` };
     if (!inTargets) return { ok: true,
-      warn: `[授权提示] 目标 ${shell.target} 不在授权清单(注意 target 只写主机名, 端口属于 transportRef)——请自行判断: 申请授权(request_authorization)/停止/或确认为授权资产后继续` };
+      warn: `[授权参考] 目标 ${shell.target}(注意 target 只写主机名, 端口属于 transportRef)。当前授权清单实况: [${(sc.targets || []).join(', ')}]——请自行比对核实: 已获授权可继续; 未含且不确定时建议 request_authorization 向用户确认` };
     if (shell.expiresAt && now > shell.expiresAt) {
       // R6-F3: 过期是事实终态——懒翻 status 让查重/list 反映真值
       // (此前僵尸 status=active 永久占名, 卡死同名重注册)。
@@ -181,7 +181,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       if (dest) {
         const ok = (sc.targets || []).some(t => targetMatches(t, dest));
         if (!ok) {
-          execWarn = `[授权提示] 通道目的地 ${dest} 不在授权清单(target 标签与端点不一致)——请自行判断是否应继续(request_authorization 可申请)`;
+          execWarn = `[授权参考] 通道目的地 ${dest}(target 标签与端点不一致)。当前授权清单实况: [${(sc.targets || []).join(', ')}]——请自行比对核实(未含且不确定时建议 request_authorization 向用户确认)`;
         }
       }
     }
@@ -233,7 +233,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       const t0 = String(target || '').trim();
       if (sc0?.targets?.length && t0
         && !sc0.targets.some(t => targetMatches(t, t0))) {
-        scopeWarn = `[授权提示] target ${t0} 不在授权清单(已放行——授权自治模式)。请自行判断: 申请授权(request_authorization)/停止/或确认为授权资产后继续`;
+        scopeWarn = `[授权参考] target ${t0}。当前授权清单实况: [${(sc0.targets || []).join(', ')}]——请自行比对核实: 已获授权可继续; 未含且不确定时建议 request_authorization 向用户确认`;
       }
     }
     // r17-1: 注册路径 scope 硬校验(web/ssh 目的地必须在授权清单——
@@ -244,7 +244,7 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       const ok0 = sc0 && dest0 && Array.isArray(sc0.targets)
         && sc0.targets.some(t => targetMatches(t, dest0));
       if (!ok0) {
-        scopeWarn = `[授权提示] 通道目的地 ${dest0 ?? tr.slice(0, 40)} 不在授权清单(已放行——授权自治模式)。请自行判断: 申请授权(request_authorization)/停止/或确认为授权资产后继续`;
+        scopeWarn = `[授权参考] 通道目的地 ${dest0 ?? tr.slice(0, 40)}。当前授权清单实况: [${(sc0.targets || []).join(', ')}]——请自行比对核实: 已获授权可继续; 未含且不确定时建议 request_authorization 向用户确认`;
       }
     }
     if (transport === 'web') {
