@@ -321,11 +321,14 @@ const caps = {
     const live2 = bus.list()
       .filter(e => e.type === 'auth-request' && !e.resolves && !settled.has(e.seq)
         && Date.now() - Date.parse(e.ts ?? 0) < TTL2);
-    return { live: live2.map(e => ({ seq: e.seq,
-        target: e.target ?? '(未记录——历史条目, 字段早于白名单)',
-        requester: e.requester ?? '(未记录)',
+    // loop38-议程⑤: legacy 无 target 条目折叠为一行计数(逐条展开 24 条
+    // '(未记录)' 无信息量且淹没有效请求; TTL 到期自动过期)。
+    const rich = live2.filter(e => e.target);
+    const legacyN = live2.length - rich.length;
+    return { live: rich.map(e => ({ seq: e.seq,
+        target: e.target, requester: e.requester ?? '(未记录)',
         reason: String(e.reason ?? '(未记录)').slice(0, 120),
-        ts: e.ts })), expired: bus.list().length ? undefined : undefined };
+        ts: e.ts })), legacyN };
   },
   /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
   scanAuthRequests: (record, target) => {

@@ -759,6 +759,9 @@ export function buildOrchestratorTools(record, caps) {
         for (let i = 0; i < params.agents.length; i += 7) waves.push(params.agents.slice(i, i + 7));
         const started2 = [];
         for (const [wi, wave] of waves.entries()) {
+          // loop38-复测②: 并行分波被证无效(7/10 中断, 总并发会话驱动)
+          // ——错峰启动: 波间 90s(待命期是中断高发窗, 让前波稳定)。
+          if (wi > 0) await new Promise(r => setTimeout(r, 90_000));
           try {
             const st = await caps.dispatch({
               instruction: `${params.instruction}\n[分波 ${wi + 1}/${waves.length}: 本波席位 ${wave.join(',')}——只做与本波席位职责相关的部分, 跨波结果经 query_intel 汇合]`,
@@ -777,7 +780,7 @@ export function buildOrchestratorTools(record, caps) {
           }
         }
         return {
-          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤7 席默认化, 429 安全区):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
+          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤7 席默认化; 波间错峰 90s——总并发会话数是中断驱动因素, 并行分波曾 7/10 中断):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
           details: { waves: started2.map(x => x.engagementId) },
         };
       }
