@@ -14,7 +14,7 @@ import { Agent, formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-cor
 import { CONFIG } from './config.mjs';
 import { typeLabelOf, CONFIG_AGENT_KEYS } from './agents.mjs';
 import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, AUTH_RULE_ONCE } from './pi.mjs';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 import { buildAuthRequestTool, buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
@@ -437,6 +437,13 @@ export class SessionStore {
     this._requireLiveAgent(record);
     if (record.busy) {
       throw Object.assign(new Error('agent 忙(并发锁定)——请用 steer'), { statusCode: 409 });
+    }
+    // 用户令(授权两分支·一次性): 会话首条用户消息前置 AUTH_RULE_ONCE,
+    // 之后不再注入(反复提醒授权=污染; 一次授权全程有效)。仅编排器。
+    const isFirstUserMsg = !record.messages?.some(m => m.role === 'user')
+      && record.agentKey === 'autopwn' && source !== 'system';
+    if (isFirstUserMsg) {
+      text = AUTH_RULE_ONCE + '\n\n' + text;
     }
     record.busy = true;
     // FEBUGS-P1-1: busy 翻转必须落 journal——此前仅内存置位, SSE 永远

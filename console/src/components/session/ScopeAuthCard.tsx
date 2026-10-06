@@ -24,11 +24,14 @@ export function ScopeAuthCard({ wsId }: { wsId: string | null }) {
       // 新项目弹全局遗留卡(用户实测 172.18.x.x crAPI 遗留)。
     .then(list => setPending(wsId ? list.filter(r => r.workSessionId === wsId) : []))
     .catch(() => {});
+  // 修复: deps [] 曾把 wsId 冻结在挂载时值(常见 null——detail 异步
+  // 才回)——10s 轮询闭包永远按旧值过滤为空, 卡永不弹(用户实测
+  // 清单外申请无卡)。deps [wsId]: 就位/切换即重载。
   useEffect(() => {
     void load();
     const t = setInterval(load, 10_000);
     return () => clearInterval(t);
-  }, []);
+  }, [wsId]);
   if (pending.length === 0) return null;
   const targets = [...new Set(pending.map(r => r.target))];
   const act = async (kind: 'approve' | 'reject') => {
