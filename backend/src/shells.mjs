@@ -130,7 +130,13 @@ export function shellBusAdapter(bus) {
  * gate 标签门与 exec 目的地校验共用; 导出供机锁直接断言。 */
 export function targetMatches(t, target) {
   const tt = String(t).toLowerCase(), dt = String(target).toLowerCase();
-  return tt === dt || (tt.startsWith('*.') && dt.endsWith(tt.slice(1)));
+  // loop-auth-场景3: 主机前缀语义——scope 条目 127.0.0.1 覆盖其任意
+  // 端口形态(127.0.0.1:30080); 一次授权全端口放行, 否则每端口都要
+  // 批一次(7852 案: 批了裸 IP 仍被带端口条目拦, 授权问题反复污染)。
+  const stripPort = x => x.replace(/:\d{1,5}$/, '');
+  return tt === dt
+    || (tt.startsWith('*.') && dt.endsWith(tt.slice(1)))
+    || (stripPort(tt) === stripPort(dt) && !stripPort(tt).includes('*'));
 }
 
 export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 死参数删(仅 persistShells 快照持久化)
