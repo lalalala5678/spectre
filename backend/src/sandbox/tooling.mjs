@@ -633,6 +633,18 @@ function shellScopeTargets() {
     }),
     execute: async (_id, p) => {
       let url = p.url;
+      // loop-auth-场景1: fetch_url 授权门——内网/localhost host 不在
+      // scope → 拦+申请指引(公网检索/文档抓取不受影响)。
+      try {
+        const h = new URL(url).hostname;
+        const priv = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|localhost$)/.test(h);
+        if (priv) {
+          const targets = shellScopeTargets();
+          if (!targets.includes(h) && !(h === 'localhost' && targets.includes('127.0.0.1'))) {
+            return errText(`[授权拦截] fetch_url 目标 ${h} 属内网/本机段且不在渗透授权清单——对目标发起任何主动请求前必须先获授权。请调用 request_authorization(target=${h}, reason=任务必要性) 申请; 批准后重试。`);
+          }
+        }
+      } catch { /* URL 解析失败由既有路径处理 */ }
       const gh = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/.exec(url);
       if (gh) url = `https://raw.githubusercontent.com/${gh[1]}/${gh[2]}/${gh[3]}`;
       const limit = 8000;

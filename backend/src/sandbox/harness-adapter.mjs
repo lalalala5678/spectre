@@ -33,6 +33,26 @@ function stubInvocation(toolCallId) {
  * invocation, context) — bare Agent calls (toolCallId, params, signal?,
  * onUpdate?). Updates are streamed through when the agent supports them.
  */
+
+/** loop-auth: 内网/localhost 目标提取+scope 校验(与 shell 门同源
+ * scope.json, 逐次读)。命中未授权目标返回该目标串, 否则 null。 */
+function scopeTargetsOf() {
+  try {
+    return JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets ?? [];
+  } catch { return []; }
+}
+function bashScopeGate(command) {
+  const targets = scopeTargetsOf();
+  const ipRe = /\b(127(?:\.\d{1,3}){3}|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})\b/g;
+  const cands = new Set([...String(command).matchAll(ipRe)].map(m => m[1]));
+  if (/\blocalhost\b/i.test(command)) cands.add('localhost');
+  for (const c of cands) {
+    if (c === '127.0.0.53') continue;  // 系统解析器
+    if (!targets.includes(c) && !(c === 'localhost' && targets.includes('127.0.0.1'))) return c;
+  }
+  return null;
+}
+
 export function adaptHarnessTool(tool, env, extraContext = {}) {
   return {
     name: tool.name,
@@ -49,6 +69,23 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       // schema — agents can still pass a larger explicit value.
       const finalParams = tool.name === 'bash' && params.timeout === undefined
         ? { ...params, timeout: 300 } : params;
+      // loop-auth-场景1: bash 主动出连授权门——授权此前只覆盖 shell
+      // 通道, bash 里 curl/nmap 直连目标全放行(实测 crAPI 30080 裸跑)。
+      // 内网段+localhost 目标不在 scope → 拦+申请指引(公网域名/CDN
+      // 不拦——pip/npm 装包不受影响)。
+      if (tool.name === 'bash' && typeof params.command === 'string') {
+        const gateHit = bashScopeGate(params.command);
+        if (gateHit) {
+          return {
+            isError: true,
+            content: [{ type: 'text', text:
+              `[授权拦截] 命令含未授权目标 ${gateHit}(内网/本机段, 不在渗透授权清单)——` +
+              `对目标发起任何主动探测/攻击前必须先获授权。` +
+              `请调用 request_authorization(target=${gateHit}, reason=任务必要性) 向用户申请; ` +
+              `批准后重试本命令即可。清单内目标不受影响。` }],
+          };
+        }
+      }
       // Shared-layer install bookkeeping: bash-side installs bypass the
       // install REST, so record them into the install-log ledger here
       // (idempotent dedupe via last-line check).
