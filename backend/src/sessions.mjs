@@ -439,10 +439,11 @@ export class SessionStore {
       throw Object.assign(new Error('agent 忙(并发锁定)——请用 steer'), { statusCode: 409 });
     }
     // 用户令(授权两分支·一次性): 会话首条用户消息前置 AUTH_RULE_ONCE,
-    // 之后不再注入(反复提醒授权=污染; 一次授权全程有效)。仅编排器。
-    const isFirstUserMsg = !record.messages?.some(m => m.role === 'user')
-      && record.agentKey === 'autopwn' && source !== 'system';
-    if (isFirstUserMsg) {
+    // 之后不再注入(反复提醒授权=污染)。仅编排器。
+    // 修复: record.messages 字段不存在(消息真身在 pi agent.state.messages)
+    // ——曾恒判"首条"导致每条 user 消息都注入(实测次条也带规则)。
+    const hadUser = (record.agent?.state?.messages ?? []).some(m => m.role === 'user');
+    if (record.agentKey === 'autopwn' && source !== 'system' && !hadUser) {
       text = AUTH_RULE_ONCE + '\n\n' + text;
     }
     record.busy = true;
