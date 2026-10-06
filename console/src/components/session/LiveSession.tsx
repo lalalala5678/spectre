@@ -59,7 +59,12 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
   const handleScroll = useCallback(() => {
     const el = scrollRef.current;
     if (!el) return;
-    if (Date.now() - pinGuard.current < 300) return;  // 程序回声不改意图
+    if (Date.now() - pinGuard.current < 300) {
+      // 程序回声豁免只吞"仍在底部"的 pin 回声——流式高频 pin 期间
+      // 用户向上拖(已离开底部)必须生效, 否则 busy 时滚动条锁死在底
+      // (用户实测思考中竖条拖不上去)。
+      if (el.scrollHeight - el.scrollTop - el.clientHeight < 4) return;
+    }
     const nearBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 120;
     stickToBottom.current = nearBottom;
     // Freeze the window start the moment the user leaves the bottom:

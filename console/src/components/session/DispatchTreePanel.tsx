@@ -41,11 +41,12 @@ function buildTree(all: ApiSessionSummary[], rootId: string): TreeNode | null {
 const TYPE_LABELS: Record<string, string> = Object.fromEntries(
   REGISTRY.map(a => [a.id, a.codename]));
 
-function Node({ node, depth, activeId, onDrill }: {
+function Node({ node, depth, activeId, onDrill, onRootClick }: {
   node: TreeNode;
   depth: number;
   activeId: string | null;
   onDrill: (id: string) => void;
+  onRootClick?: () => void;
 }) {
   const { session } = node;
   const isOrch = session.agentKey === 'autopwn';
@@ -58,7 +59,7 @@ function Node({ node, depth, activeId, onDrill }: {
           线随行高, L2 出现时最左列断线) */}
       <div className="flex">
         <button
-          onClick={() => onDrill(session.id)}
+          onClick={() => (depth === 0 && onRootClick ? onRootClick() : onDrill(session.id))}
           className={cn(
             'mb-0.5 flex min-h-11 w-full flex-col rounded-md border px-1.5 py-1 text-left',
             session.id === activeId
@@ -131,10 +132,13 @@ function Node({ node, depth, activeId, onDrill }: {
  * spawns… Click drills into that agent's live session. Root selection is
  * the workspace's current orchestrator conversation.
  */
-export function DispatchTreePanel({ rootId, activeId, onDrill }: {
+export function DispatchTreePanel({ rootId, activeId, onDrill, onRootClick }: {
   rootId: string | null;
   activeId: string | null;
   onDrill: (id: string) => void;
+  /** 点根(主控)节点=回主控视图(closeDrill)——此前走 onDrill 把主控
+   * 会话当子任务 drill, 左上残留'返回主控会话'+'子任务会话'标题。 */
+  onRootClick?: () => void;
 }) {
   const [tree, setTree] = useState<TreeNode | null>(null);
   const lastSig = useRef('');
@@ -211,7 +215,7 @@ export function DispatchTreePanel({ rootId, activeId, onDrill }: {
               : <EmptyState icon={Bot} title="无主控会话" />
         )}
         {tree && (
-          <Node node={tree} depth={0} activeId={activeId} onDrill={onDrill} />
+          <Node node={tree} depth={0} activeId={activeId} onDrill={onDrill} onRootClick={onRootClick} />
         )}
       </div>
     </div>
