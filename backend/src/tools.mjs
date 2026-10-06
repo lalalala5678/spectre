@@ -1316,20 +1316,47 @@ export function buildDirectTools(record, caps) {
       });
       // r29-#2: 互斥拦截回执(零吞并——指引 revise 并入或证伪重发)
       if (ev?.blocked) {
+        // loop38-D10b: 拦截即自动归并——按 D9 判据被拦的重复线索, 平台
+        // 直接给正本 append 共同发现者修订(writer 手工兜底仍可用但
+        // "必须手工"=FAIL); D10c: 回执引用的正本 seq=互斥命中的 dupSeq
+        // 原文直通, 不得引用其它近期条目。
+        let merged = null;
+        try {
+          merged = await caps.autoMergeVuln?.(ev.dupSeq, {
+            title: params.title, text: params.text, severity: params.severity,
+            author: caps.authorOf?.(record) ?? null,
+            requesterSessionId: record.requester?.sessionId ?? record.id,
+          });
+        } catch { /* 自动归并 best-effort, 失败走指引路径 */ }
         return {
           content: [{
             type: 'text',
             text: `[mutex-intercepted] 已拦截: 与 seq=${ev.dupSeq}《${ev.dupTitle}》疑似同点位双账(短窗互斥, 10min${ev.by === 'fingerprint' ? ', by=fingerprint 端点指纹命中' : ', token 重叠命中'})。` +
-              `同一漏洞请用 request_vulnerability_revision 并入(正本=首落 seq=${ev.dupSeq}); ` +
-              `确属不同漏洞请细化 title/detail 差异后重发。`,
+              (merged
+                ? `\n[已自动归并] 正本 seq=${ev.dupSeq} 已追加共同发现者修订(seq=${merged.seq}, 修订 ${merged.n})——引用正本一律用 seq=${ev.dupSeq}。`
+                : `\n同一漏洞请用 request_vulnerability_revision 并入(正本=首落 seq=${ev.dupSeq}); ` +
+                  `确属不同漏洞请细化 title/detail 差异后重发。`),
           }],
+        };
+      }
+      // loop38-D10a: 成功声明必携同回合可验证 seq; emit 无 seq=显式失败
+      // (成功回执假阳性三子项之根——此前'已入库'不带 seq, 幽灵 emit
+      // 无法被调用方察觉)。
+      if (!ev?.seq) {
+        return {
+          content: [{
+            type: 'text',
+            text: `[emit-unconfirmed] 漏洞未确认入库——emit 回执无 seq(可能被通道丢弃)。请 query_intel(kind=vulnerability, q=标题关键词) 核验; 确无则重发。`,
+          }],
+          details: { emitted: false },
         };
       }
       return {
         content: [{
           type: 'text',
-          text: `漏洞已入库 (${String(params.severity).toLowerCase()}): ${params.title}`,
+          text: `漏洞已入库 seq=${ev.seq} (${String(params.severity).toLowerCase()}): ${params.title}——回执 seq 可即刻 query_intel(seq=${ev.seq}) 验证。`,
         }],
+        details: { seq: ev.seq },
       };
     },
   };

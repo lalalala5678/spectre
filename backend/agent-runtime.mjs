@@ -313,6 +313,32 @@ const caps = {
     }).catch(() => { /* 上限兜底: 队列版仍在 */ });
     return ok;
   }),
+  /** loop38-D10b: 互斥拦截即自动归并——按 D9 判据被拦的重复线索,
+   * 平台直接给正本 append 共同发现者修订(writer 手工兜底保留但
+   * "必须手工"=FAIL)。 */
+  autoMergeVuln: (dupSeq, { title, text, severity, author } = {}) => {
+    try {
+      const target = bus.list().find(e => e.seq === dupSeq
+        && e.type === 'vulnerability' && !e.revises);
+      if (!target) return null;
+      const chain = bus.list().filter(e => e.revises === dupSeq);
+      const newest = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
+      const baseDetail = String(newest?.detail ?? target.detail ?? '');
+      const inc = `\n\n---\n[自动归并·共同发现者] ${String(title).slice(0, 120)}\n` +
+        `发现者: ${author?.name ?? '(未记录)'}(互斥拦截后平台自动并入; 证据增量如下)\n` +
+        `${String(text ?? '').slice(0, 4000)}`;
+      const ev = emitRevision(bus, {
+        target,
+        fields: { text: baseDetail + inc,
+          ...(severity && !target.severity ? { severity: String(severity).toLowerCase() } : {}) },
+        reason: `互斥拦截自动归并: ${author?.name ?? '?'} 的重复线索并入(共同发现者荣誉)`,
+        requestedBy: author?.name ?? 'platform',
+        approvedBy: 'platform:auto-merge',
+        origin: 'agent',
+      });
+      return ev?.seq ? { seq: ev.seq, n: ev.revision?.n ?? 1 } : null;
+    } catch { return null; }
+  },
   /** loop36-QA: 全部待批授权请求(编排者侧挂起查询——此前只能被动等
    * dup 提示或看前端确认卡, 无查询入口)。 */
   listPendingAuthRequests: () => {
