@@ -477,6 +477,7 @@ const caps = {
     try {
       return await (async () => {
         const queuedMs = Date.now() - qStart;
+        const requesterAuthor = store.authorOf(requesterRecord);
     const baseSeq = bus.list().at(-1)?.seq ?? 0;
     const tRw = Date.now();  // r14-④: 同步等待可观测(回执附 waitedMs)
     const { session: writer, timeout } = await runDetachedAgent({
