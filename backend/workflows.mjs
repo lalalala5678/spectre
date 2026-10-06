@@ -205,7 +205,7 @@ export async function autoPwnWorkflow(input) {
         // 的承诺兜底(recon 形态击穿: 无终报无代拟, 排空对账终局确认
         // 库里永远缺这一席)。failed 终报, 消灭报告空洞。
         pendingGhost.push(key);
-        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——主侧已代拟 failed 终报(送达时落账), 终局以 query_intel 为准;`;
+        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——主侧已代拟 no-result 终报(送达时落账), 终局以 query_intel 为准;`;
       }
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
