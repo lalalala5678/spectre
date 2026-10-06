@@ -203,7 +203,7 @@ export async function autoPwnWorkflow(input) {
         if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
         // loop41-#9: 中断且无终报的席位主侧代拟——"每个子代理必有报告"
         // 的承诺兜底(recon 形态击穿: 无终报无代拟, 排空对账终局确认
-        // 库里永远缺这一席)。failed 终报, 消灭报告空洞。
+        // 库里永远缺这一席)。no-result 终报, 消灭报告空洞。
         pendingGhost.push(key);
         return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——主侧已代拟 no-result 终报(送达时落账), 终局以 query_intel 为准;`;
       }
