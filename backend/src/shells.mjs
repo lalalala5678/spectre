@@ -608,8 +608,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         // r6-#5: docker 缺席时降级宿主 sh(不再 ENOENT 裸崩)——回执注明
         // 降级形态(容器语义丢失: 无 cuser 隔离/无容器 FS)。
         const haveDocker = sandboxConfig().driver === 'docker';
+        // loop40-终步: localhost/host 特例=宿主直跑语义——注册层已放行
+        // (3ceba94), 此处执行层同映射(绕过 docker exec 字面量, 复用
+        // r6-#5 的宿主 sh 降级路径)。
+        const hostAliasExec = /^(localhost|host|host.docker.internal)$/i.test(cbox || '');
         let res;
-        if (haveDocker) {
+        if (haveDocker && !hostAliasExec) {
           const argv = cuser
             ? ['exec', '-u', cuser, cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command]
             : ['exec', cbox, 'timeout', '-k', '5', String(tSec), 'bash', '-lc', command];
