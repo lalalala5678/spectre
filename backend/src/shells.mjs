@@ -381,7 +381,21 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
    * configured exec box (docker container) — benchmark-grade fidelity.
    * Returns { ok, stdout, stderr, code, ms }.
    */
-  // loop39-P0: 共享 web 通道并发串台——8990 桥共享 stdout, 并发调用
+  // loop46-②: docker 实时探测(30s 缓存)——exec 与 register 同源。
+let _dockerProbe = { at: 0, ok: false };
+function dockerLiveProbe() {
+  if (Date.now() - _dockerProbe.at < 30_000) return _dockerProbe.ok;
+  let ok = false;
+  try {
+    execFileSync('docker', ['version', '--format', '{{.Server.Version}}'],
+      { timeout: 3000, stdio: 'ignore' });
+    ok = true;
+  } catch { ok = false; }
+  _dockerProbe = { at: Date.now(), ok };
+  return ok;
+}
+
+// loop39-P0: 共享 web 通道并发串台——8990 桥共享 stdout, 并发调用
   // 命令交错注入互相收到对方输出(postex↔persistence md5 交叉实证)。
   // per-shell 串行队列: 同 shell 的 exec 排队执行, 消除交错窗。
   const shellLocks = new Map();
@@ -607,11 +621,16 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         const tSec = Math.max(1, Math.ceil(timeoutMs / 1000));
         // r6-#5: docker 缺席时降级宿主 sh(不再 ENOENT 裸崩)——回执注明
         // 降级形态(容器语义丢失: 无 cuser 隔离/无容器 FS)。
-        const haveDocker = sandboxConfig().driver === 'docker';
+        // loop46-②: 实时探测(30s 缓存)——启动时 loadSandboxConfig 的一次
+        // 性 dockerAvailable 曾把 driver 永久降级 local, 与 register 的
+        // 每次 docker ps 实时校验两套口径(实测: 校验列出容器名, exec
+        // 却降级宿主)。
+        const haveDocker = dockerLiveProbe();
         // loop40-终步: localhost/host 特例=宿主直跑语义——注册层已放行
         // (3ceba94), 此处执行层同映射(绕过 docker exec 字面量, 复用
         // r6-#5 的宿主 sh 降级路径)。
         const hostAliasExec = /^(localhost|host|host.docker.internal)$/i.test(cbox || '');
+        if (hostAliasExec) degradedNote = '本通道在宿主执行(localhost 特例)——与 bash/write 的容器文件系统不互通, 跨上下文工件经 /workspace 或情报库传递';
         let res;
         if (haveDocker && !hostAliasExec) {
           const argv = cuser
