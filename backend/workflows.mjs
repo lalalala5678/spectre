@@ -223,10 +223,10 @@ export async function autoPwnWorkflow(input) {
     for (const key of pendingGhost) {
       try {
         await quick.busEmit({
-          channel: 'share', from: key, type: 'task-report', status: 'failed',
+          channel: 'share', from: key, type: 'task-report', status: 'no-result',
           title: `[系统代拟·中断] ${key} 任务报告`,
           summary: '子工作流中断且无终报, 主战役侧代拟(报告无空洞承诺兜底)',
-          detail: '**状态**:failed(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总+5min 复查时库内无该席位终报, 由主战役代拟本报告消灭空洞。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
+          detail: '**状态**:no-result(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总+5min 复查时库内无该席位终报, 由主战役代拟本报告消灭空洞。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
           engagement: `autopwn-${engagementId}`,
           payloadRef: orchestratorSessionId ? `sess:${orchestratorSessionId}` : null,
           workSessionId: workSessionId ?? null,

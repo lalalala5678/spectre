@@ -933,7 +933,8 @@ export function buildOrchestratorTools(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `Relayed to ${params.agents.join(', ')} (${engagement}).${pendingNote}`,
+          text: `Relayed to ${params.agents.join(', ')} (${engagement}).${pendingNote}` +
+          `${(caps.engagementMembers?.(engagement.replace(/^autopwn-/, '')) ?? []).length ? `\n席位活性: ${(caps.listEngagementSessions?.(engagement.replace(/^autopwn-/, '')) ?? []).map(r => `${r.spawnName ?? r.agentKey}(${r.busy ? '运行中' : '空闲'})`).join(', ')}` : ''}`,
         }],
         details: { engagement, agents: params.agents },
       };
