@@ -246,7 +246,7 @@ const caps = {
   engagementMembers: (engagementId) => store.engagementMembersOf(engagementId),
   /** loop37-D1: 编排者最新 RUNNING 战役(relay 无参时回落——cancel 清
    * activeEngagement 后此前直接报'无进行中', 多战役时旧 RUNNING 仍在)。 */
-  latestRunningEngagement: async () => {
+  latestRunningEngagement: async (requiredAgents = null) => {
     // loop37-D1 修正: 待命席位非 busy(busy 聚合实测漏 RUNNING 战役——
     // report 席静默待命时回落失败)。改为全量会话聚合+describe 校验。
     const ids = new Set();
@@ -266,6 +266,17 @@ const caps = {
       } catch { /* 已终结/不可达=非 RUNNING */ }
     }
     if (!running.length) return null;
+    // loop37-D7: 成员优先选择——候选须含全部目标席位(取消竞态中垂死
+    // 战役可能仍报 RUNNING, 但其成员不含目标→不再选中; 无匹配返回
+    // null 由调用方给明确文案, 消息不再进非成员战役黑洞)。
+    if (Array.isArray(requiredAgents) && requiredAgents.length) {
+      const ok = running.filter(id => {
+        const members = store.engagementMembersOf?.(id) ?? [];
+        return requiredAgents.every(a => members.includes(a));
+      });
+      if (!ok.length) return null;
+      running.length = 0; running.push(...ok);
+    }
     const best = running.sort().pop();
     const seats = [...store.sessions.values()].filter(x => x.engagementId === best).length;
     return { engagementId: best, seats };

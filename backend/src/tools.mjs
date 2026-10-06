@@ -813,8 +813,18 @@ export function buildOrchestratorTools(record, caps) {
       // loop37-D1: 无参且无 activeEngagement 时回落最新 RUNNING 战役
       // (cancel 清指针后多战役场景旧战役仍在跑, 此前直接报'无进行中')。
       if (!engagement && !params.engagementId) {
-        const lr = await caps.latestRunningEngagement?.();
+        // loop37-D7: 回落=RUNNING ∧ 含全部目标席位, 取最新(垂死战役
+        // 不含目标不再选中); 无匹配=明确文案, 不静默投递。
+        const lr = await caps.latestRunningEngagement?.(params.agents);
         if (lr) engagement = `autopwn-${lr.engagementId}`;
+        else {
+          const anyRunning = await caps.latestRunningEngagement?.();
+          return { content: [{ type: 'text',
+            text: anyRunning
+              ? `转发失败:最新 RUNNING 战役(${anyRunning.engagementId})的成员不含目标席位(${params.agents.join(',')})——请显式传 engagementId(候选:${anyRunning.engagementId})或先 dispatch_agents。`
+              : '转发失败:无进行中的 engagement——先调用 dispatch_agents 发起战役再转发。' }],
+            details: { engagement: null, agents: params.agents, relayed: false, reason: 'no-engagement' } };
+        }
       }
       if (!engagement) {
         // CS41-B6: 结构化可行动回执(同函数其余失败分支制式——此前裸
