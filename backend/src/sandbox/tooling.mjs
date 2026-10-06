@@ -566,6 +566,13 @@ function shellScopeTargets() {
     }
     const pStart = Math.max(0, Number(p.start) || 0);
     const shown = uniqList.slice(pStart, pStart + 12);
+    // loop36-QA③: start 越界不再渲染负区间(13-12)——空页给显式诊断
+    // 与回退指引(空结果必须有诊断信息, AGENTS 原则4)。
+    if (!shown.length && pStart > 0) {
+      return okText(receipt.join('\n') + scopeNote
+        + `\n\n候选 0 条(start=${pStart} 越界: 结果集共 ${uniqList.length} 条)。`
+        + (uniqList.length ? `\n有效区间 0-${Math.max(0, uniqList.length - 1)}(传 start=${Math.max(0, uniqList.length - 12)} 取末页; 结果集 10 分钟内缓存稳定)` : '\n(结果集本身为空——换关键词或明确目标渠道)'));
+    }
     const moreHint = uniqList.length > pStart + 12
       ? `(传 start=${pStart + 12} 取下一段; 结果集 10 分钟内缓存稳定)` : '';
     const dedupeNote = mirrorMerged > 0

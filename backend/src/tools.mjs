@@ -1188,7 +1188,7 @@ export function buildAuthRequestTool(record, caps) {
     executionMode: 'sequential',
     parameters: Type.Object({
       target: Type.String({ description: "目标名(与 shell target/transportRef 目的地一致, 如 10.0.0.5 或 host.example.com); 传 '*' 列出当前全部待批授权请求(只读查询, 不发新请求)" }),
-      reason: Type.String({ description: '为什么需要授权该目标(一句话任务理由)' }),
+      reason: Type.Optional(Type.String({ description: '为什么需要授权该目标(一句话任务理由)。target=* 查询模式可省' })),
     }),
     execute: async (_id, params) => {
       // loop36-QA: target='*' 只读查询全部待批(此前挂起请求无查询入口)
@@ -1197,6 +1197,10 @@ export function buildAuthRequestTool(record, caps) {
         return { content: [{ type: 'text', text: pend.length
           ? `当前待批授权请求 ${pend.length} 条(用户未处理):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
           : '当前无待批授权请求。' }] };
+      }
+      // loop36-QA: reason 仅申请路径必填(查询模式 '*' 豁免被 schema 拦)
+      if (!params.reason || !params.reason.trim()) {
+        return { content: [{ type: 'text', text: 'reason 必填(申请授权需一句话任务理由; 若只想查待批清单, 传 target=* 可省 reason)。' }] };
       }
       // 同目标去重: 已 pending 或已批准则不重复发
       const dup = caps.scanAuthRequests?.(record, params.target);

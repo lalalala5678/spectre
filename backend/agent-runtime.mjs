@@ -268,8 +268,10 @@ const caps = {
     const settled = new Set(bus.list().filter(e => e.resolves).map(e => e.resolves));
     return bus.list()
       .filter(e => e.type === 'auth-request' && !e.resolves && !settled.has(e.seq))
-      .map(e => ({ seq: e.seq, target: e.target, requester: e.requester,
-        reason: String(e.reason ?? '').slice(0, 120) }));
+      .map(e => ({ seq: e.seq,
+        target: e.target ?? '(未记录——历史条目, 字段早于白名单)',
+        requester: e.requester ?? '(未记录)',
+        reason: String(e.reason ?? '(未记录)').slice(0, 120) }));
   },
   /** r47: 授权请求去重扫描(approved=目标已在 scope; pending=有未决请求)。 */
   scanAuthRequests: (record, target) => {
