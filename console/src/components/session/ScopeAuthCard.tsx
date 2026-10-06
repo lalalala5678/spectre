@@ -19,7 +19,10 @@ export function ScopeAuthCard({ wsId }: { wsId: string | null }) {
   const [start, setStart] = useState(() => new Date().toISOString().slice(0, 10));
   const [end, setEnd] = useState(() => new Date(Date.now() + 7 * 86400e3).toISOString().slice(0, 10));
   const load = () => api<typeof pending>('/scope/auth-requests')
-    .then(list => setPending(list.filter(r => (r.workSessionId ?? null) === (wsId ?? null))))
+    // 严格匹配: 仅当前项目的请求弹卡。ws 缺失(null)的历史/无归属请求
+      // 不在任何项目显示(7 天 TTL 自动过期兜底)——null===null 误配曾使
+      // 新项目弹全局遗留卡(用户实测 172.18.x.x crAPI 遗留)。
+    .then(list => setPending(wsId ? list.filter(r => r.workSessionId === wsId) : []))
     .catch(() => {});
   useEffect(() => {
     void load();
