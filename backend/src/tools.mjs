@@ -752,6 +752,35 @@ export function buildOrchestratorTools(record, caps) {
       // R32D90-OBS1/CS76-1: 源点 temporalClient 已打 temporalUnreachable
       // 标并附完整指引文案——此处直接透传, 不再正则嗅探/二次包装
       // (此前嵌套致 deploy/README×2 与 stutter)。
+      // loop38-议程③: 单波 ≤7 席默认化——超过自动分波(每波一个
+      // engagement, 共用同一 instruction; 10 并发曾 3 席被 429 击杀)。
+      if (params.agents.length > 7) {
+        const waves = [];
+        for (let i = 0; i < params.agents.length; i += 7) waves.push(params.agents.slice(i, i + 7));
+        const started2 = [];
+        for (const [wi, wave] of waves.entries()) {
+          try {
+            const st = await caps.dispatch({
+              instruction: `${params.instruction}\n[分波 ${wi + 1}/${waves.length}: 本波席位 ${wave.join(',')}——只做与本波席位职责相关的部分, 跨波结果经 query_intel 汇合]`,
+              agents: [...wave],
+              orchestratorSessionId: record.id,
+              workSessionId: record.workSessionId ?? null,
+            });
+            started2.push(st);
+            if (wi === 0) { record.activeEngagement = st; caps.persistMetaNow?.(record); }
+          } catch (e) {
+            const msg = String(e?.message ?? e);
+            return {
+              content: [{ type: 'text', text: `分波派发第 ${wi + 1} 波失败:${msg}——前 ${wi} 波已启动(${started2.map(x => x.engagementId).join(',')}), 本波及其后未启动。` }],
+              details: { error: msg, startedWaves: started2.map(x => x.engagementId) },
+            };
+          }
+        }
+        return {
+          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤7 席默认化, 429 安全区):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
+          details: { waves: started2.map(x => x.engagementId) },
+        };
+      }
       let started;
       try {
         started = await caps.dispatch({
@@ -1213,9 +1242,11 @@ export function buildAuthRequestTool(record, caps) {
       if (params.target === '*') {
         const pr = caps.listPendingAuthRequests?.() ?? { live: [] };
         const pend = Array.isArray(pr) ? pr : (pr.live ?? []);
+        const legacyN = Array.isArray(pr) ? 0 : (pr.legacyN ?? 0);
+        const legacyLine = legacyN > 0 ? `\n(另有 ${legacyN} 条无 target 字段的历史条目已折叠——字段早于白名单, 不可操作, TTL 到期自动过期)` : '';
         return { content: [{ type: 'text', text: pend.length
-          ? `当前待批授权请求 ${pend.length} 条(用户未处理; 7 天自动过期):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
-          : '当前无待批授权请求(7 天 TTL 内)。' }] };
+          ? `当前待批授权请求 ${pend.length} 条(用户未处理; 7 天自动过期):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}${legacyLine}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
+          : `当前无待批授权请求(7 天 TTL 内)。${legacyLine}` }] };
       }
       // loop36-QA: reason 仅申请路径必填(查询模式 '*' 豁免被 schema 拦)
       if (!params.reason || !params.reason.trim()) {
