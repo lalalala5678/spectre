@@ -179,6 +179,7 @@ export async function autoPwnWorkflow(input) {
   // Q2(a): completion notice auto-injected into the orchestrator session.
   // r6v2-#10: 情报库终报对账——workflow 失败(心跳丢失/worker 重启的
   // ChildWorkflowFailure)与终报已落账可并存, 以库为准消灭假警报。
+  const pendingGhost = [];  // loop41-#9: 中断且无终报席位(主侧代拟)
   let recon = {};
   // r25-5二分: 构建时对账自带查询时刻+命中数——下次快照矛盾可判
   try {
@@ -200,14 +201,30 @@ export async function autoPwnWorkflow(input) {
         const r = recon[key];
         const probeNote = recon.__probe ? `[构建对账@${String(recon.__probe.queriedAt).slice(11, 19)} 命中${recon.__probe.found}席]` : '';
         if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
-        // r6v3-#10: 构建时对账有固有盲区(终报可能晚于 workflow 判死落账)
-        // ——绝对断言"真失败"被实测证伪。降格为时点陈述, 送达时 activity
-        // 会再对账一次(见 notifyEngagementDone)。
-        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——截至通知构建时库内无终报, 送达对账见下, 终局以 query_intel 为准;`;
+        // loop41-#9: 中断且无终报的席位主侧代拟——"每个子代理必有报告"
+        // 的承诺兜底(recon 形态击穿: 无终报无代拟, 排空对账终局确认
+        // 库里永远缺这一席)。failed 终报, 消灭报告空洞。
+        pendingGhost.push(key);
+        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——主侧已代拟 failed 终报(送达时落账), 终局以 query_intel 为准;`;
       }
       return `- ${key}${ts}: ${value.summary ?? ''}`;
     })
     .join('\n');
+  // loop41-#9: 无终报中断席位的主侧代拟落账(5min 宽限后, 与通知同步)
+  if (pendingGhost.length) {
+    for (const key of pendingGhost) {
+      try {
+        await quick.busEmit({
+          channel: 'share', from: key, type: 'task-report', status: 'failed',
+          title: `[系统代拟·中断] ${key} 任务报告`,
+          summary: '子工作流中断且无终报, 主战役侧代拟(报告无空洞承诺兜底)',
+          detail: '**状态**:failed(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总时库内无该席位终报, 由主战役代拟本报告消灭空洞。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
+          engagement: `autopwn-${engagementId}`,
+          workSessionId: workSessionId ?? null,
+        });
+      } catch { /* 单席代拟失败不阻断汇总 */ }
+    }
+  }
   // r35-D7: 投递前宽限——完成通知快照曾 6/6 假警报(ChildWorkflowFailure
   // 快照时点早于长尾席位终报落账, 确定性错位而非随机故障)。5min 宽限
   // 让落账赶在 recheck 之前, 假警报面结构性收敛(投延 +5min, 相对

@@ -191,9 +191,15 @@ async function runDetachedAgent(o) {
 function lastReply(s) {
   // R32D85-E1(P1): textOf 收 content(string|parts), 此前传整消息对象
   // 恒 ''——lastReply/readSessionMessages/wake 三面自 cb381c5 起死读。
-  const last = [...s.agent.state.messages].reverse()
-    .find(m => m.role === 'assistant' && textOf(m.content).trim());
-  return last ? textOf(last.content) : '';
+  // loop41-#8: 最后一条 assistant 可能是 toolUse 轮的过渡性短语文本
+  // (writer 驳回判定说明曾取到中间思考)——判定词族优先: 从后往前
+  // 找含判定/落账词的最近一条, 无则回退最后一条。
+  const msgs = [...s.agent.state.messages].reverse()
+    .filter(m => m.role === 'assistant' && textOf(m.content).trim());
+  if (!msgs.length) return '';
+  const VERDICT = /(不成立|驳回|不予|拒绝|decline|不构成|否决|重复|合并|并入|归并|维持|既有|已存在|已由|另立|证据不足|不足以|duplicate|merge|overlap|已入库|落账|发布|mutex|成立|核实|确认)/i;
+  const hit = msgs.find(m => VERDICT.test(textOf(m.content)));
+  return hit ? textOf(hit.content) : textOf(msgs[0].content);
 }
 
 const caps = {

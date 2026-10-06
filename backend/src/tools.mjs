@@ -752,11 +752,10 @@ export function buildOrchestratorTools(record, caps) {
       // R32D90-OBS1/CS76-1: 源点 temporalClient 已打 temporalUnreachable
       // 标并附完整指引文案——此处直接透传, 不再正则嗅探/二次包装
       // (此前嵌套致 deploy/README×2 与 stutter)。
-      // loop38-议程③: 单波 ≤7 席默认化——超过自动分波(每波一个
-      // engagement, 共用同一 instruction; 10 并发曾 3 席被 429 击杀)。
-      if (params.agents.length > 7) {
+      // loop38-议程③: 单波分波默认化——loop41-#10 实测 7 席/波仍 7/10 中断, 压到 5。
+      if (params.agents.length > 5) {
         const waves = [];
-        for (let i = 0; i < params.agents.length; i += 7) waves.push(params.agents.slice(i, i + 7));
+        for (let i = 0; i < params.agents.length; i += 5) waves.push(params.agents.slice(i, i + 5)); // loop41-#10: 7→5(10 席 7/10 中断实测)
         const started2 = [];
         for (const [wi, wave] of waves.entries()) {
           // loop38-复测②: 并行分波被证无效(7/10 中断, 总并发会话驱动)
@@ -780,7 +779,7 @@ export function buildOrchestratorTools(record, caps) {
           }
         }
         return {
-          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤7 席默认化; 波间错峰 90s——总并发会话数是中断驱动因素, 并行分波曾 7/10 中断):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
+          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席(loop41 实测 7 席/波 7/10 中断); 波间错峰 90s——总并发会话数是中断驱动因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
           details: { waves: started2.map(x => x.engagementId) },
         };
       }
