@@ -230,20 +230,20 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     let scopeWarn = null;
     // loop40-③: local 通道注册前校验容器存在——伪 success(exec 才炸,
     // 且容器名沙箱内无法自省)。校验失败即拒, 不留僵尸注册。
+    // loop40-复测补: 'localhost'/'host' 特例=宿主直跑语义(r7v 通道
+    // sh-5ef8fee2 实证), 放行; 拒绝时回显 docker ps 可用名列表(发现性)。
     if (String(transport).toLowerCase() === 'local') {
       const cname = String(transportRef || '').split(':')[0];
       const haveDocker0 = sandboxConfig().driver === 'docker';
-      if (haveDocker0 && cname) {
-        // 同步校验(register 为同步函数): execFile 已在顶部 import, 用
-        // spawnSync 等价物——execFileSync 经 node:child_process 具名导入。
-        let okBox = false;
+      const hostAlias = /^(localhost|host|host.docker.internal)$/i.test(cname);
+      if (haveDocker0 && cname && !hostAlias) {
+        let names = '';
         try {
-          const names = execFileSync('docker', ['ps', '--format', '{{.Names}}'],
+          names = execFileSync('docker', ['ps', '--format', '{{.Names}}'],
             { timeout: 5000, encoding: 'utf8' });
-          okBox = String(names ?? '').split('\n').includes(cname);
-        } catch { okBox = false; }
-        if (!okBox) {
-          return { error: `local 通道校验失败: 容器 ${cname} 不存在(docker ps 无此名)——请先确认容器名; 宿主侧可用 shell list 查历史通道对照` };
+        } catch { names = ''; }
+        if (!String(names ?? '').split('\n').includes(cname)) {
+          return { error: `local 通道校验失败: 容器 ${cname} 不存在。docker ps 可用名: [${String(names ?? '').trim().split('\n').filter(Boolean).join(', ') || '(docker ps 不可读)'}]。宿主直跑语义可传 transportRef=localhost(特例放行)` };
         }
       }
     }
