@@ -1297,8 +1297,27 @@ export function buildDirectTools(record, caps) {
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
       ], { description: 'Vulnerability severity: info/low/medium/high/critical' }),
+      mergeInto: Type.Optional(Type.Number({ description: '归并直达(loop38-D10b): 判定与库内既有漏洞内容实质重叠时, 传正本 seq——平台直接把本条证据+共同发现者署名并入该正本修订链(不经互斥拦截; 互斥键对标题重组不鲁棒, 7650 教训)' })),
     }),
     execute: async (_id, params) => {
+      // loop38-D10b 直达路径: mergeInto 指定正本, 绕过互斥键(「归并:」
+      // 前缀+正文重组曾绕过 token 重叠→新建重复条目 7650, writer 被迫
+      // 手工作废兜底)。
+      if (params.mergeInto) {
+        const m = await caps.autoMergeVuln?.(params.mergeInto, {
+          title: params.title, text: params.text, severity: params.severity,
+          author: caps.authorOf?.(record) ?? null,
+          requesterSessionId: record.id,
+        });
+        if (m) {
+          return { content: [{ type: 'text',
+            text: `[已归并] 正本 seq=${params.mergeInto} 已追加共同发现者修订(修订 seq=${m.seq}, 第 ${m.n} 次)——正本引用一律用 seq=${params.mergeInto}, 修订内容可 query_intel(seq=${params.mergeInto}) 验证。` }],
+            details: { merged: true, targetSeq: params.mergeInto, revisionSeq: m.seq, n: m.n } };
+        }
+        return { content: [{ type: 'text',
+          text: `[归并失败] 正本 seq=${params.mergeInto} 不存在或不可修订(仅漏洞正本可归并)——query_intel 确认正本 seq 后重试, 或无正本时去掉 mergeInto 正常发布。` }],
+          details: { merged: false, targetSeq: params.mergeInto } };
+      }
       const ev = caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'user',
         type: 'vulnerability',

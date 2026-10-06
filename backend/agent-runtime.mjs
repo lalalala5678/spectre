@@ -471,8 +471,8 @@ const caps = {
       `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity。` +
       `共同发现者归并判据(loop38-D9): 只在内容实质重叠(同一漏洞的相同证据/点位/利用面)时并入库内既有条目并署共同发现者; ` +
       `仅会话上下文关联(同项目/发现者的其它会话、QA 性质线索)不构成归并依据——误并会篡改漏洞归属。` +
-      `判定重叠时的正确动作(loop38-D10b): 直接调用 publish_vulnerability(完整证据, title 前缀'归并:')——平台互斥拦截后会` +
-      `自动把你的证据增量与共同发现者署名并入正本修订链(回执载明正本 seq 与修订 seq), 你无需也不应手工 request_vulnerability_revision。` +
+      `判定重叠时的正确动作(loop38-D10b): 调用 publish_vulnerability 时带 mergeInto=<正本 seq>(完整证据)——平台直达归并,` +
+      `把你的证据增量与共同发现者署名并入正本修订链(回执载明正本 seq 与修订 seq); 不要依赖互斥拦截(标题重组可绕过), 也不应手工 revise。` +
       `若回执以 [mutex-intercepted] 开头=与库内既有条目同点位被拦(未成账): ` +
       `终报必须如实写「被互斥拦截待归并」, 并 query_intel 回查正本 seq——严禁写「已落账」; ` +
       `正常落账后也须以回执 seq 回查库内确认再写终报。` +
@@ -553,6 +553,16 @@ const caps = {
     // r29b-残留③: 判定词族扩充——writer 以"重复/并入/维持/证据不足"等
     // 清晰结论措辞驳回时曾被误贴"疑似未完成"旗标(验收方实测报)。
     const looksDraft = reply && !/(不成立|驳回|不予|拒绝|decline|不构成|否决|重复|合并|并入|归并|维持|既有|已存在|已由|另立|证据不足|不足以|duplicate|merge|overlap)/i.test(reply);
+    // loop38-新缺陷面: 部署/重启窗口击杀在飞 writer→无 published 无
+    // reply 的"空回执"(7234 案线索被静默消耗)——显式 [writer-lost] 声明
+    // +重试指引(回执不变量: 非成功带 seq 即显式失败)。
+    if (!published && (!reply || reply === '(无输出)') && timeout) {
+      return {
+        ok: false,
+        text: `[writer-lost] 线索未被处理——writer 会话 ${writer.id} 在 ${Math.round((Date.now() - tRw) / 1000)}s 等待窗内零输出零落账(疑似部署/重启窗口击杀)。**线索未被消耗**: 请原样重试 report_vulnerability; 若持续 writer-lost 检查 runtime 日志。`,
+        details: { sessionId: writer.id, writerLost: true, waitedMs: Date.now() - tRw },
+      };
+    }
     const replyShown = looksDraft
       ? `(writer 最终输出疑似未完成(未见判定词)——全文见 read_session ${writer.id}, 稍后复核):\n${reply.slice(0, 300)}`
       : (reply || '(无输出)');
