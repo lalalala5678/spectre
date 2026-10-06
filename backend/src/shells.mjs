@@ -613,7 +613,11 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       return { ok: false, error: 'exec 异常: ' + e.message };
     }
     sh.cmdCount += 1; sh.lastActiveAt = new Date().toISOString();
-    const task = { n: sh.cmdCount, command: command.slice(0, 500), code, ms: Date.now() - t0, at: sh.lastActiveAt };
+    // loop39-R48b: verifyMark 自愈重试的任务史打 retry 标(读数友好,
+    // 审计保留——R48b 裁定采纳)。
+    const isRetry = /^printf 'WM[a-z0-9]+S';/.test(command);
+    const task = { n: sh.cmdCount, command: command.slice(0, 500), code, ms: Date.now() - t0, at: sh.lastActiveAt,
+      ...(isRetry ? { retry: true } : {}) };
     sh.tasks.push(task);
     persistShells();  // R6-F2: every-mutation 契约
     if (sh.tasks.length > 100) sh.tasks.splice(0, sh.tasks.length - 100);
