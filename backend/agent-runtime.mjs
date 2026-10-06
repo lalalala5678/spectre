@@ -331,7 +331,7 @@ const caps = {
         target,
         fields: { text: baseDetail + inc,
           ...(severity && !target.severity ? { severity: String(severity).toLowerCase() } : {}) },
-        reason: `互斥拦截自动归并: ${author?.name ?? '?'} 的重复线索并入(共同发现者荣誉)`,
+        reason: `重复线索归并(mergeInto 直达或互斥拦截): ${author?.name ?? '?'} 并入(共同发现者荣誉)`,
         requestedBy: author?.name ?? 'platform',
         approvedBy: 'platform:auto-merge',
         origin: 'agent',
