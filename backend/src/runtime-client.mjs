@@ -54,10 +54,24 @@ export const runtime = {
   steer: (sessionId, text) =>
     call('POST', `/api/sessions/${sessionId}/steer`, { text, source: 'agent' }),
 
-  /** Waits for the agent to finish; long timeout for reasoning models. */
-  waitIdle: (sessionId) =>
-    call('POST', `/api/sessions/${sessionId}/wait-idle`, undefined,
-      CONFIG.maxIdleWaitMs + 10_000),
+  /**
+   * Waits for the agent to finish; long timeout for reasoning models.
+   * crAPI 循环1 根因修复: 单次长挂 POST /wait-idle 曾撞 undici 默认
+   * headersTimeout(300s)→HeadersTimeoutError→promptAndWait activity 击杀
+   * →ChildWorkflowFailure 三连假死(席位实际存活 10-22min, 04:29/04:40/
+   * 04:51 worker 日志实证)。改为 60s 间隔轮询 busy——每跳 ≤30s 超时窗,
+   * 不存在长挂响应头, 根因拔除。
+   */
+  waitIdle: async (sessionId) => {
+    const deadline = Date.now() + (CONFIG.maxIdleWaitMs || 1_800_000);
+    let last = { idle: false };
+    while (Date.now() < deadline) {
+      last = await call('GET', `/api/sessions/${encodeURIComponent(sessionId)}/idle`);
+      if (last?.idle || last?.busy === false) return { sessionId, reply: last.reply ?? '' };
+      await new Promise(r => setTimeout(r, 60_000));
+    }
+    return { sessionId, reply: last?.reply ?? '', timedOut: true };
+  },
 
   busEmit: (entry) =>
     call('POST', '/api/bus', entry),

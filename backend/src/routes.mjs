@@ -432,6 +432,16 @@ function realRouter({ store, bus, caps, wal }) {
         return json(res, 202, { ok: true, ...(echoObj ? { message: echoObj } : {}),
           ...(r14pending ? { pendingReport: true, hint: '该代理尚未提交任务报告(在途)' } : {}) });
       }
+      if (action === '/idle' && method === 'GET') {
+        // R1a: worker 轮询式 waitIdle 的轻量跳(busy/末条回复, 立即返回)
+        if (!isInternalCaller(req)) {
+          return bad(res, 401, '仅限内部调用');
+        }
+        const msgs = record.agent?.state?.messages ?? [];
+        const lastA = [...msgs].reverse().find(m => m.role === 'assistant');
+        return json(res, 200, { idle: !record.busy, busy: !!record.busy,
+          reply: lastA?.text ? String(lastA.text).slice(0, 4000) : '' });
+      }
       if (action === '/wait-idle' && method === 'POST') {
         if (!isInternalCaller(req)) {
           return bad(res, 401, '仅限内部调用');
@@ -598,7 +608,16 @@ function realRouter({ store, bus, caps, wal }) {
         // A10 推送: 批准实时广播同项目全部活跃席位(不等席位下次拉取,
         // 在飞席位立即拿到新边界——weakcred 过期快照重测教训)。
         const scopeLine = sc.targets.join(', ');
-        const broadcast = (sid, note) => { try { caps.followUp?.(sid, note); } catch { /* 会话已死则跳过 */ } };
+        // R3: busy 席位用 steer 即时注入(回合边界 followUp 节拍曾使
+        // 授权广播迟到 20min——在飞长回合的席位持续持旧边界, 编排者
+        // 被迫手工 relay 纠偏); idle 席位照常 followUp 起新回合。
+        const broadcast = (sid, note) => {
+          try {
+            const rec = store.get(sid);
+            if (rec?.busy) { store.steer(rec, note, 'system'); }
+            else { caps.followUp?.(sid, note); }
+          } catch { /* 会话已死则跳过 */ }
+        };
         broadcast(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
           `[授权已批准] ${reqEv.target} 已入授权清单。当前清单实况: [${scopeLine}]——边界内目标无需再考虑授权问题, 直接执行。`);
         let broadcastN = 1;

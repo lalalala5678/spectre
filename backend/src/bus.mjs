@@ -157,18 +157,16 @@ export class Bus {
       if (other.type !== 'vulnerability' || other.revises || other.void
         || otherTs < fpCut) continue;
       if (!sameWs) {
-        // 靶场指纹源=title+detail(title 常无端口, DVGA 案例全在 detail):
-        // host:port 完整串(127.0.0.1:30020)与裸 port 两种形态任一交集
-        // 即视为同靶场实例。
-        const ep = x => {
-          const lo = String(x ?? '').toLowerCase();
-          const out = new Set(lo.match(/\b\d{1,3}(?:\.\d{1,3}){3}:\d{4,5}\b/g) ?? []);
-          for (const m of lo.matchAll(/(?<![\w-])(\d{4,5})(?![\w-])/g)) out.add(`port:${m[1]}`);
-          return [...out];
-        };
+        // 靶场指纹源=title+detail(title 常无端口, DVGA 案例全在 detail)。
+        // crAPI 循环1 复盘收紧: 裸 port 形态退出跨项目比对——chromaDB
+        // (.3 无认证)曾被 port:8000 交集误配 7334《172.18.0.2:8000》
+        // (IP 都不符, 9689 注记); 跨项目只认完整 host:port 串(同实例
+        // 强特征), 端口号撞车是弱特征。
+        const ep = x => new Set(String(x ?? '').toLowerCase()
+          .match(/\b\d{1,3}(?:\.\d{1,3}){3}:\d{4,5}\b/g) ?? []);
         const aP = ep(`${entry.title} ${entry.detail ?? ''}`);
         const bP = ep(`${other.title} ${other.detail ?? ''}`);
-        if (!aP.some(pt => bP.includes(pt))) continue;  // 无共同靶场指纹: 不同靶场, 放行
+        if (![...aP].some(pt => bP.has(pt))) continue;  // 无共同实例指纹: 放行
       }
       const ot = tokens(`${other.title} ${other.detail ?? ''}`);
       if (ot.size < 4) continue;
@@ -205,12 +203,27 @@ export class Bus {
       const oPorts = [...op].filter(t => t.startsWith('port:'));
       const portsCompatible = myPorts.length === 0 || oPorts.length === 0
         || myPorts.some(pt => oPorts.includes(pt));
-      const fpMatch = mp.size > 0 && op.size > 0
+      // crAPI 循环1 复盘收紧: 纯 port: 指纹不构成同点位证据——同端口可载
+      // 多洞(30080 上 BOLA/SQLi/JWT 各自正本), 且跨资产 port 撞车已实
+      // 证。同点位指纹 = 真 path 串交集(非 port:) 或双方均无 path 时
+      // host:port 串全等; 裸 port 只保留同 ws 的 portsCompatible 辅判。
+      // 纯数字段(CWE-521/307、CVE-2024-1234 的编号尾巴)不是端点 path
+      const realPaths = t => [...t].filter(x => !x.startsWith('port:') && /[a-z]/.test(x));
+      // 无 path 形态(TCP 服务洞, 5173/5177 场景): port 集全等即同点位
+      // ——同 ws 内同端口=同服务; 跨 ws 已被 R2a 完整串门槛先行挡住,
+      // 此分支天然只在同 ws 生效。双方均无任何指纹时不构成证据。
+      const realPathHit = (realPaths(mp).some(x => realPaths(op).includes(x)))
+        || (realPaths(mp).length === 0 && realPaths(op).length === 0
+          && myPorts.length > 0 && oPorts.length > 0
+          && myPorts.length === oPorts.length
+          && myPorts.every(pt => oPorts.includes(pt)));
+      const fpMatch = realPathHit && mp.size > 0 && op.size > 0
         && phit / Math.min(op.size, mp.size) >= 0.5 && portsCompatible;
       // r43-②: token 高重叠仅短窗; 指纹命中不限窗
       if ((overlap >= 0.7 && otherTs >= cut) || fpMatch) {
         return { blocked: true, dupSeq: other.seq, dupTitle: other.title,
-          ...(fpMatch && overlap < 0.7 ? { by: 'fingerprint' } : {}) };
+          dupWs: other.workSessionId ?? null,
+          ...(fpMatch ? { by: 'fingerprint' } : {}) };
       }
     }
     return null;

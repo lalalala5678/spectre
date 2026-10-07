@@ -195,7 +195,7 @@ async function runDetachedAgent(o) {
   for (let i = 0; i < 200 && !s.busy && !(s.events?.length > 1); i++) {
     await new Promise(r => setTimeout(r, 100).unref?.());
   }
-  await store.awaitCompletion(s, 300_000);
+  await store.awaitCompletion(s, o.waitMs ?? 300_000);
   // 超时/空收割兜底: writer 可能仍在后台落账——再宽限 10s 轮询回执侧
   // 事件(landed 判定由调用方做), 避免把"稍后落账"误报为"未落账"。
   for (let i = 0; i < 10 && s.busy; i++) {
@@ -276,6 +276,15 @@ const caps = {
     if ((record.workSessionId ?? null) !== (callerWs ?? null)) return null;
     return record.agent.state.messages.slice(-last)
       .map(m => ({ role: m.role, text: textOf(m.content) || '' }));
+  },
+  /** R7: read_session toFile 的落盘通道(共享工作区, 容器与宿主同源)。 */
+  writeFile: async (pathInWs, body) => {
+    const { writeFile, mkdir } = await import('node:fs/promises');
+    const { dirname } = await import('node:path');
+    const host = pathInWs.replace(/^\/workspace\//, '/var/lib/spectre/workspace/');
+    await mkdir(dirname(host), { recursive: true });
+    await writeFile(host, String(body), 'utf8');
+    return { path: pathInWs, size: String(body).length };
   },
   /** Provenance snapshot for intel events (delegates to SessionStore). */
   authorOf: (record) => store.authorOf(record),
@@ -516,6 +525,7 @@ const caps = {
       ws: requesterRecord.workSessionId ?? null,
       name: `报告:${String(hint).slice(0, 20)}`,
       description: `漏洞线索:${String(hint).slice(0, 60)}`,
+      waitMs: 90_000,  // R8: 同步等待上限 90s(实测 129-241s 钉死编排回合), 超时即转后台 DM 完成回投
       requester: { sessionId: requesterRecord.id, author: requesterAuthor },
       // 占位 emit 于 runDetachedAgent 内 spawn+prompt 落定即刻回调——
       // 真正的在飞起点(此前在 await 终局之后, 生产里占位永不"在飞可见")。

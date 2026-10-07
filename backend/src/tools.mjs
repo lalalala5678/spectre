@@ -536,11 +536,14 @@ export function buildIntelTools(record, caps) {
       full: Type.Optional(Type.Boolean({
         description: 'Raise per-message cap 300→8000 chars (still marked if clipped)',
       })),
+      toFile: Type.Optional(Type.String({
+        description: 'crAPI 循环1: Optional filename — writes the FULL transcript (no per-message cap, 8000/message) into the shared workspace as /workspace/<ws>/sessions/<file>, receipt carries path+size. For 17k+ char sessions this beats 30/12/6 three-segment full reads.',
+      })),
     }),
     execute: async (_id, params) => {
       // R32D96-N1/CS80-1: 只剥 payloadRef 的 "sess:" 前缀——会话 ID
       // 本体即 "sess-..." 开头, 此前 EB 双收版连裸 ID 前缀一起吞致
-      // 查找必败(P1 回归); 裸 ID 原样直传。
+      // 查找必败(P1 回执); 裸 ID 原样直传。
       const sid = String(params.sessionId).replace(/^sess:/, '');
       const last = Math.min(Math.max(Number(params.last) || 10, 1), 30);
       // Access the session store via caps — injected by the composition root
@@ -551,6 +554,18 @@ export function buildIntelTools(record, caps) {
       }
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
+      }
+      // R7: 全量导出到工作区(17k+ 会话分段读的终结方案)
+      if (params.toFile) {
+        try {
+          const safe = String(params.toFile).replace(/[^\w.-]/g, '_').slice(0, 80) || 'session-export';
+          const body = messages.map(m => `[${m.role}${m.source ? '/' + m.source : ''}] ${String(m.text ?? m.content ?? '').replace(/\n/g, '\n')}`).join('\n\n');
+          const path = `/workspace/${record.workSessionId ?? '_default'}/sessions/${safe}`;
+          await caps.writeFile?.(path, body);
+          return { content: [{ type: 'text', text: `全文已导出: ${path}(${messages.length} 条消息, ${body.length} 字符)——bash cat/分段读均可; 本回执不再内联正文。` }] };
+        } catch (e) {
+          return { content: [{ type: 'text', text: `导出失败(${String(e?.message ?? e).slice(0, 120)})——回落分段读(full=true)。` }] };
+        }
       }
       // CS41-B1/CS44-F5: 单条截断直接调 clipMarked 单源(此前手搓标记
       // 差一前导空格; AGENTS 原则3)。
@@ -1429,10 +1444,12 @@ export function buildDirectTools(record, caps) {
           content: [{
             type: 'text',
             text: `[mutex-intercepted] 已拦截: 与 seq=${ev.dupSeq}《${ev.dupTitle}》疑似同点位双账(短窗互斥, 10min${ev.by === 'fingerprint' ? ', by=fingerprint 端点指纹命中' : ', token 重叠命中'})。` +
-              (merged
-                ? `\n[已自动归并] 正本 seq=${ev.dupSeq} 已追加共同发现者修订(seq=${merged.seq}, 修订 ${merged.n})——引用正本一律用 seq=${ev.dupSeq}。`
-                : `\n同一漏洞请用 request_vulnerability_revision 并入(正本=首落 seq=${ev.dupSeq}); ` +
-                  `确属不同漏洞请细化 title/detail 差异后重发。`),
+              (ev.dupWs && ev.dupWs !== (record.workSessionId ?? null)
+                ? `\n[跨项目正本] 该正本归属其它项目(seq=${ev.dupSeq}), 你在本项目 query_intel 不可见属预期——证据已通过自动归并保全, 勿尝试 query_intel(seq=${ev.dupSeq}) 验证(不可执行); 如认为误配, 细化 title/detail 端点差异后重发。`
+                : (merged
+                  ? `\n[已自动归并] 正本 seq=${ev.dupSeq} 已追加共同发现者修订(seq=${merged.seq}, 修订 ${merged.n})——引用正本一律用 seq=${ev.dupSeq}。`
+                  : `\n同一漏洞请用 request_vulnerability_revision 并入(正本=首落 seq=${ev.dupSeq}); ` +
+                    `确属不同漏洞请细化 title/detail 差异后重发。`)),
           }],
         };
       }
