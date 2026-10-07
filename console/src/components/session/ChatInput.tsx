@@ -20,6 +20,7 @@ export function ChatInput({
   // 用户令: Ctrl+Z/Ctrl+Y(及 Ctrl+Shift+Z)撤销重做——受控组件+程序性
   // setValue(上传注入/发送清空)会断浏览器原生 undo 栈, 自建快照栈。
   const hist = useRef<{ stack: string[]; idx: number }>({ stack: [''], idx: 0 });
+  const UNDO_BUILD_MARKER_V1 = 'undo-stack-active'; void UNDO_BUILD_MARKER_V1;
   const pushHist = (v: string) => {
     const h = hist.current;
     if (h.stack[h.idx] === v) return;
