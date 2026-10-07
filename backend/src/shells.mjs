@@ -276,8 +276,8 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       }
     }
     if (transport === 'web') {
-      if (!tr.includes('{CMD}'))
-        return { error: 'web transportRef 需含 {CMD} 占位(如 http://h/p.php?c={CMD}#MARK);自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
+      if (!(tr.includes('{CMD}') || tr.includes('{CMD_B64}')))
+        return { error: 'web transportRef 需含 {CMD} 或 {CMD_B64}(base64 零转义, 嵌套文法通道用)占位;自定义头加 "H: 名称: 值" 段(POST 用 | 分隔,GET 用空格)' };
       // r6v2-观测12: 注册预验与执行解析同规(此前 GET|前缀注册不拒、
       // 执行才爆)。全段跑一遍: POST 段形态/GET 禁 |/头段合法。
       // r35-N2b: GET 显式前缀先剥(与 exec 解析同规)——register 预验
@@ -293,11 +293,12 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         return { error: 'GET 形态不含 "|"(检测到 GET| 前缀误写——POST 才用 | 分隔)' };
       const headerRe = /^\s*H:\s*([!#$%&'*+.^`|~0-9A-Za-z-]+):\s*(.*)$/;
       if (spec0.startsWith('POST|')) {
+        // DVGA终解配套: 模板含 | (如 base64 解码管道)与段分隔符冲突——
+        // 非 H: 段不再逐段校验, 全部 | 重连后须含占位即合法。
         const parts = spec0.slice(5).split('|');
-        for (const part of parts.slice(1)) {
-          if (!headerRe.test(part) && !part.includes('{CMD}'))
-            return { error: `POST 段无法识别(${part.slice(0, 40)})——段须含 {CMD} 或形如 "H: 名称: 值"` };
-        }
+        const stray = parts.filter(part => !headerRe.test(part)).join('|');
+        if (!stray.includes('{CMD}') && !stray.includes('{CMD_B64}'))
+          return { error: `POST 段无法识别(${stray.slice(0, 40)})——段须含 {CMD}/{CMD_B64} 或形如 "H: 名称: 值"` };
       } else {
         for (const seg of spec0.split(/\s+(?=H:\s)/).slice(1)) {
           if (!headerRe.test(seg.trim()))
@@ -553,7 +554,7 @@ function dockerLiveProbe() {
             sh._urlTpl = segs[0];
           }
         }
-        if (!tpl.includes('{CMD}')) return { ok: false, error: 'web transportRef 需含 {CMD} 占位' };
+        if (!tpl.includes('{CMD}') && !tpl.includes('{CMD_B64}')) return { ok: false, error: 'web transportRef 需含 {CMD} 或 {CMD_B64} 占位' };
         const enc = encodeURIComponent(command);
         const urlTpl = (!isPost && sh._urlTpl) ? sh._urlTpl : (isPost ? postUrl : tpl);
         const url = isPost ? postUrl : urlTpl.replace('{CMD}', enc);
@@ -562,10 +563,19 @@ function dockerLiveProbe() {
         // DVGA验收终项: JSON| 的 {CMD} 做字符串转义(双引号/反斜杠/
         // 控制字符)——read_file 内部命令带双引号曾裸插模板坏 JSON 体
         // (sh-4c2d9d6c read_file 恒败+SPF 探针恒 null 的根因)。
-        const cmdReplaced = isJson
-          ? JSON.stringify(command).slice(1, -1)
-          : (isRaw ? command : enc);
-        const body = isPost ? postForm.replace('{CMD}', cmdReplaced) : null;
+        // DVGA终解: {CMD_B64}=命令 base64 后代入(字符集 A-Za-z0-9+/=
+        // 在 JSON/GraphQL/SQL/XML 任何嵌套字符串文法零转义需求——单层
+        // {CMD_JSON} 原理上无法满足 JSON∋GraphQL 双层文法, 用户双引号
+        // 命令/read_file/SPF 探针曾全炸)。read_file/探针经同一路径自动
+        // b64 化; 模板侧自解码(如 systemDiagnostics cmd 里 |base64 -d|sh)。
+        const isB64 = postForm.includes('{CMD_B64}');
+        const cmdReplaced = isB64
+          ? Buffer.from(command, 'utf8').toString('base64')
+          : (isJson ? JSON.stringify(command).slice(1, -1)
+            : (isRaw ? command : enc));
+        const body = isPost
+          ? postForm.replace(isB64 ? '{CMD_B64}' : '{CMD}', cmdReplaced)
+          : null;
         const ctl = new AbortController();
         // 自测-6: 上限裁剪显式化——此前静默钳 60s, 调用方传大值无效且回执
         // 不注明, 报告方以为超时参数生效。裁剪发生时在结果附 cappedAt。
