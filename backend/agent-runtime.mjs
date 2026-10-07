@@ -270,12 +270,20 @@ const caps = {
   readSessionMessages: (sessionId, last, callerWs) => {
     const record = store.get(sessionId);
     if (!record) return null;
+    // QA建议2: 总数只读(判断"读到的是否全量")
     // R12-F1: 项目作用域(F33 同语义)——此前唯一无门的跨项目读取通道,
     // A 项目 agent 凭任意 sessionId 可读 B 项目全部转录(writer 会话/
     // 用户直连会话含内)。null===null 时旧会话互通。
     if ((record.workSessionId ?? null) !== (callerWs ?? null)) return null;
     return record.agent.state.messages.slice(-last)
-      .map(m => ({ role: m.role, text: textOf(m.content) || '' }));
+      .map(m => ({ role: m.role, text: textOf(m.content) || '', ts: m.timestamp ?? null }));
+  },
+  /** QA建议2: 会话消息总数(read_session meta 行)。 */
+  readSessionCount: (sessionId, callerWs) => {
+    const record = store.get(sessionId);
+    if (!record) return null;
+    if ((record.workSessionId ?? null) !== (callerWs ?? null)) return null;
+    return record.agent.state.messages.length;
   },
   /** R7: read_session toFile 的落盘通道(共享工作区, 容器与宿主同源)。 */
   writeFile: async (pathInWs, body) => {

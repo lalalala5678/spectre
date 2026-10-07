@@ -637,9 +637,28 @@ function realRouter({ store, bus, caps, wal }) {
           resolves: seq, status: 'rejected', target: reqEv.target,
           title: `授权被驳回: ${reqEv.target}`, summary: `用户驳回了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求。`,
           workSessionId: reqEv.workSessionId ?? null });
-        caps.followUp?.(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
+        // QA建议4: 撤销对称广播(与批准同款——busy 席位 steer 即时注入,
+        // 同项目其它席位不再对该目标发起操作/申请)。
+        const broadcastR = (sid, note) => {
+          try {
+            const rec = store.get(sid);
+            if (rec?.busy) { store.steer(rec, note, 'system'); }
+            else { caps.followUp?.(sid, note); }
+          } catch { /* 会话已死则跳过 */ }
+        };
+        broadcastR(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
           `[授权被驳回] 用户驳回了你对 ${reqEv.target} 的授权请求——请勿再尝试该目标, 调整方案或汇报。`);
-        return json(res, 200, { ok: true });
+        let rn = 1;
+        for (const sess of store.list()) {
+          const rec = store.get(sess.id);
+          if (!rec || sess.id === (reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId)) continue;
+          if (rec.workSessionId && rec.workSessionId === (reqEv.workSessionId ?? null)) {
+            broadcastR(sess.id,
+              `[授权变更·撤销广播] ${reqEv.target} 的授权申请已被用户驳回(申请人 ${reqEv.requester ?? reqEv.from})——该目标不在授权清单, 勿对其发起主动渗透。`);
+            rn++;
+          }
+        }
+        return json(res, 200, { ok: true, broadcast: rn });
       }
       return bad(res, 400, '未知 action(approve|reject)');
     }

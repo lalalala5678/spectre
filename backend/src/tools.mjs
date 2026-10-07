@@ -548,6 +548,9 @@ export function buildIntelTools(record, caps) {
       const last = Math.min(Math.max(Number(params.last) || 10, 1), 30);
       // Access the session store via caps — injected by the composition root
       const messages = caps.readSessionMessages?.(sid, last, record.workSessionId ?? null);
+      // QA建议2: 会话规模与新鲜度随行(判断"读到的是否全量/是否还在长")
+      const total = caps.readSessionCount?.(sid, record.workSessionId ?? null) ?? messages.length;
+      const lastTs = messages.length ? (messages[messages.length - 1].ts ?? null) : null;
       if (!messages) {
         return { content: [{ type: 'text',
           text: `会话 ${sid} 不存在或不可读。payloadRef 形如 "sess:sess-xxx"——直接传或传整个 payloadRef 均可(仅剥 sess: 段, ID 本体 sess- 段保留)。` }] };
@@ -570,6 +573,7 @@ export function buildIntelTools(record, caps) {
           return { content: [{ type: 'text', text: `导出失败(${String(e?.message ?? e).slice(0, 120)})——回落分段读(full=true)。` }] };
         }
       }
+      const metaLine = `(会话共 ${total} 条消息, 本次显示最新 ${messages.length} 条${lastTs ? `, 最后写入 ${new Date(lastTs).toISOString().slice(11, 19)}Z` : ''})\n`;
       // CS41-B1/CS44-F5: 单条截断直接调 clipMarked 单源(此前手搓标记
       // 差一前导空格; AGENTS 原则3)。
       // CS66-F1: 补全手段改工具内可行动 full 参数——此前指针指向
@@ -581,7 +585,7 @@ export function buildIntelTools(record, caps) {
         return `${who}: ${clipMarked(raw, cap, '传 full: true 提高单条上限')}`;
       });
       return { content: [{ type: 'text',
-        text: clipMarked(`会话 ${sid} 最近 ${messages.length} 条消息:\n\n${lines.join('\n\n---\n\n')}`,
+        text: clipMarked(`${metaLine}会话 ${sid} 最近 ${messages.length} 条消息:\n\n${lines.join('\n\n---\n\n')}`,
           CONFIG.intelDigestChars, '可减小 last 参数') }] };
     },
   };
