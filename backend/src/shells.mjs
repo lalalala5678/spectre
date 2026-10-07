@@ -559,8 +559,13 @@ function dockerLiveProbe() {
         const url = isPost ? postUrl : urlTpl.replace('{CMD}', enc);
         // RAW=原样字节(不 encodeURIComponent——DVGA 实证 form 编码破坏
         // 自建端点); 默认形态保持编码(webshell 兼容)。
-        const body = isPost
-          ? postForm.replace('{CMD}', isRaw ? command : enc) : null;
+        // DVGA验收终项: JSON| 的 {CMD} 做字符串转义(双引号/反斜杠/
+        // 控制字符)——read_file 内部命令带双引号曾裸插模板坏 JSON 体
+        // (sh-4c2d9d6c read_file 恒败+SPF 探针恒 null 的根因)。
+        const cmdReplaced = isJson
+          ? JSON.stringify(command).slice(1, -1)
+          : (isRaw ? command : enc);
+        const body = isPost ? postForm.replace('{CMD}', cmdReplaced) : null;
         const ctl = new AbortController();
         // 自测-6: 上限裁剪显式化——此前静默钳 60s, 调用方传大值无效且回执
         // 不注明, 报告方以为超时参数生效。裁剪发生时在结果附 cappedAt。
