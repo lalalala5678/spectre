@@ -204,15 +204,19 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
     try {
       // r14-①: 后台输出落盘可回读——外层重定向不影响命令内部显式重定向
       // (内部 > 优先生效, 外层仅兜底捕获未定向输出)。回执附日志路径。
-      const bgLog = `/tmp/spectre-bg-${Date.now().toString(36)}.log`;
-      const bg = spawn('bash', ['-c', `mkdir -p /tmp; ( ${cmdStr} ) > ${bgLog} 2>&1`], {
+      // DVGA验收-1: 兜底日志曾被报"不存在"——双保险: 预建文件(touch
+      // 先行, 命令未产输出时文件也在)+落 workspace(回合回收不影响)。
+      const bgId = Date.now().toString(36);
+      const bgLog = `/tmp/spectre-bg-${bgId}.log`;
+      const bgLog2 = `${cwdHost}/spectre-bg-${bgId}.log`;
+      const bg = spawn('bash', ['-c', `touch ${bgLog} ${bgLog2}; ( ${cmdStr} ) >> ${bgLog} 2>>${bgLog}; cp -f ${bgLog} ${bgLog2} 2>/dev/null || true`], {
         detached: true, stdio: 'ignore',
         env: sanitizedEnv(extraEnv), cwd: cwdHost,
       });
       bg.unref();
       // FLv2: 与 spawnShell 正常 resolve 形状对齐({exitCode,text})——
       // 上版给 {ok,stdout} 被官方 bash 工具的 text.split 路径炸(undefined)
-      return Promise.resolve({ exitCode: 0, text: `(后台任务已启动, 不等待输出——注意: ①后台进程随本回合结束可能被回收, 不保证持久; ②后台与前台同上下文执行, 跨上下文(bash 容器 vs shell 宿主通道)工件不互通, 经 /workspace 或情报库传递; 兜底日志: ${bgLog}(命令内部显式重定向优先); 持久任务建议 nohup/setsid+工作区落盘)`, timedOut: false, background: true, bgLog });
+      return Promise.resolve({ exitCode: 0, text: `(后台任务已启动, 不等待输出——注意: ①后台进程随本回合结束可能被回收, 不保证持久; ②后台与前台同上下文执行, 跨上下文(bash 容器 vs shell 宿主通道)工件不互通, 经 /workspace 或情报库传递; 兜底日志双落点: ${bgLog} 与工作区 ${bgLog2}(命令内部显式重定向优先; 任一可读); 持久任务建议 nohup/setsid+工作区落盘)`, timedOut: false, background: true, bgLog });
     } catch (e) {
       return Promise.resolve({ exitCode: -1, text: String(e?.message ?? e), timedOut: false, spawnError: String(e?.message ?? e) });
     }

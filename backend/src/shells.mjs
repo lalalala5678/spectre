@@ -194,9 +194,13 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
     try {
       if (shell.transport === 'web') {
         const [spec0raw] = tr.split('#');
-        // r35-N2b: 同款 GET 前缀剥离(授权门 host 提取曾误析)
-        const spec0 = /^GET[ |]/i.test(spec0raw) ? spec0raw.replace(/^GET[ |]/i, '') : spec0raw;
-        const tpl = spec0.startsWith('POST|') ? spec0.slice(5) : spec0;
+        // r35-N2b: 同款 GET 前缀剥离(授权门 host 提取曾误析);
+        // DVGA验收-6: RAW|/JSON| 前缀一并剥(URL 解析+展示净化)。
+        let spec0 = spec0raw;
+        if (spec0.startsWith('JSON|')) spec0 = spec0.slice(5);
+        else if (spec0.startsWith('RAW|')) spec0 = spec0.slice(4);
+        if (/^GET[ |]/i.test(spec0)) spec0 = spec0.replace(/^GET[ |]/i, '');
+        const tpl = spec0.startsWith('POST|') ? spec0.replace(/^POST[ |]/i, '') : spec0;
         const urlPart = tpl.split('|')[0];
         return new URL(urlPart).hostname;
       }
@@ -280,8 +284,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       // 曾拒 "GET http://…" 形态, 复测一活一死的红灯根因。
       let spec0 = tr.split('#')[0].replace(/\s+$/, '');
       // loop-DVGA优化: RAW| 前缀先剥(原样字节形态, 后续按 POST/GET 常规校验)
-      const hadRawPrefix = spec0.startsWith('RAW|');
-      if (hadRawPrefix) spec0 = spec0.slice(4);
+      const hadRawPrefix = spec0.startsWith('RAW|') || spec0.startsWith('JSON|');
+      if (spec0.startsWith('JSON|')) spec0 = spec0.slice(5);
+      else if (hadRawPrefix) spec0 = spec0.slice(4);
       const hadGetPrefix = /^GET[ |]/i.test(spec0);
       if (hadGetPrefix) spec0 = spec0.replace(/^GET[ |]/i, '');
       if (!spec0.startsWith('POST|') && spec0.includes('|'))
@@ -503,8 +508,11 @@ function dockerLiveProbe() {
         // loop-DVGA优化: RAW| 前缀=原样字节传输(DVGA 实证 form 编码曾
         // 破坏自建端点语义——'whoami; id' 实发 'whoami%3B+id=')。默认
         // form 编码保持不变(标准 webshell 兼容)。
-        const isRaw = spec0.startsWith('RAW|');
-        const specR = isRaw ? spec0.slice(4) : spec0;
+        // DVGA验收-2: JSON| 前缀=RAW+Content-Type application/json
+        // (可直连 GraphQL 类端点, seq=9287 教训全作废)。
+        const isJson = spec0.startsWith('JSON|');
+        const isRaw = spec0.startsWith('RAW|') || isJson;
+        const specR = isJson ? spec0.slice(5) : (isRaw ? spec0.slice(4) : spec0);
         const isPost = specR.startsWith('POST|') || specR.startsWith('POST ');
         let spec0n = specR;
         if (!isPost && /^GET[ |]/i.test(specR)) spec0n = specR.replace(/^GET[ |]/i, '');
@@ -566,7 +574,8 @@ function dockerLiveProbe() {
             ? (isRaw ? String(body) : new URLSearchParams(parseFormBody(body)))
             : undefined,
             headers: {
-              ...(isPost ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
+              ...(isPost && !isJson ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
+              ...(isPost && isJson ? { 'content-type': 'application/json' } : {}),
               ...extraHeaders,
             },
             signal: ctl.signal,
