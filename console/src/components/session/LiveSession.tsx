@@ -264,6 +264,13 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
                 delete copy[i].__optimistic;
                 return copy;
               }
+              // 双条复发根治(方案A配套): 发送回执已转正的条(ts=服务端)
+              // 与 SSE 回显同 ts 同文——回显只用于认领乐观条, 已在库的
+              // 消息(精确 ts+text 双等值, 不吞合法同文重发: 那些ts不同)
+              // 一律丢弃, 永不 concat。
+              if (next.some(m => m.role === 'user' && m.ts === msg.ts && m.text === msg.text)) {
+                return next;
+              }
             }
             return next.concat(msg);
           });

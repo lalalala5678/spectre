@@ -17,6 +17,18 @@ export function ChatInput({
   const [uploading, setUploading] = useState(false);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
+  // 用户令: Ctrl+Z/Ctrl+Y(及 Ctrl+Shift+Z)撤销重做——受控组件+程序性
+  // setValue(上传注入/发送清空)会断浏览器原生 undo 栈, 自建快照栈。
+  const hist = useRef<{ stack: string[]; idx: number }>({ stack: [''], idx: 0 });
+  const pushHist = (v: string) => {
+    const h = hist.current;
+    if (h.stack[h.idx] === v) return;
+    h.stack = h.stack.slice(0, h.idx + 1);
+    h.stack.push(v);
+    if (h.stack.length > 100) h.stack.shift();
+    h.idx = h.stack.length - 1;
+  };
+  const setVal = (v: string) => { setValue(v); pushHist(v); };
 
   /** Attachment → /opt/uploads (sandbox-visible to every agent). */
   const upload = async (file: File) => {
@@ -34,10 +46,10 @@ export function ChatInput({
         throw new Error(body.error ?? `HTTP ${res.status}`);
       }
       const data = await res.json() as { sandboxPath: string };
-      setValue(v => (v ? `${v}\n` : '') + `[已上传 ${data.sandboxPath}] `);
+      setVal(value + (value ? '\n' : '') + `[已上传 ${data.sandboxPath}] `);
       inputRef.current?.focus();
     } catch (e) {
-      setValue(v => `${v}[上传失败:${String(e)}] `);
+      setVal(value + `[上传失败:${String(e)}] `);
     } finally { setUploading(false); }
   };
 
@@ -49,7 +61,7 @@ export function ChatInput({
     const text = value.trim();
     if (!text) return;
     onSend(text, busy || steer ? 'steer' : 'prompt');
-    setValue('');
+    setVal('');
     // FEVERIFY-P3-3: 高度经 onChange 自管, 清值不经 onChange→残留, 显式复位。
     requestAnimationFrame(() => {
       const ta = document.activeElement as HTMLTextAreaElement | null;
@@ -86,7 +98,7 @@ export function ChatInput({
           ref={inputRef}
           value={value}
           onChange={(e) => {
-            setValue(e.target.value);
+            setVal(e.target.value);
             const el = e.target as HTMLTextAreaElement;
             el.style.height = 'auto';
             el.style.height = Math.min(el.scrollHeight, 160) + 'px';
@@ -96,6 +108,20 @@ export function ChatInput({
           rows={1}
           onKeyDown={(e) => {
             if (e.nativeEvent.isComposing) return;  // R8-F1: IME 组合期 Enter 是确认候选, 不是提交
+            const undoKey = (e.ctrlKey || e.metaKey) && !e.altKey && e.key.toLowerCase() === 'z';
+            const redoKey = (e.ctrlKey || e.metaKey) && !e.altKey && (e.key.toLowerCase() === 'y' || (e.shiftKey && e.key.toLowerCase() === 'z'));
+            if (undoKey && !e.shiftKey) {
+              e.preventDefault();
+              const h = hist.current;
+              if (h.idx > 0) { h.idx -= 1; setValue(h.stack[h.idx]); }
+              return;
+            }
+            if (redoKey) {
+              e.preventDefault();
+              const h = hist.current;
+              if (h.idx < h.stack.length - 1) { h.idx += 1; setValue(h.stack[h.idx]); }
+              return;
+            }
             if (e.key === 'Enter' && e.shiftKey) {
               return; // plain newline — textarea default, never submits
             }

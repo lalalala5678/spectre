@@ -279,6 +279,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       // r35-N2b: GET 显式前缀先剥(与 exec 解析同规)——register 预验
       // 曾拒 "GET http://…" 形态, 复测一活一死的红灯根因。
       let spec0 = tr.split('#')[0].replace(/\s+$/, '');
+      // loop-DVGA优化: RAW| 前缀先剥(原样字节形态, 后续按 POST/GET 常规校验)
+      const hadRawPrefix = spec0.startsWith('RAW|');
+      if (hadRawPrefix) spec0 = spec0.slice(4);
       const hadGetPrefix = /^GET[ |]/i.test(spec0);
       if (hadGetPrefix) spec0 = spec0.replace(/^GET[ |]/i, '');
       if (!spec0.startsWith('POST|') && spec0.includes('|'))
@@ -497,10 +500,15 @@ function dockerLiveProbe() {
         const spec0 = spec0raw.replace(/\s+$/, '');
         // r35-N2: "GET " 前缀形态兼容——agent 常把 GET 写成显式前缀,
         // 此前整段当 URL 使授权门 host 误析+拒绝文案截断(#W 半截)。
-        const isPost = spec0.startsWith('POST|') || spec0.startsWith('POST ');
-        let spec0n = spec0;
-        if (!isPost && /^GET[ |]/i.test(spec0)) spec0n = spec0.replace(/^GET[ |]/i, '');
-        const tpl = isPost ? spec0.slice(5) : spec0n;
+        // loop-DVGA优化: RAW| 前缀=原样字节传输(DVGA 实证 form 编码曾
+        // 破坏自建端点语义——'whoami; id' 实发 'whoami%3B+id=')。默认
+        // form 编码保持不变(标准 webshell 兼容)。
+        const isRaw = spec0.startsWith('RAW|');
+        const specR = isRaw ? spec0.slice(4) : spec0;
+        const isPost = specR.startsWith('POST|') || specR.startsWith('POST ');
+        let spec0n = specR;
+        if (!isPost && /^GET[ |]/i.test(specR)) spec0n = specR.replace(/^GET[ |]/i, '');
+        const tpl = isPost ? specR.replace(/^POST[ |]/i, '') : spec0n;
         // F26: POST 模板形如 "url|c={CMD}" —— url 与 form 段用 | 分隔;
         // 此前整段 tpl 当 fetch url 且 parseFormBody 吃进完整 URL 导致
         // 命令字段丢失(实测 post-ok: 空)。拆开:url 部分 fetch,form 部分
@@ -541,7 +549,10 @@ function dockerLiveProbe() {
         const enc = encodeURIComponent(command);
         const urlTpl = (!isPost && sh._urlTpl) ? sh._urlTpl : (isPost ? postUrl : tpl);
         const url = isPost ? postUrl : urlTpl.replace('{CMD}', enc);
-        const body = isPost ? postForm.replace('{CMD}', enc) : null;
+        // RAW=原样字节(不 encodeURIComponent——DVGA 实证 form 编码破坏
+        // 自建端点); 默认形态保持编码(webshell 兼容)。
+        const body = isPost
+          ? postForm.replace('{CMD}', isRaw ? command : enc) : null;
         const ctl = new AbortController();
         // 自测-6: 上限裁剪显式化——此前静默钳 60s, 调用方传大值无效且回执
         // 不注明, 报告方以为超时参数生效。裁剪发生时在结果附 cappedAt。
@@ -551,7 +562,9 @@ function dockerLiveProbe() {
         try {
           const r = await fetch(url, {
             method: isPost ? 'POST' : 'GET',
-            body: isPost ? new URLSearchParams(parseFormBody(body)) : undefined,
+            body: isPost
+            ? (isRaw ? String(body) : new URLSearchParams(parseFormBody(body)))
+            : undefined,
             headers: {
               ...(isPost ? { 'content-type': 'application/x-www-form-urlencoded' } : {}),
               ...extraHeaders,
