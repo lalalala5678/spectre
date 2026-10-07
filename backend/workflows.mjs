@@ -226,9 +226,12 @@ export async function autoPwnWorkflow(input) {
           channel: 'share', from: key, type: 'task-report', status: 'no-result',
           title: `[系统代拟·中断] ${key} 任务报告`,
           summary: '子工作流中断且无终报, 主战役侧代拟(报告无空洞承诺兜底)',
-          detail: '**状态**:no-result(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总+5min 复查时库内无该席位终报, 由主战役代拟本报告消灭空洞。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
+          detail: '**状态**:no-result(系统代拟·中断)\n\n## 说明\n子工作流中断且截至战役汇总+5min 复查时库内无该席位终报, 由主战役代拟本报告消灭空洞(子席位会话 id 因中断不可得, 溯源经 engagement 与通知对应行)。\n\n中断记录见战役完成通知对应行; 若该席位实际有产出, 应已在库内其它事件落账——终局以 query_intel 为准。',
           engagement: `autopwn-${engagementId}`,
-          payloadRef: orchestratorSessionId ? `sess:${orchestratorSessionId}` : null,
+          // loop47cold-①: payloadRef 语义=条目源会话——主侧代拟拿不到
+          // 子席位会话 id, 曾错挂编排者会话(9000/9038 双例确定性错挂,
+          // 审计链断点)。宁缺勿错: 不挂, detail 注明不可得。
+          payloadRef: null,
           workSessionId: workSessionId ?? null,
         });
       } catch { /* 单席代拟失败不阻断汇总 */ }
