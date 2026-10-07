@@ -388,7 +388,8 @@ function realRouter({ store, bus, caps, wal }) {
         if (body.source === 'agent' && !isInternalCaller(req)) {
           return bad(res, 401, 'source=agent 需要内部令牌');
         }
-        let r14pending = false;  // r14-③(作用域提升——try 内声明曾致 catch 外引用炸, degradedNote 同型)
+        let r14pending = false;
+        let echoObj = null;  // 方案A: 202 回执携带的服务器消息对象(真实 ts)  // r14-③(作用域提升——try 内声明曾致 catch 外引用炸, degradedNote 同型)
         try {
           // body.source==='agent' marks Temporal-side injections (internal
           // token enforced above); classify their origin so the console
@@ -414,6 +415,10 @@ function realRouter({ store, bus, caps, wal }) {
           } else {
             store.steer(record, injectText, source);
           }
+          echoObj = action === '/messages' && echoTs ? {
+            role: 'user', ts: echoTs, text: injectText,
+            ...(source ? { source } : {}),
+          } : null;
           // r14-③: steer 回执附未决提醒——目标代理尚未提交任务报告时
           // 明示(编排器可判断该代理仍在途)。
           r14pending = action === '/steer' && (record.taskReportCount ?? 0) === 0;
@@ -423,16 +428,8 @@ function realRouter({ store, bus, caps, wal }) {
         // 乐观渲染根治(方案A): /messages 回执带服务器消息对象(真实 ts)
         // ——前端发送成功即用真实条替换乐观条, 不再单通道依赖 SSE 回显
         // 认领(runtime 重启窗口 SSE 丢回显曾致乐观+真实双条, 用户实测)。
-        // 乐观渲染根治(A 终版): ts 由服务端预生成并传入 prompt(与最终
-        // 存储严格一致——此前回查 state.messages 曾因 pi 异步入列恒空)。
-        let echo = null;
-        if (action === '/messages' && echoTs) {
-          echo = {
-            role: 'user', ts: echoTs, text: injectText,
-            ...(source ? { source } : {}),
-          };
-        }
-        return json(res, 202, { ok: true, ...(echo ? { message: echo } : {}),
+        // 乐观渲染根治(A 终版): echoObj 由 try 内构造(ts 与 prompt 存储严格一致)。
+        return json(res, 202, { ok: true, ...(echoObj ? { message: echoObj } : {}),
           ...(r14pending ? { pendingReport: true, hint: '该代理尚未提交任务报告(在途)' } : {}) });
       }
       if (action === '/wait-idle' && method === 'POST') {
