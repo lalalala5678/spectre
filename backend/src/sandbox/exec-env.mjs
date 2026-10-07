@@ -194,33 +194,12 @@ function spawnShell(argv, command, timeoutSec, cwdContainer, extraEnv) {
   // nday live run — surfaced 2026-09-12).
   const cwdHost = argv.length ? process.cwd()
     : (containerPathToHost(cwdContainer) ?? cwdContainer);
-  // r12 建议: 后台形态命令(nohup/& 收尾/setsid/screen/tmux)提前返回——
-  // 此前后台子进程持有 stdout fd, execFile 一直等到 300s 超时(r12 靶场
-  // 重建实测"包装器挂起怪癖")。detached+ignore stdio 让父进程即时退出。
-  const cmdStr = String(command);
-  const isBg = /(^|\s)(nohup|setsid|screen|tmux)\b/.test(cmdStr)
-    || /&\s*(#.*)?$/.test(cmdStr.trim()) || /\s&\s/.test(cmdStr);
-  if (isBg) {
-    try {
-      // r14-①: 后台输出落盘可回读——外层重定向不影响命令内部显式重定向
-      // (内部 > 优先生效, 外层仅兜底捕获未定向输出)。回执附日志路径。
-      // DVGA验收-1: 兜底日志曾被报"不存在"——双保险: 预建文件(touch
-      // 先行, 命令未产输出时文件也在)+落 workspace(回合回收不影响)。
-      const bgId = Date.now().toString(36);
-      const bgLog = `/tmp/spectre-bg-${bgId}.log`;
-      const bgLog2 = `${cwdHost}/spectre-bg-${bgId}.log`;
-      const bg = spawn('bash', ['-c', `touch ${bgLog} ${bgLog2}; ( ${cmdStr} ) >> ${bgLog} 2>>${bgLog}; cp -f ${bgLog} ${bgLog2} 2>/dev/null || true`], {
-        detached: true, stdio: 'ignore',
-        env: sanitizedEnv(extraEnv), cwd: cwdHost,
-      });
-      bg.unref();
-      // FLv2: 与 spawnShell 正常 resolve 形状对齐({exitCode,text})——
-      // 上版给 {ok,stdout} 被官方 bash 工具的 text.split 路径炸(undefined)
-      return Promise.resolve({ exitCode: 0, text: `(后台任务已启动, 不等待输出——注意: ①后台进程随本回合结束可能被回收, 不保证持久; ②后台与前台同上下文执行, 跨上下文(bash 容器 vs shell 宿主通道)工件不互通, 经 /workspace 或情报库传递; 兜底日志双落点: ${bgLog} 与工作区 ${bgLog2}(命令内部显式重定向优先; 任一可读); 持久任务建议 nohup/setsid+工作区落盘)`, timedOut: false, background: true, bgLog });
-    } catch (e) {
-      return Promise.resolve({ exitCode: -1, text: String(e?.message ?? e), timedOut: false, spawnError: String(e?.message ?? e) });
-    }
-  }
+  // DVGA验收终修: r12 时代的 isBg 自动后台化分支已删除——它把命令
+  // 静默切到宿主 runner 执行(与正常路径的容器域能不一致), 且 /tmp 落
+  // 点埋进 systemd PrivateTmp(三视图全盲), 实测回执承诺的兜底日志两
+  // 落点一不可读一为空。& 形态命令经正常路径(容器/宿主一致)实测正常
+  // ((cmd > log &) 容器内落盘+读回双证)——不再需要特判; 卡死风险由
+  // pi 官方 timeout 兜底。
   return new Promise(resolve => {
     // r46-③根治: stdin=ignore(=/dev/null)——默认 pipe 下 stdin 探测型工具
     // (nuclei 对非 tty stdin 走管道读目标路径)永久阻塞等 EOF, rc=124
