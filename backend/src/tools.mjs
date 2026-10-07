@@ -832,7 +832,7 @@ export function buildOrchestratorTools(record, caps) {
           }
         }
         return {
-          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席(loop41 实测 7 席/波 7/10 中断); 波间错峰 90s——总并发会话数是中断驱动因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
+          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席——r52/loop1 前旧中断数据的历史口径, 假死根因(/idle 长挂撞 headersTimeout)已拔除, 7 席/波实测存活 7min+; 上限保留为资源节流而非可靠性约束, 大波次可按需放宽); 波间错峰 90s(总并发会话的资源因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
           details: { waves: started2.map(x => x.engagementId) },
         };
       }
