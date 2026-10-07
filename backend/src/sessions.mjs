@@ -8,13 +8,15 @@
  */
 
 import crypto from 'node:crypto';
+import { readFileSync } from 'node:fs';
+import { join } from 'node:path';
 
 import { Agent, formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-core';
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf, CONFIG_AGENT_KEYS } from './agents.mjs';
 import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, SESSION_BOOT_RULES } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, sessionBootRules } from './pi.mjs';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 import { buildAuthRequestTool, buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
@@ -445,8 +447,14 @@ export class SessionStore {
     const hadUser = (record.agent?.state?.messages ?? []).some(m => m.role === 'user');
     if (record.agentKey === 'autopwn' && source !== 'system' && !hadUser) {
       try {
+        // 用户令: 注入即携带授权清单实况(确认手段随规则同行)
+        let scopeTargets = null;
+        try {
+          scopeTargets = JSON.parse(readFileSync(
+            join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets;
+        } catch { scopeTargets = null; }
         record.agent.state.messages.push({
-          role: 'user', content: SESSION_BOOT_RULES,
+          role: 'user', content: sessionBootRules(scopeTargets),
           timestamp: Date.now() - 1, source: 'system-internal',
         });
       } catch { /* 注入失败不阻断用户消息 */ }
