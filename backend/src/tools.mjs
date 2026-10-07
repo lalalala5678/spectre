@@ -222,12 +222,27 @@ export function buildIntelTools(record, caps) {
       const olderLeft = paged.length - hits.length;
       // r10-UX: 翻页提示置底+方向箭头(before 曾两轮被误用——语义正确
       // 但方向直觉易反)
-      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,库内最新 seq=${latestSeq}):`;
+      // 复盘令: 编写中占位——writer 在飞的 report_vulnerality 对其它
+      // 席位可见(标题+申请人+进行中标记, 不落正文)。
+      const kindNorm = String(params.kind ?? 'both').toLowerCase();
+      // resolves=被指向语义: resolve 事件自身带 resolves=<draft seq>,
+      // 原事件自身字段不变——用指向集合判定在飞。
+      const resolvedSet = new Set(rawWs.filter(e => e.resolves).map(e => e.resolves));
+      const drafts = (kindNorm === 'vulnerability' || kindNorm === 'both' || kindNorm === 'vuln')
+        ? inWs.filter(e => e.type === 'vuln-draft' && !e.resolves && !resolvedSet.has(e.seq)).slice(0, 20)
+        : [];
+      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,库内最新 seq=${latestSeq})${drafts.length ? `,另有编写中 ${drafts.length} 条` : ''}:`
+        + (drafts.length ? `\n` + drafts.map(e =>
+          `[编写中]《${e.title ?? e.summary}》——撰写申请由 ${e.requester ?? e.from} 提交, writer 处理中(payloadRef=${e.payloadRef ?? '?'}); 完成后此处被正式条目取代`).join('\n') : '');
       const footLine = olderLeft > 0
         ? `\n\n↓ 还有更旧 ${olderLeft} 条——续翻下一页(更旧)传 before=${hits[hits.length - 1].seq}; ↑ 回到最新一页去掉 before;单条全文传 seq=…`
         : (before ? `\n\n↑ 已到 before=${before} 之前的末页。注意:before 是排他上界(只看 seq<before 的更旧条目)——要看最新请去掉 before(库内最新 seq=${latestSeq})。` : '');
 
       if (hits.length === 0) {
+        if (drafts.length) {
+          return { content: [{ type: 'text', text: `无已落账条目, 但有 ${drafts.length} 条报告正在编写中(完成后此处可见正式条目):\n`
+            + drafts.map(e => `[编写中]《${e.title ?? e.summary}》——撰写申请由 ${e.requester ?? e.from} 提交, writer 处理中(payloadRef=${e.payloadRef ?? '?'})`).join('\n') }] };
+        }
         const scope = inWs.filter(e => isEntry(e) && !e.void);
         const reports = scope.filter(e => e.type === 'task-report').length;
         const vulns = scope.filter(e => entryKind(e) === 'vulnerability').length;
@@ -423,8 +438,15 @@ export function buildIntelTools(record, caps) {
           const hit = published.find(p => p.norm.includes(nt) || nt.includes(p.norm));
           if (hit) vulnResolved.push(`《${t}》→ 命中现行漏洞《${hit.title}》`);
           else {
+            // A15: 未命中时模糊建议(库内近似标题 top3)——省一次人工
+            // query+revise 修正轮(9584 教训)。
+            const ranked = published
+              .map(pv => ({ ...pv, sc: [...new Set(nt)].filter(ch => pv.norm.includes(ch)).length }))
+              .filter(pv => pv.sc >= Math.max(3, Math.ceil([...new Set(nt)].length * 0.4)))
+              .sort((a, b) => b.sc - a.sc).slice(0, 3);
+            const sug = ranked.length ? ` 库内近似: ${ranked.map(r => `《${r.title}》`).join(' / ')}——若所指即其中之一, revise 修正 vulns 引用即可` : '';
             vulnResolved.push(`《${t}》→ 未命中(库内 0 匹配)`);
-            warnings.push(`《${t}》在情报库未找到对应漏洞实体——若尚未发布请用 publish_vulnerability 发布,或从 vulns 中移除该引用`);
+            warnings.push(`《${t}》在情报库未找到对应漏洞实体——若尚未发布请用 publish_vulnerability 发布,或从 vulns 中移除该引用。${sug}`);
           }
         }
       }
@@ -1129,6 +1151,9 @@ export function entryKind(e) {
   if (e.type === 'vulnerability' || e.type === 'intel') return 'vulnerability';
   if (e.type === 'intel-note') return 'intel-note';
   if (e.type === 'task-report') return 'task-report';
+  // 编写中占位(vuln-draft): 计入条目域(query_intel 可见), 但 kind 归
+  // 类独立——不混入 vulnerability/intel 计数, 由 drafts 段单独渲染。
+  if (e.type === 'vuln-draft') return 'vuln-draft';
   return null;
 }
 
@@ -1239,7 +1264,7 @@ export function buildChildTools(record, caps) {
 /** r47: 授权请求工具——agent 对清单外目标发起授权申请, 用户前端一键批/驳。
  * 全业务面挂载(编排器/席位): shell gate 被拒时按回执指引调用本工具。 */
 export function buildAuthRequestTool(record, caps) {
-  return {
+  const authTool = {
     name: 'request_authorization',
     label: '申请渗透授权',
     description:
@@ -1248,10 +1273,44 @@ export function buildAuthRequestTool(record, caps) {
       '非滥用通道: 每个目标申请一次, 附清晰理由(任务必要性/目标归属)。',
     executionMode: 'sequential',
     parameters: Type.Object({
-      target: Type.String({ description: "目标名(与 shell target/transportRef 目的地一致, 如 10.0.0.5 或 host.example.com); 传 '*' 列出当前全部待批授权请求(只读查询, 不发新请求)" }),
+      target: Type.String({ description: "目标名, 支持一次多目标(逗号/空格分隔, 如 '10.0.0.5, 172.28.11.0/24'——批量测绘对账场景); 单目标形如 10.0.0.5 或 host.example.com; 传 '*' 列出当前全部待批授权请求(只读查询, 不发新请求)" }),
       reason: Type.Optional(Type.String({ description: '为什么需要授权该目标(一句话任务理由)。target=* 查询模式可省' })),
     }),
     execute: async (_id, params) => {
+      // A14: 多目标支持——逗号/空格分隔拆分逐个走原逻辑, 末尾汇总。
+      const rawT = String(params.target ?? '').trim();
+      if (rawT !== '*' && /[,\s]/.test(rawT)) {
+        const items = [...new Set(rawT.split(/[,\s]+/).map(x => x.trim()).filter(Boolean))];
+        const lines = [];
+        for (const it of items) {
+          const r = await authTool.execute(_id, { target: it, reason: params.reason });
+          lines.push(`- ${it}: ${(r?.content?.[0]?.text ?? '(无回执)').split('\n')[0].slice(0, 160)}`);
+        }
+        return { content: [{ type: 'text', text: `多目标授权申请(${items.length} 个)逐项结果:\n${lines.join('\n')}` }] };
+      }
+      // A11: 子网覆盖去重——单机 IP 落在已批准/待批网段内则不发新申请
+      // (被网段覆盖=同一授权面, 重复申请纯噪声)。
+      const ipInCidr = (ip, cidr) => {
+        const m = /^(\d{1,3}(?:\.\d{1,3}){3})(?:\/(\d{1,2}))?$/.exec(cidr);
+        if (!m) return false;
+        const toL = (a) => a.split('.').map(Number).reduce((x, y) => ((x << 8) | y) >>> 0, 0) >>> 0;
+        const bits = m[2] === undefined ? 32 : Number(m[2]);
+        if (bits < 8 || bits > 32) return false;
+        const mask = bits === 0 ? 0 : ((0xffffffff << (32 - bits)) >>> 0);
+        return ((toL(ip) & mask) >>> 0) === ((toL(m[1]) & mask) >>> 0);
+      };
+      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(rawT)) {
+        const covered = (caps.listScope?.() ?? { targets: [] }).targets
+          ?.find(t => t !== rawT && /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(t) && ipInCidr(rawT, t));
+        if (covered) {
+          return { content: [{ type: 'text', text: `${rawT} 已被授权清单内的网段 ${covered} 覆盖——无需申请, 直接执行。` }] };
+        }
+        const pendList = (caps.listPendingAuthRequests?.() ?? { live: [] });
+        const pendCov = (pendList.live ?? []).find?.(x => x.target !== rawT && /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(x.target) && ipInCidr(rawT, x.target));
+        if (pendCov) {
+          return { content: [{ type: 'text', text: `${rawT} 已被待批网段申请 ${pendCov.target}(seq=${pendCov.seq}) 覆盖——请等待该申请获批, 勿重复申请。` }] };
+        }
+      }
       // loop36-QA: target='*' 只读查询全部待批(此前挂起请求无查询入口)
       if (params.target === '*') {
         const pr = caps.listPendingAuthRequests?.() ?? { live: [] };
@@ -1287,6 +1346,7 @@ export function buildAuthRequestTool(record, caps) {
       return { content: [{ type: 'text', text: `授权请求已提交用户(target=${params.target}, seq=${ev?.seq ?? '?'}): 用户批准后目标立即入清单, 你会收到 [授权已批准] 回执通知, 届时重试被拦操作即可。` }] };
     },
   };
+  return authTool;
 }
 
 export function buildDirectTools(record, caps) {

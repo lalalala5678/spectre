@@ -592,9 +592,18 @@ export class SessionStore {
     // r6v2-#9: 迟到预判同 steer——正在流式的长回合里排队的 DM 在收官
     // 后才注入, 预打 [迟到中段消息] 头(r6 验证轮实测 9-10min 仍裸头)。
     const turnMs = record.turnStartedAt ? Date.now() - record.turnStartedAt : 0;
-    const tagged = agent.state.isStreaming && turnMs > 5 * 60_000
+    let tagged = agent.state.isStreaming && turnMs > 5 * 60_000
       && !text.startsWith('[排队到达')
       ? `[排队到达·主控回合已进行 ${Math.round(turnMs / 60_000)}min(排队属常态, 与情报库终态对账即可)]\n${text}` : text;
+    // A16: DM 附投递时刻情报库水位——收方可判"这条 DM 的建议是否已被
+    // 更新的落账超越"(任务闭环后仍收到过期"下一步"指引的解药)。
+    try {
+      const evs = this.caps?.listBus?.() ?? [];
+      const last = evs.filter(e => Number.isInteger(e.seq)).at(-1);
+      if (last) {
+        tagged = `[水位: 情报库最新 seq=${last.seq}@${String(last.ts ?? '').slice(11, 19)}——若你已掌握更新落账, 本条建议以新为准]\n${tagged}`;
+      }
+    } catch { /* 水位缺失不影响注入 */ }
     const msg = { role: 'user', content: tagged, timestamp: Date.now(), source };
     // loop-DM(A+B): 平台自管 DM 队列——忙时不再 agent.followUp(pi 队列
     // 在 run 结束后无人 pump, r47-D4 洞), 改入 _dmQueue; 回合结束→

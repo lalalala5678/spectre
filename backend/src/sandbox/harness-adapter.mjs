@@ -48,6 +48,9 @@ function scopeTargetsOf() {
     return Array.isArray(t) ? t : null;
   } catch { return null; }
 }
+// bash 授权横幅已提示目标集合(进程级, 每目标一次)
+const authWarnShown = new Set();
+
 function bashScopeGate(command) {
   const targets = scopeTargetsOf();
   if (targets === null) return null;  // scope 不可读: 不提示(fail-open)
@@ -139,14 +142,16 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       }
       // 授权自治: 未授权目标的警告注入输出头(命令已执行——回执如实,
       // 决策交给模型)。
+      // 复盘降噪(用户令: 不要每条 bash 都带授权回执): 同一目标进程内
+      // 只提示一次——模型收到过指引即有行动依据, 逐命令重复横幅纯噪
+      // 声。目标入清单后 gate 自然不再命中, 无需清理。
       if (authWarnHit && out && Array.isArray(out.content)) {
         const first = out.content.find(c => c.type === 'text');
-        // 终版(用户令): 平台零判定——不输出"在/不在", 只贴目标+清单
-        // 实况, 比对交给模型(判定逻辑仅内部决定是否提示)。
-        if (first) first.text = `[授权参考] 命令涉及内网目标 ${authWarnHit}。
-当前授权清单实况: [${(scopeTargetsOf() ?? ['(清单暂不可读)']).join(', ')}]
-请自行比对核实: 已获授权可继续; 未含且不确定时建议 request_authorization 向用户确认。
+        if (first && !authWarnShown.has(authWarnHit)) {
+          authWarnShown.add(authWarnHit);
+          first.text = `[授权参考·一次性] 命令涉及内网目标 ${authWarnHit}, 当前授权清单实况: [${(scopeTargetsOf() ?? ['(清单暂不可读)']).join(', ')}]——请自行比对核实(未含且不确定时建议 request_authorization 向用户确认)。此后同目标不再重复提示。
 \n---\n${first.text ?? ''}`;
+        }
       }
       return out;
     },

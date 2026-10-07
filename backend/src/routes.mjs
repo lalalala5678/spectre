@@ -566,6 +566,8 @@ function realRouter({ store, bus, caps, wal }) {
       if (!reqEv) return bad(res, 404, `授权请求 seq=${seq} 不存在或已处理`);
       if (act === 'approve') {
         const b2 = await readJson(req).catch(() => ({}));
+        // A3 原子化: 清单写入与回执在同一同步序列完成(读-写-发, 之间
+        // 无 await), 消除"状态先行、回执滞后"窗口。
         const sc = readScope() ?? { targets: [], exercise: '', window: {} };
         if (!sc.targets.includes(reqEv.target)) {
           sc.targets.push(reqEv.target);
@@ -582,9 +584,34 @@ function realRouter({ store, bus, caps, wal }) {
           resolves: seq, status: 'approved', target: reqEv.target,
           title: `授权已批准: ${reqEv.target}`, summary: `用户批准了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求——目标已入清单。`,
           workSessionId: reqEv.workSessionId ?? null });
-        caps.followUp?.(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
-          `[授权已批准] 你请求的渗透目标 ${reqEv.target} 已被用户加入授权清单——现在可正常对该目标执行(register/exec 等将放行)。`);
-        return json(res, 200, { ok: true, targets: sc.targets });
+        // A2 幂等去重: 同 target 的其余 pending 一并 resolve(并入本次
+        // 批准), 逐条批准不再产生重复回执观感。
+        const dups = bus.list().filter(e => e.type === 'auth-request'
+          && !e.resolves && e.target === reqEv.target && e.seq !== seq);
+        for (const d of dups) {
+          bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
+            resolves: d.seq, status: 'approved', target: d.target,
+            title: `授权已批准(并入 seq=${seq}): ${d.target}`,
+            summary: `同目标既有批准已覆盖, 并入 seq=${seq} 处理。`,
+            workSessionId: d.workSessionId ?? null });
+        }
+        // A10 推送: 批准实时广播同项目全部活跃席位(不等席位下次拉取,
+        // 在飞席位立即拿到新边界——weakcred 过期快照重测教训)。
+        const scopeLine = sc.targets.join(', ');
+        const broadcast = (sid, note) => { try { caps.followUp?.(sid, note); } catch { /* 会话已死则跳过 */ } };
+        broadcast(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
+          `[授权已批准] ${reqEv.target} 已入授权清单。当前清单实况: [${scopeLine}]——边界内目标无需再考虑授权问题, 直接执行。`);
+        let broadcastN = 1;
+        for (const sess of store.list()) {
+          const rec = store.get(sess.id);
+          if (!rec || sess.id === (reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId)) continue;
+          if (rec.workSessionId && rec.workSessionId === (reqEv.workSessionId ?? null)) {
+            broadcast(sess.id,
+              `[授权变更·广播] ${reqEv.target} 已被用户批准入清单(申请人 ${reqEv.requester ?? reqEv.from})。当前清单: [${scopeLine}]——如你正在等该边界, 现在可直接执行。`);
+            broadcastN++;
+          }
+        }
+        return json(res, 200, { ok: true, targets: sc.targets, resolvedAlso: dups.length, broadcast: broadcastN });
       }
       if (act === 'reject') {
         bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',

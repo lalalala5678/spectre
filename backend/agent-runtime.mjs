@@ -485,6 +485,21 @@ const caps = {
         const queuedMs = Date.now() - qStart;
         const requesterAuthor = store.authorOf(requesterRecord);
     const baseSeq = bus.list().at(-1)?.seq ?? 0;
+    // A6 提交前轻量查重(仅提示, 不拦): hint 有效 token 与库内近 7 天
+    // 同项目 vuln 标题重叠 ≥3 → 回执附疑似同点位 seq(判定仍以 writer
+    // 实测为准)。
+    const toks = String(hint).toLowerCase().match(/[a-z0-9_.:-]{3,}/g) ?? [];
+    const recent = bus.list().filter(e => e.type === 'vulnerability' && !e.revises
+      && e.workSessionId === (requesterRecord.workSessionId ?? null)
+      && Date.parse(e.ts ?? 0) > Date.now() - 7 * 86400e3);
+    let dupPre = null;
+    for (const v of recent) {
+      const vt = String(v.title ?? '').toLowerCase();
+      const hits = new Set(toks.filter(t => vt.includes(t)));
+      if (hits.size >= 3) { dupPre = { seq: v.seq, title: v.title, hits: [...hits].slice(0, 6) }; break; }
+    }
+    const dupPreNote = dupPre
+      ? `[查重参考] 库内疑似同点位: seq=${dupPre.seq}《${dupPre.title}》(重叠: ${dupPre.hits.join('/')})——提交已照常进行, 判定以 writer 实测为准。\n` : '';
     const tRw = Date.now();  // r14-④: 同步等待可观测(回执附 waitedMs)
     const { session: writer, timeout } = await runDetachedAgent({
       agentKey: 'report',
@@ -518,12 +533,31 @@ const caps = {
       `5) 用 submit_task_report 提交任务报告收尾。`,
     });
     if (timeout) {
+    // 复盘令: 编写中占位——writer 在飞期间, 其它席位 query_intel 就能
+    // 看见"[编写中] 标题+申请人"(只占位不落正文, 终局 resolves)。
+    const draftEv = bus.emit({
+      channel: 'share', from: 'report', type: 'vuln-draft',
+      title: `[编写中] 报告:${String(hint).slice(0, 40)}`,
+      summary: `漏洞线索正在撰写中——撰写申请由 ${requesterAuthor.name}(${requesterAuthor.typeLabel})提交, writer 会话 ${writer.id} 处理中; 完成后以正式漏洞条目为准`,
+      requester: requesterAuthor.name,
+      payloadRef: `sess:${writer.id}`,
+      workSessionId: requesterRecord.workSessionId ?? null,
+    });
+    const resolveDraft = (status, note) => {
+      try {
+        bus.emit({ channel: 'audit', from: 'report', type: 'vuln-draft',
+          resolves: draftEv?.seq ?? null, status,
+          title: `编写中占位结束(${status}): 报告:${String(hint).slice(0, 40)}`,
+          summary: note ?? `writer 终局=${status}`, workSessionId: requesterRecord.workSessionId ?? null });
+      } catch { /* 占位结束失败不影响回执 */ }
+    };
       // r43-U1: 完成回投——writer 后台完成落账时 DM 通知发现者会话,
       // 编排回合不再干等(同步预算 300s 内长任务曾钉死 263s)。
       const wRec = store.get(writer.id);
       Promise.resolve(wRec ? store.awaitCompletion(wRec, 600_000) : null).then(() => {
         const hit = bus.list().find(e => e.seq > baseSeq
           && e.type === 'vulnerability' && e.author?.sessionId === writer.id);
+        resolveDraft(hit ? 'published' : 'declined', hit ? `writer 后台落账 seq=${hit.seq}` : 'writer 后台终审未立账');
         caps.followUp(requesterRecord.id,
           `[writer 完成] 你上报的线索${hit
             ? `已落账:《${hit.title}》(seq=${hit.seq}, severity=${hit.severity})`
@@ -531,7 +565,8 @@ const caps = {
           `${hit ? '' : `\n${(lastReply(writer) || '(无输出)').slice(0, 300)}`}\n(撰写对话 ${writer.id}, read_session 可复盘)`);
       }).catch(() => {});
       return { ok: false, timeout: true,
-        text: `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
+        text: `{"verdict":"timeout","sessionId":"${writer.id}"}\n` + dupPreNote +
+          `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
           `其完成后我会自动 DM 通知你(无需轮询); 也可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查` };
     }
     const published = bus.list().find(e => e.seq > baseSeq
@@ -547,9 +582,11 @@ const caps = {
         && e.workSessionId === (requesterRecord.workSessionId ?? null)
         && Date.parse(e.ts ?? 0) > tRw - 60_000);
       if (dupHit) {
+        resolveDraft('merged', `归并入正本 seq=${dupHit.seq}`);
         return {
           ok: true, merged: true,
-          text: `线索已归并:《${dupHit.title}》(正本 seq=${dupHit.seq}, severity=${dupHit.severity})——` +
+          text: `{"verdict":"merged","mergedInto":${dupHit.seq},"sessionId":"${writer.id}"}\n` + dupPreNote +
+            `线索已归并:《${dupHit.title}》(正本 seq=${dupHit.seq}, severity=${dupHit.severity})——` +
             `writer 判定与既有条目为同点位重复, 未另立正本(零双账)。你的发现者身份经 coDiscoverers/` +
             `修订链保留, read_session ${writer.id} 可复盘其查重论证。`,
           details: { sessionId: writer.id, mergedInto: dupHit.seq, waitedMs: Date.now() - tRw },
@@ -557,9 +594,11 @@ const caps = {
       }
     }
     if (published) {
+      resolveDraft('published', `正式落账 seq=${published.seq}`);
       return {
         ok: true,
-        text: `漏洞报告已产出并入库:《${published.title}》` +
+        text: `{"verdict":"published","seq":${published.seq},"severity":"${published.severity}","sessionId":"${writer.id}"}\n` + dupPreNote +
+          `漏洞报告已产出并入库:《${published.title}》` +
           `(severity=${published.severity},seq=${published.seq};同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
           `撰写对话 ${writer.id}(read_session 可复盘其思考与验证过程)。`,
         details: { sessionId: writer.id, seq: published.seq,
@@ -573,13 +612,15 @@ const caps = {
     // 通用 declined 前缀「未将此线索立为漏洞」与被拦正文并置, 曾致
     // 三次「已落账」误报接力(4908→回执→DM), 荣誉面临静默丢失。
     if (reply && /mutex-intercepted/i.test(reply)) {
+      resolveDraft('mutex-intercepted', '同点位被互斥拦截, 归并路径见回执');
       return {
         ok: false, mutexIntercepted: true,
-        text: `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截(命中方式: ${/by=fingerprint/.test(reply) ? '端点指纹命中' : 'token 重叠命中'})——**未独立成账**(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
+        text: `{"verdict":"mutex-intercepted","sessionId":"${writer.id}"}\n` + dupPreNote +
+          `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截(命中方式: ${/by=fingerprint/.test(reply) ? '端点指纹命中' : 'token 重叠命中'})——**未独立成账**(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
           `平台自动归并(loop38-D10b): 拦截时带完整证据则正本修订链已追加共同发现者修订——` +
           `query_intel(正本 seq) 验修订计数 +1; writer 拦截回执里载明的正本 seq 即引用目标(与库内一致)。` +
           `未自动归并时再用 request_vulnerability_revision 并入(共同发现者荣誉); 严禁重复 publish。` +
-          `(writer 处理记录摘要: ${reply.slice(0, 220)})`,
+          `(writer 处理记录摘要: ${reply.slice(0, 220)}——全文 read_session ${writer.id})`,
         details: { sessionId: writer.id, mutex: true, waitedMs: Date.now() - tRw },
       };
     }
@@ -592,18 +633,21 @@ const caps = {
     // reply 的"空回执"(7234 案线索被静默消耗)——显式 [writer-lost] 声明
     // +重试指引(回执不变量: 非成功带 seq 即显式失败)。
     if (!published && (!reply || reply === '(无输出)') && timeout) {
+      resolveDraft('writer-lost', 'writer 等待窗内零输出零落账');
       return {
         ok: false,
-        text: `[writer-lost] 线索未被处理——writer 会话 ${writer.id} 在 ${Math.round((Date.now() - tRw) / 1000)}s 等待窗内零输出零落账(疑似部署/重启窗口击杀)。**线索未被消耗**: 请原样重试 report_vulnerability; 若持续 writer-lost 检查 runtime 日志。`,
+        text: `{"verdict":"writer-lost","sessionId":"${writer.id}"}\n[writer-lost] 线索未被处理——writer 会话 ${writer.id} 在 ${Math.round((Date.now() - tRw) / 1000)}s 等待窗内零输出零落账(疑似部署/重启窗口击杀)。**线索未被消耗**: 请原样重试 report_vulnerability; 若持续 writer-lost 检查 runtime 日志。`,
         details: { sessionId: writer.id, writerLost: true, waitedMs: Date.now() - tRw },
       };
     }
     const replyShown = looksDraft
       ? `(writer 最终输出疑似未完成(未见判定词)——全文见 read_session ${writer.id}, 稍后复核):\n${reply.slice(0, 300)}`
       : (reply || '(无输出)');
+    resolveDraft('declined', 'writer 判定不构成漏洞');
     return {
       ok: false,
-      text: `报告agent未将此线索立为漏洞(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。其判定说明:\n` +
+      text: `{"verdict":"declined","sessionId":"${writer.id}"}\n` + dupPreNote +
+        `报告agent未将此线索立为漏洞(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。其判定说明:\n` +
         `${replyShown.slice(0, 600)}\n` +
         `(撰写对话 ${writer.id};若你有更强证据可再次上报,` +
         `或用 publish_intel 留存线索)`,

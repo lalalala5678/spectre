@@ -70,7 +70,7 @@ export function ScopeAuthCard({ wsId }: { wsId: string | null }) {
           className="h-7 rounded-md border border-line bg-surface px-2 text-xs" />
         <span className="flex-1" />
         <Button variant="ghost" size="sm" disabled={busy} onClick={() => act('reject')}>失败</Button>
-        <Button variant="primary" size="sm" disabled={busy} onClick={() => act('approve')}>确认授权</Button>
+        <Button variant="primary" size="sm" disabled={busy} onClick={() => act('approve')}>确认授权{targets.length > 1 ? `(${targets.length} 项一键全批)` : ''}</Button>
       </div>
     </div>
   );

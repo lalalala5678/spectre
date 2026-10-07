@@ -269,6 +269,57 @@ export async function autoPwnWorkflow(input) {
     } catch { /* 战役确已完成: 结果在返回值+先前的关闭公告 */ }
   }
 
+  // A7/A9: 宽限窗后的代拟落账(复盘令——此前代拟先于宽限窗落账, 4/4
+  // 假失败根因面: 宽限只保护通知文案不保护代拟本身)。
+  // A8: 代拟一律 provisional——真终报迟到时自动 void 并互链。
+  const ghostSeqs = [];
+  if (pendingGhost.length) {
+    let recon2 = {};
+    try { recon2 = await quick.engagementChildren?.(engagementId) ?? {}; } catch { recon2 = {}; }
+    for (const key of [...pendingGhost]) {
+      if (recon2[key]) pendingGhost.splice(pendingGhost.indexOf(key), 1);
+    }
+    for (const key of pendingGhost) {
+      try {
+        const ev = await quick.busEmit({
+          channel: 'share', from: key, type: 'task-report', status: 'no-result',
+          title: `[系统代拟·provisional] ${key} 任务报告`,
+          summary: '子工作流中断且无终报, 主战役侧代拟(provisional——真终报迟到自动作废互链)',
+          detail: '**状态**:no-result(系统代拟·provisional)\n\n## 说明\n子工作流中断且截至战役汇总+5min 宽限复查时库内无该席位终报, 由主战役代拟本报告。**provisional**: 若该席位真终报随后落账, 本代拟将被自动作废修订并互链(以 query_intel 现行版为准)。\n\n中断记录见战役完成通知对应行。',
+          engagement: `autopwn-${engagementId}`,
+          payloadRef: null,
+          workSessionId: workSessionId ?? null,
+        });
+        if (ev?.seq) ghostSeqs.push({ key, seq: ev.seq });
+      } catch { /* 单席代拟失败不阻断汇总 */ }
+    }
+  }
+  // A8: 迟到真终报互链 void——再等 10min, 席位真终报落账则对代拟追加
+  // 修订事件(revises=代拟 seq)声明作废, 消灭"no-result 与真终报并存"
+  // 的矛盾审计面。
+  if (ghostSeqs.length) {
+    await sleep(10 * 60 * 1000);
+    let recon3 = {};
+    try { recon3 = await quick.engagementChildren?.(engagementId) ?? {}; } catch { recon3 = {}; }
+    for (const g of ghostSeqs) {
+      const real = recon3[g.key];
+      if (real?.seq) {
+        try {
+          await quick.busEmit({
+            channel: 'share', from: g.key, type: 'task-report', status: 'no-result',
+            revises: g.seq, revision: { n: 1, reason: `真终报迟到已落账(seq=${real.seq}), 代拟作废互链`, requestedBy: 'system', approvedBy: 'system' },
+            title: `[系统代拟·已作废] ${g.key} 任务报告`,
+            summary: `代拟作废——席位真终报已落账(seq=${real.seq}《${String(real.title ?? '').slice(0, 50)}》), 以真终报为准`,
+            detail: `本条为系统代拟的作废修订(revises seq=${g.seq}): 席位 ${g.key} 的真实终报在代拟后落账(seq=${real.seq}), 请以真终报为准。互链: 代拟 ${g.seq} ↔ 真终报 ${real.seq}。`,
+            engagement: `autopwn-${engagementId}`,
+            payloadRef: null,
+            workSessionId: workSessionId ?? null,
+          });
+        } catch { /* 互链失败不阻断 */ }
+      }
+    }
+  }
+
   return {
     engagementId,
     agents: [...results.entries()].map(([key, value]) => ({ agentKey: key, ...value })),
