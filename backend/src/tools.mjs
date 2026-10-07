@@ -605,7 +605,14 @@ function buildReportVulnerabilityTool(record, caps) {
         return { content: [{ type: 'text',
           text: '报告撰写服务不可用(capability 缺失)。可用 publish_intel 留存线索。' }] };
       }
-      const result = await caps.reportWriter(record, params.hint);
+      // 复盘 P0: writer 管线异常兜底——回执如实带错误与重试指引(此前
+      // ReferenceError 直接穿透成裸错误文本, 普通席位无从判断)。
+      let result;
+      try {
+        result = await caps.reportWriter(record, params.hint);
+      } catch (e) {
+        result = { text: `[writer 异常] 管线错误: ${String(e?.message ?? e).slice(0, 200)}——线索未被消耗, 请稍后原样重试; 持续异常则 platform 侧排查。` };
+      }
       return {
         content: [{ type: 'text', text: result.text }],
         details: result.details ?? {},

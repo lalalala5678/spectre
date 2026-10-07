@@ -536,12 +536,11 @@ const caps = {
       `   不成立 → 不发布,在最终回复中明确说明判定理由(该理由将回执给发现者);\n` +
       `5) 用 submit_task_report 提交任务报告收尾。`,
     });
-    if (timeout) {
     // 复盘令: 编写中占位——writer 在飞期间, 其它席位 query_intel 就能
     // 看见"[编写中] 标题+申请人"(只占位不落正文, 终局 resolves)。
-    // P0 防御(复测教训): draftEv emit 一旦抛错, 原 const resolveDraft
-    // 定义被跳过→六分支调用点 ReferenceError 吞掉判定回执——定义前置
-    // + emit 全隔离, 占位失败绝不影响判定路径。
+    // 结构防御(复测 P0 教训): 定义与 emit 全隔离, 且不触碰 if(timeout)
+    // 边界——上次 draft 块替换吞掉 if(timeout) 行致 IIFE 提前闭合,
+    // 六分支全部落到作用域外(resolveDraft is not defined)。
     let draftSeq = null;
     const resolveDraft = (status, note) => {
       try {
@@ -564,6 +563,7 @@ const caps = {
       });
       draftSeq = draftEv?.seq ?? null;
     } catch { /* 占位落账失败不影响判定 */ }
+    if (timeout) {
       // r43-U1: 完成回投——writer 后台完成落账时 DM 通知发现者会话,
       // 编排回合不再干等(同步预算 300s 内长任务曾钉死 263s)。
       const wRec = store.get(writer.id);
