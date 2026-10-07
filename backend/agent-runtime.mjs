@@ -547,8 +547,10 @@ const caps = {
         if (draftSeq != null) {
           bus.emit({ channel: 'audit', from: 'report', type: 'vuln-draft',
             resolves: draftSeq, status,
+            author: { key: 'report', name: requesterAuthor.name, typeLabel: requesterAuthor.typeLabel, sessionId: writer.id },
             title: `编写中占位结束(${status}): 报告:${String(hint).slice(0, 40)}`,
-            summary: note ?? `writer 终局=${status}`, workSessionId: requesterRecord.workSessionId ?? null });
+            summary: (note ?? `writer 终局=${status}`) + `——原申请: ${requesterAuthor.name}(${requesterAuthor.typeLabel})`,
+            workSessionId: requesterRecord.workSessionId ?? null });
         }
       } catch { /* 占位结束失败不影响回执 */ }
     };
@@ -852,7 +854,7 @@ loadSandboxConfig().then(async cfg => {
     // r20v4: bus 事件不进会话——同时 followUp 直接注入编排器(idle 即
     // 触发回合, 看得见才算通知)
     try {
-      store.followUp(rec, `[DM from system] 平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。`);
+      store.followUp(rec, `[DM from system] 平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。注意: 重启不变更任何环境/靶场/网络状态(容器与配置原样), 一切以实探为准——勿在汇报中自行推断"环境已重置"。`);
     } catch { /* 会话不可注入时 bus 事件兜底 */ }
   }
   const ensured = await ensureSandbox();

@@ -79,7 +79,7 @@ export function buildIntelTools(record, caps) {
         Type.Literal('intel'), Type.Literal('both'), Type.Literal('reports'),
         Type.Literal('vuln'), Type.Literal('vulnerabilities'), Type.Literal('notes'),
         Type.Literal('task_report'),
-      ], { description: 'Entry kind: task-report(=reports) / vulnerability(=vuln) / intel(=notes) / both. Default both' })),
+      ], { description: 'Entry kind: task-report(=reports) / vulnerability(=vuln) / intel(=notes) / both. Default both. 编写中报告占位(kind=vuln-draft)随 vulnerability/both 一并显示(标题+申请人, 无正文), 无需单独指定' })),
       seq: Type.Optional(Type.Number({
         description: 'Fetch ONE entry in full detail by its seq (from a previous listing)',
       })),
