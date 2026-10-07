@@ -940,6 +940,11 @@ function realRouter({ store, bus, caps, wal }) {
       if (!requireFields(res, body, ['channel', 'from', 'summary'])) {
         return;
       }
+      // P4: 平台署名条目(勘误/公告类, from=system)经此通道 emit 时自动
+      // 回填 author——此前缺省显示 system(溯源缺失)(9631 教训)。
+      if (body.from === 'system' && !body.author) {
+        body.author = { key: 'system', name: '平台运维', typeLabel: '系统' };
+      }
       return json(res, 201, bus.emit(body));
     }
 
