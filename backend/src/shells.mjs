@@ -538,9 +538,8 @@ function dockerLiveProbe() {
             if (hm) extraHeaders[hm[1]] = hm[2].trim();
             else stray.push(part);
           }
-          if (stray.length > 1) {
-            return { ok: false, error: `transportRef 第 4+ 段无法识别(${stray.slice(1).join('|').slice(0, 60)})——自定义头请用 "H: 名称: 值" 段` };
-          }
+          // DVGA终解配套: 含占位段的 | 重连为完整 postForm(base64 解码
+          // 管道多段模板不再误判——与 register 侧分段规则对齐)。
           postForm = stray.join('|') || 'c={CMD}';
         } else {
           // GET 形态: "...{CMD} H: K: v H: K2: v2#MARK" 空格分隔头段
@@ -736,10 +735,17 @@ function dockerLiveProbe() {
       const m3 = String(u.stdout).indexOf('__SPF3__');
       const raw = String(u.stdout);
       const clean = (a, b) => (a >= 0 && b > a ? raw.slice(a + 8, b) : '');
+      // DVGA残留2: JSON 包裹响应(/graphql {"data":{…}})里换行是字面
+      // \n 两字符——user 白名单禁反斜杠恒空(os 因 \ 可打印侥幸过)。
+      // 先做一层 JSON 字符串反转义再走白名单。
+      const jsonUnescape = (t) => {
+        if (!/\\["\\nrt]/.test(t)) return t;
+        try { return JSON.parse('"' + t.replace(/"/g, '\\"') + '"'); } catch { return t; }
+      };
       let user, osLine;
       if (m1 >= 0 && m3 > m1) {
-        user = clean(m1, m2).split('\n')[0];
-        osLine = clean(m2, m3);
+        user = jsonUnescape(clean(m1, m2)).split('\n')[0];
+        osLine = jsonUnescape(clean(m2, m3));
         // r6v2-#4: 哨兵齐全分支同样过形态白名单(标记间夹带编码/回显
         // 残渣此前直入 user)
         if (!/^[A-Za-z0-9._-]{1,32}$/.test(user)) user = '';
@@ -748,8 +754,8 @@ function dockerLiveProbe() {
         // HTML 形态直接判污染置空(r4 实测 user 残留哨兵)。
         // r6-#4: 递归回显(响应把命令文本原样/URL 编码回显)——先剥编码
         // 形态哨兵, 再尝试 decode 一次, 白名单不过即判污染置空。
-        let stripped = raw.replace(/__SPF\d__/g, '')
-          .replace(/%5F%5FSPF|%5f%5fSPF/gi, '__SPF').replace(/__SPF\d+__/gi, '')
+        let stripped = jsonUnescape(raw.replace(/__SPF\d__/g, '')
+          .replace(/%5F%5FSPF|%5f%5fSPF/gi, '__SPF').replace(/__SPF\d+__/gi, ''))
           .split('\n')[0].trim();
         if (/%[0-9a-f]{2}/i.test(stripped)) {
           try { stripped = decodeURIComponent(stripped).replace(/__SPF\d+/g, '').trim(); } catch { /* 保原值走白名单 */ }
