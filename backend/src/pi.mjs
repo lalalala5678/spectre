@@ -81,7 +81,7 @@ export const SESSION_BOOT_RULES = [
   '② 开战考古: 扫描沙箱历史工件(/tmp 与工作区的 hits/HIT/台账/词表消耗/上轮战报)并',
   '   publish_intel 灌入情报库为战场记忆——负空间不许重烧, 已发现的禁止再花预算去发现。',
   '   (考古扫的是沙箱自身文件, 不构成对目标的操作)',
-  '两件事情完成、确认已获授权后, 正常进行渗透测试。',
+  '两件事情完成后, 正常进行渗透测试。',
 ].join('\n');
 
 export const ORCHESTRATOR_PROMPT = [
