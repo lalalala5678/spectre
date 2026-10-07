@@ -419,7 +419,22 @@ function realRouter({ store, bus, caps, wal }) {
         } catch (err) {
           return bad(res, err.statusCode || 500, err.message);
         }
-        return json(res, 202, { ok: true, ...(r14pending ? { pendingReport: true, hint: '该代理尚未提交任务报告(在途)' } : {}) });
+        // 乐观渲染根治(方案A): /messages 回执带服务器消息对象(真实 ts)
+        // ——前端发送成功即用真实条替换乐观条, 不再单通道依赖 SSE 回显
+        // 认领(runtime 重启窗口 SSE 丢回显曾致乐观+真实双条, 用户实测)。
+        let echo = null;
+        if (action === '/messages') {
+          try {
+            const stored = [...(record.agent?.state?.messages ?? [])]
+              .reverse().find(m => m.role === 'user' && m.content === injectText);
+            if (stored) echo = {
+              role: 'user', ts: stored.timestamp ?? Date.now(), text: injectText,
+              ...(stored.source ? { source: stored.source } : {}),
+            };
+          } catch { /* echo 尽力——缺失时前端回退旧 SSE 认领路径 */ }
+        }
+        return json(res, 202, { ok: true, ...(echo ? { message: echo } : {}),
+          ...(r14pending ? { pendingReport: true, hint: '该代理尚未提交任务报告(在途)' } : {}) });
       }
       if (action === '/wait-idle' && method === 'POST') {
         if (!isInternalCaller(req)) {

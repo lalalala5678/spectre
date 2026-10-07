@@ -289,10 +289,20 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
       setMessages(prev => [...prev, { role: 'user', ts: opTs, text, __optimistic: true }]);
     }
     try {
-      await api(`/sessions/${sessionId}/${mode === 'prompt' ? 'messages' : 'steer'}`, {
+      const resp = await api<{ ok: boolean; message?: { role: 'user'; ts: number; text: string; source?: ApiMessage['source'] } }>(
+        `/sessions/${sessionId}/${mode === 'prompt' ? 'messages' : 'steer'}`, {
         method: 'POST',
         json: { text },
       });
+      // 方案A(乐观根治): 服务器回执带真实消息对象(服务端 ts)——立即
+      // 转正乐观条, 不再单通道依赖 SSE 回显认领(SSE 断流窗口曾致
+      // 乐观+真实双条, 用户实测)。
+      if (mode === 'prompt' && resp?.message?.ts) {
+        setMessages(prev => prev.map(m =>
+          (m.role === 'user' && m.ts === opTs && m.text === text && m.__optimistic)
+            ? { role: 'user', ts: resp.message!.ts, text, source: resp.message!.source }
+            : m));
+      }
     } catch (err) {
       // R8-F3: 回滚乐观气泡——失败的消息从未入账, 残留即转录造假。
       setMessages(prev => prev.filter(m =>
