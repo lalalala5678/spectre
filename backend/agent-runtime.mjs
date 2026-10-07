@@ -181,6 +181,12 @@ async function runDetachedAgent(o) {
   if (o.requester) s.requester = o.requester;
   if (o.revisionTarget !== undefined) s.revisionTarget = o.revisionTarget;
   store.prompt(s, o.prompt, 'system');
+  // 复盘 P3(占位终局回填真因): reportWriter 的占位此前在 await 本函数
+  // (writer 终局)之后才 emit——生产里占位永不"在飞可见"。onSpawned 于
+  // writer 会话创建+prompt 落定即刻回调, 占位落行于真正的在飞起点。
+  if (typeof o.onSpawned === 'function') {
+    try { o.onSpawned(s); } catch { /* 回调异常不影响骨架 */ }
+  }
   // 自测-2: awaitCompletion 的空闲快路径与 prompt() 微任务置 busy 之间有
   // 窗口——首次调用曾因此即时空收割(writer 还没开跑, 回执"非判定"而
   // 落账随后发生, 重试才查到)。先等 busy 置位(≤5s), 再挂完成等待。
@@ -511,6 +517,22 @@ const caps = {
       name: `报告:${String(hint).slice(0, 20)}`,
       description: `漏洞线索:${String(hint).slice(0, 60)}`,
       requester: { sessionId: requesterRecord.id, author: requesterAuthor },
+      // 占位 emit 于 runDetachedAgent 内 spawn+prompt 落定即刻回调——
+      // 真正的在飞起点(此前在 await 终局之后, 生产里占位永不"在飞可见")。
+      onSpawned: (w) => {
+        draftState.writerId = w.id;
+        try {
+          const ev = bus.emit({
+            channel: 'share', from: 'report', type: 'vuln-draft',
+            title: `[编写中] 报告:${String(hint).slice(0, 40)}`,
+            summary: `漏洞线索正在撰写中——撰写申请由 ${requesterAuthor.name}(${requesterAuthor.typeLabel})提交, writer 会话 ${w.id} 处理中; 完成后以正式漏洞条目为准`,
+            requester: requesterAuthor.name,
+            payloadRef: `sess:${w.id}`,
+            workSessionId: requesterRecord.workSessionId ?? null,
+          });
+          draftState.seq = ev?.seq ?? null;
+        } catch { /* 占位落账失败不影响判定 */ }
+      },
       prompt:
       `【漏洞报告撰写】你是报告撰写专职 agent。发现者 ${requesterAuthor.name}` +
       `(${requesterAuthor.typeLabel})在会话 ${requesterRecord.id} 中上报了漏洞线索:\n` +
@@ -541,30 +563,19 @@ const caps = {
     // 结构防御(复测 P0 教训): 定义与 emit 全隔离, 且不触碰 if(timeout)
     // 边界——上次 draft 块替换吞掉 if(timeout) 行致 IIFE 提前闭合,
     // 六分支全部落到作用域外(resolveDraft is not defined)。
-    let draftSeq = null;
+    const draftState = { seq: null, writerId: null };
     const resolveDraft = (status, note) => {
       try {
-        if (draftSeq != null) {
+        if (draftState.seq != null) {
           bus.emit({ channel: 'audit', from: 'report', type: 'vuln-draft',
-            resolves: draftSeq, status,
-            author: { key: 'report', name: requesterAuthor.name, typeLabel: requesterAuthor.typeLabel, sessionId: writer.id },
+            resolves: draftState.seq, status,
+            author: { key: 'report', name: requesterAuthor.name, typeLabel: requesterAuthor.typeLabel, sessionId: draftState.writerId },
             title: `编写中占位结束(${status}): 报告:${String(hint).slice(0, 40)}`,
             summary: (note ?? `writer 终局=${status}`) + `——原申请: ${requesterAuthor.name}(${requesterAuthor.typeLabel})`,
             workSessionId: requesterRecord.workSessionId ?? null });
         }
       } catch { /* 占位结束失败不影响回执 */ }
     };
-    try {
-      const draftEv = bus.emit({
-        channel: 'share', from: 'report', type: 'vuln-draft',
-        title: `[编写中] 报告:${String(hint).slice(0, 40)}`,
-        summary: `漏洞线索正在撰写中——撰写申请由 ${requesterAuthor.name}(${requesterAuthor.typeLabel})提交, writer 会话 ${writer.id} 处理中; 完成后以正式漏洞条目为准`,
-        requester: requesterAuthor.name,
-        payloadRef: `sess:${writer.id}`,
-        workSessionId: requesterRecord.workSessionId ?? null,
-      });
-      draftSeq = draftEv?.seq ?? null;
-    } catch { /* 占位落账失败不影响判定 */ }
     if (timeout) {
       // r43-U1: 完成回投——writer 后台完成落账时 DM 通知发现者会话,
       // 编排回合不再干等(同步预算 300s 内长任务曾钉死 263s)。
