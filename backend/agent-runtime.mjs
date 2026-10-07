@@ -602,7 +602,7 @@ const caps = {
       }).catch(() => {});
       return { ok: false, timeout: true,
         text: `{"verdict":"timeout","sessionId":"${writer.id}"}\n` + dupPreNote +
-          `撰写agent 300s 未完成仍在运行, 本回执不是判定——` +
+          `撰写agent 90s 未完成仍在运行(同步窗已从 300s 收紧), 本回执不是判定——` +
           `其完成后我会自动 DM 通知你(无需轮询); 也可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查` };
     }
     const published = bus.list().find(e => e.seq > baseSeq

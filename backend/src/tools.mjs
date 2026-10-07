@@ -555,9 +555,12 @@ export function buildIntelTools(record, caps) {
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
       }
-      // R7: 全量导出到工作区(17k+ 会话分段读的终结方案)
+      // R7: 全量导出到工作区(17k+ 会话分段读的终结方案)。
+      // QA 瑕疵修正: toFile 不受 last(默认 10)限制——重取全量转录。
       if (params.toFile) {
         try {
+          const all = params.last ? messages : (caps.readSessionMessages?.(sid, 1_000_000, record.workSessionId ?? null) ?? messages);
+          messages.splice(0, messages.length, ...all);
           const safe = String(params.toFile).replace(/[^\w.-]/g, '_').slice(0, 80) || 'session-export';
           const body = messages.map(m => `[${m.role}${m.source ? '/' + m.source : ''}] ${String(m.text ?? m.content ?? '').replace(/\n/g, '\n')}`).join('\n\n');
           const path = `/workspace/${record.workSessionId ?? '_default'}/sessions/${safe}`;
