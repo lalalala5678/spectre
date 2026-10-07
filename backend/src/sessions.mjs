@@ -372,7 +372,11 @@ export class SessionStore {
    */
   _displayTitle(record) {
     if (record.title) return record.title;
-    const first = record.agent?.state.messages.find(m => m.role === 'user') ?? null;
+    // loop-DVGA复盘-标题: 跳过平台内部注入(system-internal 开场规则
+    // 曾成为首条 user 消息→会话被命名"开战流程:授权确认与战场考古")
+    // ——标题只取真实用户/DM 的第一条消息。
+    const first = record.agent?.state.messages.find(
+      m => m.role === 'user' && m.source !== 'system-internal') ?? null;
     const text = first ? (normalizeMessage(first).text || '').trim() : '';
     if (!text) return null;
     const line = (text.split('\n').find(l => l.trim()) ?? '').trim();
