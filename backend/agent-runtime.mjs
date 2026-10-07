@@ -628,7 +628,7 @@ const caps = {
       resolveDraft('mutex-intercepted', '同点位被互斥拦截, 归并路径见回执');
       return {
         ok: false, mutexIntercepted: true,
-        text: `{"verdict":"mutex-intercepted","sessionId":"${writer.id}"}\n` + dupPreNote +
+        text: `{"verdict":"mutex-intercepted","autoMerged":true,"sessionId":"${writer.id}"}\n(语义统一: mutex-intercepted 即拦截时自动归并已完成——writer 术语「归并落账」与 wrapper「互斥拦截」为同一动作的两面, 据本判定行决定后续: 无需再 request_vulnerability_revision, 除非你要补增量证据)\n` + dupPreNote +
           `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截(命中方式: ${/by=fingerprint/.test(reply) ? '端点指纹命中' : 'token 重叠命中'})——**未独立成账**(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
           `平台自动归并(loop38-D10b): 拦截时带完整证据则正本修订链已追加共同发现者修订——` +
           `query_intel(正本 seq) 验修订计数 +1; writer 拦截回执里载明的正本 seq 即引用目标(与库内一致)。` +
