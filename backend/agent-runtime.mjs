@@ -885,8 +885,11 @@ loadSandboxConfig().then(async cfg => {
   if (!recentSame) bus.emit({ channel: 'audit', from: 'system', type: 'intel-note',
     author: { key: 'system', name: '平台运维', typeLabel: '系统' },
     title: '平台运行时已重启',
-    summary: '平台运行时已重启:沙箱临时态(/tmp 进程与文件)已重置',
-    detail: '平台刚完成重启部署。/tmp 下的自建靶场进程与临时文件已被重置;需要保留的战场环境请提前落工作区或等部署窗口。本条经 query_intel 可查。',
+    // 复盘勘误: 旧文案断言"/tmp 自建靶场已重置"与实况不符(docker 容器
+    // 化靶场跨重启持久, 曾连环误导在飞战役 7 次)——改为精确实况: 仅
+    // 沙箱临时态受影响, 容器/持久环境原样, 一切以实探为准。
+    summary: '平台运行时已重启:仅沙箱内 /tmp 临时态受影响(进程与临时文件清空)',
+    detail: '平台刚完成重启部署。受影响面**仅限沙箱容器内 /tmp 临时态**(运行中进程与未落盘临时文件); docker 容器化靶场、/opt 共享层、工作区与情报库全部原样持久——**勿推断任何靶场/环境已被重置, 一切以实探为准**。本条经 query_intel 可查。',
     workSessionId: curWs });
   if (ensured.recreated) {
     const { markTransportDead } = await import('./src/shells.mjs');
