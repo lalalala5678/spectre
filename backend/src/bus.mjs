@@ -149,9 +149,27 @@ export class Bus {
       // 拦截新漏洞落账(CWE-338 writer 复核成立仍入不了账, 证据被错并
       // 进作废条目修订链)。作废=审计存档, 不再占用"同端点终身一正本"
       // 的指纹名额。
+      // loop-DVGA复盘-B: 跨 ws 同靶场也比对——ws(None/项目1/项目2)曾
+      // 使同一靶场同一漏洞落 3 条正本(9144/9169/9220)。同 ws 照旧全量
+      // 比对; 跨 ws 时仅当双方 port 指纹有交集(同靶场实例)才进入
+      // token/指纹比对(不同靶场跨项目放行不受影响)。
+      const sameWs = other.workSessionId === entry.workSessionId;
       if (other.type !== 'vulnerability' || other.revises || other.void
-        || other.workSessionId !== entry.workSessionId
         || otherTs < fpCut) continue;
+      if (!sameWs) {
+        // 靶场指纹源=title+detail(title 常无端口, DVGA 案例全在 detail):
+        // host:port 完整串(127.0.0.1:30020)与裸 port 两种形态任一交集
+        // 即视为同靶场实例。
+        const ep = x => {
+          const lo = String(x ?? '').toLowerCase();
+          const out = new Set(lo.match(/\b\d{1,3}(?:\.\d{1,3}){3}:\d{4,5}\b/g) ?? []);
+          for (const m of lo.matchAll(/(?<![\w-])(\d{4,5})(?![\w-])/g)) out.add(`port:${m[1]}`);
+          return [...out];
+        };
+        const aP = ep(`${entry.title} ${entry.detail ?? ''}`);
+        const bP = ep(`${other.title} ${other.detail ?? ''}`);
+        if (!aP.some(pt => bP.includes(pt))) continue;  // 无共同靶场指纹: 不同靶场, 放行
+      }
       const ot = tokens(`${other.title} ${other.detail ?? ''}`);
       if (ot.size < 4) continue;
       let hit = 0;

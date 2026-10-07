@@ -225,6 +225,12 @@ const caps = {
     if (entry?.type === 'vulnerability' && !entry.revises) {
       const block = bus.vulnMutexCheck?.(entry);
       if (block) return block;
+      // loop-DVGA复盘-A: 上报链路无项目归属(ws=None, 常见于无项目
+      // 直连会话)的正本标注跨项目域——互斥按靶场指纹全局生效(B),
+      // 标注让台账可辨此类条目的来源形态。
+      if (!entry.workSessionId && !entry.title?.includes('[跨项目域]')) {
+        entry = { ...entry, title: `${entry.title} [跨项目域]` };
+      }
     }
     return bus.emit(entry);
   },
@@ -499,6 +505,9 @@ const caps = {
       `仅会话上下文关联(同项目/发现者的其它会话、QA 性质线索)不构成归并依据——误并会篡改漏洞归属。` +
       `判定重叠时的正确动作(loop38-D10b): 调用 publish_vulnerability 时带 mergeInto=<正本 seq>(完整证据)——平台直达归并,` +
       `把你的证据增量与共同发现者署名并入正本修订链(回执载明正本 seq 与修订 seq); 不要依赖互斥拦截(标题重组可绕过), 也不应手工 revise。` +
+      `**归并硬约束(DVGA 复盘令)**: mergeInto/修订只允许**同一漏洞**(同根因+同端点+同漏洞类型, 如均为 identity 键注入)。` +
+      `攻击链相邻但根因不同的发现(如口令泄露 vs 命令执行 vs SSRF)必须各自另立正本, 严禁并入同一条修订链;` +
+      `修订的标题不得漂移成另一漏洞(正本 identity 的修订标题变成 RCE 属于事故)。` +
       `若回执以 [mutex-intercepted] 开头=与库内既有条目同点位被拦(未成账): ` +
       `终报必须如实写「被互斥拦截待归并」, 并 query_intel 回查正本 seq——严禁写「已落账」; ` +
       `正常落账后也须以回执 seq 回查库内确认再写终报。` +
