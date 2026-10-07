@@ -321,12 +321,15 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
   // R23-F5: 起点落在 assistant(toolCalls) 与 toolResult 之间时配对
   // 断裂渲染成孤立'工具'步骤——回退越过前导 toolResult 使配对的
   // assistant 进入窗口。
+  // 内部机理消息(系统一次性注入规则等)不进前端时间线——开源工具
+  // 的注入管线对用户不可见(用户令)。API 侧仍可审计。
   const visible = useMemo(() => {
-    let start = effectiveStart;
-    while (start > 0 && messages[start]?.role === 'toolResult') start -= 1;
-    return messages.slice(start);
+    const shown = messages.filter(m => m.source !== 'system-internal');
+    let start = Math.max(0, effectiveStart - (messages.length - shown.length));
+    while (start > 0 && shown[start]?.role === 'toolResult') start -= 1;
+    return shown.slice(start);
   }, [messages, effectiveStart]);
-  const olderCount = messages.length - visible.length;
+  const olderCount = messages.filter(m => m.source !== 'system-internal').length - visible.length;
   // Hot path: streaming deltas patch `messages` every chunk — the item
   // rebuild is memoized and the bubbles below are memo'd so history
   // entries skip re-render; only the trailing streaming bubble re-renders.

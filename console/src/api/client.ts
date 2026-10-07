@@ -31,7 +31,7 @@ export interface ApiMessage {
   __optimistic?: boolean;
   /** who injected this turn: 'user' (human) | 'agent' (DM) | 'system';
    *  absent on legacy messages — classified by text-prefix fallback */
-  source?: 'user' | 'agent' | 'system';
+  source?: 'user' | 'agent' | 'system' | 'system-internal';  // system-internal=平台一次性注入规则(前端隐藏, API 可审计)
   thinking?: string;
   toolCalls?: { id?: string; name: string; args: unknown }[];
   toolCallId?: string;

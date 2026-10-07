@@ -14,7 +14,7 @@ import { Agent, formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-cor
 import { CONFIG } from './config.mjs';
 import { typeLabelOf, CONFIG_AGENT_KEYS } from './agents.mjs';
 import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
-import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, AUTH_RULE_ONCE } from './pi.mjs';
+import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, SESSION_BOOT_RULES } from './pi.mjs';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
 import { buildAuthRequestTool, buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
@@ -438,13 +438,18 @@ export class SessionStore {
     if (record.busy) {
       throw Object.assign(new Error('agent 忙(并发锁定)——请用 steer'), { statusCode: 409 });
     }
-    // 用户令(授权两分支·一次性): 会话首条用户消息前置 AUTH_RULE_ONCE,
-    // 之后不再注入(反复提醒授权=污染)。仅编排器。
-    // 修复: record.messages 字段不存在(消息真身在 pi agent.state.messages)
-    // ——曾恒判"首条"导致每条 user 消息都注入(实测次条也带规则)。
+    // 会话开场一次性规则(用户令·迁移): 首条用户消息时以独立前置消息
+    // 注入 state.messages(source:'system-internal'——模型可见, 前端
+    // 隐藏, 用户原文保持干净不拼接); 之后全程不再注入。
+    // (此前曾把规则拼接进用户正文——系统话冒充用户话+内部机理外泄。)
     const hadUser = (record.agent?.state?.messages ?? []).some(m => m.role === 'user');
     if (record.agentKey === 'autopwn' && source !== 'system' && !hadUser) {
-      text = AUTH_RULE_ONCE + '\n\n' + text;
+      try {
+        record.agent.state.messages.push({
+          role: 'user', content: SESSION_BOOT_RULES,
+          timestamp: Date.now() - 1, source: 'system-internal',
+        });
+      } catch { /* 注入失败不阻断用户消息 */ }
     }
     record.busy = true;
     // FEBUGS-P1-1: busy 翻转必须落 journal——此前仅内存置位, SSE 永远
