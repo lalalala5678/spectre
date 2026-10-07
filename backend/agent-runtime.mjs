@@ -215,6 +215,10 @@ function lastReply(s) {
 }
 
 const caps = {
+  // 复盘 P1: request_authorization 的子网覆盖去重需要读授权清单实况
+  // (此前 caps 无 listScope, 工具侧 fallback 空清单→CIDR 去重恒不命中,
+  // 172.28.10.99 落已批网段仍发申请 seq=9594 教训)。
+  listScope: shellScope,
   persistMetaNow: (record) => store.persistMetaNow?.(record),  // r20-②
   shells: shellRegistry,
   dispatch: (input) => startAutopwn(input),
@@ -535,22 +539,31 @@ const caps = {
     if (timeout) {
     // 复盘令: 编写中占位——writer 在飞期间, 其它席位 query_intel 就能
     // 看见"[编写中] 标题+申请人"(只占位不落正文, 终局 resolves)。
-    const draftEv = bus.emit({
-      channel: 'share', from: 'report', type: 'vuln-draft',
-      title: `[编写中] 报告:${String(hint).slice(0, 40)}`,
-      summary: `漏洞线索正在撰写中——撰写申请由 ${requesterAuthor.name}(${requesterAuthor.typeLabel})提交, writer 会话 ${writer.id} 处理中; 完成后以正式漏洞条目为准`,
-      requester: requesterAuthor.name,
-      payloadRef: `sess:${writer.id}`,
-      workSessionId: requesterRecord.workSessionId ?? null,
-    });
+    // P0 防御(复测教训): draftEv emit 一旦抛错, 原 const resolveDraft
+    // 定义被跳过→六分支调用点 ReferenceError 吞掉判定回执——定义前置
+    // + emit 全隔离, 占位失败绝不影响判定路径。
+    let draftSeq = null;
     const resolveDraft = (status, note) => {
       try {
-        bus.emit({ channel: 'audit', from: 'report', type: 'vuln-draft',
-          resolves: draftEv?.seq ?? null, status,
-          title: `编写中占位结束(${status}): 报告:${String(hint).slice(0, 40)}`,
-          summary: note ?? `writer 终局=${status}`, workSessionId: requesterRecord.workSessionId ?? null });
+        if (draftSeq != null) {
+          bus.emit({ channel: 'audit', from: 'report', type: 'vuln-draft',
+            resolves: draftSeq, status,
+            title: `编写中占位结束(${status}): 报告:${String(hint).slice(0, 40)}`,
+            summary: note ?? `writer 终局=${status}`, workSessionId: requesterRecord.workSessionId ?? null });
+        }
       } catch { /* 占位结束失败不影响回执 */ }
     };
+    try {
+      const draftEv = bus.emit({
+        channel: 'share', from: 'report', type: 'vuln-draft',
+        title: `[编写中] 报告:${String(hint).slice(0, 40)}`,
+        summary: `漏洞线索正在撰写中——撰写申请由 ${requesterAuthor.name}(${requesterAuthor.typeLabel})提交, writer 会话 ${writer.id} 处理中; 完成后以正式漏洞条目为准`,
+        requester: requesterAuthor.name,
+        payloadRef: `sess:${writer.id}`,
+        workSessionId: requesterRecord.workSessionId ?? null,
+      });
+      draftSeq = draftEv?.seq ?? null;
+    } catch { /* 占位落账失败不影响判定 */ }
       // r43-U1: 完成回投——writer 后台完成落账时 DM 通知发现者会话,
       // 编排回合不再干等(同步预算 300s 内长任务曾钉死 263s)。
       const wRec = store.get(writer.id);
