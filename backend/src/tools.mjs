@@ -1093,9 +1093,11 @@ export function buildShellTools(record, caps) {
           if (!p.path) return say({ ok: false, error: 'path 必填' });  // R12-F2
           const r = await R.readFile(p.shellId, p.path, { verifyMark: p.verifyMark === true });
           // r9-D9: 错误路径透传(closed/过期此前被吞成空 content 无说明)
-          if (!r.ok && r.error) return say({ ok: false, error: r.error });
+          if (!r.ok && r.error) return say({ ok: false, error: r.error,
+            ...(r.degradedNote ? { degradedNote: r.degradedNote } : {}) });  // loop47: 跨上下文警示随错误回执透传
           return say({ ok: r.ok,
-            content: markClipped(r.stdout, 16000, '重读用 tail -c +N 分段取'), code: r.code });  // R12-F3
+            content: markClipped(r.stdout, 16000, '重读用 tail -c +N 分段取'), code: r.code,
+            ...(r.degradedNote ? { degradedNote: r.degradedNote } : {}) });  // loop47-①: 警示透传(read_file 恰是跨上下文陷阱最典型入口)
         }
         if (p.action === 'status') {
           const g = R.get(p.shellId);
