@@ -20,14 +20,22 @@ export function ChatInput({
   // 用户令: Ctrl+Z/Ctrl+Y(及 Ctrl+Shift+Z)撤销重做——受控组件+程序性
   // setValue(上传注入/发送清空)会断浏览器原生 undo 栈, 自建快照栈。
   const hist = useRef<{ stack: string[]; idx: number }>({ stack: [''], idx: 0 });
-  const UNDO_BUILD_MARKER_V1 = 'undo-stack-active'; void UNDO_BUILD_MARKER_V1;
+  // 撤销粒度: 600ms 内连续输入合并为一个单元(逐键快照曾使 Ctrl+Z
+  // 一次只撤一个字符——实测 PPQQ→PPQ)。
+  const lastPushAt = useRef(0);
   const pushHist = (v: string) => {
     const h = hist.current;
     if (h.stack[h.idx] === v) return;
-    h.stack = h.stack.slice(0, h.idx + 1);
-    h.stack.push(v);
-    if (h.stack.length > 100) h.stack.shift();
-    h.idx = h.stack.length - 1;
+    const now = Date.now();
+    if (now - lastPushAt.current < 600 && h.idx === h.stack.length - 1 && h.stack.length > 1) {
+      h.stack[h.idx] = v;  // 输入流内: 并入当前单元
+    } else {
+      h.stack = h.stack.slice(0, h.idx + 1);
+      h.stack.push(v);
+      if (h.stack.length > 100) h.stack.shift();
+      h.idx = h.stack.length - 1;
+    }
+    lastPushAt.current = now;
   };
   const setVal = (v: string) => { setValue(v); pushHist(v); };
 

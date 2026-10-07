@@ -408,8 +408,9 @@ function realRouter({ store, bus, caps, wal }) {
           }
           const source = body.source === 'agent'
             ? injectionOriginOf(injectText) : undefined;
+          const echoTs = action === '/messages' ? Date.now() : 0;
           if (action === '/messages') {
-            store.prompt(record, injectText, source);
+            store.prompt(record, injectText, source, echoTs || undefined);
           } else {
             store.steer(record, injectText, source);
           }
@@ -422,16 +423,14 @@ function realRouter({ store, bus, caps, wal }) {
         // 乐观渲染根治(方案A): /messages 回执带服务器消息对象(真实 ts)
         // ——前端发送成功即用真实条替换乐观条, 不再单通道依赖 SSE 回显
         // 认领(runtime 重启窗口 SSE 丢回显曾致乐观+真实双条, 用户实测)。
+        // 乐观渲染根治(A 终版): ts 由服务端预生成并传入 prompt(与最终
+        // 存储严格一致——此前回查 state.messages 曾因 pi 异步入列恒空)。
         let echo = null;
-        if (action === '/messages') {
-          try {
-            const stored = [...(record.agent?.state?.messages ?? [])]
-              .reverse().find(m => m.role === 'user' && m.content === injectText);
-            if (stored) echo = {
-              role: 'user', ts: stored.timestamp ?? Date.now(), text: injectText,
-              ...(stored.source ? { source: stored.source } : {}),
-            };
-          } catch { /* echo 尽力——缺失时前端回退旧 SSE 认领路径 */ }
+        if (action === '/messages' && echoTs) {
+          echo = {
+            role: 'user', ts: echoTs, text: injectText,
+            ...(source ? { source } : {}),
+          };
         }
         return json(res, 202, { ok: true, ...(echo ? { message: echo } : {}),
           ...(r14pending ? { pendingReport: true, hint: '该代理尚未提交任务报告(在途)' } : {}) });

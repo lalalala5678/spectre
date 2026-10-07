@@ -439,7 +439,7 @@ export class SessionStore {
    * microtask — waitIdle callers must never observe idle in the dispatch
    * window, or they'd harvest an empty reply (the "(无输出)" bug).
    */
-  prompt(record, text, source) {
+  prompt(record, text, source, tsOverride) {
     this._requireLiveAgent(record);
     if (record.busy) {
       throw Object.assign(new Error('agent 忙(并发锁定)——请用 steer'), { statusCode: 409 });
@@ -478,8 +478,8 @@ export class SessionStore {
         // absent = the real human user. Survives to the console via
         // normalizeMessage so injections never render as "you".
         const msg = source
-          ? { role: 'user', content: text, timestamp: Date.now(), source }
-          : text;
+          ? { role: 'user', content: text, timestamp: tsOverride ?? Date.now(), source }
+          : (tsOverride ? { role: 'user', content: text, timestamp: tsOverride } : text);
         record.agent.prompt(msg).catch(err => {
           // R1-F2: 'already processing' 恰恰意味着另一运行在途(竞态败
           // 者)——此时 agent 正在流式, 清 busy 会让 waitIdle 收割旧回
