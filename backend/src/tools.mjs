@@ -1267,9 +1267,6 @@ function markClipped(text, cap, how) {
   return s.slice(0, cap) + `\n[已截断:${cap}/${s.length} 字符,${how}]`  // CS44-F5: 逗号单源制式;
 }
 
-// Q1b: 互斥活锁豁免计数(requester×dupSeq → 被拦次数, 进程级)
-const _mutexEscape = new Map();
-
 /** Bus-entry kind normalization. Legacy WAL data carries vulnerability events
  * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
  * intel notes use 'intel-note' to avoid the collision. */
@@ -1514,28 +1511,36 @@ export function buildDirectTools(record, caps) {
         Type.Literal('info'), Type.Literal('low'), Type.Literal('medium'),
         Type.Literal('high'), Type.Literal('critical'),
       ], { description: 'Vulnerability severity: info/low/medium/high/critical' }),
-      mergeInto: Type.Optional(Type.Number({ description: '归并直达(loop38-D10b): 判定与库内既有漏洞内容实质重叠时, 传正本 seq——平台直接把本条证据+共同发现者署名并入该正本修订链(不经互斥拦截; 互斥键对标题重组不鲁棒, 7650 教训)' })),
+      mergeInto: Type.Optional(Type.Number({ description: '已有报告覆盖此问题时的补充合并: 传该报告 seq——本条内容作为修订并入' })),
     }),
     execute: async (_id, params) => {
       // loop38-D10b 直达路径: mergeInto 指定正本, 绕过互斥键(「归并:」
       // 前缀+正文重组曾绕过 token 重叠→新建重复条目 7650, writer 被迫
       // 手工作废兜底)。
       if (params.mergeInto) {
-        const m = await caps.autoMergeVuln?.(params.mergeInto, {
-          title: params.title, text: params.text, severity: params.severity,
-          author: caps.authorOf?.(record) ?? null,
-          requesterSessionId: record.id,
-        });
-        if (m) {
+        // 用户令: 归并判定归 writer——平台只提供"补充合并"的机械路径:
+        // 以修订事件(revises)并入指定报告, 不做任何重叠判定。
+        const target = (caps.listBus?.() ?? []).find(e2 => e2.seq === Number(params.mergeInto)
+          && e2.type === 'vulnerability' && !e2.revises);
+        if (!target) {
           return { content: [{ type: 'text',
-            text: `[已归并] 正本 seq=${params.mergeInto} 已追加共同发现者修订(修订 seq=${m.seq}, 第 ${m.n} 次)——正本引用一律用 seq=${params.mergeInto}, 修订内容可 query_intel(seq=${params.mergeInto}) 验证。` }],
-            details: { merged: true, targetSeq: params.mergeInto, revisionSeq: m.seq, n: m.n } };
+            text: `[归并失败] seq=${params.mergeInto} 不是漏洞正本——query_intel 确认 seq 后重试, 或不带 mergeInto 新建。` }],
+            details: { merged: false, targetSeq: params.mergeInto } };
         }
+        const n = (caps.listBus?.() ?? []).filter(e2 => e2.revises === target.seq).length + 1;
+        const rev = caps.emitBus({
+          channel: 'share', from: record.agentKey, type: 'vulnerability',
+          revises: target.seq, revision: { n, reason: '补充合并(共同发现者)', requestedBy: caps.authorOf?.(record) ?? null, approvedBy: caps.authorOf?.(record) ?? null },
+          title: params.title, summary: params.title, severity: String(params.severity).toLowerCase(),
+          detail: params.text, payloadRef: `sess:${record.id}`,
+          author: caps.authorOf?.(record) ?? null,
+          requester: record.requester?.author ?? null,
+          workSessionId: record.workSessionId ?? null,
+        });
         return { content: [{ type: 'text',
-          text: `[归并失败] 正本 seq=${params.mergeInto} 不存在或不可修订(仅漏洞正本可归并)——query_intel 确认正本 seq 后重试, 或无正本时去掉 mergeInto 正常发布。` }],
-          details: { merged: false, targetSeq: params.mergeInto } };
+          text: `[已归并] 报告 seq=${params.mergeInto} 已追加第 ${n} 次修订(seq=${rev?.seq ?? '?'})——内容并入完成, 引用一律用 seq=${params.mergeInto}。` }],
+          details: { merged: true, targetSeq: params.mergeInto, revisionSeq: rev?.seq, n } };
       }
-      const ev0escaped = _mutexEscape.get(`${record.id}#pending`) === 'armed';
       const ev = caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'user',
         type: 'vulnerability',
@@ -1546,52 +1551,11 @@ export function buildDirectTools(record, caps) {
         severity: String(params.severity).toLowerCase(),
         title: params.title,
         summary: params.title,
-        detail: (ev0escaped ? `[escapeHatch: 同 requester 对原 dupSeq 第 3 次命中互斥, 按活锁豁免独立落账(WebGoat循环2 Q1b); 证据链与既有条目可能相关, 由人工/下游 revise 裁决归并]\n\n` : '') + params.text,
+        detail: params.text,
         origin: 'direct',
         author: caps.authorOf?.(record) ?? null,
         workSessionId: record.workSessionId ?? null,
       });
-      // r29-#2: 互斥拦截回执(零吞并——指引 revise 并入或证伪重发)
-      // Q1b(WebGoat循环2 活锁豁免): 同 requester 对同 dupSeq 被拦≥2 次
-      // (重试仍命中——短窗过期重报被自动并入的循环, 9973 修订史 17 次
-      // 实证)后 fail-open 独立落账, 附 escapeHatch 注记; 勿依赖人工复合
-      // 正本。豁免次数进程级记忆。
-      if (ev?.blocked) {
-        // 循环4: 豁免键改 dupSeq+题名归一——此前绑 record.id 而 writer 会话
-        // 每请求新建, 计数永不累积(登录 SQLi 拉锯 6 次未豁免实证)。
-        const rk = `dup#${ev.dupSeq}#${normTitle(params.title)}`;
-        _mutexEscape.set(rk, (_mutexEscape.get(rk) ?? 0) + 1);
-        if (_mutexEscape.get(rk) >= 3) {
-          ev = { ...ev, blocked: false, escaped: true };
-          _mutexEscape.set(`${record.id}#pending`, 'armed');  // emit 注记用
-        }
-      }
-      if (ev?.blocked) {
-        // loop38-D10b: 拦截即自动归并——按 D9 判据被拦的重复线索, 平台
-        // 直接给正本 append 共同发现者修订(writer 手工兜底仍可用但
-        // "必须手工"=FAIL); D10c: 回执引用的正本 seq=互斥命中的 dupSeq
-        // 原文直通, 不得引用其它近期条目。
-        let merged = null;
-        try {
-          merged = await caps.autoMergeVuln?.(ev.dupSeq, {
-            title: params.title, text: params.text, severity: params.severity,
-            author: caps.authorOf?.(record) ?? null,
-            requesterSessionId: record.requester?.sessionId ?? record.id,
-          });
-        } catch { /* 自动归并 best-effort, 失败走指引路径 */ }
-        return {
-          content: [{
-            type: 'text',
-            text: `[mutex-intercepted] 已拦截: 与 seq=${ev.dupSeq}《${ev.dupTitle}》疑似同点位双账(短窗互斥, 10min${ev.by === 'fingerprint' ? ', by=fingerprint 端点指纹命中' : ', token 重叠命中'})。` +
-              (ev.dupWs && ev.dupWs !== (record.workSessionId ?? null)
-                ? `\n[跨项目正本] 该正本归属其它项目(seq=${ev.dupSeq}), 你在本项目 query_intel 不可见属预期——证据已通过自动归并保全, 勿尝试 query_intel(seq=${ev.dupSeq}) 验证(不可执行); 如认为误配, 细化 title/detail 端点差异后重发。`
-                : (merged
-                  ? `\n[已自动归并] 正本 seq=${ev.dupSeq} 已追加共同发现者修订(seq=${merged.seq}, 修订 ${merged.n})——引用正本一律用 seq=${ev.dupSeq}。`
-                  : `\n同一漏洞请用 request_vulnerability_revision 并入(正本=首落 seq=${ev.dupSeq}); ` +
-                    `确属不同漏洞请细化 title/detail 差异后重发。`)),
-          }],
-        };
-      }
       // loop38-D10a: 成功声明必携同回合可验证 seq; emit 无 seq=显式失败
       // (成功回执假阳性三子项之根——此前'已入库'不带 seq, 幽灵 emit
       // 无法被调用方察觉)。

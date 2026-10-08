@@ -232,15 +232,12 @@ const caps = {
   // r29-#2: vuln 落账互斥——emit 前预检, 短窗高重叠拦截(非吞并),
   // 返回 {blocked, dupSeq} 供 publish_vulnerability 回执指引 revise。
   emitBus: (entry) => {
-    if (entry?.type === 'vulnerability' && !entry.revises) {
-      const block = bus.vulnMutexCheck?.(entry);
-      if (block) return block;
-      // loop-DVGA复盘-A: 上报链路无项目归属(ws=None, 常见于无项目
-      // 直连会话)的正本标注跨项目域——互斥按靶场指纹全局生效(B),
-      // 标注让台账可辨此类条目的来源形态。
-      if (!entry.workSessionId && !entry.title?.includes('[跨项目域]')) {
-        entry = { ...entry, title: `${entry.title} [跨项目域]` };
-      }
+    // 用户令(2026-10-08): 归并/另立判定权完全归 writer——机械互斥拦截
+    // 与自动归并全链拆除(loop38-D9/D10b/DVGA 复盘令/escape hatch 一并
+    // 废止, 提示词同步极简), 平台仅保留 bus.emit 的同文幂等(防重发)。
+    if (entry?.type === 'vulnerability' && !entry.revises
+      && !entry.workSessionId && !entry.title?.includes('[跨项目域]')) {
+      entry = { ...entry, title: `${entry.title} [跨项目域]` };
     }
     return bus.emit(entry);
   },
@@ -372,32 +369,6 @@ const caps = {
     }).catch(() => { /* 上限兜底: 队列版仍在 */ });
     return ok;
   }),
-  /** loop38-D10b: 互斥拦截即自动归并——按 D9 判据被拦的重复线索,
-   * 平台直接给正本 append 共同发现者修订(writer 手工兜底保留但
-   * "必须手工"=FAIL)。 */
-  autoMergeVuln: (dupSeq, { title, text, severity, author } = {}) => {
-    try {
-      const target = bus.list().find(e => e.seq === dupSeq
-        && e.type === 'vulnerability' && !e.revises);
-      if (!target) return null;
-      const chain = bus.list().filter(e => e.revises === dupSeq);
-      const newest = chain.sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0))[0];
-      const baseDetail = String(newest?.detail ?? target.detail ?? '');
-      const inc = `\n\n---\n[自动归并·共同发现者] ${String(title).slice(0, 120)}\n` +
-        `发现者: ${author?.name ?? '(未记录)'}(互斥拦截后平台自动并入; 证据增量如下)\n` +
-        `${String(text ?? '').slice(0, 4000)}`;
-      const ev = emitRevision(bus, {
-        target,
-        fields: { text: baseDetail + inc,
-          ...(severity && !target.severity ? { severity: String(severity).toLowerCase() } : {}) },
-        reason: `重复线索归并(mergeInto 直达或互斥拦截): ${author?.name ?? '?'} 并入(共同发现者荣誉)`,
-        requestedBy: author?.name ?? 'platform',
-        approvedBy: 'platform:auto-merge',
-        origin: 'agent',
-      });
-      return ev?.seq ? { seq: ev.seq, n: ev.revision?.n ?? 1 } : null;
-    } catch { return null; }
-  },
   /** loop36-QA: 全部待批授权请求(编排者侧挂起查询——此前只能被动等
    * dup 提示或看前端确认卡, 无查询入口)。 */
   listPendingAuthRequests: () => {
@@ -577,16 +548,8 @@ const caps = {
       `2) 需要时用 query_intel 交叉验证项目内情报,或 read_session 其它相关会话;\n` +
       `3) 判定该线索是否构成真实危害、可提交的漏洞;\n` +
       `4) 成立 → 调用 publish_vulnerability 落账:自行拟定标题与 severity。` +
-      `共同发现者归并判据(loop38-D9): 只在内容实质重叠(同一漏洞的相同证据/点位/利用面)时并入库内既有条目并署共同发现者; ` +
-      `仅会话上下文关联(同项目/发现者的其它会话、QA 性质线索)不构成归并依据——误并会篡改漏洞归属。` +
-      `判定重叠时的正确动作(loop38-D10b): 调用 publish_vulnerability 时带 mergeInto=<正本 seq>(完整证据)——平台直达归并,` +
-      `把你的证据增量与共同发现者署名并入正本修订链(回执载明正本 seq 与修订 seq); 不要依赖互斥拦截(标题重组可绕过), 也不应手工 revise。` +
-      `**归并硬约束(DVGA 复盘令)**: mergeInto/修订只允许**同一漏洞**(同根因+同端点+同漏洞类型, 如均为 identity 键注入)。` +
-      `攻击链相邻但根因不同的发现(如口令泄露 vs 命令执行 vs SSRF)必须各自另立正本, 严禁并入同一条修订链;` +
-      `修订的标题不得漂移成另一漏洞(正本 identity 的修订标题变成 RCE 属于事故)。` +
-      `若回执以 [mutex-intercepted] 开头=与库内既有条目同点位被拦(未成账): (循环4-1 终态纪律: **严禁以"先等窗口"之类开放性措辞收尾**——你必须在终报里二值化声明: 要么"已自动重试 N 次仍拦截, 需人工按 intel seq 直转", 要么"判定不成立"; 不得留静默等待态让编排者悬空)` +
-      `终报必须如实写「被互斥拦截待归并」, 并 query_intel 回查正本 seq——严禁写「已落账」; ` +
-      `正常落账后也须以回执 seq 回查库内确认再写终报。` +
+      `落账规则(唯一): 之前已有覆盖此问题的报告就用 publish_vulnerability 带 mergeInto=<该报告 seq> 把你的内容补充合并进去; 没有就创建新漏洞(不带 mergeInto)。` +
+      `判断有没有: 必须 query_intel 后逐条**读漏洞正文**比对内容, 不得只凭标题判断。` +
       `标题必须一行式简洁命名(参考 CVSS/CVE 业界惯例): 资产+端点+漏洞类型(CWE 编号可选), ` +
       `≤40 字, 禁止句子化描述/影响铺陈(那些放正文)。正例:'SpectreTest /api/transfer 无鉴权 BOLA'/'登录页 SQL 注入(CWE-89)'; 反例:'发现某接口存在一个非常重要的未授权访问漏洞可以挪动资金'。` +
       `正文包含发现过程、证据链、危害分析与POC,并注明发现者 ${requesterAuthor.name};\n` +
@@ -637,23 +600,9 @@ const caps = {
     // "未立为漏洞", 归并事实要靠编排者自行回查才发现。落账没发生≠
     // 线索无效: 查 writer 期内最近 3min 的同项目 vuln(无 author 过滤)——
     // 命中即归并回执。
-    if (!published) {
-      const dupHit = [...bus.list()].reverse().find(e =>
-        e.type === 'vulnerability' && !e.revises
-        && e.workSessionId === (requesterRecord.workSessionId ?? null)
-        && Date.parse(e.ts ?? 0) > tRw - 60_000);
-      if (dupHit) {
-        resolveDraft('merged', `归并入正本 seq=${dupHit.seq}`);
-        return {
-          ok: true, merged: true,
-          text: `{"verdict":"merged","mergedInto":${dupHit.seq},"sessionId":"${writer.id}"}\n` + dupPreNote +
-            `线索已归并:《${dupHit.title}》(正本 seq=${dupHit.seq}, severity=${dupHit.severity})——` +
-            `writer 判定与既有条目为同点位重复, 未另立正本(零双账)。你的发现者身份经 coDiscoverers/` +
-            `修订链保留, read_session ${writer.id} 可复盘其查重论证。`,
-          details: { sessionId: writer.id, mergedInto: dupHit.seq, waitedMs: Date.now() - tRw },
-        };
-      }
-    }
+    // 用户令: 归并/另立由 writer 自判(带 mergeInto 的合并走 tools 修订
+    // 路径落账, 回执如实反映)——wrapper 不再做"近期同项目 vuln"机械
+    // 归并猜测(r43-O1 dupHit 分支废止)。
     if (published) {
       resolveDraft('published', `正式落账 seq=${published.seq}`);
       return {
@@ -672,27 +621,6 @@ const caps = {
     // r29e-1: 互斥拦截专属回执——被拦方必须知道「未成账+荣誉路径」。
     // 通用 declined 前缀「未将此线索立为漏洞」与被拦正文并置, 曾致
     // 三次「已落账」误报接力(4908→回执→DM), 荣誉面临静默丢失。
-    if (reply && /mutex-intercepted/i.test(reply)) {
-      resolveDraft('mutex-intercepted', '同点位被互斥拦截, 归并路径见回执');
-      return {
-        ok: false, mutexIntercepted: true,
-        text: `{"verdict":"mutex-intercepted","autoMerged":true,"sessionId":"${writer.id}"}\n(语义统一: mutex-intercepted 即拦截时自动归并已完成——writer 术语「归并落账」与 wrapper「互斥拦截」为同一动作的两面, 据本判定行决定后续: 无需再 request_vulnerability_revision, 除非你要补增量证据)\n` + dupPreNote +
-          `[mutex-intercepted] 你的上报与库内既有条目同点位, 已被落账互斥拦截(命中方式: ${/by=fingerprint/.test(reply) ? '端点指纹命中' : 'token 重叠命中'})——**未独立成账**(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
-          `平台自动归并(loop38-D10b): 拦截时带完整证据则正本修订链已追加共同发现者修订——` +
-          `query_intel(正本 seq) 验修订计数 +1; writer 拦截回执里载明的正本 seq 即引用目标(与库内一致)。` +
-          `未自动归并时再用 request_vulnerability_revision 并入(共同发现者荣誉); 严禁重复 publish。` +
-          `(writer 处理记录摘要: ${reply.slice(0, 220)}——全文 read_session ${writer.id})`,
-        details: { sessionId: writer.id, mutex: true, waitedMs: Date.now() - tRw },
-      };
-    }
-    // r18-1: 半成品检测——草稿/中断文本混入回执两轮未收敛, 判定词缺位
-    // 时如实标注(不再把未完成输出当判定说明)。
-    // r29b-残留③: 判定词族扩充——writer 以"重复/并入/维持/证据不足"等
-    // 清晰结论措辞驳回时曾被误贴"疑似未完成"旗标(验收方实测报)。
-    const looksDraft = reply && !/(不成立|驳回|不予|拒绝|decline|不构成|否决|重复|合并|并入|归并|维持|既有|已存在|已由|另立|证据不足|不足以|duplicate|merge|overlap)/i.test(reply);
-    // loop38-新缺陷面: 部署/重启窗口击杀在飞 writer→无 published 无
-    // reply 的"空回执"(7234 案线索被静默消耗)——显式 [writer-lost] 声明
-    // +重试指引(回执不变量: 非成功带 seq 即显式失败)。
     if (!published && (!reply || reply === '(无输出)') && timeout) {
       resolveDraft('writer-lost', 'writer 等待窗内零输出零落账');
       return {
