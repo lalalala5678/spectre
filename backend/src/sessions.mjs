@@ -485,7 +485,7 @@ export class SessionStore {
           // 者)——此时 agent 正在流式, 清 busy 会让 waitIdle 收割旧回
           // 复、并发 /messages 绕过 409。只在真实非流式时清。
           if (!record.agent.state.isStreaming) {
-            record.busy = false;  // run never started — don't strand waitIdle
+            record.busy = false;  // run never started — don'tstrand waitIdle
             // R15-F4: 事件驱动等待者(reportWriter 等 awaitCompletion)
             // 此前被困 300s——agent_end 永不来, busy 快路径已过。
             for (const fn of record.completionWaiters ?? [])
@@ -493,6 +493,34 @@ export class SessionStore {
             record.completionWaiters = [];
           }
           this._journal(record, 'error', { message: String(err) });
+          // 用户令(2026-10-08, "发了消息不回"): 消息已入上下文但回合
+          // 死亡时此前零反馈零重试——用户侧石沉大海。可重试错误(429/
+          // 网络/5xx)45s 退避自动重触发(最多 2 次, 原消息保留上下文,
+          // 重试触发为独立注入不产生重复内容); 耗尽则注入显式失败注记
+          // (前端可见, 用户知道该重发)。
+          const errText = String(err?.message ?? err);
+          const retryable = /429|rate.?limit|速率|限流|fetch|network|ECONNR|timeout|5\d\d/i.test(errText);
+          const attempt = (msg._autoRetry ?? 0);
+          if (retryable && attempt < 2 && !record.agent.state.isStreaming) {
+            setTimeout(() => {
+              try {
+                if (record.busy || record.agent?.state?.isStreaming) return;  // 已被其它路径接管
+                this.prompt(record,
+                  `[系统自动重试 ${attempt + 1}/2] 你此前收到的一条用户消息因 ${errText.slice(0, 80)} 未能产生任何回复(消息本体仍在你上下文中)——请直接回答该消息, 不要因本注记改变回答内容。`,
+                  'system-internal', undefined);
+              } catch { /* 会话已死则弃 */ }
+            }, 45_000).unref?.();
+            msg._autoRetry = attempt + 1;
+          } else if (attempt >= 2 || !retryable) {
+            try {
+              (record.agent.state.messages ?? []).push({
+                role: 'user', timestamp: Date.now(),
+                source: 'system-internal',
+                content: `[回合失败] 你收到一条用户消息但连续 ${attempt + 1} 次未能产生回复(${errText.slice(0, 100)})——消息本体仍在上下文。请用户重发, 或你在下一条触发时优先回答该消息。`,
+              });
+              this._journal(record, 'turn_failed_visible', { message: errText.slice(0, 200) });
+            } catch { /* best-effort */ }
+          }
         });
       });
   }
