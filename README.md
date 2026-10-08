@@ -13,7 +13,7 @@
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/pulls)
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](./console/package.json)
+[![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](https://github.com/lalalala5678/spectre/releases)
 [![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?style=flat-square&logo=docker&logoColor=white)](./deploy/README.md)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./backend/package.json)
 
@@ -30,6 +30,8 @@
 给一个目标,SPECTRE 自己完成剩余的事: 测绘资产、对账授权边界、按阶段调度专职智能体、逐项验证漏洞、产出带证据链的报告。你只做两件事 —— 批准授权、看结果。
 
 一次真实战役里, 平台同时跑着 recon 测绘端口与指纹、weakcred 爆破弱口令、api 铺越权矩阵、exploit 验证利用链、persistence 落地权限维持、postex 做后渗透取证, report agent 全程独立复核每一条漏洞后才允许落账。所有产出进同一条 append-only 事件总线, 前端实时渲染, 重启零丢失。
+
+一份实战终报长这样(脱敏导出, 漏洞台账/杀伤链/负空间清单齐备): [docs/samples/sample-report.md](docs/samples/sample-report.md)——由 report agent 独立复核后落账, 非模型一次性输出。
 
 **设计取向**:
 
@@ -142,6 +144,12 @@ cd backend && npm test    # 65 用例: 互斥去重 / 会话生命周期 / 修�
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) —— 架构决策记录与行数软指引
 - `docs/` 各阶段技能方法论与工具脚本
 - [AGENTS.md](AGENTS.md) —— 工具与智能体边界的完整设计规范
+
+## 贡献与支持
+
+- Bug / 功能建议: [提 Issue](https://github.com/lalalala5678/spectre/issues), 附复现步骤与 runtime 日志片段
+- PR 欢迎: 改动若触及 `tools/pi/sessions/routes` 等核心文件, 请同步 `docs/ARCHITECTURE.md` 行数表(测试会锁), 并跑通 `cd backend && npm test`
+- 行为准则: 对事不对人; 安全相关披露请走私下渠道, 勿在公开 issue 贴未脱敏的目标凭据
 
 ## 合规声明
 

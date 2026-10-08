@@ -13,7 +13,7 @@ Full-chain automation from asset mapping to report delivery — 11 stage agents,
 [![GitHub Pull Requests](https://img.shields.io/github/issues-pr/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/pulls)
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
-[![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](./console/package.json)
+[![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](https://github.com/lalalala5678/spectre/releases)
 [![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?style=flat-square&logo=docker&logoColor=white)](./deploy/README.md)
 [![Node](https://img.shields.io/badge/node-%E2%89%A522-339933?style=flat-square&logo=nodedotjs&logoColor=white)](./backend/package.json)
 
@@ -30,6 +30,8 @@ Full-chain automation from asset mapping to report delivery — 11 stage agents,
 Give SPECTRE a target and it handles the rest: map assets, reconcile the authorization boundary, dispatch specialized agents per stage, verify every finding, and produce evidence-chained reports. Your job is two things — approve authorization, read results.
 
 During a real engagement the platform runs recon (port & fingerprint mapping), weakcred (credential spraying), api (BOLA/BFLA/IDOR matrices), exploit (chain construction), persistence (redundant footholds), and postex (forensics) concurrently, while the report agent independently re-verifies every finding before it lands in the ledger. All output flows through a single append-only event bus, rendered live in the console, surviving restarts.
+
+See what a real engagement report looks like (sanitized export, full vulnerability ledger / kill chains / negative-space list): [docs/samples/sample-report.md](docs/samples/sample-report.md) — landed only after independent re-verification by the report agent, not one-shot model output.
 
 **Design stance:**
 
@@ -143,6 +145,12 @@ cd backend && npm test    # 65 cases: dedup mutex / session lifecycle / revision
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture decision records
 - `docs/` — per-stage skill methodology and tooling
 - [AGENTS.md](AGENTS.md) — the complete design spec for tooling & agent boundaries
+
+## Contributing & Support
+
+- Bugs / feature requests: [open an issue](https://github.com/lalalala5678/spectre/issues) with reproduction steps and runtime log excerpts
+- PRs welcome: changes touching core files (`tools/pi/sessions/routes`) must sync the line-count table in `docs/ARCHITECTURE.md` (tests lock it) and pass `cd backend && npm test`
+- Security disclosures: private channels only — never post unredacted target credentials in public issues
 
 ## Compliance
 
