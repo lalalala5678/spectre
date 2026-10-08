@@ -629,6 +629,9 @@ const caps = {
         details: { sessionId: writer.id, writerLost: true, waitedMs: Date.now() - tRw },
       };
     }
+    // r18-1: 半成品检测——判定词缺位时如实标注(定义曾被 E 段清理误删,
+    // looksDraft is not defined 三连实测)。
+    const looksDraft = reply && !/(不成立|驳回|不予|拒绝|decline|不构成|否决|重复|合并|并入|归并|维持|既有|已存在|已由|另立|证据不足|不足以|duplicate|merge|overlap)/i.test(reply);
     const replyShown = looksDraft
       ? `(writer 最终输出疑似未完成(未见判定词)——全文见 read_session ${writer.id}, 稍后复核):\n${reply.slice(0, 300)}`
       : (reply || '(无输出)');
