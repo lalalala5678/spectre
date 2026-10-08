@@ -604,12 +604,27 @@ const caps = {
     // 路径落账, 回执如实反映)——wrapper 不再做"近期同项目 vuln"机械
     // 归并猜测(r43-O1 dupHit 分支废止)。
     if (published) {
-      resolveDraft('published', `正式落账 seq=${published.seq}`);
+      // 回执结论二分(用户令: 重复报告 vs 新报告必须给清晰结论)——
+      // writer 走 mergeInto 时落的是修订事件(revises=正本 seq): 回执
+      // verdict=merged + 合并目标正本 seq; 新建则 verdict=published +
+      // 新正本 seq。引用目标始终是正本 seq。
+      if (published.revises) {
+        resolveDraft('merged', `合并入既有报告 seq=${published.revises}`);
+        return {
+          ok: true, merged: true,
+          text: `{"verdict":"merged","mergedInto":${published.revises},"revisionSeq":${published.seq},"sessionId":"${writer.id}"}\n` + dupPreNote +
+            `结论: 线索已**合并入既有报告**——正本 seq=${published.revises}(引用一律用此 seq), 本次内容作为第 ${published.revision?.n ?? '?'} 次修订(seq=${published.seq})并入, 发现者署名随修订链保留。` +
+            `(同步等待 ${Math.round((Date.now() - tRw) / 1000)}s; 撰写对话 ${writer.id})`,
+          details: { sessionId: writer.id, mergedInto: published.revises,
+            revisionSeq: published.seq, title: published.title,
+            waitedMs: Date.now() - tRw, stage: 'writer-review' },
+        };
+      }
+      resolveDraft('published', `新报告落账 seq=${published.seq}`);
       return {
         ok: true,
         text: `{"verdict":"published","seq":${published.seq},"severity":"${published.severity}","sessionId":"${writer.id}"}\n` + dupPreNote +
-          `漏洞报告已产出并入库:《${published.title}》` +
-          `(severity=${published.severity},seq=${published.seq};同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
+          `结论: 线索立为**新漏洞报告**——《${published.title}》(severity=${published.severity}, 正本 seq=${published.seq};同步等待 ${Math.round((Date.now() - tRw) / 1000)}s)。` +
           `撰写对话 ${writer.id}(read_session 可复盘其思考与验证过程)。`,
         details: { sessionId: writer.id, seq: published.seq,
           title: published.title, severity: published.severity,

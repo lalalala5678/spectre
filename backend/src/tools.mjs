@@ -1514,9 +1514,6 @@ export function buildDirectTools(record, caps) {
       mergeInto: Type.Optional(Type.Number({ description: '已有报告覆盖此问题时的补充合并: 传该报告 seq——本条内容作为修订并入' })),
     }),
     execute: async (_id, params) => {
-      // loop38-D10b 直达路径: mergeInto 指定正本, 绕过互斥键(「归并:」
-      // 前缀+正文重组曾绕过 token 重叠→新建重复条目 7650, writer 被迫
-      // 手工作废兜底)。
       if (params.mergeInto) {
         // 用户令: 归并判定归 writer——平台只提供"补充合并"的机械路径:
         // 以修订事件(revises)并入指定报告, 不做任何重叠判定。
