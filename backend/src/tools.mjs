@@ -1554,7 +1554,9 @@ export function buildDirectTools(record, caps) {
       // 实证)后 fail-open 独立落账, 附 escapeHatch 注记; 勿依赖人工复合
       // 正本。豁免次数进程级记忆。
       if (ev?.blocked) {
-        const rk = `${record.id}#${ev.dupSeq}`;
+        // 循环4: 豁免键改 dupSeq+题名归一——此前绑 record.id 而 writer 会话
+        // 每请求新建, 计数永不累积(登录 SQLi 拉锯 6 次未豁免实证)。
+        const rk = `dup#${ev.dupSeq}#${normTitle(params.title)}`;
         _mutexEscape.set(rk, (_mutexEscape.get(rk) ?? 0) + 1);
         if (_mutexEscape.get(rk) >= 3) {
           ev = { ...ev, blocked: false, escaped: true };
