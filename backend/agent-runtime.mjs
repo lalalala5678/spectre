@@ -882,8 +882,22 @@ loadSandboxConfig().then(async cfg => {
       workSessionId: rec.workSessionId ?? null });
     // r20v4: bus 事件不进会话——同时 followUp 直接注入编排器(idle 即
     // 触发回合, 看得见才算通知)
+    // 循环2-新3: 已收官战役(最近终报后无新增产出)标注幂等——免编排器
+    // 全套对账(eng-muypts9u 实证: 完成战役仍触发靶场活性/授权/情报库
+    // 三项复核)。
+    let doneNote = '';
     try {
-      store.followUp(rec, `[DM from system] 平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。注意: 重启不变更任何环境/靶场/网络状态(容器与配置原样), 一切以实探为准——勿在汇报中自行推断"环境已重置"。`);
+      const evs = bus.list();
+      const wsEvs = evs.filter(e => e.workSessionId === (rec.workSessionId ?? null)
+        && e.type === 'task-report');
+      const lastReportTs = Math.max(...wsEvs.map(e => Date.parse(e.ts ?? 0)), 0);
+      const idleHrs = lastReportTs ? (Date.now() - lastReportTs) / 3600e3 : 0;
+      if (lastReportTs && idleHrs > 2) {
+        doneNote = ` 该战役最近终报距今 ${Math.round(idleHrs)}h 且无后续产出——**大概率已收官, 本通知幂等, 无需对账**(如确有在途成员再按常规处理)。`;
+      }
+    } catch { /* 判定失败不影响通知 */ }
+    try {
+      store.followUp(rec, `[DM from system] 平台重启:你的战役 ${eng} 的 Temporal 执行已被中断——成员产出以情报库为准(query_intel 对账), 失联成员可重派。注意: 重启不变更任何环境/靶场/网络状态(容器与配置原样), 一切以实探为准——勿在汇报中自行推断"环境已重置"。${doneNote}`);
     } catch { /* 会话不可注入时 bus 事件兜底 */ }
   }
   const ensured = await ensureSandbox();

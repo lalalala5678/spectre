@@ -516,7 +516,26 @@ export function buildIntelTools(record, caps) {
           text: `空修订: seq=${params.seq} 未携带任何可变更字段(title/severity/text/status/void/vulns 至少其一)——纯复制修订已拒绝。` }] };
       }
       const result = caps.reviseEntry?.(record, params);
-      return { content: [{ type: 'text', text: result.text }],
+      // 循环2-新2: revise 带 vulns 时附同款引用解析块(免一次性探针报告
+      // 才能验证锚定的窘境)。
+      let vulnLines = '';
+      if (Array.isArray(params.vulns) && params.vulns.length) {
+        try {
+          const published2 = foldRevisions((caps.listBus?.() ?? [])
+            .filter(e => e.workSessionId === (record.workSessionId ?? null) && entryKind(e) !== null))
+            .filter(e => entryKind(e.current ?? e) === 'vulnerability' && !e.current.void)
+            .map(e => ({ norm: normTitle(e.current.title ?? e.title), title: e.current.title ?? e.title, seq: e.seq }));
+          vulnLines = '\n[漏洞引用解析]\n' + params.vulns.map(t => {
+            const sm = /#(\d{3,6})\s*$|seq[:=]\s*(\d{3,6})/i.exec(String(t));
+            const sa = sm ? Number(sm[1] ?? sm[2]) : null;
+            const nt = normTitle(t);
+            const h = published2.find(pv => (sa && pv.seq === sa)
+              || (!sa && (pv.norm.includes(nt) || nt.includes(pv.norm))));
+            return `- 《${t}》→ ${h ? `命中《${h.title}》(seq=${h.seq})` : '未命中'}`;
+          }).join('\n');
+        } catch { /* 解析失败不阻断修订回执 */ }
+      }
+      return { content: [{ type: 'text', text: result.text + vulnLines }],
         details: result.details ?? {} };
     },
   };
@@ -768,8 +787,8 @@ function buildSpawnAgentTool(record, caps) {
       return {
         content: [{
           type: 'text',
-          text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 L${verdict.depth}——计数:根=L0,当前 spawnMaxDepth=${verdict.spawnMaxDepth ?? '?'} 表示最深允许第 ${verdict.spawnMaxDepth ?? '?'} 层),` +
-          `并发护栏(Q7): spawn 无自动分波(dispatch 有)——请自行守单波 ≤5 席(资源节流口径), 超出建议错峰; relay 定向本会话可用 relay_to_agents(sessionIds=["${spawned.id}"])。` + +
+          text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 L${Number.isFinite(verdict.depth) ? verdict.depth : '?'}——计数:根=L0,当前 spawnMaxDepth=${Number.isFinite(verdict.spawnMaxDepth) ? verdict.spawnMaxDepth : '?'} 表示最深允许第 ${Number.isFinite(verdict.spawnMaxDepth) ? verdict.spawnMaxDepth : '?'} 层),` +
+          `并发护栏(Q7): spawn 无自动分波(dispatch 有)——请自行守单波 ≤5 席(资源节流口径), 超出建议错峰; relay 定向本会话可用 relay_to_agents(sessionIds=["${spawned.id}"])。` +
             '完成后会以 [DM] 向你回报结果。',
         }],
         details: { sessionId: spawned.id, depth: verdict.depth },
@@ -795,8 +814,17 @@ export function buildOrchestratorTools(record, caps) {
       agents: Type.Array(stageEnum, {
         description: 'Stage agent keys to dispatch, e.g. ["recon","nday"]',
       }),
+      sharedContext: Type.Optional(Type.String({
+        description: '循环2-新5: Optional engagement-level shared block (scope/凭据/边界/判收纪律等所有成员共用的参数)——平台自动以「共享参数区」标题附加到每个成员的派发指令尾部, 漂移风险由平台兜底; 变更仍走 relay。',
+      })),
     }),
     execute: async (_id, params) => {
+      // 循环2-新5: 共享参数区——每成员指令尾部统一附加(单一事实源,
+      // 9 份派发指令手工复制同一凭据块的漂移风险由平台兜底)。
+      const withShared = params.sharedContext
+        ? { ...params, instruction: `${params.instruction}\n\n【共享参数区(engagement 级, 全员一致——以本区为准, 勿自行改写)】\n${params.sharedContext}` }
+        : params;
+      params = withShared;
       // Fix-B (A1): quota applies to BOTH dispatch entry points. A batch
       // that would push the tree past the cap is refused up front — the
       // project-3 lockout started exactly here (7+3=10>8 accepted).

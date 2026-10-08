@@ -5,7 +5,7 @@
  * keeping the official schema, description, truncation and spill
  * semantics byte-for-byte. Zero pi modifications.
  */
-import { readFileSync } from 'node:fs';
+import { readFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { CONFIG } from '../config.mjs';
 import { looksLikeInstall, appendInstallLog } from './container.mjs';
@@ -48,8 +48,21 @@ function scopeTargetsOf() {
     return Array.isArray(t) ? t : null;
   } catch { return null; }
 }
-// bash 授权横幅已提示目标集合(进程级, 每目标一次)
+// bash 授权横幅已提示目标集合(每目标一次)。循环2-新4: 持久化到
+// scope.json 的 warned 数组——重启不再重新武装(重启后首条 bash 又注入
+// 横幅的噪声); 进程内 Set 为热缓存。
 const authWarnShown = new Set();
+try {
+  const sc0 = JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'));
+  for (const w of sc0?.warned ?? []) authWarnShown.add(w);
+} catch { /* 读失败=空集, 不影响 */ }
+const persistWarned = (t) => {
+  try {
+    const sc = JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8')) ?? {};
+    sc.warned = [...new Set([...(sc.warned ?? []), t])].slice(-50);
+    writeFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), JSON.stringify(sc, null, 2));
+  } catch { /* 持久化失败不影响会话内降噪 */ }
+};
 
 function bashScopeGate(command) {
   const targets = scopeTargetsOf();
@@ -149,6 +162,7 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
         const first = out.content.find(c => c.type === 'text');
         if (first && !authWarnShown.has(authWarnHit)) {
           authWarnShown.add(authWarnHit);
+          persistWarned(authWarnHit);
           first.text = `[授权参考·一次性] 命令涉及内网目标 ${authWarnHit}, 当前授权清单实况: [${(scopeTargetsOf() ?? ['(清单暂不可读)']).join(', ')}]——请自行比对核实(未含且不确定时建议 request_authorization 向用户确认)。此后同目标不再重复提示。
 \n---\n${first.text ?? ''}`;
         }
