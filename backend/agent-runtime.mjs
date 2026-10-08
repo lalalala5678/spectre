@@ -543,7 +543,7 @@ const caps = {
       if (hits.size >= 3) { dupPre = { seq: v.seq, title: v.title, hits: [...hits].slice(0, 6) }; break; }
     }
     const dupPreNote = dupPre
-      ? `[查重参考] 库内疑似同点位: seq=${dupPre.seq}《${dupPre.title}》(重叠: ${dupPre.hits.join('/')})——提交已照常进行, 判定以 writer 实测为准。\n` : '';
+      ? `[查重参考] 库内疑似同点位: seq=${dupPre.seq}《${dupPre.title}》——命中 token: ${dupPre.hits.map(h => `${h}(${String(h).length >= 5 ? '强' : '弱'})`).join('/')}, 覆盖 hint 长词 ${(dupPre.hits.filter(h => h.length >= 5).length)}/${Math.max(1, toks.filter(t => t.length >= 5).length)}(token 级模糊匹配, 低警觉勿据此放弃提交——判定以 writer 实测为准, 提交已照常进行)。\n` : '';
     const tRw = Date.now();  // r14-④: 同步等待可观测(回执附 waitedMs)
     const { session: writer, timeout } = await runDetachedAgent({
       agentKey: 'report',
@@ -584,7 +584,7 @@ const caps = {
       `**归并硬约束(DVGA 复盘令)**: mergeInto/修订只允许**同一漏洞**(同根因+同端点+同漏洞类型, 如均为 identity 键注入)。` +
       `攻击链相邻但根因不同的发现(如口令泄露 vs 命令执行 vs SSRF)必须各自另立正本, 严禁并入同一条修订链;` +
       `修订的标题不得漂移成另一漏洞(正本 identity 的修订标题变成 RCE 属于事故)。` +
-      `若回执以 [mutex-intercepted] 开头=与库内既有条目同点位被拦(未成账): ` +
+      `若回执以 [mutex-intercepted] 开头=与库内既有条目同点位被拦(未成账): (循环4-1 终态纪律: **严禁以"先等窗口"之类开放性措辞收尾**——你必须在终报里二值化声明: 要么"已自动重试 N 次仍拦截, 需人工按 intel seq 直转", 要么"判定不成立"; 不得留静默等待态让编排者悬空)` +
       `终报必须如实写「被互斥拦截待归并」, 并 query_intel 回查正本 seq——严禁写「已落账」; ` +
       `正常落账后也须以回执 seq 回查库内确认再写终报。` +
       `标题必须一行式简洁命名(参考 CVSS/CVE 业界惯例): 资产+端点+漏洞类型(CWE 编号可选), ` +

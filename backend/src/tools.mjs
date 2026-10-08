@@ -658,7 +658,7 @@ function buildReportVulnerabilityTool(record, caps) {
     name: 'report_vulnerability',
     label: '上报漏洞线索',
     description:
-      '[runs writer; 同步等待上限 300s, 超时转后台异步完成并 DM 回执] ' +
+      '[runs writer; 异步为主——实测多数判定 90-240s 超同步窗, 超窗自动转后台并由 [writer 完成] DM 送达终局(勿轮询, 回执即非终局时以 DM 为准)] ' +
       'Report a suspected submittable vulnerability in ONE sentence. A ' +
       'dedicated report-writer agent will read YOUR conversation context ' +
       '(and any other sessions / intel it needs), verify the claim, and ' +

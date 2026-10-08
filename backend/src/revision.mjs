@@ -91,5 +91,9 @@ export function emitRevision(bus, { target, fields, reason,
     requester: target.requester ?? null,
     revision: { n, reason: String(reason ?? ''), requestedBy: requestedBy ?? null,
       approvedBy: approvedBy ?? null },
+    ...(fields.void !== undefined && fields.void && target.revises
+      ? { title: `${String(fields.title ?? target.title ?? '').slice(0, 60)}[现行正本→seq=${target.revises}]`,
+          detail: `本条作废修订: 现行有效正本为 seq=${target.revises}(本条 revises 链的头)。${String(fields.text ?? target.detail ?? '')}` }
+      : {}),
   });
 }
