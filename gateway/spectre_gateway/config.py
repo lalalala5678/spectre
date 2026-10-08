@@ -52,8 +52,11 @@ RUNTIME_TOKEN = os.environ.get("INTERNAL_TOKEN", "")
 #: GATEWAY_INSECURE_COOKIE=1 关闭 Secure 位; 生产必须走 TLS。
 COOKIE_SECURE = os.environ.get("GATEWAY_INSECURE_COOKIE", "") != "1"
 COOKIE_NAME = "spectre_sess"
-SESSION_IDLE_SECS = 3600
-SESSION_ABSOLUTE_SECS = 12 * 3600
+# 会话时长(用户令 2026-10-08): 登录保持默认一周——此前 12h 绝对上限
+# +1h 空闲导致"过一天就需重登"; 现两限均放宽为 7 天(cookie Max-Age 同源
+# 自动一周), 周内免重登, 主动 logout 或改密即时失效不变。
+SESSION_IDLE_SECS = 7 * 86400
+SESSION_ABSOLUTE_SECS = 7 * 86400
 
 #: Brute-force lockout.
 MAX_FAILS = 5
