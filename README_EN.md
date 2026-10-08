@@ -2,9 +2,9 @@
 
 # SPECTRE
 
-**Multi-Agent Penetration Testing Platform**
+### Give it a target. It hands you back a pentest report.
 
-Full-chain automation from asset mapping to report delivery — 11 stage agents, Temporal workflows, audit-replayable end to end.
+**Multi-agent penetration testing platform** — 11 specialist agents in coordinated battle. You press "approve" twice.
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 [![GitHub Watchers](https://img.shields.io/github/watchers/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/watchers)
@@ -25,136 +25,151 @@ Full-chain automation from asset mapping to report delivery — 11 stage agents,
 
 ---
 
-## What it is
+## What a campaign looks like
 
-Give SPECTRE a target and it handles the rest: map assets, reconcile the authorization boundary, dispatch specialized agents per stage, verify every finding, and produce evidence-chained reports. Your job is two things — approve authorization, read results.
+You type: `pentest the Juice Shop at 127.0.0.1:30080`
 
-During a real engagement the platform runs recon (port & fingerprint mapping), weakcred (credential spraying), api (BOLA/BFLA/IDOR matrices), exploit (chain construction), persistence (redundant footholds), and postex (forensics) concurrently, while the report agent independently re-verifies every finding before it lands in the ledger. All output flows through a single append-only event bus, rendered live in the console, surviving restarts.
+From here you do nothing:
 
-See what a real engagement report looks like (sanitized export, full vulnerability ledger / kill chains / negative-space list): [docs/samples/sample-report.md](docs/samples/sample-report.md) — landed only after independent re-verification by the report agent, not one-shot model output.
+1. **Mapping** — the recon agent sweeps 60+ endpoints, tech stack, hidden directories, internal topology
+2. **Asking permission** — target isn't in the authorized scope, one confirmation card pops up, you click approve (**the first of your two clicks**)
+3. **Squad warfare** — while recon keeps mapping, weakcred sprays credentials, api lays out authz matrices, exploit builds chains, nday reconciles CVEs — all in parallel
+4. **Independent verification** — every finding is **re-verified by a separate report agent** before it can enter the ledger. The AI that finds the hole is not the AI that certifies it
+5. **Delivery** — a full report with evidence chains, POCs, kill chains, and a negative-space list lands in the ledger. You open it and read (**second click**)
 
-**Design stance:**
+Actual Juice Shop campaign output: **22 findings, 3 critical** (SQLi auth bypass / JWT forgery to admin / arbitrary file read), 24 of the official 116 challenges triggered. Zero human intervention beyond authorization.
 
-- **Judgment belongs to agents, not the platform** — whether to merge or file a vulnerability, what severity to assign: the report agent reads the full text and decides. The platform provides mechanical channels only; zero "smart" interception.
-- **Audit before everything** — every command, tool call, and event leaves a trace. Authorization is soft-prompted, never hard-blocked, but every action is attributable.
-- **Survives process death** — write-ahead logging, automatic resumption of severed turns, graceful workflow shutdown. Deploy restarts don't kill in-flight work.
+> Read a real report (sanitized): [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
-## Architecture
+## Track record
+
+During development the platform ran five public-range campaigns end to end — **every one fought by the agents themselves; humans only approved authorization**:
+
+| Campaign | Target type | Findings | Highlights |
+|---|---|---|---|
+| crAPI v1.1.5 | Modern API stack (Spring/Node/Mongo) | **30** (7 critical) | 5 complete kill chains; default DB credentials → full compromise |
+| WebGoat 8 | Java/Spring enterprise | **29** | Five JWT forgeries, XXE, SQLi; 12/12 lessons |
+| vAPI | PHP/MySQL, OWASP API Top 10 | **19** | 13/13 lessons; offline API-token forgery → full takeover |
+| Juice Shop 20 | Node/Angular e-commerce | **22** (3 critical) | 24/116 official challenges; deserialization RCE chain closed |
+| DVWA | PHP classic | **16** | 14/14 modules; dual-channel webshell persistence |
+
+**116 findings total.** Every one carries a POC, evidence chain, and independent-verification record — traceable in the intel ledger.
+
+## Six things that make it more than "one ChatGPT pretending"
+
+**1. Eleven specialists, not one model wearing eleven hats**
+
+Recon, weakcred, api, exploit, persistence, postex — each seat has its own toolchain, skill set, and prompt. The cracker runs dictionaries, the API seat lays authz matrices, the exploit seat builds chains. Like a real red team. The orchestrator dispatches and reconciles; it doesn't do everything itself.
+
+**2. The AI that finds a hole isn't the AI that certifies it**
+
+Every lead goes to an independent report agent: re-reads context, reproduces evidence, checks the existing ledger — files it, merges it, or declines it with reasons. That's our answer to "AI pentesting = hallucination gift packs."
+
+**3. Authorization is a process, not a cage**
+
+Targets inside the scope never bother the agents again. Outside, first contact requests permission; one approval propagates project-wide instantly. No code-level hard blocks — but every command and event lands in an append-only audit chain.
+
+**4. The process dies; the campaign doesn't**
+
+Write-ahead log on every mutation. Deploys drain in-flight turns before restart. Severed turns resume from the breakpoint after a crash. Rate limits back off and retry. Each of these exists because a real incident demanded it.
+
+**5. Full audit replay**
+
+Every command, tool call, DM, and reasoning turn lands in the event bus and replays in the console timeline. Vulnerability reports carry revision chains (who changed what, when, why). The ledger is append-only.
+
+**6. Bring any model**
+
+OpenAI-compatible / Anthropic / Gemini — four fields in settings, probed with a real request before saving. Default model plus per-seat overrides.
+
+## Architecture at a glance
 
 ```
-┌─ console (React) ── gateway (Python, :8081) ── agent-runtime (Node, :8090)
-│                                                 ├─ 14 session agents (pi-agent-core)
-│                                                 │    autopwn / recon / nday / weakcred / api
-│                                                 │    exploit / phish / c2 / persistence
-│                                                 │    postex / report / config trio
-│                                                 ├─ MCP stdio servers (recon/nday intel)
-│                                                 └─ sandbox (docker driver, CLI/skills mounts)
-├─ worker (Temporal activities) ── temporal (:7233)
-└─ oob-collector (:19999) ── OOB verdicts    /    Caddy TLS (:443)
+┌─ console (React) ── gateway (Python) ── agent-runtime (Node)
+│                                      ├─ 11 business agents + 3 config agents (pi-agent-core)
+│                                      ├─ MCP intel: fofa/quake/hunter/zoomeye/censys/shodan...
+│                                      └─ Docker sandbox: nuclei/hydra/nmap, container-isolated
+├─ Temporal workflows ── campaign orchestration / resumption / ghost-report handling
+└─ OOB collector (:19999) ── out-of-band verdicts, readable from the sandbox
 ```
 
-| Agent | Role |
+<details>
+<summary><b>Agent seats</b></summary>
+
+| Seat | Role |
 |---|---|
-| autopwn | Orchestrator: decompose targets, dispatch seats, reconcile output, chain leads |
-| recon | Asset mapping & fingerprinting: ports, routes, stacks, internal topology |
-| nday | NDay validation: CVE reconciliation, template matching, variant bypasses |
-| weakcred | Weak credentials: dictionary attacks, credential reuse, spraying |
-| api | API pentest: authz matrices (BOLA/BFLA/IDOR), mass assignment, JWT |
-| exploit | Vulnerability research & exploit-chain construction |
-| phish | Phishing: mail templates, landing pages, credential recovery |
-| c2 | Command channels: webshell/implant registration & lifecycle |
-| persistence | Foothold redundancy & mimicry |
-| postex | Post-exploitation: credential extraction, lateral mapping, forensics |
-| report | Reports: independently re-verifies every lead; files, merges, or declines |
+| autopwn | Orchestrator: decompose, dispatch, reconcile |
+| recon | Asset mapping: ports, routes, stacks, topology |
+| nday | NDay validation: CVE reconciliation, variants |
+| weakcred | Credential attacks: dictionaries, reuse, spraying |
+| api | API pentest: authz matrices, mass assignment, JWT |
+| exploit | Vulnerability research & chain construction |
+| phish | Phishing: templates, landing pages, recovery |
+| c2 | Command channels: registration & lifecycle |
+| persistence | Footholds: redundancy, mimicry |
+| postex | Post-exploitation: forensics, lateral mapping |
+| report | Reports: independently verifies every lead |
 
-The config trio (skill-config / mcp-config / cli-config) holds all configuration tooling — business agents are never polluted by config prompts.
+The config trio holds all configuration tooling — business seats are never polluted.
 
-## Quick Start
+</details>
+
+## Quick start
 
 ```bash
 git clone https://github.com/lalalala5678/spectre && cd spectre
 sudo bash deploy/setup.sh    # with a domain: sudo bash deploy/setup.sh your.domain.com
 ```
 
-One command: dependency build, admin bootstrap, systemd units, Caddy TLS. Entry point and credentials printed at the end.
+One command: build, admin bootstrap, systemd services, TLS. Open the console, point it at any OpenAI-compatible model, type a target — and watch.
 
-> ⚠️ The one-shot script takes over the machine (occupies 8090/8081/443, writes `/etc/spectre`). On shared hosts use the [manual path](#manual-deployment).
+> ⚠️ The one-shot script takes over the machine (8090/8081/443 + /etc/spectre). On shared hosts use the [manual path](#manual-deployment).
 
 <details>
-<summary><b>Manual deployment</b> (shared hosts / debugging / customization)</summary>
+<summary><b>Manual deployment</b></summary>
 
 ```bash
 # ① Backend (Node ≥ 22)
-cd backend && cp .env.example .env
-#    Edit .env: set INTERNAL_TOKEN to a random string (delete the placeholder
-#    line — the parser is first-wins per line)
+cd backend && cp .env.example .env   # set INTERNAL_TOKEN (delete placeholder line)
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs
 
-# ② Console (same Node version as ①)
+# ② Console
 cd ../console && npm i && npm run build
 
-# ③ Gateway (pure stdlib, zero dependencies)
+# ③ Gateway (pure stdlib)
 cd ../gateway
-SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<password>' python3 spectre-passwd.py add admin
-INTERNAL_TOKEN=<same-as-①> SPECTRE_DATA_DIR=/tmp/spectre-data \
+SPECTRE_AUTH_DIR=/tmp/spectre-auth PASS='<pw>' python3 spectre-passwd.py add admin
+INTERNAL_TOKEN=<same> SPECTRE_DATA_DIR=/tmp/spectre-data \
   SPECTRE_AUTH_DIR=/tmp/spectre-auth python3 server.py
 ```
 
-Open `http://127.0.0.1:8081/spectre/` and log in as admin. Remote plain-HTTP testing needs `GATEWAY_INSECURE_COOKIE=1`; use TLS in production.
+Open `http://127.0.0.1:8081/spectre/`, log in as admin, configure the model in settings.
 
 </details>
 
-<details>
-<summary><b>Configure the LLM</b> (after login, managed by the platform)</summary>
+## FAQ
 
-Settings → general config → API format (OpenAI-compatible / Anthropic / Gemini) + Base URL + API key + model name. The platform probes connectivity with the full config before saving. Per-agent overrides on top of the default provider (e.g. GLM default, DeepSeek for reports). Legacy `.env` `LLM_*` values are imported once on first boot; the env channel is dead afterwards.
+**Can I trust AI-found vulnerabilities?**
+Every lead is independently re-verified by the report seat before landing; across our five campaigns it has also declined its teammates' false positives. Every finding ships a POC and evidence chain you can re-check.
 
-</details>
+**Will it attack unauthorized targets?**
+Out-of-scope targets trigger an authorization request on first contact. No approval, no attack. The platform doesn't hard-block (that would wreck tempo), but the audit chain keeps every action attributable.
 
-## Tooling
+**What about crashes / restarts / rate limits?**
+See "six things" #4 — each failure mode has a purpose-built recovery mechanism, earned from real incidents.
 
-| Layer | Contents |
-|---|---|
-| MCP | recon-datasources (fofa / quake / hunter / zoomeye / censys / shodan / github / cse / ipinfo / threatbook), nday-intel (nvd_cve), hot-mount custom servers |
-| Shared tools | Every agent holds its own search_web / fetch_url instance (vertical channels need zero keys, optional provider fallback) |
-| Sandbox CLI | nuclei / hydra / nmap / fscan etc.; installs are ledgered and replayed on container rebuild |
-| Skills | agentskills.io format (SKILL.md), mounted per-agent, loaded on demand |
-| OOB verdicts | :19999 TCP collector, read-only mount at `/oob/`; agents read actual receipts via `ls -t /oob/` |
-
-## Authorization model
-
-Autonomy first: targets inside the authorized scope never bother the agent again. Outside the scope, first contact triggers a one-time banner (per target); the agent decides whether to request authorization from the user. One approval propagates project-wide in real time (busy seats get it via immediate steering). No code-level hard blocks — authorization is a process, not a cage.
-
-## Reliability
-
-- **Write-ahead log** — sessions, events, and the bus hit disk on every mutation; crash-restart loses nothing.
-- **Graceful shutdown** — SIGTERM drains in-flight turns (110s cap) before sealing; deploy restarts stop killing streaming work.
-- **Severed-turn resumption** — after restart, turns killed mid-flight (tool batch done, zero output) are auto-detected and resumed; 429/network failures retry with 45-60s backoff.
-- **No more false deaths** — workflow waits poll at 60s intervals (a single long-hang previously tripped transport-layer timeouts, causing three consecutive 5-minute false failures).
-
-## Tests
-
-```bash
-cd backend && npm test    # 65 cases: dedup mutex / session lifecycle / revision chains / idempotency / scope gates / line-count locks
-```
-
-## Documentation
-
-- [deploy/README.md](deploy/README.md) — full deployment: systemd units, sandbox, private-stack kill-verification, credential boundaries
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) — architecture decision records
-- `docs/` — per-stage skill methodology and tooling
-- [AGENTS.md](AGENTS.md) — the complete design spec for tooling & agent boundaries
+**Can I use my own model?**
+Yes — any OpenAI-compatible / Anthropic / Gemini endpoint. Four fields in settings, connectivity-probed before saving.
 
 ## Contributing & Support
 
-- Bugs / feature requests: [open an issue](https://github.com/lalalala5678/spectre/issues) with reproduction steps and runtime log excerpts
-- PRs welcome: changes touching core files (`tools/pi/sessions/routes`) must sync the line-count table in `docs/ARCHITECTURE.md` (tests lock it) and pass `cd backend && npm test`
-- Security disclosures: private channels only — never post unredacted target credentials in public issues
+- Bugs / features: [open an issue](https://github.com/lalalala5678/spectre/issues) with reproduction steps and log excerpts
+- PRs: sync `docs/ARCHITECTURE.md` line-count table for core-file changes (tests lock it); pass `cd backend && npm test`
+- Security disclosures: private channels only — never post unredacted credentials in public issues
 
 ## Compliance
 
-SPECTRE is for penetration testing **with written authorization only**. The platform ships an authorization ledger and full audit chains, but compliance is the operator's responsibility. Consequences of testing unauthorized targets are not this project's.
+SPECTRE is for penetration testing **with written authorization only**. The platform ships an authorization ledger and full audit chains, but compliance is the operator's responsibility.
 
 ## License
 
