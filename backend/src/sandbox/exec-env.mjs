@@ -431,7 +431,22 @@ export function makeExecutionEnv(cfg, wsId) {
   const shell = {
     exec: (command, options, _ctx) => {
       const runner = cfg.driver === 'docker'
-        ? (cmd, timeout) => spawnShell(execArgv, cmd, timeout, cwdContainer)
+        ? async (cmd, timeout) => {
+            // 循环3-终批: 惰性重建——容器被删(No such container)时 bash
+            // 通道曾直接砖死(3 连失败无自愈)。动态 import 避免与
+            // container.mjs 的静态循环; 重建一次后重试。
+            let r = await spawnShell(execArgv, cmd, timeout, cwdContainer);
+            if (r && /no such container/i.test(String(r.text ?? r.spawnError ?? ''))) {
+              try {
+                const { ensureSandbox } = await import('./container.mjs');
+                const ensured = await ensureSandbox();
+                if (ensured?.ok) {
+                  r = await spawnShell(execArgv, cmd, timeout, cwdContainer);
+                }
+              } catch { /* 重建失败保持原错误回执 */ }
+            }
+            return r;
+          }
         : (cmd, timeout) => {
           // r19-1: 重写发生时在回执尾注记(此前静默改写, 代理不知命令
           // 文本已按本地映射转换)
