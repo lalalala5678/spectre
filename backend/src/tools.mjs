@@ -429,13 +429,18 @@ export function buildIntelTools(record, caps) {
             && entryKind(e) !== null))
           .filter(e => entryKind(e.current ?? e) === 'vulnerability'
             && !e.current.void)
-          .map(e => ({ norm: normTitle(e.current.title ?? e.title), title: e.current.title ?? e.title }));
+          .map(e => ({ norm: normTitle(e.current.title ?? e.title), title: e.current.title ?? e.title, seq: e.seq }));
         // r24-backlog⑤: 引用解析透明化——命中也回执映射表(模糊匹配
         // 从'暗箱'变'可核对', 未命中才告警)
         vulnResolved = [];
         for (const t of params.vulns) {
+          // Q3: seq 锚定优先——《标题》#seq / #seq / seq:N 形态直接精确
+          // 命中(writer 改题后引用不脆断, WebGoat循环2 9944 改题实证)。
+          const seqM = /#(\d{3,6})\s*$|seq[:=]\s*(\d{3,6})/i.exec(String(t));
+          const seqAnchor = seqM ? Number(seqM[1] ?? seqM[2]) : null;
           const nt = normTitle(t);
-          const hit = published.find(p => p.norm.includes(nt) || nt.includes(p.norm));
+          const hit = published.find(p => (seqAnchor && p.seq === seqAnchor)
+            || (!seqAnchor && (p.norm.includes(nt) || nt.includes(p.norm))));
           if (hit) vulnResolved.push(`《${t}》→ 命中现行漏洞《${hit.title}》`);
           else {
             // A15: 未命中时模糊建议(库内近似标题 top3)——省一次人工
@@ -764,6 +769,7 @@ function buildSpawnAgentTool(record, caps) {
         content: [{
           type: 'text',
           text: `已派生 ${params.name}(${params.agentKey} ${spawned.id},深度 L${verdict.depth}——计数:根=L0,当前 spawnMaxDepth=${verdict.spawnMaxDepth ?? '?'} 表示最深允许第 ${verdict.spawnMaxDepth ?? '?'} 层),` +
+          `并发护栏(Q7): spawn 无自动分波(dispatch 有)——请自行守单波 ≤5 席(资源节流口径), 超出建议错峰; relay 定向本会话可用 relay_to_agents(sessionIds=["${spawned.id}"])。` + +
             '完成后会以 [DM] 向你回报结果。',
         }],
         details: { sessionId: spawned.id, depth: verdict.depth },
@@ -886,11 +892,29 @@ export function buildOrchestratorTools(record, caps) {
         description: 'Target stage agent keys (members of the engagement)',
       }),
       text: Type.String({ description: 'Message to relay' }),
+      sessionIds: Type.Optional(Type.Array(Type.String(), {
+        description: 'Q2(WebGoat循环2): Optional session-id direct routing — spawn_agent 回执的 sess-id 可直接定向(不经 engagement 成员校验, 会话存活即达; 适合派生子代理的中段路线修正)',
+      })),
       engagementId: Type.Optional(Type.String({
         description: 'Defaults to your active engagement (auto-cleared once cancelled)',
       })),
     }),
     execute: async (_id, params) => {
+      // Q2: sessionId 直达路由(spawn 派生会话寻址——DM followUp, 会话
+      // 存活即达, 不依赖 engagement 成员面/工作流存活)。
+      if (params.sessionIds?.length) {
+        const sent = [];
+        for (const sidRaw of params.sessionIds) {
+          const sid = String(sidRaw).replace(/^sess:/, '');
+          try {
+            await caps.followUp(sid, `[DM from orchestrator] ${params.text}`);
+            sent.push(sid);
+          } catch { sent.push(`${sid}(不可达)`); }
+        }
+        return { content: [{ type: 'text',
+          text: `已定向转发 ${sent.length} 个会话:\n${sent.map(x => `- ${x}`).join('\n')}——(不経 engagement 校验; "(不可达)"=会话已死, 终局以 query_intel 为准)` }],
+          details: { sessionIds: sent, relayed: true, via: 'session-direct' } };
+      }
       let engagement = params.engagementId
         ? `autopwn-${params.engagementId.replace(/^autopwn-/, '')}`
         : record.activeEngagement?.workflowId;
@@ -1173,6 +1197,9 @@ function markClipped(text, cap, how) {
   return s.slice(0, cap) + `\n[已截断:${cap}/${s.length} 字符,${how}]`  // CS44-F5: 逗号单源制式;
 }
 
+// Q1b: 互斥活锁豁免计数(requester×dupSeq → 被拦次数, 进程级)
+const _mutexEscape = new Map();
+
 /** Bus-entry kind normalization. Legacy WAL data carries vulnerability events
  * as type='intel' (pre-rename) — they ARE vulnerabilities now; new
  * intel notes use 'intel-note' to avoid the collision. */
@@ -1302,7 +1329,7 @@ export function buildAuthRequestTool(record, caps) {
       '非滥用通道: 每个目标申请一次, 附清晰理由(任务必要性/目标归属)。',
     executionMode: 'sequential',
     parameters: Type.Object({
-      target: Type.String({ description: "目标名, 支持一次多目标(逗号/空格分隔, 如 '10.0.0.5, 172.28.11.0/24'——批量测绘对账场景); 单目标形如 10.0.0.5 或 host.example.com; 传 '*' 列出当前全部待批授权请求(只读查询, 不发新请求)" }),
+      target: Type.String({ description: "目标名, 支持一次多目标(逗号/空格分隔, 如 '10.0.0.5, 172.28.11.0/24'——批量测绘对账场景); 单目标形如 10.0.0.5 或 host.example.com; 传 '*' 列出当前全部待批授权请求(只读查询); 传 'withdraw:seq' 或 'withdraw:all' 撤回自己发出的待批申请" }),
       reason: Type.Optional(Type.String({ description: '为什么需要授权该目标(一句话任务理由)。target=* 查询模式可省' })),
     }),
     execute: async (_id, params) => {
@@ -1339,6 +1366,26 @@ export function buildAuthRequestTool(record, caps) {
         if (pendCov) {
           return { content: [{ type: 'text', text: `${rawT} 已被待批网段申请 ${pendCov.target}(seq=${pendCov.seq}) 覆盖——请等待该申请获批, 勿重复申请。` }] };
         }
+      }
+      // Q4: withdraw——撤回自己发出的待批请求(target 形如 withdraw:seq
+      // 或 withdraw:all)。OOB 判收等基建类申请作废时不再永久悬置
+      // (WebGoat循环2 9958/9959 实证: RCE 改写→读回后无撤回手段)。
+      if (/^withdraw:/i.test(rawT)) {
+        const wSeq = rawT.split(':')[1];
+        const pendAll = (caps.listPendingAuthRequests?.() ?? { live: [] }).live ?? [];
+        const mine = pendAll.filter(x2 => (x2.payloadRef === `sess:${record.id}` || x2.requester === (record.spawnName ?? record.agentKey))
+          && (wSeq === 'all' || String(x2.seq) === wSeq));
+        if (!mine.length) {
+          return { content: [{ type: 'text', text: `无可撤回的待批请求(${rawT})——用 target=* 查看待批列表核对 seq 与申请人。` }] };
+        }
+        for (const m of mine) {
+          try { caps.emitBus?.({ channel: 'audit', from: 'system', type: 'auth-request',
+            resolves: m.seq, status: 'withdrawn', target: m.target,
+            title: `授权申请已撤回: ${m.target}`,
+            summary: `${record.spawnName ?? record.agentKey} 撤回了 seq=${m.seq} 的授权申请(${m.target})——不再待批, 无需处理。`,
+            workSessionId: m.workSessionId ?? record.workSessionId ?? null }); } catch { /* 单条失败不阻断 */ }
+        }
+        return { content: [{ type: 'text', text: `已撤回 ${mine.length} 条待批请求: ${mine.map(m => `seq=${m.seq}(${m.target})`).join(', ')}——用户侧确认卡同步消失(resolves 语义)。` }] };
       }
       // loop36-QA: target='*' 只读查询全部待批(此前挂起请求无查询入口)
       if (params.target === '*') {
@@ -1418,6 +1465,7 @@ export function buildDirectTools(record, caps) {
           text: `[归并失败] 正本 seq=${params.mergeInto} 不存在或不可修订(仅漏洞正本可归并)——query_intel 确认正本 seq 后重试, 或无正本时去掉 mergeInto 正常发布。` }],
           details: { merged: false, targetSeq: params.mergeInto } };
       }
+      const ev0escaped = _mutexEscape.get(`${record.id}#pending`) === 'armed';
       const ev = caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'user',
         type: 'vulnerability',
@@ -1428,12 +1476,24 @@ export function buildDirectTools(record, caps) {
         severity: String(params.severity).toLowerCase(),
         title: params.title,
         summary: params.title,
-        detail: params.text,
+        detail: (ev0escaped ? `[escapeHatch: 同 requester 对原 dupSeq 第 3 次命中互斥, 按活锁豁免独立落账(WebGoat循环2 Q1b); 证据链与既有条目可能相关, 由人工/下游 revise 裁决归并]\n\n` : '') + params.text,
         origin: 'direct',
         author: caps.authorOf?.(record) ?? null,
         workSessionId: record.workSessionId ?? null,
       });
       // r29-#2: 互斥拦截回执(零吞并——指引 revise 并入或证伪重发)
+      // Q1b(WebGoat循环2 活锁豁免): 同 requester 对同 dupSeq 被拦≥2 次
+      // (重试仍命中——短窗过期重报被自动并入的循环, 9973 修订史 17 次
+      // 实证)后 fail-open 独立落账, 附 escapeHatch 注记; 勿依赖人工复合
+      // 正本。豁免次数进程级记忆。
+      if (ev?.blocked) {
+        const rk = `${record.id}#${ev.dupSeq}`;
+        _mutexEscape.set(rk, (_mutexEscape.get(rk) ?? 0) + 1);
+        if (_mutexEscape.get(rk) >= 3) {
+          ev = { ...ev, blocked: false, escaped: true };
+          _mutexEscape.set(`${record.id}#pending`, 'armed');  // emit 注记用
+        }
+      }
       if (ev?.blocked) {
         // loop38-D10b: 拦截即自动归并——按 D9 判据被拦的重复线索, 平台
         // 直接给正本 append 共同发现者修订(writer 手工兜底仍可用但

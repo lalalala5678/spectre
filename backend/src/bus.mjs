@@ -220,7 +220,17 @@ export class Bus {
       const fpMatch = realPathHit && mp.size > 0 && op.size > 0
         && phit / Math.min(op.size, mp.size) >= 0.5 && portsCompatible;
       // r43-②: token 高重叠仅短窗; 指纹命中不限窗
-      if ((overlap >= 0.7 && otherTs >= cut) || fpMatch) {
+      // Q1(WebGoat循环2): token 重叠路径加端点约束——同 WebGoat/challenge
+      // 语境词在 /challenge/7 vs /challenge/8(不同完整端点)全撞(C8 被误
+      // 并 9973 修订8, 活锁至 17 修订实证)——行文相似但端点无交集=不同
+      // 漏洞, 放行; 端点交集交由 fpMatch 精判。
+      const mpNow = paths(entry.title);
+      const opNow = paths(other.title);
+      const rpMine = [...mpNow].filter(x => !x.startsWith('port:'));
+      const rpOther = [...opNow].filter(x => !x.startsWith('port:'));
+      const endpointCompatible = rpMine.length === 0 || rpOther.length === 0
+        || rpMine.some(x => rpOther.includes(x));
+      if (((overlap >= 0.7 && endpointCompatible) && otherTs >= cut) || fpMatch) {
         return { blocked: true, dupSeq: other.seq, dupTitle: other.title,
           dupWs: other.workSessionId ?? null,
           ...(fpMatch ? { by: 'fingerprint' } : {}) };

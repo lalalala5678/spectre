@@ -625,13 +625,23 @@ export class SessionStore {
     record.busy = true;  // same synchronous-flip rule as prompt()
     this._journal(record, 'agent_start', { via: 'followup' });  // FEBUGS-P1-1
     this._journal(record, 'followup_injected', { text: truncateText(text, 200) });
-    Promise.resolve(record.agent.prompt(msg)).catch(() => {
+    Promise.resolve(record.agent.prompt(msg)).catch((err) => {
       // R1-F2: 同 prompt()——输给竞态时不清 busy(见上)。
       if (!record.agent.state.isStreaming) {
         record.busy = false;
         for (const fn of record.completionWaiters ?? [])
         { try { fn(); } catch { /* best-effort(同上) */ } }  // R15-F4
         record.completionWaiters = [];
+      }
+      // Q5(429 尾损): 限速击杀曾把记账 DM 连杀两次(23:48/23:49 WebGoat
+      // 实证)——退避 45s 重排队一次, 记账类消息不再随 429 蒸发。
+      const is429 = /429|速率|rate.?limit/i.test(String(err?.message ?? err));
+      if (is429 && !(msg._dmRetry >= 1)) {
+        record._dmQueue ??= [];
+        record._dmQueue.push({ ...msg, _dmRetry: 1 });
+        this._journal(record, 'dm_retry_429', { text: truncateText(tagged, 120), delayMs: 45_000 });
+        setTimeout(() => { try { this._scheduleDmPump(record); } catch { /* 会话死则弃 */ } }, 45_000).unref?.();
+        return;
       }
       queue();
     });
@@ -661,6 +671,21 @@ export class SessionStore {
       const merged = q.length === 1
         ? q[0].content
         : `[DM 批×${q.length}(排队到达已合批——一轮处理, 逐条勿重复对账)]\n` + q.map(m => `---\n${m.content}`).join('\n');
+      // Q7: 超长 DM 自动落 intel 副本——400 截断处的原文保全(中段情报
+      // 尚未入 intel 库时的丢失窗口, WebGoat循环2 观测)。截断即 bus 存档。
+      try {
+        if (merged.length > 3800 && this.caps?.listBus) {
+          this.caps.emitBus?.({
+            channel: 'share', from: record.agentKey, type: 'intel-note',
+            title: `[DM 存档·超长] 会话 ${record.id} 合批 ${q.length} 条(${merged.length} 字符)`,
+            severity: 'info',
+            summary: 'DM 注入超长自动存档(防截断丢失)——原文全文见 detail, 与会话注入同刻。',
+            detail: merged.slice(0, CONFIG.busDetailMaxChars ?? 20000),
+            payloadRef: `sess:${record.id}`,
+            workSessionId: record.workSessionId ?? null,
+          });
+        }
+      } catch { /* 存档失败不影响注入 */ }
       this._journal(record, 'followup_batch_injected', { n: q.length });
       record.busy = true;
       this._journal(record, 'agent_start', { via: 'followup-batch' });
