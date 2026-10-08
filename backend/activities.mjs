@@ -59,6 +59,12 @@ export async function engagementChildren(engagementId) {
   return runtime.engagementChildren(engagementId);
 }
 
+/** F2(循环5): 席位近 45min 在途产出(vuln/intel 落账, writer 发布含)——
+ * 代拟前的扩展活性对账面。 */
+export async function recentAgentOutputs(engagementId) {
+  return runtime.recentAgentOutputs(engagementId);
+}
+
 export async function busEmit(entry) {
   return runtime.busEmit(entry);
 }

@@ -609,6 +609,7 @@ export class SessionStore {
     // 在 run 结束后无人 pump, r47-D4 洞), 改入 _dmQueue; 回合结束→
     // 3s 去抖窗合批→单条注入(prompt 新回合, 心智上下文还热)。
     const enqueue = () => {
+      msg.queuedAt = Date.now();  // F3: 排队时刻随行(合批时可辨"发出 vs 内容生成"倒挂)
       (record._dmQueue ??= []).push(msg);
       this._journal(record, 'followup_queued', { text: truncateText(tagged, 200) });
       this._scheduleDmPump(record);
@@ -670,7 +671,7 @@ export class SessionStore {
       record._dmPumpScheduled = false;
       const merged = q.length === 1
         ? q[0].content
-        : `[DM 批×${q.length}(排队到达已合批——一轮处理, 逐条勿重复对账)]\n` + q.map(m => `---\n${m.content}`).join('\n');
+        : `[DM 批×${q.length}(排队到达已合批——一轮处理, 逐条勿重复对账; 各条排队时刻附行尾 HH:MM:SS, 内容内引用的更晚时刻=发送方生成时点, 与发出时刻倒挂属排队常态)]\n` + q.map(m => `---\n${m.content}\n[queued ${new Date(m.queuedAt ?? Date.now()).toISOString().slice(11, 19)}Z]`).join('\n');
       // Q7: 超长 DM 自动落 intel 副本——400 截断处的原文保全(中段情报
       // 尚未入 intel 库时的丢失窗口, WebGoat循环2 观测)。截断即 bus 存档。
       try {
@@ -910,7 +911,10 @@ export class SessionStore {
    * published provenance.
    */
   authorOf(record) {
+    // F4(循环5): 派生会话优先显示代号——spawnName 缺时回退会话名(如
+    // "XSS客户端组"), 最后才是父 agentKey(10433"溯源缺失/父键标签"实证)。
     const label = rec => rec.spawnName
+      ?? (typeof rec.name === 'string' && rec.name.trim() ? rec.name.trim().slice(0, 24) : null)
       ?? (rec.agentKey === ORCHESTRATOR_KEY ? '主控' : rec.agentKey);
     const chain = [];
     const seen = new Set();

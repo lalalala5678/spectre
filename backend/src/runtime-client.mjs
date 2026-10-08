@@ -83,6 +83,10 @@ export const runtime = {
   engagementChildren: (engagementId) =>
     call('GET', `/api/engagements/${encodeURIComponent(engagementId)}/children`),
 
+  /** F2(循环5): 席位近 45min 在途产出(vuln/intel, 含 writer 发布)。 */
+  recentAgentOutputs: (engagementId) =>
+    call('GET', `/api/engagements/${encodeURIComponent(engagementId)}/recent-outputs`),
+
   /** Task-report counter + last report meta (workflow gate reads this). */
   reportState: (sessionId) =>
     call('GET', `/api/sessions/${sessionId}/report-state`),

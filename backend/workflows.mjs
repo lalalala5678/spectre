@@ -252,7 +252,8 @@ const summaryLines = [...results.entries()]
     await quick.notifyEngagementDone({
       orchestratorSessionId,
       engagementId,
-      summary: (allClean ? '[零异常批次·对账从简——各席终报已各自落账, 逐条核对仅在有疑点时做]\n' : '') + summaryLines,
+      summary: (allClean ? '[零异常批次·对账从简——各席终报已各自落账, 逐条核对仅在有疑点时做]\n' : '') + summaryLines
+        + '\n[F6 收尾提示: 本战役注册的 shell 通道(如有)按需 close——靶场文件已删的通道在下次探测时才翻标不可用, 战役收官即关更干净]',
       // r6v3-#10: 送达时对账原料——activity 投递前重查情报库, 对这些
       // 成员追加最新终报状态(构建与送达之间的落账不再漏报)。
       recheck: [...results.entries()]
@@ -279,8 +280,13 @@ const summaryLines = [...results.entries()]
   if (pendingGhost.length) {
     let recon2 = {};
     try { recon2 = await quick.engagementChildren?.(engagementId) ?? {}; } catch { recon2 = {}; }
+    // F2(循环5): 在途产出扩展对账——该席位近 45min 的 vuln/intel 落账
+    // (writer 发布/席位情报)也证明席位活着且在被消化——10473 代拟
+    // no-result 与 4 条正本(10466/10472/10477/10479)并存的解毒剂。
+    let recentByAgent = {};
+    try { recentByAgent = await quick.recentAgentOutputs?.(engagementId) ?? {}; } catch { /* 扩展对账不可用则仅终报域 */ }
     for (const key of [...pendingGhost]) {
-      if (recon2[key]) pendingGhost.splice(pendingGhost.indexOf(key), 1);
+      if (recon2[key] || recentByAgent[key]) pendingGhost.splice(pendingGhost.indexOf(key), 1);
     }
     for (const key of pendingGhost) {
       try {

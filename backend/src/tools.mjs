@@ -943,12 +943,12 @@ export function buildOrchestratorTools(record, caps) {
       '(or an explicit engagementId). Use when a child report warrants it.',
     executionMode: 'sequential',
     parameters: Type.Object({
-      agents: Type.Array(stageEnum, {
+      agents: Type.Optional(Type.Array(stageEnum, {
         // Fix-E (P7): empty array sailed through schema and produced
         // the lying receipt "Relayed to  (…)".
         minItems: 1,
-        description: 'Target stage agent keys (members of the engagement)',
-      }),
+        description: 'Target stage agent keys (members of the engagement)——sessionIds 模式下可省略(被忽略)',
+      })),
       text: Type.String({ description: 'Message to relay' }),
       sessionIds: Type.Optional(Type.Array(Type.String(), {
         description: 'Q2(WebGoat循环2): Optional session-id direct routing — spawn_agent 回执的 sess-id 可直接定向(不经 engagement 成员校验, 会话存活即达; 适合派生子代理的中段路线修正)',
@@ -958,6 +958,9 @@ export function buildOrchestratorTools(record, caps) {
       })),
     }),
     execute: async (_id, params) => {
+      if (!params.sessionIds?.length && !params.agents?.length) {
+        return { content: [{ type: 'text', text: '未转发: agents 与 sessionIds 至少其一(agents=成员席位; sessionIds=派生会话直达)。' }] };
+      }
       // Q2: sessionId 直达路由(spawn 派生会话寻址——DM followUp, 会话
       // 存活即达, 不依赖 engagement 成员面/工作流存活)。
       if (params.sessionIds?.length) {

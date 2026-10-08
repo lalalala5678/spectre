@@ -251,6 +251,29 @@ function realRouter({ store, bus, caps, wal }) {
       console.log('[r47-D4] abort 调用:', sid2, '→', ok2);
       return json(res, 200, { ok: ok2 });
     }
+    if (path.startsWith('/api/engagements/') && path.endsWith('/recent-outputs') && method === 'GET') {
+      // F2(循环5): 席位近 45min 在途产出——代拟前扩展活性对账面。
+      if (!isInternalCaller(req)) return bad(res, 401, '仅限内部调用');
+      const engId = decodeURIComponent(path.split('/')[3]);
+      const cutoff = Date.now() - 45 * 60_000;
+      const out = {};
+      for (const e of bus.list()) {
+        if (Date.parse(e.ts ?? 0) < cutoff) continue;
+        const from = String(e.from ?? '');
+        if (!from || from === 'system' || from === 'orchestrator') continue;
+        if (e.type === 'vulnerability' || e.type === 'intel-note') {
+          // writer 发布的 author.sessionId 归属席位会话→按其 agentKey 记;
+          // 席位自发 from=agentKey 记同键。
+          const sid = e.author?.sessionId;
+          let seat = null;
+          if (sid) { const r = store.get(sid); seat = r?.agentKey ?? null; }
+          else seat = from;
+          if (seat) out[seat] = true;
+        }
+        if (e.type === 'task-report' && !e.revises && e.workSessionId) out[from] = true;
+      }
+      return json(res, 200, out);
+    }
     if (path.startsWith('/api/engagements/') && path.endsWith('/children') && method === 'GET') {
       if (!isInternalCaller(req)) return bad(res, 401, '仅限内部调用');
       const engId = path.split('/')[3];

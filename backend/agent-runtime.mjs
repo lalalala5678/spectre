@@ -550,7 +550,7 @@ const caps = {
       ws: requesterRecord.workSessionId ?? null,
       name: `报告:${String(hint).slice(0, 20)}`,
       description: `漏洞线索:${String(hint).slice(0, 60)}`,
-      waitMs: 90_000,  // R8: 同步等待上限 90s(实测 129-241s 钉死编排回合), 超时即转后台 DM 完成回投
+      waitMs: 180_000,  // R8→F5(循环5): 同步窗 90→180s(writer 实测众数 90-240s, 90s 时 11/11 全 timeout 名存实亡)
       requester: { sessionId: requesterRecord.id, author: requesterAuthor },
       // 占位 emit 于 runDetachedAgent 内 spawn+prompt 落定即刻回调——
       // 真正的在飞起点(此前在 await 终局之后, 生产里占位永不"在飞可见")。
@@ -627,7 +627,7 @@ const caps = {
       }).catch(() => {});
       return { ok: false, timeout: true,
         text: `{"verdict":"timeout","sessionId":"${writer.id}"}\n` + dupPreNote +
-          `撰写agent 90s 未完成仍在运行(同步窗已从 300s 收紧), 本回执不是判定——` +
+          `撰写agent 180s 未完成仍在运行(同步窗 180s), 本回执不是判定——` +
           `其完成后我会自动 DM 通知你(无需轮询); 也可 read_session(${writer.id}) 复盘, 或稍后 query_intel 核查` };
     }
     const published = bus.list().find(e => e.seq > baseSeq
