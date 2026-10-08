@@ -822,6 +822,33 @@ const store = new SessionStore({ model, streamFn, modelForAgent, caps, wal,
   summarizer: new Summarizer({ model, streamFn }) });
 const spawnPolicy = makeSpawnPolicy(store);
 store.rehydrate([...replay.records.values()]);
+// 调研终修②: 重启恢复续跑——WAL 重放后扫描"末条消息=toolResult 或
+// assistant(带 toolCall)且近 1h 活跃"的会话=被进程击杀腰斩的回合,
+// 注入系统续跑(崩溃/断电/任何进程级死亡的兜底; 优雅停机是源头面)。
+try {
+  const now = Date.now();
+  let resumed = 0;
+  for (const rec of store.sessions.values()) {
+    try {
+      if (rec.agentKey === 'report' || rec.busy) continue;
+      const msgs = rec.agent?.state?.messages ?? [];
+      if (!msgs.length) continue;
+      const last = msgs[msgs.length - 1];
+      const lastTs = Number(last.timestamp ?? 0);
+      if (!lastTs || now - lastTs > 3600e3) continue;
+      const severed = last.role === 'toolResult'
+        || (last.role === 'assistant' && Array.isArray(last.content)
+          && last.content.some(c => c.type === 'toolCall'));
+      if (!severed) continue;
+      rec.busy = false;
+      store.followUp(rec,
+        '[系统续跑·重启恢复] 进程重启腰斩了你的在飞回合(此前工具结果已在上下文)——请从中断处继续完成原任务, 不要因本注记改变任务内容。',
+        'system-internal');
+      resumed++;
+    } catch { /* 单会话失败不阻断 */ }
+  }
+  if (resumed) console.log(`[runtime] restart-resume: ${resumed} 个腰斩会话已注入续跑`);
+} catch { /* 恢复续跑整体失败不影响引导 */ }
 if (replay.records.size || replay.busEvents.length) {
   console.log(`[runtime] recovered ${replay.records.size} sessions, ` +
     `${replay.busEvents.length} bus events from WAL`);
@@ -919,14 +946,24 @@ process.on('uncaughtException', err => {
   console.error('[runtime] uncaughtException:', err);
 });
 process.on('SIGTERM', () => {
-  // R27-F2: WAL 关闭必须后于连接排空——此前先 close 再等 server, 排空
-  // 窗口(≤1.5s)内完成的消息 safeWalAppend 吞异常后永久丢(已流给 SSE
-  // 的回复重启消失), Bus.emit 直连 append 抛错 500。compact 后 fd 以 a
-  // 模式重开, 窗口期增量落在其上, WAL 形状=快照基线+增量尾, replay 兼容。
-  try { compactWal(); } catch { /* best effort */ }
-  const seal = () => { try { wal.close(); } catch { /* already closed */ } process.exit(0); };
-  server.close(() => seal());
-  setTimeout(seal, 1500).unref();
+  // 调研终修(独立盲审+三点闭合, 2026-10-08): 部署重启曾在流式回合中
+  // SIGTERM 击杀进程——pi 的 error/aborted 收尾来不及执行, WAL 恢复后
+  // 会话无腰斩标记无续跑→"工具批后静默收尾"永久停滞(46s 窗口铁证)。
+  // 优雅停机: 先等在飞回合排空(busy 会话归零或 110s 上限), 再走
+  // R27-F2 的连接排空+WAL 封存。systemd TimeoutStopSec 已配 130s。
+  const deadline = Date.now() + 110_000;
+  const drainTurns = async () => {
+    while (Date.now() < deadline) {
+      const busyN = [...store.sessions.values()].filter(r => r.busy).length;
+      if (busyN === 0) break;
+      await new Promise(r => setTimeout(r, 2000));
+    }
+    try { compactWal(); } catch { /* best effort */ }
+    const seal = () => { try { wal.close(); } catch { /* already closed */ } process.exit(0); };
+    server.close(() => seal());
+    setTimeout(seal, 1500).unref();
+  };
+  void drainTurns();
 });
 function truncateTextForJournal(t) { return String(t).slice(0, 60); }
 
