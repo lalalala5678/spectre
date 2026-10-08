@@ -405,6 +405,28 @@ export function buildIntelTools(record, caps) {
         section('后续建议', params.nextSteps);
       record.taskReportCount += 1;
       record.lastReport = { title: params.title, status };
+      // 循环3-②: 正报落账即 supersede 同席位 no-result 系统代拟(事件
+      // 驱动——代拟互链作废曾只有 10min 单查, api 02:0x 代拟/02:23 正报
+      // 窗口错过; 现正报一落地, 该席位同 engagement 的代拟立即追加
+      // superseded 修订)。
+      try {
+        const ghost2 = (caps.listBus?.() ?? []).find(e2 => e2.type === 'task-report'
+          && e2.status === 'no-result' && !e2.revises && !e2.void
+          && /^\[系统代拟/.test(String(e2.title ?? ''))
+          && e2.from === record.agentKey
+          && e2.engagement === (record.engagementId ? `autopwn-${record.engagementId}` : e2.engagement)
+          && Date.parse(e2.ts ?? 0) > Date.now() - 48 * 3600e3);
+        if (ghost2) {
+          caps.emitBus?.({ channel: 'share', from: record.agentKey, type: 'task-report',
+            revises: ghost2.seq, revision: { n: 1, reason: `正报已落账(seq 对应本次提交《${params.title}》), 代拟 superseded`, requestedBy: 'system', approvedBy: 'system' },
+            status: 'no-result',
+            title: `[系统代拟·已作废] ${record.agentKey} 任务报告`,
+            summary: `代拟作废——席位正报《${params.title}》已落账, 以正报为准(事件驱动 supersede)`,
+            detail: `本条为系统代拟的作废修订(revises seq=${ghost2.seq}): 该席位真实任务报告已提交(《${params.title}》), 请以正报为准。`,
+            engagement: ghost2.engagement, payloadRef: null,
+            workSessionId: record.workSessionId ?? null });
+        }
+      } catch { /* supersede 失败不影响正报 */ }
       const ev = caps.emitBus({
         channel: 'share', from: record.agentKey, type: 'task-report',
         author: caps.authorOf?.(record) ?? null,
@@ -449,6 +471,12 @@ export function buildIntelTools(record, caps) {
               .map(pv => ({ ...pv, sc: [...new Set(nt)].filter(ch => pv.norm.includes(ch)).length }))
               .filter(pv => pv.sc >= Math.max(3, Math.ceil([...new Set(nt)].length * 0.4)))
               .sort((a, b) => b.sc - a.sc).slice(0, 3);
+            // 循环3-⑤: 唯一近似自动采纳(题名措辞差 5/19 未命中的自愈
+            // ——回执明示采纳, 多候选仍走建议)。
+            if (ranked.length === 1) {
+              vulnResolved[vulnResolved.length - 1] = `《${t}》→ 唯一近似自动采纳《${ranked[0].title}》(seq=${ranked[0].seq})`;
+              continue;
+            }
             const sug = ranked.length ? ` 库内近似: ${ranked.map(r => `《${r.title}》`).join(' / ')}——若所指即其中之一, revise 修正 vulns 引用即可` : '';
             vulnResolved.push(`《${t}》→ 未命中(库内 0 匹配)`);
             warnings.push(`《${t}》在情报库未找到对应漏洞实体——若尚未发布请用 publish_vulnerability 发布,或从 vulns 中移除该引用。${sug}`);
@@ -821,9 +849,11 @@ export function buildOrchestratorTools(record, caps) {
     execute: async (_id, params) => {
       // 循环2-新5: 共享参数区——每成员指令尾部统一附加(单一事实源,
       // 9 份派发指令手工复制同一凭据块的漂移风险由平台兜底)。
-      const withShared = params.sharedContext
-        ? { ...params, instruction: `${params.instruction}\n\n【共享参数区(engagement 级, 全员一致——以本区为准, 勿自行改写)】\n${params.sharedContext}` }
-        : params;
+      // 循环3-④: 平台自有资产自动标注(此前靠编排者 sharedContext 手工
+      // 标注禁打清单——新战役无预知时存在误打平台端口的结构风险)。
+      const platformPorts = '22(ssh)/80,443(反代)/5432(pg)/7233(temporal)/8081(console)/8090(runtime)/8990/19998,19999(OOB 收集器——判收查询面 /oob/)/30030-30100 区段(平台靶场历史位)';
+      const withShared = { ...params,
+        instruction: `${params.instruction}\n\n【平台自有资产(自动标注, 勿打)】宿主端口: ${platformPorts}——以上为平台自身服务面, 非目标资产; 误打=攻击平台自身。` + (params.sharedContext ? `\n\n【共享参数区(engagement 级, 全员一致——以本区为准, 勿自行改写)】\n${params.sharedContext}` : '') };
       params = withShared;
       // Fix-B (A1): quota applies to BOTH dispatch entry points. A batch
       // that would push the tree past the cap is refused up front — the
@@ -994,7 +1024,7 @@ export function buildOrchestratorTools(record, caps) {
             content: [{
               type: 'text',
               text: `未转发:${invalid.join(',')} 不在 ${engagement} 成员列表` +
-                `(成员:${members.join(',')})。请核对 agents 参数。`,
+                `(成员:${members.join(',')})。三条路: ①显式传 engagementId(该席位所在战役); ②改用 sessionIds 定向直达(spawn 回执里的 sess-id, 不依赖战役); ③对新目标新波次 dispatch。`,
             }],
             details: { engagement, agents: params.agents, relayed: false, invalid },
           };

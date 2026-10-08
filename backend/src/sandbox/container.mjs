@@ -151,6 +151,9 @@ export async function ensureSandbox() {
     '-v', `${HOST.skills}:/opt/skills:ro`,
     '-v', `${HOST.tools}:/opt/tools`,
     '-v', `${HOST.uploads}:/opt/uploads`,
+    // 循环3-Q6: OOB 收集器实收查询面——落盘目录只读挂载(此前铁则要求
+    // 查实收但沙箱无路径, RCE 判收被迫改口径)。
+    '-v', `${path.join(HOST.workspace, '..', 'oob')}:/oob:ro`,
     '-w', '/workspace',
     cfg.image, 'sleep', 'infinity',
     // --init(F11): tini 作为 PID1 收割孤儿——sleep infinity 不 wait() 导致

