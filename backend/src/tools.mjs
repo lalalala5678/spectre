@@ -931,16 +931,25 @@ export function buildOrchestratorTools(record, caps) {
       // Q2: sessionId 直达路由(spawn 派生会话寻址——DM followUp, 会话
       // 存活即达, 不依赖 engagement 成员面/工作流存活)。
       if (params.sessionIds?.length) {
+        // 循环2-终批①: busy 会话改 steer 即时注入(此前 followUp 排队到
+        // 回合边界——探针实测第 8 周期后才 flush, 全程 7.5min 时延, 中途
+        // 修正能力不成立; steer 与授权广播同款节拍); 回执区分已注入/已入队。
         const sent = [];
         for (const sidRaw of params.sessionIds) {
           const sid = String(sidRaw).replace(/^sess:/, '');
           try {
-            await caps.followUp(sid, `[DM from orchestrator] ${params.text}`);
-            sent.push(sid);
+            const rec2 = await caps.getRecord?.(sid);
+            if (rec2?.busy) {
+              await caps.steerSession?.(sid, `[DM from orchestrator] ${params.text}`);
+              sent.push(`${sid}(已注入·steer 即时)`);
+            } else {
+              await caps.followUp(sid, `[DM from orchestrator] ${params.text}`);
+              sent.push(`${sid}(已注入·新回合)`);
+            }
           } catch { sent.push(`${sid}(不可达)`); }
         }
         return { content: [{ type: 'text',
-          text: `已定向转发 ${sent.length} 个会话:\n${sent.map(x => `- ${x}`).join('\n')}——(不経 engagement 校验; "(不可达)"=会话已死, 终局以 query_intel 为准)` }],
+          text: `已定向转发 ${sent.length} 个会话:\n${sent.map(x => `- ${x}`).join('\n')}——(不经 engagement 校验; "(不可达)"=会话已死, 终局以 query_intel 为准)` }],
           details: { sessionIds: sent, relayed: true, via: 'session-direct' } };
       }
       let engagement = params.engagementId

@@ -278,6 +278,14 @@ const caps = {
     return record.agent.state.messages.slice(-last)
       .map(m => ({ role: m.role, text: textOf(m.content) || '', ts: m.timestamp ?? null }));
   },
+  /** 循环2-终批①: relay sessionIds 直达的 steer/读记录通道。 */
+  getRecord: (sid) => store.get(sid) ?? null,
+  steerSession: (sid, text) => {
+    const rec = store.get(sid);
+    if (!rec) throw new Error(`会话 ${sid} 不存在`);
+    store.steer(rec, text, 'agent');
+    return { sid, steered: true };
+  },
   /** QA建议2: 会话消息总数(read_session meta 行)。 */
   readSessionCount: (sessionId, callerWs) => {
     const record = store.get(sessionId);
@@ -478,6 +486,15 @@ const caps = {
         child._wdNudged = true;
         store.followUp(store.get(child.id) ?? child,
           '【看门狗】30 分钟无事件——请汇报当前状态与阻塞点; 已无法推进请立即提交任务报告收尾。');
+        // 循环2-终批②: 冻结会话 flush 兜底——冻结态(busy 但长时零事件,
+        // DM 队列被回合边界假设卡死)定期泵空 _dmQueue(探针 A 实证:
+        // 冻结会话的排队 DM 永不 flush)。
+        {
+          const rec2 = store.get(child.id);
+          if (rec2?._dmQueue?.length && !rec2.agent?.state?.isStreaming) {
+            try { store._scheduleDmPump?.(rec2); } catch { /* 泵失败下次再试 */ }
+          }
+        }
         bus.emit({
           channel: 'dm', from: 'system', to: parentRecord.agentKey,
           type: 'watchdog',
