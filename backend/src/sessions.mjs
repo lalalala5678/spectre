@@ -1182,10 +1182,38 @@ export class SessionStore {
         // 429 status (1113 余额不足 = balance exhausted) must NOT — cooling
         // down cannot fix an empty account, it just looks like a hang.
         const errText = event.message?.errorMessage || '';
-        if (event.message?.stopReason === 'error'
+        const stopErr = event.message?.stopReason === 'error';
+        if (stopErr
             && /429|1302|rate.?limit/i.test(errText)
             && !/1113|余额|balance|insufficient|quota/i.test(errText)) {
           noteRateLimit();
+        }
+        // ── 回合中途死亡自愈(用户令 2026-10-08: "莫名其妙结束/没动静")──
+        // 工具结果回传后续流失败(429/网络/5xx)时, pi 以 stopReason='error'
+        // 结束回合: 此前只做全局节流, 该回合零产出零续跑零反馈——用户侧
+        // 表现为"发消息后没动静"。现: 可重试错误自动续跑(≤2 次, 60s 退避,
+        // 原上下文含工具结果全保留, 续跑注入独立成条不重复内容); 不可
+        // 重试/耗尽则记 turn_failed_visible 审计。正常回合清零计数。
+        if (stopErr) {
+          const fatal = /1113|余额|balance|insufficient|quota|abort|cancel/i.test(errText);
+          record._turnErrRetry = (record._turnErrRetry ?? 0) + 1;
+          this._journal(record, 'turn_error_mid', { msg: errText.slice(0, 200), attempt: record._turnErrRetry });
+          if (!fatal && record._turnErrRetry <= 2) {
+            const sid = record.id;
+            setTimeout(() => {
+              try {
+                const rec2 = this.sessions.get(sid);
+                if (!rec2 || rec2.busy || rec2.agent?.state?.isStreaming) return;
+                this.prompt(rec2,
+                  `[系统续跑 ${rec2._turnErrRetry}/2] 上一回合在执行中因 ${errText.slice(0, 90)} 中断, 未产出回复(你此前的工具结果与上下文全部保留)——请从中断处继续完成原任务, 不要因本注记改变任务内容。`,
+                  'system-internal');
+              } catch { /* 会话已死则弃 */ }
+            }, 60_000).unref?.();
+          } else {
+            this._journal(record, 'turn_failed_visible', { msg: errText.slice(0, 200), attempts: record._turnErrRetry });
+          }
+        } else {
+          record._turnErrRetry = 0;  // 正常回合清零
         }
         // Write-ahead: RAW message (full thinking/usage for context
         // restore) + meta piggyback, fsync'd before the journal fires.
