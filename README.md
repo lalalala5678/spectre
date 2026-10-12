@@ -4,9 +4,11 @@
 
 # SPECTRE
 
-**多智能体协作的渗透测试平台** —— 从外网入口打到内网数据, 每条线索独立复核后才落账, 全程审计可回放
+**多智能体协作的渗透测试平台**
 
 ### 适配国内攻防环境 · 多步链路攻击贴合真实场景 · 全程图形化 Web 操作
+
+从入口突破到数据落袋, 每条线索独立复核后才落账, 全程审计可回放
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 

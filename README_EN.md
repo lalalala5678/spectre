@@ -4,9 +4,11 @@
 
 # SPECTRE
 
-**Multi-agent penetration testing platform** — from outer web into intranet data; every lead re-verified by an independent seat before it lands; fully auditable and replayable
+**Multi-agent penetration testing platform**
 
 ### Built for China's real attack surface · multi-step intrusion paths that mirror real playbooks · a full graphical Web UI
+
+From initial breach to data in hand — every lead re-verified by an independent seat before it lands, fully auditable and replayable
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 
