@@ -4,9 +4,9 @@
 
 # SPECTRE
 
-### 适配国内攻防环境, 多步链路攻击贴合真实场景 · 全程图形化 Web 操作
+**多智能体协作的渗透测试平台** —— 从外网入口打到内网数据, 每条线索独立复核后才落账, 全程审计可回放
 
-**渗透测试平台** —— 从外网入口打到内网数据, 每条线索独立复核后才落账, 全程审计可回放; 多智能体协作
+### 适配国内攻防环境 · 多步链路攻击贴合真实场景 · 全程图形化 Web 操作
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 
