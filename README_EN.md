@@ -1,10 +1,12 @@
 <div align="center">
 
+<img src="console/public/favicon.svg" width="96" alt="SPECTRE"/>
+
 # SPECTRE
 
-### Give it a target. It hands you back a pentest report.
+### Asset mapping → credential spraying → authz matrices → nday exploit chains → lateral movement, an 11-agent red team advancing in parallel
 
-**Multi-agent penetration testing platform** — an 11-seat specialist red team, independently verified findings, fully auditable and replayable
+**Multi-agent penetration testing platform** — discovery and verdict are separated (every lead is re-verified by an independent seat before it lands), fully auditable and replayable
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 [![GitHub Watchers](https://img.shields.io/github/watchers/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/watchers)
@@ -28,11 +30,11 @@
 
 ## Why SPECTRE
 
-**You press "approve" twice.** Type a target; from there recon maps, weakcred cracks, api lays authz matrices, exploit builds chains, nday reconciles CVEs — all in parallel. Every lead is **re-verified by an independent report seat** before entering the ledger. A report with evidence chains, POCs, kill chains, and a negative-space list lands at the end. Two clicks: one approval, one to open the report.
+**Type a target, then walk away.** Recon maps, weakcred cracks, api lays authz matrices, exploit builds chains, nday reconciles CVEs — all in parallel. Every lead is **re-verified by an independent report seat** before entering the ledger. A report with evidence chains, POCs, kill chains, and a negative-space list lands at the end.
 
 **The AI that finds a hole isn't the AI that certifies it.** Discovery and judgment seats are separate — the verifier reproduces the evidence, reads the full context, checks the ledger: file it, merge it, or decline it with reasons. Across five real campaigns it has declined its own teammates' false positives. Our direct answer to "AI pentesting = hallucination gift packs."
 
-**116 real findings, every one traceable.** During development the platform ran five fully autonomous campaigns against public ranges (see the track record below). Every output is in the ledger — POC, evidence chain, verification record, revision history.
+**235 real findings, every one traceable.** During development the platform ran five end-to-end campaigns against public ranges (116 findings); then — **in a single 24-hour run — completed 52 campaigns against 52 universities, producing 119 findings (8 critical / 28 high / 47 medium / 36 low)**. One university closed out every 28 minutes on average. Every output is in the ledger: POC, evidence chain, verification record, revision history.
 
 **The process dies; the campaign doesn't.** Write-ahead log on every mutation; deploys drain in-flight turns before restart; severed turns resume from the breakpoint; rate limits back off and retry. Not aspirations — each mechanism was machined from a real incident (see [Reliability engineering](#reliability-engineering)).
 
@@ -48,7 +50,27 @@
 | Juice Shop 20 | Node / Angular | **22** (3 critical) | 24/116 challenges; deserialization RCE chain closed |
 | DVWA | PHP classic | **16** | 14/14 modules; dual-channel webshell persistence |
 
-**116 total, humans only approved authorization.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
+**116 total.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
+
+### EduSRC Higher-Education Campaigns (Oct 2026)
+
+**24 hours × 52 universities × 119 findings** — asset mapping → fingerprinting → verification → impact reinforcement → independent review before ledger entry, one university closed out every 28 minutes on average.
+
+| Dimension | Data |
+|---|---|
+| Campaigns | **52 universities in 24 hours** (avg 2.3 findings each, single-target max **19** — an entire HPC portal family) |
+| Findings | **119 total**: **critical×8** / high×28 / medium×47 / low×36 — every one independently re-verified by the report agent before ledger entry |
+| Depth | Outer web to intranet: unthrottled CAS brute-force → credential reuse into SSL VPN → L3 tunnel (open-source client protocol re-implementation) → 137k-shot faculty-ID spray → vertical privilege escalation pulling 8,394 personnel records (ID numbers + password hashes) in a single request |
+
+**Representative findings** (by attack surface):
+
+- **SSO / identity family**: captcha-free enumeration oracle → admin weak credential → campus-wide SSO takeover (critical); remember-me cookie storing password-equivalent plaintext; faculty ID format extracted from a leaked user tree
+- **OA family**: Weaver e-cology VerifyQuickLogin unauthenticated admin takeover (critical); self-built PHP mail system login page found **actively backdoored by a third party** (critical — full payload chain reverse-engineered: hidden iframe → DES exfil engine → cross-site identity theft)
+- **Dev leftovers**: career-services platform exposing dev-login in production — POST a known netId, no password, receive system_admin JWT (critical); same platform's IDM export leaks full faculty PII (critical)
+- **Research computing**: HPC portal arbitrary-path file write (high, write→execute chain honestly downgraded after proving unreachable) / IDOR reading campus-wide job ledger / unfiltered full account tree; lab-safety system student-JWT vertical escalation
+- **RCE**: visualization platform unauthenticated command injection (critical, benign-command echo then stop)
+- **Gateways & keys**: WebVPN shipping its factory-default URL-rewrite key (key embedded in plaintext in every unauth response, cross-campus default corroborated) → unauthenticated proxy to whitelisted host; SSL VPN with deprecated TLS + 1024-bit keys
+- **Vertical app family**: ACM/OJ submitter real-IP leak + group-problem cross-tenant download; library SaaS admin endpoint unauthenticated; admissions/careers/finance systems with hardcoded AES keys, server-side captcha no-ops, XFF-spoofable lockouts
 
 ## Interface tour
 
@@ -66,7 +88,7 @@ All output flows into an append-only intel ledger: vulnerability entries with se
 
 ### 🔗 Audit & evidence chain
 
-Every command, tool call, and event is traceable — the evidentiary backbone of a pentest report.
+Every command, tool call, and event is traceable — the evidentiary backbone of every finding.
 
 ![audit](console/screenshots/panel-audit.png)
 
@@ -78,7 +100,7 @@ Command channels (webshells / implants) registered during engagements are manage
 
 ### ⚙️ Runtime configuration
 
-Model config (four fields, probed before saving), data-source credentials, authorization scope — all in the console. No code edits, no env vars.
+Model config (four fields, probed before saving), data-source credentials — all in the console. No code edits, no env vars.
 
 ![settings](console/screenshots/panel-settings.png)
 
@@ -173,8 +195,6 @@ cd backend && npm test    # 65 cases: dedup mutex / session lifecycle / revision
 
 **Can I trust AI-found vulnerabilities?** An independent report seat re-verifies every lead; it has declined its own teammates' false positives. Every filed finding ships a POC and evidence chain you can re-check.
 
-**Will it attack unauthorized targets?** Out-of-scope targets request authorization on first contact; no approval, no attack. Authorization is yours, execution is theirs, the record is on the chain.
-
 **Crashes / rate limits / restarts?** See [Reliability engineering](#reliability-engineering) — five failure modes, five mechanisms machined from real incidents.
 
 **Can I use my own model?** Any OpenAI-compatible / Anthropic / Gemini endpoint. Four fields, probed before saving, per-seat overrides supported.
@@ -187,8 +207,10 @@ cd backend && npm test    # 65 cases: dedup mutex / session lifecycle / revision
 
 ## Compliance
 
-SPECTRE is for penetration testing **with written authorization only**. The platform ships an authorization ledger and full audit chains, but compliance is the operator's responsibility.
-
 ## License
 
 [MIT](./LICENSE) © 2026 lalalala5678
+
+---
+
+Compliance is the operator's responsibility.
