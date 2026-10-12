@@ -8,8 +8,6 @@
 
 ### 适配国内攻防环境 · 多步链路攻击贴合真实场景 · 全程图形化 Web 操作
 
-从入口突破到数据落袋, 每条线索独立复核后才落账, 全程审计可回放
-
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
@@ -28,7 +26,9 @@
 
 ## 为什么是 SPECTRE
 
-输入目标后, recon 测绘、weakcred 爆破、api 铺越权矩阵、exploit 构造利用链、nday 对账 CVE 并行推进, 最后交付一份带证据链、POC、已验证无漏洞项清单的终报。
+输入目标后, 主控智能体自动编排: 先调用 recon 智能体跑 fofa/quake 等测绘源与端口扫描完成目标测绘, 再根据指纹与暴露面动态决定调用哪个席位——弱口令爆破、越权矩阵、利用链构造、CVE 对账——环节与真实人工渗透一致, 最终交付带证据链、POC、已验证无漏洞项清单的终报。
+
+**席位能力可自由装配。** 通过三个配置智能体, 给任意子席位挂载 MCP 情报源、自定义 skill 与共享 CLI 工具(装一次全员可用), 全程 Web 控制台操作, 不改代码。
 
 **发现与判定分离。** 发现漏洞的席位和判定漏洞的席位是分开的: 复核席位复现证据、读全文、对照库内, 成立才写入漏洞库(下文称"落账"), 重复则合并, 不成立驳回并写明理由。开发期间的实战里它驳回过自己席位的误报。
 

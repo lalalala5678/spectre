@@ -8,8 +8,6 @@
 
 ### Built for China's real attack surface · multi-step intrusion paths that mirror real playbooks · a full graphical Web UI
 
-From initial breach to data in hand — every lead re-verified by an independent seat before it lands, fully auditable and replayable
-
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
@@ -28,7 +26,9 @@ From initial breach to data in hand — every lead re-verified by an independent
 
 ## Why SPECTRE
 
-Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit builds chains, nday reconciles CVEs in parallel, and a final report lands with evidence chains, POCs, and a list of verified-no-finding items.
+Type a target and the orchestrator runs the engagement itself: it calls the recon agent to map the target via fofa/quake intel sources and port scans, then decides from fingerprints and exposed surface which seats to invoke next — weak-credential cracking, authz matrices, exploit-chain construction, CVE reconciliation — mirroring how a human pentest team actually works, and closes with a final report carrying evidence chains, POCs, and a list of verified-no-finding items.
+
+**Seats are freely outfittable.** Through the three config agents you can mount MCP intel sources, custom skills, and shared CLI tools (installed once, available to every seat) on any seat — all from the Web console, no code changes.
 
 **Discovery and verdict are separated.** The seat that finds a vulnerability is not the seat that certifies it: the verifier reproduces the evidence, reads the full context, checks the ledger — then files it into the vulnerability store (referred to below as "ledger entry"), merges duplicates, or declines with reasons. During development campaigns it declined its own teammates' false positives.
 
