@@ -26,11 +26,11 @@
 
 ## Why SPECTRE
 
-Type a target and the orchestrator runs the engagement itself: it calls the recon agent to map the target via fofa/quake intel sources and port scans, then decides from fingerprints and exposed surface which seats to invoke next — weak-credential cracking, authz matrices, exploit-chain construction, CVE reconciliation — mirroring how a human pentest team actually works, and closes with a final report carrying evidence chains, POCs, and a list of verified-no-finding items.
+Type a target and the orchestrator runs the engagement itself: it calls the recon agent to map the target via fofa/quake intel sources and port scans, then decides from fingerprints and exposed surface which seats to invoke next — weak-credential cracking, authz matrices, exploit-chain construction, CVE exploitation — mirroring how a human pentest team actually works, and closes with a final report carrying evidence chains, POCs, and a list of verified-no-finding items.
 
-**Seats are freely outfittable.** Through the three config agents you can mount MCP intel sources, custom skills, and shared CLI tools (installed once, available to every seat) on any seat — all from the Web console, no code changes.
+**Seats are freely outfittable.** Through the three config agents you can mount MCP intel sources, custom skills, and shared CLI tools on any seat — via the Web UI, or just let the AI install them for you.
 
-**Discovery and verdict are separated.** The seat that finds a vulnerability is not the seat that certifies it: the verifier reproduces the evidence, reads the full context, checks the ledger — then files it into the vulnerability store (referred to below as "ledger entry"), merges duplicates, or declines with reasons. During development campaigns it declined its own teammates' false positives.
+**Adversarial review keeps AI hallucinations out of the report.** The seat that finds a vulnerability doesn't get the final say: every lead is re-reproduced and verified by a separate, independent seat before it enters the vulnerability store (referred to below as "ledger entry"); duplicates auto-merge, and failures are declined with reasons — in practice it has rejected its own camp's false positives.
 
 **Two bodies of field work.** Five end-to-end campaigns against public ranges during development (116 findings); then 52 campaigns against 52 universities in a single 24-hour run, producing 119 findings (8 critical / 28 high / 47 medium / 36 low) — one university closed out every 28 minutes on average.
 
