@@ -40,11 +40,11 @@
 
 | 战役 | 目标栈 | 发现 | 亮点 |
 |---|---|---|---|
-| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | 5 条完整利用链; 默认数据库凭据可直接读取全部数据存储 |
-| WebGoat 8 | Java / Spring | **29 项** | JWT 五重伪造、XXE、SQLi; 12/12 课目 |
-| vAPI | PHP / MySQL, OWASP API Top10 | **19 项** | 13/13 课目; API Token 离线伪造后可调用全部管理接口 |
-| Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 24/116 官方挑战; 反序列化利用链从入口到命令执行完整走通 |
-| DVWA | PHP 经典 | **16 项** | 14/14 模块; webshell 权限维持全流程(注册-执行-审计) |
+| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | SQL 注入读取全库; 默认数据库凭据直连全部数据存储; 5 条端到端利用链(入口→凭据→数据) |
+| WebGoat 8 | Java / Spring | **29 项** | JWT 签名算法混淆伪造管理员会话; XXE 读取服务器文件; SQL 注入提取全表 |
+| vAPI | PHP / MySQL, OWASP API Top10 | **19 项** | 登录 SQL 注入绕过认证; API Token 离线伪造后可调用全部管理接口 |
+| Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 反序列化从入口到命令执行实现 RCE |
+| DVWA | PHP 经典 | **16 项** | 命令注入与文件上传双路径拿下 webshell(命令执行), 权限维持含注册-执行-审计全流程 |
 
 **合计 116 项。** 一份脱敏终报样例: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 

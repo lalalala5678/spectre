@@ -40,11 +40,11 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 
 | Campaign | Stack | Findings | Highlights |
 |---|---|---|---|
-| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | 5 complete exploit chains; default DB credentials read every data store directly |
-| WebGoat 8 | Java / Spring | **29** | Five JWT forgeries, XXE, SQLi; 12/12 lessons |
-| vAPI | PHP / MySQL, OWASP API Top10 | **19** | 13/13 lessons; offline token forgery grants every admin API |
-| Juice Shop 20 | Node / Angular | **22** (3 critical) | 24/116 challenges; deserialization chain walked end to end to command execution |
-| DVWA | PHP classic | **16** | 14/14 modules; webshell persistence end to end (register–execute–audit) |
+| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | SQL injection reading the full database; default DB credentials connect to every data store; 5 end-to-end chains (entry → credentials → data) |
+| WebGoat 8 | Java / Spring | **29** | JWT algorithm-confusion forging admin sessions; XXE reading server files; SQL injection extracting full tables |
+| vAPI | PHP / MySQL, OWASP API Top10 | **19** | Login SQL injection bypassing authentication; offline token forgery grants every admin API |
+| Juice Shop 20 | Node / Angular | **22** (3 critical) | Deserialization from entry to command execution (RCE) |
+| DVWA | PHP classic | **16** | Command injection and file upload each yield a webshell (command execution); persistence covers register–execute–audit |
 
 **116 total.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
