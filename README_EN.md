@@ -4,9 +4,9 @@
 
 # SPECTRE
 
-### Asset mapping → credential spraying → authz matrices → nday exploit chains → lateral movement, an 11-agent red team advancing in parallel
+### Built for China's real attack surface: Sangfor SSL VPN / Weaver e-cology OA / WebVPN / CAS SSO exploit chains; multi-step intrusion paths from outer web to intranet data that mirror real attacker playbooks
 
-**Multi-agent penetration testing platform** — discovery and verdict are separated (every lead is re-verified by an independent seat before it lands), fully auditable and replayable
+**Penetration testing platform** (multi-agent) — discovery and verdict are separated (every lead is re-verified by an independent seat before it lands), fully auditable and replayable
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 

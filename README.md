@@ -4,9 +4,9 @@
 
 # SPECTRE
 
-### 资产测绘 → 凭据爆破 → 越权矩阵 → nday 利用链 → 内网横向, 11 席智能体红队并行推进
+### 适配国内攻防环境: 深信服 VPN / 泛微 OA / WebVPN / CAS 统一认证等主流生态利用链齐备, 从外网入口到内网数据的多步链路攻击贴合真实攻击场景
 
-**多智能体渗透测试平台** —— 漏洞发现与判定分离(每条线索由独立席位复核后才落账), 全程审计可回放
+**渗透测试平台**(多智能体协作)—— 漏洞发现与判定分离(每条线索由独立席位复核后才落账), 全程审计可回放
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 
