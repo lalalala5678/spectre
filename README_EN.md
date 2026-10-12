@@ -44,9 +44,9 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 
 | Dimension | Data |
 |---|---|
-| Campaigns | **52 universities in 24 hours** (avg 2.3 each; single-target max **19**, concentrated in file-write and access-control flaws of an HPC portal) |
-| Findings | **119 total**: **critical×8** / high×28 / medium×47 / low×36 — every one re-verified before entering the vulnerability store |
-| Depth | Outer web into internal systems: captcha-free CAS brute-force → credential login to VPN → L3 tunnel (open-source client protocol re-implementation) → faculty-ID dictionary (137k attempts) → vertical privilege escalation reading 8,394 personnel records (ID numbers + password hashes) in one request |
+| Campaigns | **52 universities in 24 hours** (avg 2.3 each; worst-case result: a single request read the sensitive records of **8,394 faculty members** at one Double First-Class university) |
+| Findings | **119 total**: **critical×8** / high×28 / medium×47 / low×36 |
+| Depth | One Double First-Class university fully breached: captcha-free brute-force on the SSO enumerated 14k student IDs → weak student credential → same credential logs into the SSL VPN → L3 tunnel via re-implemented open-source client bypassing gateway ACLs → 137k-attempt faculty-ID dictionary hits a teacher account → teacher JWT calls a research-management API beyond its role → one request dumps the full 8,394-person database, yielding a complete dataset of ID numbers and salted password hashes |
 
 **Representative findings** (by attack surface):
 
