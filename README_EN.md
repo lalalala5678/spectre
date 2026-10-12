@@ -4,7 +4,7 @@
 
 # SPECTRE
 
-### Built for China's real attack surface: Sangfor SSL VPN / Weaver e-cology OA / WebVPN / CAS SSO exploit chains; multi-step intrusion paths from outer web to intranet data that mirror real attacker playbooks
+### Built for China's real attack surface, with multi-step intrusion paths from outer web to intranet data that mirror real attacker playbooks; a full graphical Web UI — where pentesting tooling still lives on the command line
 
 **Penetration testing platform** (multi-agent) — discovery and verdict are separated (every lead is re-verified by an independent seat before it lands), fully auditable and replayable
 
