@@ -70,8 +70,6 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 | Juice Shop 20 | Node / Angular | **22** (3 critical) | Deserialization from entry to command execution (RCE) |
 | DVWA | PHP classic | **16** | Command injection and file upload each yield a webshell (command execution); persistence covers register–execute–audit |
 
-**116 total.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
-
 ## Interface tour
 
 ### 🪖 Agent battle view
