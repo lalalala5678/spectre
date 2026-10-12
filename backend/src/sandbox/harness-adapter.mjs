@@ -5,9 +5,6 @@
  * keeping the official schema, description, truncation and spill
  * semantics byte-for-byte. Zero pi modifications.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { join } from 'node:path';
-import { CONFIG } from '../config.mjs';
 import { looksLikeInstall, appendInstallLog } from './container.mjs';
 import {
   createBashTool, createReadTool, createWriteTool, createEditTool,
@@ -37,45 +34,9 @@ function stubInvocation(toolCallId) {
  * onUpdate?). Updates are streamed through when the agent supports them.
  */
 
-/** loop-auth: 内网/localhost 目标提取+scope 校验(与 shell 门同源
- * scope.json, 逐次读)。命中未授权目标返回该目标串, 否则 null。 */
-function scopeTargetsOf() {
-  // loop-auth 取证修复: 读失败曾静默返回 [](空清单=任何目标都误报
-  // "不在", 与 request_authorization 同时刻矛盾——用户实测)。fail-open:
-  // null=不可读, 调用方跳过提示。
-  try {
-    const t = JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets;
-    return Array.isArray(t) ? t : null;
-  } catch { return null; }
-}
-// bash 授权横幅已提示目标集合(每目标一次)。循环2-新4: 持久化到
-// scope.json 的 warned 数组——重启不再重新武装(重启后首条 bash 又注入
-// 横幅的噪声); 进程内 Set 为热缓存。
-const authWarnShown = new Set();
-try {
-  const sc0 = JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'));
-  for (const w of sc0?.warned ?? []) authWarnShown.add(w);
-} catch { /* 读失败=空集, 不影响 */ }
-const persistWarned = (t) => {
-  try {
-    const sc = JSON.parse(readFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8')) ?? {};
-    sc.warned = [...new Set([...(sc.warned ?? []), t])].slice(-50);
-    writeFileSync(join(CONFIG.dataDir, 'tools/c2/scope.json'), JSON.stringify(sc, null, 2));
-  } catch { /* 持久化失败不影响会话内降噪 */ }
-};
-
-function bashScopeGate(command) {
-  const targets = scopeTargetsOf();
-  if (targets === null) return null;  // scope 不可读: 不提示(fail-open)
-  const ipRe = /\b(127(?:\.\d{1,3}){3}|10(?:\.\d{1,3}){3}|192\.168(?:\.\d{1,3}){2}|172\.(?:1[6-9]|2\d|3[01])(?:\.\d{1,3}){2})\b/g;
-  const cands = new Set([...String(command).matchAll(ipRe)].map(m => m[1]));
-  if (/\blocalhost\b/i.test(command)) cands.add('localhost');
-  for (const c of cands) {
-    if (c === '127.0.0.53') continue;  // 系统解析器
-    if (!targets.includes(c) && !(c === 'localhost' && targets.includes('127.0.0.1'))) return c;
-  }
-  return null;
-}
+// (授权机制已按用户令 2026-10-09 移除: 平台是工具, 不替用户判断授权;
+// 原 scope 校验/警告横幅/request_authorization 指引全部删除, 目标判断
+// 完全交由用户在任务指令中给出。)
 
 export function adaptHarnessTool(tool, env, extraContext = {}) {
   return {
@@ -93,14 +54,7 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
       // schema — agents can still pass a larger explicit value.
       const finalParams = tool.name === 'bash' && params.timeout === undefined
         ? { ...params, timeout: 300 } : params;
-      // loop-auth-场景1: bash 主动出连授权门——授权此前只覆盖 shell
-      // 通道, bash 里 curl/nmap 直连目标全放行(实测 crAPI 30080 裸跑)。
-      // 内网段+localhost 目标不在 scope → 拦+申请指引(公网域名/CDN
-      // 不拦——pip/npm 装包不受影响)。
-      // 用户令(授权自治): 不做硬件拦截——命中未授权目标时照常执行,
-      // 结果头部注入警告, 大模型自主判断(申请/停止/继续)。
-      const authWarnHit = (tool.name === 'bash' && typeof params.command === 'string')
-        ? bashScopeGate(params.command) : null;
+      // (原 bash 授权门已移除——命令照常执行, 无警告注入。)
       // Shared-layer install bookkeeping: bash-side installs bypass the
       // install REST, so record them into the install-log ledger here
       // (idempotent dedupe via last-line check).
@@ -153,20 +107,7 @@ export function adaptHarnessTool(tool, env, extraContext = {}) {
         && looksLikeInstall(params.command)) {
         appendInstallLog(params.command).catch(() => {});
       }
-      // 授权自治: 未授权目标的警告注入输出头(命令已执行——回执如实,
-      // 决策交给模型)。
-      // 复盘降噪(用户令: 不要每条 bash 都带授权回执): 同一目标进程内
-      // 只提示一次——模型收到过指引即有行动依据, 逐命令重复横幅纯噪
-      // 声。目标入清单后 gate 自然不再命中, 无需清理。
-      if (authWarnHit && out && Array.isArray(out.content)) {
-        const first = out.content.find(c => c.type === 'text');
-        if (first && !authWarnShown.has(authWarnHit)) {
-          authWarnShown.add(authWarnHit);
-          persistWarned(authWarnHit);
-          first.text = `[授权参考·一次性] 命令涉及内网目标 ${authWarnHit}, 当前授权清单实况: [${(scopeTargetsOf() ?? ['(清单暂不可读)']).join(', ')}]——请自行比对核实(未含且不确定时建议 request_authorization 向用户确认)。此后同目标不再重复提示。
-\n---\n${first.text ?? ''}`;
-        }
-      }
+      // (原授权警告注入点已随授权机制移除。)
       return out;
     },
   };

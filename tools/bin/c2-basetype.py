@@ -11,7 +11,7 @@
                适用 decomp 文本变换族 + c2-qa/c2-functest 全流水线
   real-lane  : jMG 真实生成 class 字节(BASE64 解码),功能核=内存马本身;标记走
                manifest(sha256/jmg info);文本 decomp 不适用,需字节码变换族(未建,如实)
-纪律: 授权门(scope.json)+EDUSRC 隔离+审计,与 c2-qa 同源(list/gen 过门; CS66-F9: verify 属只读校验不门——scope-gate SKILL 成文契约, 语义同 bytecode info)。
+纪律: 审计留痕(授权门/EDUSRC 隔离已按用户令 2026-10-09 移除)。
 """
 
 import sys, base64, hashlib, json, os, re, subprocess
@@ -25,8 +25,7 @@ DEFAULT_DIR = os.path.join(_C2, 'basetypes-jmg')
 def _edusrc_pre_gate():
     # CS71-3: EDUSRC 门提为 main 派发前(对齐 c2-qa/phish 族——此前未知/
     # 缺子命令落用法 rc=2, 门不可达, SKILL 门序表同述三员两种实现)。
-    if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr); sys.exit(76)
+    pass  # (EDUSRC 硬隔离已按用户令 2026-10-09 移除——直通)
 
 def gate():
     # CS37-F2/F3: 收敛 _common 单源门——此前本地副本不查 exercise(SKILL

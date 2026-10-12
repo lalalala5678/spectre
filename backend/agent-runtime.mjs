@@ -82,7 +82,8 @@ if (!takeLock()) {
 process.on('exit', () => { try { fs.unlinkSync(lockPath); } catch { /* best-effort: 锁文件已不存在 */ } });
 
 const { model, streamFn, modelForAgent } = await buildPi();
-const wal = new Wal(path.join(CONFIG.dataDir, 'state.wal'));
+const WAL_PATH = path.join(CONFIG.dataDir, 'state.wal');
+const wal = new Wal(WAL_PATH);
 wal.open();
 
 // Boot recovery: replay the WAL (sessions + transcripts + bus) before the
@@ -95,6 +96,8 @@ const replay = { records: new Map(), busEvents: [] };
 for (const e of entries) {
   if (e.t === 'sess') {
     replay.records.set(e.d.id, { shell: e.d, messages: e.m ?? [], meta: e.meta ?? {} });
+  } else if (e.t === 'sess-del') {
+    replay.records.delete(e.d.id);  // 2026-10-11 会话墓碑: 重放时剔除
   } else if (e.t === 'msg') {
     const r = replay.records.get(e.d.sid);
     if (r) {
@@ -282,6 +285,14 @@ const caps = {
     if (!rec) throw new Error(`会话 ${sid} 不存在`);
     store.steer(rec, text, 'agent');
     return { sid, steered: true };
+  },
+  /** 2026-10-12 紧急消息: relay_to_agents(urgent=true) 的直达通道——打断
+   * 接收方在飞回合, 处理完紧急消息后自动继续原工作。 */
+  urgentSteerSession: (sid, text) => {
+    const rec = store.get(sid);
+    if (!rec) throw new Error(`会话 ${sid} 不存在`);
+    store.urgentSteer(rec, text, 'agent');
+    return { sid, urgent: true };
   },
   /** QA建议2: 会话消息总数(read_session meta 行)。 */
   readSessionCount: (sessionId, callerWs) => {
@@ -928,16 +939,20 @@ loadSandboxConfig().then(async cfg => {
     `rehydrated agents re-mounted: ${remounted}`);
 }).catch(err => console.warn('[sandbox] boot degraded:', err.message));
 
-const compactWal = () => wal.compact([
-  ...store.snapshotForDisk(),
-  ...bus.list().map(e => ({ t: 'bus', d: e })),
-  ...listProjects().map(p => ({ t: 'proj', d: p })),
-  ...[...tombstonesAll()].map(id => ({ t: 'proj-del', d: { id } })),  // R9-F5: 墓碑过 compact
-  { t: 'pref', d: getPrefs() },
-  { t: 'spawn', d: getSpawnSettings() },  // F68: compact 白名单补 spawn
-]);
-compactWal();
-// R32D58-F1(P0) 兜底: 任何漏网异步异常打日志而非杀进程——核心资产是
+// (2026-10-10 事故补丁: compact 是原子覆盖, 任何上游过滤/重建逻辑的
+// 缩减都会被放大成 WAL 物理删除——compact 前强制安全带:
+// ①快照会话数 < WAL 现有会话数的 90% 时拒绝(告警+跳过, 追加式继续写)
+// ②执行前先把旧 WAL 复制成 state.wal.prev(永久留一份上一代快照))
+const compactWalGuarded = () => {
+  // (墓碑语义: 只清已删项目的记录, WAL 自身是真相源——内存状态与存储解耦)
+  try {
+    const r = wal.compact(new Set(tombstonesAll()));
+    console.log(`[wal] tombstone compact: 保留 ${r.kept} 条, 清除 ${r.dropped} 条(墓碑)`);
+  } catch (e) {
+    console.error(`[wal-guard] compact 拒绝: ${e.message}`);
+  }
+};
+compactWalGuarded();
 // 自身存活率; F1 主修(URL 解析守卫)之外的最后防线。
 process.on('unhandledRejection', (reason, origin) => {
   console.error(`[runtime] unhandledRejection(${origin}):`, reason);
@@ -958,7 +973,7 @@ process.on('SIGTERM', () => {
       if (busyN === 0) break;
       await new Promise(r => setTimeout(r, 2000));
     }
-    try { compactWal(); } catch { /* best effort */ }
+    try { compactWalGuarded(); } catch { /* best effort */ }
     const seal = () => { try { wal.close(); } catch { /* already closed */ } process.exit(0); };
     server.close(() => seal());
     setTimeout(seal, 1500).unref();

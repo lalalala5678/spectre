@@ -19,7 +19,7 @@ import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, sessionBootRules } from './pi.mjs';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
-import { buildAuthRequestTool, buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
+import { buildChildTools, buildDirectTools, buildIntelTools, buildOrchestratorTools, buildShellTools } from './tools.mjs';
 import { Summarizer } from './summarizer.mjs';
 // CS1-A4: 单源常量(此前与 workflows.mjs 双胞胎漂移, workflows 侧曾把 status 说成必填)。
 import { REPORT_NUDGE_TEXT } from './nudge-text.mjs';
@@ -220,10 +220,10 @@ export class SessionStore {
         ? buildToolingTools(record, this.caps)
         : hasParent
           ? [...buildChildTools(record, this.caps), ...buildIntelTools(record, this.caps),
-            ...buildToolingTools(record, this.caps), buildAuthRequestTool(record, this.caps)]
+            ...buildToolingTools(record, this.caps)]
           : [...buildDirectTools(record, this.caps),
             ...buildIntelTools(record, this.caps),
-            buildAuthRequestTool(record, this.caps)];
+            ];
     // Sandbox layer: official bash/read/write/edit (ExecutionEnv-bound,
     // project cwd) + per-agent MCP tools + per-agent skill index.
     const mount = mountForSession(record.agentKey, record.workSessionId);
@@ -278,10 +278,19 @@ export class SessionStore {
    * @param {Array<{shell: object, messages: object[], meta?: object}>} items
    */
   rehydrate(items) {
+    // (2026-10-10 修正: 全量重建——UI 对话完整性优先; 防"历史会话复活
+    // 抢配额"由续跑注入的 1h 活跃窗+护栏死锁破解负责, 不在重建层过滤。)
+    const seenIds = new Set(items.map(it => it?.shell?.id ?? it?.meta?.id).filter(Boolean));
     for (const { shell, messages = [], meta = {} } of items) {
       const record = {
         ...shell,
         ...meta,
+        // 2026-10-11 防线①: 壳字段显式兜底——record 构造被误改(如 spread
+        // 丢 shell)时 id 仍在, 会话不丢壳; {...meta} 覆盖顺序保持 meta 优先。
+        id: meta.id ?? shell.id,
+        agentKey: meta.agentKey ?? shell.agentKey,
+        workSessionId: meta.workSessionId ?? shell.workSessionId,
+        createdAt: meta.createdAt ?? shell.createdAt,
         brief: meta.brief ?? null,
         briefUpTo: meta.briefUpTo ?? 0,
         lastActivityTs: meta.lastActivityTs ?? Date.now(),
@@ -309,6 +318,15 @@ export class SessionStore {
         }
       }
       this.sessions.set(record.id, record);
+    }
+    // 2026-10-11 防线②: 启动对账断言——输入去重 id 数 ≠ 重建数即 ERROR
+    // 并打缺失清单(2026-10-11 "...shell 丢失"事故 40→1 静默通过的教训)。
+    const rebuilt = seenIds.size ? [...this.sessions.keys()].filter(id => seenIds.has(id)).length : this.sessions.size;
+    if (rebuilt !== seenIds.size) {
+      const missing = [...seenIds].filter(id => !this.sessions.has(id));
+      console.error(`[rehydrate][FATAL-CHECK] 对账失败: 输入 ${seenIds.size} 个去重 id, 仅重建 ${rebuilt} 个; 缺失: ${missing.slice(0, 10).join(', ')}${missing.length > 10 ? '…' : ''}`);
+    } else {
+      console.log(`[rehydrate] 对账 ✓ ${seenIds.size} 条 → ${rebuilt} 个会话`);
     }
   }
 
@@ -451,14 +469,9 @@ export class SessionStore {
     const hadUser = (record.agent?.state?.messages ?? []).some(m => m.role === 'user');
     if (record.agentKey === 'autopwn' && source !== 'system' && !hadUser) {
       try {
-        // 用户令: 注入即携带授权清单实况(确认手段随规则同行)
-        let scopeTargets = null;
-        try {
-          scopeTargets = JSON.parse(readFileSync(
-            join(CONFIG.dataDir, 'tools/c2/scope.json'), 'utf8'))?.targets;
-        } catch { scopeTargets = null; }
+        // (授权机制已移除: 不再读 scope.json, 开战流程不含授权对账)
         record.agent.state.messages.push({
-          role: 'user', content: sessionBootRules(scopeTargets),
+          role: 'user', content: sessionBootRules(),
           timestamp: Date.now() - 1, source: 'system-internal',
         });
       } catch { /* 注入失败不阻断用户消息 */ }
@@ -599,6 +612,58 @@ export class SessionStore {
       ? { role: 'user', content: tagged, timestamp: Date.now(), source }
       : { role: 'user', content: tagged, timestamp: Date.now() });
     this._journal(record, 'steer_queued', { text: truncateText(tagged, 200) });
+  }
+
+  /** 2026-10-12 紧急消息: 打断接收方当前回合, 立即处理消息后继续原工作。
+   * 空闲(!busy && !isStreaming)=直达现有 steer(prompt 直注); 忙=入
+   * urgentQueue + abortSession 打断在飞回合(杀在飞工具, 不置任何终态),
+   * 回合收尾(agent_end 处 _pumpUrgent)自动注入。防递归: 紧急处理回合
+   * (_urgentTurn=true)内再收 urgent 只入队不再 abort, 待本回合结束统一
+   * 注入——紧急打断不再打断紧急处理本身。 */
+  urgentSteer(record, text, source) {
+    this._requireLiveAgent(record);
+    if (!record.busy && !record.agent.state.isStreaming) {
+      return this.steer(record, text, source);
+    }
+    (record.urgentQueue ??= []).push({ text, source: source ?? null, ts: Date.now() });
+    this._journal(record, 'urgent_queued', { text: truncateText(text, 200) });
+    if (record._urgentTurn) return;  // 防递归: 本回合已是紧急处理回合
+    this.abortSession(record);  // 打断在飞回合(现有行为: 只 abort 不杀会话)
+    // 2026-10-12 兜底泵: abortSession 同步唤醒 completionWaiters, 但 pi
+    // 个别 abort 边角 agent_end 可能迟到/缺席——1.5s 后补一次收尾注入
+    // (与 agent_end 主泵以 队列空/忙 互斥, 双跑不重复)。
+    void this.awaitCompletion(record, 30_000).then(() => {
+      setTimeout(() => {
+        try {
+          if (record.urgentQueue?.length
+            && record.busy && !record.agent?.state?.isStreaming) {
+            // agent_end 缺席: 手动落 busy 再注入(同 prompt 错误路径语义)
+            record.busy = false;
+            for (const fn of record.completionWaiters ?? [])
+              { try { fn(); } catch { /* best-effort */ } }
+            record.completionWaiters = [];
+          }
+          this._pumpUrgent(record);
+        } catch { /* 会话已死则弃 */ }
+      }, 1500).unref?.();
+    });
+  }
+
+  /** 2026-10-12 紧急消息: 回合收尾注入点——busy 翻 false 处检测
+   * urgentQueue, 合并单条 prompt 开紧急处理回合。与续跑注入共存:
+   * 紧急注入先同步翻 busy, 续跑类注入(followUp/_dmQueue 泵/系统续跑
+   * 定时器)检测到忙自动顺延至其后, 两者都不丢(紧急先、续跑后)。 */
+  _pumpUrgent(record) {
+    const q = record.urgentQueue;
+    if (!q?.length) { record._urgentTurn = false; return; }
+    if (record.busy || record.agent?.state?.isStreaming) return;
+    record.urgentQueue = [];
+    const merged = q.map(m => `[${new Date(m.ts).toISOString().slice(11, 19)}Z${m.source ? ` from ${m.source}` : ''}] ${m.text}`).join('\n\n');
+    record._urgentTurn = true;  // 防递归: 本回合=紧急处理回合
+    this._journal(record, 'urgent_injected', { count: q.length, text: truncateText(merged, 200) });
+    this.prompt(record,
+      `[紧急·打断] ${merged}\n[处理完上述紧急消息后, 继续你被打断的工作——原回合上下文完整保留, 被腰斩的工具调用结果缺失属预期]`,
+      'system');
   }
 
   /**
@@ -1230,6 +1295,9 @@ export class SessionStore {
       case 'agent_end':
         record.busy = false;
         record.turnStartedAt = null;  // r6-#9: 回合结束清计时基准
+        // 2026-10-12 紧急消息: 回合收尾(busy 翻 false)检测紧急队列——
+        // 非空则立即开紧急处理回合(续跑类注入经 _dmQueue/定时器顺延其后)。
+        this._pumpUrgent(record);
         this._journal(record, 'agent_end', {
           messages: record.agent.state.messages.length,
         });

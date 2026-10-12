@@ -416,7 +416,7 @@ const fieldTypeOf = fid => (CRED_FIELD.has(fid) ? 'password' : 'text');
 // CS59-F1/CS60-N1: recon 源字段 def 单源(四处 schema map 此前各写一份)。
 const reconField = (sid, fid, flabel) => (fid === 'allow_plaintext'
   ? { id: `${sid}.${fid}`, label: flabel, type: 'select', options: ['true', 'false'], default: 'false',
-      hint: 'true=中继无 STARTTLS 时允许明文降级(明文发 AUTH 凭据, 仅限本地授权靶)' }
+      hint: 'true=中继无 STARTTLS 时允许明文降级(明文发 AUTH 凭据)' }
   : { id: `${sid}.${fid}`, label: flabel, type: fieldTypeOf(fid) });
 
 // R32D59-N6: 凭据读面掩码(••••+尾4)/写面掩码哨兵还原——多账号共享

@@ -1,62 +1,12 @@
 ---
 name: scope-gate
-description: 授权门——目标清单+时间窗+审计+一次性绑定+EDUSRC 工具层硬隔离
+description: (已废止) 授权门——2026-10-09 用户令整体移除, 保留本文仅作历史字段说明
 ---
 
-# 授权门(硬纪律)
-一切载荷生成/检测/交付的前置条件。**工具层已落实,不要只靠会话自觉。**
+# 授权门(已废止, 2026-10-09 用户令)
 
-## scope.json 权威样例(字段 schema 唯一记载处——R32D38 观-1)
+**授权机制已整体移除**: 平台定位=纯工具, 不替用户判断授权。目标与边界
+完全由用户在任务指令中给出; 工具层(scope_gate_full / edusrc_gate /
+edusrc_gate_phish)已全部改为直通 no-op, 不再 exit 75/76。
 
-```json
-{
-  "targets": ["*.target-range.example", "203.0.113.0/24"],
-  "exercise": "EX-2026-渗投-042",
-  "window": {"start": "2020-01-01T00:00:00Z", "end": "2099-01-01T00:00:00Z"}
-}
-```
-
-> 注: window 起止改成你的演练窗口(UTC ISO-8601)——上面的宽窗口仅为
-> 逐字可用的占位(样例本身是合法 JSON, 可直接拷贝后改字段)。
-
-三必填字段: `targets`(glob/网段清单)、`exercise`(本次演练标识, 入审计
-账)、`window`(UTC ISO-8601, 起止闭区间)。
-
-最小合法样例(可直接拷贝改字段):
-
-```json
-{"exercise": "EX-2026-01", "targets": ["*.example.com"],
- "window": {"start": "2026-01-01T00:00:00Z", "end": "2026-12-31T23:59:59Z"}}
-```
-
-位置: 数据根 `tools/c2/scope.json`
-(容器视角 `/opt/tools/c2/scope.json`)。缺任一 → `SCOPE-REJECT` exit 75。
-
-## 工具层落实表(2026-09-19 起)
-| 检查 | 工具/位置 | 违规行为 |
-|---|---|---|
-| scope 空/出窗 | c2-qa.py gate() / c2-variant.py gen / c2-basetype.py gate() / c2-bytecode.py gate() / c2-bind.py bind·verify·expire | exit 75 拒绝 |
-| EDUSRC 硬隔离 | 全员 env-only, 门序=-h→EDUSRC(76)→scope(75)→用法(2)→引擎(2): qa/basetype/bytecode 主入口派发前 \_edusrc 预门+子命令内 gate() 收 scope(CS71-3: 缺/未知子命令+EDUSRC 亦 76); variant/javart/functest/disguise=\_common.edusrc\_gate; phish 族四工具=edusrc\_gate\_phish; bind 无 EDUSRC(目标门 70); 只读校验子命令免 scope 门(basetype verify/bytecode info/variant fingerprint——CS72-2: EDUSRC 预门为全员硬隔离仍拦, 此前'不门'表述过宽) | **仅**环境旗标 `SPECTRE_EDUSRC=1|true|yes`(或值含 edusrc)→ **exit 76** 拒; cwd/路径启发式已废(R32D58 用户裁定: 不误伤正常使用) |
-| 目标不在清单 | c2-bind.py bind | exit 70 |
-| 审计 | /opt/tools/c2/audit.log | 正常操作落行: qa scan/round、bind/expire、basetype gen、bytecode split、qa 的 EDUSRC 拒绝(target=EDUSRC); 其余拒绝(scope 75 等)与 variant/basetype/bytecode/javart/functest/disguise 的 EDUSRC 76 不落行(内联门与 \_common 门均无 audit 调用) |
-
-## 一次性载荷绑定(c2-bind.py v2,交付协议一部分)
-```
-c2-bind.py bind --payload p [--target t] [--days N]   # exp 默认=scope 窗口 end,不可超窗
-c2-bind.py verify --payload p [--target t]            # 交付前必过
-c2-bind.py expire --payload p                          # 人工提前作废
-```
-退出码语义:0=OK;77=**EXPIRED(过期自废,qa 拒绝交付)**;78=目标越出当前 scope;
-79=载荷绑定后被改;80=签名坏;81=无/坏 sidecar;70/75 同上(bind 无 EDUSRC——76 对 bind 不可达)。
-绑定=HMAC-SHA256(bind.key, sha256|target|exercise|exp);sidecar `<payload>.bind.json` 随交付包。
-c2-qa 交付路径已自动 bind+verify;任何下游 agent 拿到交付件先 `verify` 再用。
-
-## 窗口结束纪律
-窗口结束:scope gate 全线拒绝(exit 75)≈载荷生成停用;已交付件 verify=EXPIRED(77)自废。
-不做"为续期改 scope"的动作——窗口变更走编排器侧重新授权,会话不得自改 scope.json。
-
-## EDUSRC 判定细节
-- 旗标:SPECTRE_EDUSRC∈{1,true,yes}, 或值含 "edusrc"(大小写不敏感)——**唯一触发条件**
-- 路径/cwd 启发式已废除(R32D58 用户裁定: 目录名碰巧含 edusrc 不影响任何工具正常使用)
-- 审计留痕仅 c2-qa gate(target=EDUSRC, action=REJECT); variant/basetype/bytecode 拒绝不落审计行
-- **教育 SRC 工作区连 benchmark/本地面杀也不做**(硬纪律,无豁免口)
+scope.json 文件若存在仍可读取(仅作任务参考数据), 但无任何拦截语义。

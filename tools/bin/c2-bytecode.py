@@ -12,7 +12,7 @@
   ① javap -p 成员签名集 原版≡变体(反编译可见核不变)
   ② 加载级:Class.forName(name,false) 解析+链接成功
   ③ 容器执行级:RTHarness listener 模式注册+请求触发无 5xx/无未捕获异常
-授权门/EDUSRC 隔离与 c2-qa 同源。
+审计留痕(授权门/EDUSRC 隔离已移除 2026-10-09)。
 """
 import sys, os, json, subprocess, tempfile, glob, re
 from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f
@@ -30,8 +30,7 @@ JMG_DIR = os.path.join(_C2, 'basetypes-jmg')
 def _edusrc_pre_gate():
     # CS71-3: EDUSRC 门提为 main 派发前(对齐 c2-qa/phish 族——此前未知/
     # 缺子命令落用法 rc=2, 门不可达, SKILL 门序表同述三员两种实现)。
-    if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr); sys.exit(76)
+    pass  # (EDUSRC 硬隔离已按用户令 2026-10-09 移除——直通)
 
 def gate():
     # CS37-F2/F3: 收敛 _common 单源门——此前本地副本不查 exercise(SKILL

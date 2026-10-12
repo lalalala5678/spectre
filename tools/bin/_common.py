@@ -34,29 +34,12 @@ def _data_root():
 
 
 def scope_gate_full():
-    """完整授权门: targets+exercise+window 三必填(SKILL 契约), exit 75。"""
-    SCOPE = os.path.join(_data_root(), 'c2/scope.json')
-    # R32D65-N3: 解析错/校验错分报(此前 JSON 异常折叠进'empty targets'
-    # 误导排障——与 qa 内联门的真因消息分叉)。
+    """(授权门已按用户令 2026-10-09 移除——直通: 读得到 scope.json 就原样返回
+    供字段参考, 读不到返回空 dict, 一律不拒。)"""
     try:
-        sc = json.load(open(SCOPE))
-    except FileNotFoundError:
-        print(f'SCOPE-REJECT: no scope file(期望 {SCOPE}; 字段唯一记载: docs/scope-gate/SKILL.md)', file=sys.stderr); sys.exit(75)  # R32D87-C
-    except Exception as e:
-        print(f'SCOPE-REJECT: bad scope.json: {e}(字段见 docs/scope-gate/SKILL.md)', file=sys.stderr); sys.exit(75)
-    try:
-        now = time.strftime('%Y-%m-%dT%H:%M:%SZ', time.gmtime())
-        # CS36-Z3: SKILL 三必填契约(targets/exercise/window)——exercise
-        # 此前仅 c2-qa 查, 单源门补齐族内一致。
-        ok = (sc.get('targets') and sc.get('exercise') and
-              sc['window']['start'] and sc['window']['end'] and
-              sc['window']['start'] <= now <= sc['window']['end'])
+        return json.load(open(os.path.join(_data_root(), 'c2/scope.json')))
     except Exception:
-        ok = False
-    if not ok:
-        print('SCOPE-REJECT: empty targets/exercise or out of window(三必填语义见 docs/scope-gate/SKILL.md)', file=sys.stderr)
-        sys.exit(75)
-    return sc
+        return {}
 
 
 def _edusrc_hit():
@@ -65,21 +48,13 @@ def _edusrc_hit():
 
 
 def edusrc_gate(paths=()):
-    """F48: EDU SRC 硬隔离——仅显式 env 旗标触发(exit 76)。
-    R32D58 用户裁定: 此前的 cwd/路径启发式会误伤正常使用(目录名碰巧
-    含 edusrc 即拒), 一律废除——不影响任何未显式声明的工作区。paths
-    形参保留以稳调用面, 不再参与判定。"""
-    if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
-        sys.exit(76)
+    """(EDUSRC 硬隔离已按用户令 2026-10-09 移除——直通 no-op。)"""
+    return None
 
 
 def edusrc_gate_phish(paths=()):
-    """F48: EDUSRC 硬隔离(同 c2-qa 语义)——仅显式 env 旗标触发(exit 76;
-    R32D58 同上裁定, 路径启发式废除)。"""
-    if _edusrc_hit():
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用钓鱼能力(工具层硬隔离)', file=sys.stderr)
-        sys.exit(76)
+    """(EDUSRC 硬隔离已按用户令 2026-10-09 移除——直通 no-op。)"""
+    return None
 
 
 def sha256f(p):

@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useState } from 'react';
 import { CornerUpLeft, History, Loader2, PencilLine, SendHorizontal } from 'lucide-react';
+import { api, subscribeBus, getBusCache, type ApiBusEvent } from '../../api/client';
 
-import {
-  api, foldEntries, reviseEntryDirect, reviseEntryViaAgent, subscribeBus,
-  type ApiBusEvent,
-} from '../../api/client';
+import { foldEntries, reviseEntryDirect, reviseEntryViaAgent } from '../../api/client';
 import { Markdown } from './Markdown';
 import { SeverityBadge, StatusBadge } from './VulnPanel';
 import { Badge } from '../ui/Badge';
@@ -48,10 +46,16 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   // 订历史永不渲染+SSE 不刷新)。统一锚 rootSeq。
   const rootSeq = event.revises ?? event.seq;
   const loadChain = async () => {
+    // 2026-10-11 性能修复: ①内存缓存优先(列表已拉过全量, 零网络零延迟)
+    // ②miss 时走单条修订链端点(几 KB)——原实现 ws=None 条目触发 12.4MB
+    // 全平台拉取=点击卡 6 秒的根因。
     try {
-      const all = await api<ApiBusEvent[]>('/bus'
-        + (event.workSessionId ? `?ws=${event.workSessionId}` : ''));
-      setChain(all.filter(e => e.seq === rootSeq || e.revises === rootSeq));
+      const cached = getBusCache().filter(e => e.seq === rootSeq || e.revises === rootSeq);
+      // brief 副作用防护: 缓存条目必须现行版含 detail 才可直接用——
+      // brief 快照(全局视图)无 detail, 命中即返回会渲染空白正文。
+      const current0 = cached.find(e => !e.revises) ?? cached[0];
+      if (cached.length && current0?.detail != null) { setChain(cached); return; }
+      setChain(await api<ApiBusEvent[]>(`/bus/chain/${rootSeq}`));
     } catch { /* SSE will heal */ }
   };
   // loadChain 每渲染新引用; 语义=根 seq 变化重取修订链

@@ -216,71 +216,7 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
   );
 }
 
-/* r47: 渗透授权(scope)——前端可配置(用户令: 打新靶不用上服务器改 json)。
- * targets chips 增删 + 演习窗口; PUT /api/scope 即时生效(shell 硬门每
- * 次读盘)。 */
-function ScopeSection() {
-  const [scope, setScope] = useState<{ targets: string[]; exercise: string; window: { start: string; end: string } | null } | null>(null);
-  const [draftTarget, setDraftTarget] = useState('');
-  const [saving, setSaving] = useState(false);
-  const load = () => api<typeof scope>('/scope').then(setScope);
-  useEffect(() => { void load(); }, []);
-  const save = async (next: NonNullable<typeof scope>) => {
-    setSaving(true);
-    try {
-      const r = await api<typeof scope>('/scope', { method: 'PUT', json: next });
-      setScope(r);
-    } finally { setSaving(false); }
-  };
-  const addTarget = () => {
-    const t = draftTarget.trim();
-    if (!t || !scope || scope.targets.includes(t)) return;
-    setDraftTarget('');
-    void save({ ...scope, targets: [...scope.targets, t] });
-  };
-  return (
-    <section className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
-      <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
-        <span className="text-[13px] font-medium text-primary">渗透授权清单</span>
-        {saving && <span className="text-[11px] text-tertiary">保存中…</span>}
-      </div>
-      <div className="space-y-3 px-4 py-3">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {scope?.targets.map(t => (
-            <span key={t} className="inline-flex items-center gap-1 rounded-full border border-line-strong bg-surface px-2 py-0.5 font-mono text-xs text-secondary">
-              {t}
-              <button
-                onClick={() => scope && save({ ...scope, targets: scope.targets.filter(x => x !== t) })}
-                className="text-tertiary hover:text-danger-text"
-                aria-label={`删除 ${t}`}
-              >×</button>
-            </span>
-          ))}
-          <input
-            value={draftTarget}
-            onChange={e => setDraftTarget(e.target.value)}
-            onKeyDown={e => { if (e.key === 'Enter') { e.preventDefault(); addTarget(); } }}
-            placeholder="目标名(如 10.0.0.5 / host.example.com)"
-            className="h-7 w-56 rounded-md border border-line bg-surface px-2 text-xs text-primary outline-none focus:border-accent"
-          />
-          <Button size="sm" variant="primary" onClick={addTarget} disabled={!draftTarget.trim()}>添加</Button>
-        </div>
-        {scope?.window && (
-          <div className="flex items-center gap-2 text-xs text-tertiary">
-            <span>演习窗口</span>
-            <input type="date" value={scope.window.start.slice(0, 10)}
-              onChange={e => scope && save({ ...scope, window: { start: new Date(e.target.value).toISOString(), end: scope.window!.end } })}
-              className="h-7 rounded-md border border-line bg-surface px-2 text-xs" />
-            <span>→</span>
-            <input type="date" value={scope.window.end.slice(0, 10)}
-              onChange={e => scope && save({ ...scope, window: { start: scope.window!.start, end: new Date(e.target.value).toISOString() } })}
-              className="h-7 rounded-md border border-line bg-surface px-2 text-xs" />
-          </div>
-        )}
-      </div>
-    </section>
-  );
-}
+// (渗透授权面板已按用户令 2026-10-09 随授权机制移除)
 
 export function SettingsPage() {
   // FEVERIFY6-P3: 未保存改动计数——派发全局事件, App 路由切换前拦截确认
@@ -344,7 +280,6 @@ export function SettingsPage() {
     { id: 'sec-common', label: '通用与模型' },
     { id: 'sec-agentllm', label: '按智能体换模型' },
     { id: 'sec-agents', label: '智能体专属配置' },
-    { id: 'sec-scope', label: '渗透授权' },
   ];
   const [activeSec, setActiveSec] = useState('sec-common');
   const scrollHostRef = useRef<HTMLDivElement>(null);
@@ -495,7 +430,6 @@ export function SettingsPage() {
         </section>
       ))}
       <div id="sec-scope" className="scroll-mt-4" />
-      <ScopeSection />
       </div>
     </div>
   );

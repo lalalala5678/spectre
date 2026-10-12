@@ -243,6 +243,18 @@ function realRouter({ store, bus, caps, wal }) {
     // r6v2-#10: engagement 成员终报对账面——完成通知/状态判定用情报库
     // 作事实源(ChildWorkflowFailure 可能与已落账终报并存, 直接报失败
     // 即假警报)。内部调用。
+    // 2026-10-11: 会话删除(墓碑语义)——坏数据/空壳清理口; WAL 记 t:'sess-del'
+    // 墓碑, replay 跳过 + tombstone compact 物理清除(与 proj-del 同款链路)。
+    {
+      const m = path.match(/^\/api\/sessions\/(sess-[\w-]+)$/);
+      if (m && method === 'DELETE') {
+        const sid = m[1];
+        const rec = store.get(sid);
+        wal.append({ t: 'sess-del', d: { id: sid } });
+        if (rec) { store.sessions.delete(sid); }
+        return json(res, 200, { deleted: true, id: sid });
+      }
+    }
     if (path.startsWith('/api/sessions/') && path.endsWith('/abort') && method === 'POST') {
       const sid2 = path.split('/')[3];
       const rec2 = store.get(sid2);
@@ -435,6 +447,10 @@ function realRouter({ store, bus, caps, wal }) {
           const echoTs = action === '/messages' ? Date.now() : 0;
           if (action === '/messages') {
             store.prompt(record, injectText, source, echoTs || undefined);
+          } else if (action === '/steer' && body.urgent === true) {
+            // 2026-10-12 紧急消息: body.urgent=true 时改走 urgentSteer——
+            // 打断接收方当前回合立即处理(处理完自动继续原工作); 其余行为不变。
+            store.urgentSteer(record, injectText, source);
           } else {
             store.steer(record, injectText, source);
           }
@@ -550,141 +566,9 @@ function realRouter({ store, bus, caps, wal }) {
       return json(res, 200, { deleted: true, id: pid });
     }
 
-    // ── 渗透授权面(r47): scope 前端可配置 + agent 授权请求一键批驳 ──
-    const scopePath = path_mod.join(CONFIG.dataDir, 'tools/c2/scope.json');
-    const readScope = () => {
-      try { return JSON.parse(fs.readFileSync(scopePath, 'utf8')); } catch { return null; }
-    };
-    const writeScope = (sc) => {
-      fs.mkdirSync(path_mod.dirname(scopePath), { recursive: true });
-      fs.writeFileSync(scopePath, JSON.stringify(sc, null, 2) + '\n');
-    };
-    if (path === '/api/scope' && method === 'GET') {
-      return json(res, 200, readScope() ?? { targets: [], exercise: '', window: null });
-    }
-    if (path === '/api/scope' && method === 'PUT') {
-      const b = await readJson(req);
-      const targets = Array.isArray(b.targets) ? [...new Set(b.targets.map(String).filter(t => t.trim()))] : null;
-      if (!targets) return bad(res, 400, 'targets 须为字符串数组');
-      const sc = readScope() ?? { targets: [], exercise: '', window: {} };
-      sc.targets = targets;
-      if (typeof b.exercise === 'string') sc.exercise = b.exercise;
-      if (b.window && typeof b.window.start === 'string' && typeof b.window.end === 'string') {
-        sc.window = { start: b.window.start, end: b.window.end };
-      }
-      writeScope(sc);
-      bus.emit({ channel: 'audit', from: 'system', type: 'context',
-        title: `渗透授权清单已更新(用户直改): targets=${targets.join('/')}`,
-        summary: `窗口:${sc.window?.start ?? '?'}→${sc.window?.end ?? '?'}`, workSessionId: null });
-      return json(res, 200, sc);
-    }
-    if (path === '/api/scope/auth-requests' && method === 'GET') {
-      // pending = auth-request 且无后续 approved/rejected 事件 resolves 它
-      const evs = bus.list().filter(e => e.type === 'auth-request');
-      const settled = new Set(evs.filter(e => e.resolves).map(e => e.resolves));
-      // r47b: 白名单修复前的脏事件(target 为空)过滤——24 条历史垃圾
-      // pending 隐去(不删链, 审计可考古)。
-      const pending = evs.filter(e => !e.resolves && !settled.has(e.seq)
-        && e.target)
-        .map(e => ({ seq: e.seq, target: e.target, reason: e.reason,
-          from: e.from, requester: e.requester, ts: e.ts,
-          workSessionId: e.workSessionId ?? null }));
-      return json(res, 200, pending);
-    }
-    if (path.startsWith('/api/scope/auth-requests/') && (method === 'POST')) {
-      // /api/scope/auth-requests/<seq>/approve|reject
-      const parts = path.split('/');
-      const seq = Number(parts[4]); const act = parts[5];
-      const reqEv = bus.list().find(e => e.seq === seq && e.type === 'auth-request' && !e.resolves);
-      if (!reqEv) return bad(res, 404, `授权请求 seq=${seq} 不存在或已处理`);
-      if (act === 'approve') {
-        const b2 = await readJson(req).catch(() => ({}));
-        // A3 原子化: 清单写入与回执在同一同步序列完成(读-写-发, 之间
-        // 无 await), 消除"状态先行、回执滞后"窗口。
-        const sc = readScope() ?? { targets: [], exercise: '', window: {} };
-        if (!sc.targets.includes(reqEv.target)) {
-          sc.targets.push(reqEv.target);
-        }
-        // r47b: 确认卡带时间期限(默认一周由前端给; 后端兜底 now+7d)
-        if (typeof b2.windowStart === 'string' && typeof b2.windowEnd === 'string') {
-          sc.window = { start: b2.windowStart, end: b2.windowEnd };
-        } else if (!sc.window) {
-          sc.window = { start: new Date().toISOString(),
-            end: new Date(Date.now() + 7 * 86400e3).toISOString() };
-        }
-        writeScope(sc);
-        bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
-          resolves: seq, status: 'approved', target: reqEv.target,
-          title: `授权已批准: ${reqEv.target}`, summary: `用户批准了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求——目标已入清单。`,
-          workSessionId: reqEv.workSessionId ?? null });
-        // A2 幂等去重: 同 target 的其余 pending 一并 resolve(并入本次
-        // 批准), 逐条批准不再产生重复回执观感。
-        const dups = bus.list().filter(e => e.type === 'auth-request'
-          && !e.resolves && e.target === reqEv.target && e.seq !== seq);
-        for (const d of dups) {
-          bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
-            resolves: d.seq, status: 'approved', target: d.target,
-            title: `授权已批准(并入 seq=${seq}): ${d.target}`,
-            summary: `同目标既有批准已覆盖, 并入 seq=${seq} 处理。`,
-            workSessionId: d.workSessionId ?? null });
-        }
-        // A10 推送: 批准实时广播同项目全部活跃席位(不等席位下次拉取,
-        // 在飞席位立即拿到新边界——weakcred 过期快照重测教训)。
-        const scopeLine = sc.targets.join(', ');
-        // R3: busy 席位用 steer 即时注入(回合边界 followUp 节拍曾使
-        // 授权广播迟到 20min——在飞长回合的席位持续持旧边界, 编排者
-        // 被迫手工 relay 纠偏); idle 席位照常 followUp 起新回合。
-        const broadcast = (sid, note) => {
-          try {
-            const rec = store.get(sid);
-            if (rec?.busy) { store.steer(rec, note, 'system'); }
-            else { caps.followUp?.(sid, note); }
-          } catch { /* 会话已死则跳过 */ }
-        };
-        broadcast(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
-          `[授权已批准] ${reqEv.target} 已入授权清单。当前清单实况: [${scopeLine}]——边界内目标无需再考虑授权问题, 直接执行。`);
-        let broadcastN = 1;
-        for (const sess of store.list()) {
-          const rec = store.get(sess.id);
-          if (!rec || sess.id === (reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId)) continue;
-          if (rec.workSessionId && rec.workSessionId === (reqEv.workSessionId ?? null)) {
-            broadcast(sess.id,
-              `[授权变更·广播] ${reqEv.target} 已被用户批准入清单(申请人 ${reqEv.requester ?? reqEv.from})。当前清单: [${scopeLine}]——如你正在等该边界, 现在可直接执行。`);
-            broadcastN++;
-          }
-        }
-        return json(res, 200, { ok: true, targets: sc.targets, resolvedAlso: dups.length, broadcast: broadcastN });
-      }
-      if (act === 'reject') {
-        bus.emit({ channel: 'audit', from: 'system', type: 'auth-request',
-          resolves: seq, status: 'rejected', target: reqEv.target,
-          title: `授权被驳回: ${reqEv.target}`, summary: `用户驳回了 ${reqEv.requester ?? reqEv.from} 对 ${reqEv.target} 的授权请求。`,
-          workSessionId: reqEv.workSessionId ?? null });
-        // QA建议4: 撤销对称广播(与批准同款——busy 席位 steer 即时注入,
-        // 同项目其它席位不再对该目标发起操作/申请)。
-        const broadcastR = (sid, note) => {
-          try {
-            const rec = store.get(sid);
-            if (rec?.busy) { store.steer(rec, note, 'system'); }
-            else { caps.followUp?.(sid, note); }
-          } catch { /* 会话已死则跳过 */ }
-        };
-        broadcastR(reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId,
-          `[授权被驳回] 用户驳回了你对 ${reqEv.target} 的授权请求——请勿再尝试该目标, 调整方案或汇报。`);
-        let rn = 1;
-        for (const sess of store.list()) {
-          const rec = store.get(sess.id);
-          if (!rec || sess.id === (reqEv.payloadRef?.replace(/^sess:/, '') ?? reqEv.sessionId)) continue;
-          if (rec.workSessionId && rec.workSessionId === (reqEv.workSessionId ?? null)) {
-            broadcastR(sess.id,
-              `[授权变更·撤销广播] ${reqEv.target} 的授权申请已被用户驳回(申请人 ${reqEv.requester ?? reqEv.from})——该目标不在授权清单, 勿对其发起主动渗透。`);
-            rn++;
-          }
-        }
-        return json(res, 200, { ok: true, broadcast: rn });
-      }
-      return bad(res, 400, '未知 action(approve|reject)');
-    }
+    // (渗透授权面 r47 已按用户令 2026-10-09 整体移除: /api/scope 读写、
+    // auth-requests 批/驳 API 及其广播全部删除——平台不再持有授权概念,
+    // 目标与边界完全由用户在任务指令中给出。)
     if (path === '/api/prefs' && method === 'GET') {
       return json(res, 200, maskPrefs(getPrefs()));
     }
@@ -967,18 +851,29 @@ function realRouter({ store, bus, caps, wal }) {
     }
 
     // ---------- bus ----------
+    // 2026-10-11 性能修复: 单条修订链端点——详情页为一棵树拉整片森林
+    // (ws=None 条目曾触发 12.4MB 全量)的病灶根除。
+    if (path.startsWith('/api/bus/chain/') && method === 'GET') {
+      const root = Number(path.split('/')[4]);
+      if (!Number.isFinite(root)) return bad(res, 400, 'chain 端点需数字 seq');
+      const chain = bus.list().filter(e => e.seq === root || e.revises === root);
+      return json(res, 200, chain);
+    }
     if (path === '/api/bus' && method === 'GET') {
       const since = Number(url.searchParams.get('since') || 0);
       // Server-side project scoping: panels used to fetch the FULL bus
       // (292KB at 224 events) and filter client-side ×3 panels per switch.
       // ?ws= cuts the payload to the project's own entries.
       const ws = url.searchParams.get('ws');
+      // 2026-10-11 性能: ?brief=1 列表瘦身(剥 detail)——全局视图(无 ws)曾
+      // 拉全量含 detail ≈8MB×3 面板; 详情全文由 /bus/chain/<seq> 单条供给。
+      const brief = url.searchParams.get('brief') === '1';
       // R32D32-R6: ?q= 服务端过滤(title/summary 包含, 不区分大小写)——
       // 全局搜索此前全量拉总线再前端滤。
       const qRaw = url.searchParams.get('q');
       const q = qRaw ? qRaw.trim().toLowerCase() : '';
       const events = bus.list(since);
-      return json(res, 200, ws
+      let out = ws
         ? events.filter(e => e.workSessionId === ws
           && (!q
             || `${e.title ?? ''}`.toLowerCase().includes(q)
@@ -987,7 +882,9 @@ function realRouter({ store, bus, caps, wal }) {
           ? events.filter(e =>
             `${e.title ?? ''}`.toLowerCase().includes(q)
             || `${e.summary ?? ''}`.toLowerCase().includes(q))
-          : events));
+          : events);
+      if (brief) out = out.map(({ detail: _d, ...rest }) => rest);
+      return json(res, 200, out);
     }
     if (path === '/api/bus/events' && method === 'GET') {
       const since = Number(url.searchParams.get('since') || 0);

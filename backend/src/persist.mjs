@@ -14,6 +14,22 @@ import fs from 'node:fs';
 import path from 'node:path';
 
 export class Wal {
+  /** 2026-10-10 事故补丁: 当前 WAL 里的会话条目数(compact 对账用)。 */
+  countSessions() {
+    try {
+      const lines = fs.readFileSync(this.file, 'utf8').split('\n');
+      const ids = new Set();
+      for (const l of lines) {
+        if (!l.trim()) continue;
+        try {
+          const e = JSON.parse(l);
+          if ((e.t === 'session' || e.t === 'sess' || e.t === 'msg-batch') && e.d?.id) ids.add(e.d.id);
+        } catch { /* 跳过坏行 */ }
+      }
+      return ids.size || null;
+    } catch { return null; }
+  }
+
   /** @param {string} file absolute WAL path; parent dirs are created */
   constructor(file) {
     this.file = file;
@@ -76,24 +92,57 @@ export class Wal {
     return { entries, truncated };
   }
 
-  /** Atomic rewrite from current state (boot compaction / graceful stop). */
-  compact(entries) {
+  /**
+   * 2026-10-10 重设计(墓碑语义, 替代"内存快照全量重写"):
+   * - WAL 自身是唯一真相源; compact 只做两种删除:
+   *   ①tombstoned 项目 id 集合相关的记录(proj/sess/bus)
+   *   ②尾部撕裂行(readAll 已标 truncated 的)
+   * - 除此之外一条不动——内存里有什么/缺什么与存储永不相干
+   * - 执行前 rotate 留三代(.wal.1/.wal.2/.wal.3), 任何覆盖都有前代兜底
+   * - 对账: 保留条数 < (总条数 - 墓碑相关) 时拒绝执行(防墓碑误传全量)
+   * @param {Set<string>} tombstonedProjIds 已删除项目 id 集合
+   */
+  compact(tombstonedProjIds = new Set()) {
+    const { entries, truncated } = this.readAll();
+    const tombs = tombstonedProjIds instanceof Set ? tombstonedProjIds : new Set(tombstonedProjIds);
+    // 2026-10-11: 会话墓碑(内联收集)——sess-del 命中的 sess/msg/meta 物理清除
+    const sessTombs = new Set(entries.filter(e => e?.t === 'sess-del').map(e => e?.d?.id));
+    const kept = []; let dropped = 0;
+    for (const e of entries) {
+      const pid = e?.d?.id ?? e?.d?.projectId ?? e?.d?.workSessionId;
+      const isProjRec = e?.t === 'proj' && tombs.has(e?.d?.id);
+      const isSessOfTomb = e?.t === 'sess' && (tombs.has(pid) || sessTombs.has(pid));
+      const isBusOfTomb = e?.t === 'bus' && tombs.has(e?.d?.workSessionId);
+      const isMsgOfSessTomb = (e?.t === 'msg' || e?.t === 'meta') && sessTombs.has(e?.d?.sid);
+      const isSessDelMarker = e?.t === 'sess-del';
+      if (isProjRec || isSessOfTomb || isBusOfTomb || isMsgOfSessTomb || isSessDelMarker) { dropped++; continue; }
+      kept.push(e);
+    }
+    // 对账: 剔除数必须≤墓碑可能关联数(宽松上界=每墓碑 × 条目总数过大也拦不住,
+    // 用比例: 剔除超过总数 50% 且墓碑数 < 条目数×0.5 → 异常, 拒绝)
+    if (dropped > entries.length * 0.5 && tombs.size < entries.length * 0.5) {
+      throw new Error(`wal compact 对账失败: 拟删 ${dropped}/${entries.length} 条但墓碑仅 ${tombs.size} 个——拒绝执行(疑似误传)`);
+    }
+    // rotate 三代
+    for (let g = 3; g >= 1; g--) {
+      const from = g === 1 ? this.file : `${this.file}.${g - 1}`;
+      const to = `${this.file}.${g}`;
+      try { if (fs.existsSync(from)) fs.renameSync(from, to); } catch { /* 尽力而为 */ }
+    }
     const tmp = `${this.file}.tmp`;
     const fd = fs.openSync(tmp, 'w');
-    for (const entry of entries) {
+    for (const entry of kept) {
       fs.writeSync(fd, JSON.stringify(entry) + '\n');
     }
     fs.fsyncSync(fd);
     fs.closeSync(fd);
-    if (this.fd !== null) {
-      fs.closeSync(this.fd);
-    }
+    if (this.fd !== null) fs.closeSync(this.fd);
     fs.renameSync(tmp, this.file);
-    // fsync the directory so the rename itself survives power loss.
     const dirFd = fs.openSync(path.dirname(this.file), 'r');
     fs.fsyncSync(dirFd);
     fs.closeSync(dirFd);
     this.fd = fs.openSync(this.file, 'a');
+    return { kept: kept.length, dropped, truncated };
   }
 
   close() {

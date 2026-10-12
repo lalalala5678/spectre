@@ -120,7 +120,7 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
             <TerminalSquare className="h-5 w-5 text-accent-text" />Shell 控制台
           </h1>
           <p className="mt-1 text-[13px] text-tertiary">
-            C2 植入通道的运维终端——授权窗口内经服务端授权门执行;亦可把 shellId 交给 权限维持/后渗透 agent 代操作。
+            C2 植入通道的运维终端——直接执行(审计留痕);亦可把 shellId 交给 权限维持/后渗透 agent 代操作。
           </p>
         </div>
         <Button onClick={() => void reload()} variant="ghost" size="icon" aria-label="刷新 shell 列表" title="刷新" className="mb-1">
@@ -199,7 +199,7 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
               <pre key={i} className={cn('whitespace-pre-wrap break-all',
                 l.dir === 'in' ? 'text-accent-text' : l.dir === 'err' ? 'text-danger-text' : l.dir === 'sys' ? 'text-tertiary' : 'text-primary')}>{l.text}</pre>
             ))}
-            {lines.length === 0 && <div className="text-tertiary">— 在下方输入命令(经服务端授权门) —</div>}
+            {lines.length === 0 && <div className="text-tertiary">— 在下方输入命令 —</div>}
           </div>
           {readOpen && (
             <div className="flex items-center gap-2 border-t border-line bg-surface-2/40 px-3 py-1.5">

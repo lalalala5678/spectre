@@ -29,15 +29,15 @@ export function useBusPanelEntries(
   const [loaded, setLoaded] = useState(false);
 
   useEffect(() => {
-    // r50i: ws 未就绪(空串/undefined)不请求——带错参查询返回空+loaded
-    // 曾致"暂无漏洞/情报"闪现(切页/项目瞬间); 就绪后 effect 重跑拉真数据。
-    if (!ws) { setEvents([]); setLoaded(false); return; }
+    // 2026-10-11 修复: 无项目会话(直连)面板回退全局视图——空 ws 查询
+    // 后端语义=不过滤全量。原 r50i 早退曾使直连会话三面板永远空白。
+    // 切页瞬态多拉一次全量无害(随后 effect 以真 ws 重跑)。
     let stopped = false;
     const cursor = { v: 0 };
     setEvents([]);
     setLoaded(false);
     const snapshot = async (retry = true) => {
-      const all = await api<ApiBusEvent[]>(`/bus?ws=${ws}`);
+      const all = await api<ApiBusEvent[]>(`/bus?ws=${ws ?? ''}&limit=3000${ws ? '' : '&brief=1'}`);
       if (stopped) return;
       const folded = foldEntries(all).filter(accept);
       // r50i: 空结果一次免费重试(瞬时竞态不落"暂无"态)

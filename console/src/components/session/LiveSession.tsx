@@ -1,4 +1,3 @@
-import { ScopeAuthCard } from './ScopeAuthCard';
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Bot, Check, ChevronDown, Loader2, User, X, TriangleAlert } from 'lucide-react';
 
@@ -27,7 +26,6 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
   heading?: string;  // EQ-10: 语义标题(替代裸 sess-xxx id)
 }) {
   const [messages, setMessages] = useState<ApiMessage[]>([]);
-  const [wsId, setWsId] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [loaded, setLoaded] = useState(false);
   const [error, setError] = useState('');
@@ -158,7 +156,6 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
         if (cancelled) return;
         setMessages(detail.messages);
         setBusy(detail.busy);
-        setWsId(detail.workSessionId ?? null);
         // SSE cursor starts AFTER the fetched history — replaying it would
         // duplicate every message on screen.
         lastSeq.current = detail.lastSeq ?? 0;
@@ -446,7 +443,6 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
           <ToolTimeline key={`t-${item.steps[0]?.key}-${i}`} steps={item.steps} />
         ))}
         {/* 用户令(r47c): 授权确认卡=会话消息流内的交互消息(非页面横幅) */}
-        {agentKey === 'autopwn' && <ScopeAuthCard wsId={wsId} />}
         {busy && (
           <div className="flex items-center gap-2 px-1 text-[13px] text-tertiary">
             <Bot className="h-4 w-4 animate-pulse" />

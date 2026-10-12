@@ -444,15 +444,8 @@ function shellScopeTargets() {
       }
       receipt[receipt.length - 1] += ` [下发: ${String(ch.query ?? p.query).slice(0, 80)}]`;
     }
-    // loop36-QA: 越界提示(信息性, 不拦)——query 含 IPv4 且不在授权
-    // 清单时附注(搜索/OSINT 不受限; 对该目标主动探测前需授权)。
-    let scopeNote = '';
-    try {
-      const ips = String(p.query).match(/\b\d{1,3}(?:\.\d{1,3}){3}\b/g) ?? [];
-      const targets = shellScopeTargets();
-      const out = [...new Set(ips.filter(x => !targets.includes(x)))];
-      if (out.length) scopeNote = `\n[越界提示] query 含 ${out.join(', ')} 不在渗透授权清单——OSINT/检索不受限, 但对其主动探测/扫描前需 request_authorization。`;
-    } catch { /* scope 读失败静默(提示为增强非门禁) */ }
+    // (原 [越界提示] 授权参考注入已按用户令 2026-10-09 随授权机制移除)
+    const scopeNote = '';
     const cfg = await getPrefs();
     // U2: 唯一来源=设置面板 common.webSearch(旧顶层 webSearchProvider
     // 从未被任何部署设置过,零迁移直接切换)
@@ -633,21 +626,8 @@ function shellScopeTargets() {
     }),
     execute: async (_id, p) => {
       let url = p.url;
-      // loop-auth-场景1: fetch_url 授权门——内网/localhost host 不在
-      // scope → 拦+申请指引(公网检索/文档抓取不受影响)。
-      // 授权自治: 不拦——内网/localhost 未授权目标照常抓取, 结果
-      // 头部注入警告(大模型自主判断)。
-      let authNote = '';
-      try {
-        const h = new URL(url).hostname;
-        const priv = /^(127\.|10\.|192\.168\.|172\.(1[6-9]|2\d|3[01])\.|localhost$)/.test(h);
-        if (priv) {
-          const targets = shellScopeTargets();
-          if (!targets.includes(h) && !(h === 'localhost' && targets.includes('127.0.0.1'))) {
-            authNote = `[授权参考] fetch_url 涉及内网目标 ${h}。当前授权清单实况: [${targets.join(', ')}]——请自行比对核实(未含且不确定时建议 request_authorization 向用户确认)。\n`;
-          }
-        }
-      } catch { /* URL 解析失败由既有路径处理 */ }
+      // (原 fetch_url 授权参考注入已按用户令 2026-10-09 随授权机制移除)
+      const authNote = '';
       const gh = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/(.+)$/.exec(url);
       if (gh) url = `https://raw.githubusercontent.com/${gh[1]}/${gh[2]}/${gh[3]}`;
       const limit = 8000;

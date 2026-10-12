@@ -205,10 +205,12 @@ export function buildIntelTools(record, caps) {
         })
         .filter(e => {
           if (!q) return true;
-          const hay = `${e.title ?? ''}\n${e.summary ?? ''}\n${e.detail ?? ''}`.toLowerCase();
-          return hay.includes(q);
-        })
-        .sort((a, b) => b.seq - a.seq);
+        // 2026-10-12 查重门补强: 检索面加入 payloadRef 与 requester——
+        // 搜 'sess-xxx'/上报者名可命中对应条目(查重协调时定位对方会话)。
+        const hay = `${e.title ?? ''}\n${e.summary ?? ''}\n${e.detail ?? ''}\n${e.payloadRef ?? ''}\n${e.requester ?? ''}`.toLowerCase();
+        return hay.includes(q);
+      })
+      .sort((a, b) => b.seq - a.seq);
       // F35: 上限 20→50 + before 游标(翻页: 传 before=本页最旧 seq 取更旧一页)
       const limit = Math.min(Math.max(Number(params.limit) || 10, 1), 50);
       const before = Number(params.before) || null;
@@ -231,9 +233,10 @@ export function buildIntelTools(record, caps) {
       const drafts = (kindNorm === 'vulnerability' || kindNorm === 'both' || kindNorm === 'vuln')
         ? inWs.filter(e => e.type === 'vuln-draft' && !e.resolves && !resolvedSet.has(e.seq)).slice(0, 20)
         : [];
+      // 2026-10-12 查重门补强: 编写中占位带上报时间戳(先后判定依据)。
+      const draftLine = e => `[编写中]《${e.title ?? e.summary}》——撰写申请由 ${e.requester ?? e.from} 于 ${String(e.ts ?? '').slice(0, 19).replace('T', ' ')} 提交, writer 处理中(payloadRef=${e.payloadRef ?? '?'})`;
       const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,库内最新 seq=${latestSeq})${drafts.length ? `,另有编写中 ${drafts.length} 条` : ''}:`
-        + (drafts.length ? `\n` + drafts.map(e =>
-          `[编写中]《${e.title ?? e.summary}》——撰写申请由 ${e.requester ?? e.from} 提交, writer 处理中(payloadRef=${e.payloadRef ?? '?'}); 完成后此处被正式条目取代`).join('\n') : '');
+        + (drafts.length ? `\n` + drafts.map(e => draftLine(e) + '; 完成后此处被正式条目取代').join('\n') : '');
       const footLine = olderLeft > 0
         ? `\n\n↓ 还有更旧 ${olderLeft} 条——续翻下一页(更旧)传 before=${hits[hits.length - 1].seq}; ↑ 回到最新一页去掉 before;单条全文传 seq=…`
         : (before ? `\n\n↑ 已到 before=${before} 之前的末页。注意:before 是排他上界(只看 seq<before 的更旧条目)——要看最新请去掉 before(库内最新 seq=${latestSeq})。` : '');
@@ -241,7 +244,7 @@ export function buildIntelTools(record, caps) {
       if (hits.length === 0) {
         if (drafts.length) {
           return { content: [{ type: 'text', text: `无已落账条目, 但有 ${drafts.length} 条报告正在编写中(完成后此处可见正式条目):\n`
-            + drafts.map(e => `[编写中]《${e.title ?? e.summary}》——撰写申请由 ${e.requester ?? e.from} 提交, writer 处理中(payloadRef=${e.payloadRef ?? '?'})`).join('\n') }] };
+            + drafts.map(e => draftLine(e)).join('\n') }] };
         }
         const scope = inWs.filter(e => isEntry(e) && !e.void);
         const reports = scope.filter(e => e.type === 'task-report').length;
@@ -324,7 +327,10 @@ export function buildIntelTools(record, caps) {
       'file one when the user asks or when a meaningful unit of work ' +
       'concludes. Field values are MARKDOWN (lists/tables/code blocks ' +
       'allowed); the report renders as a markdown document — structure ' +
-      'long content properly.',
+      'long content properly. 提交前自查(未竟项铁则): 终报里每条"后续' +
+      '建议/未竟项"必须标注 blocked_by=physical|credential|none; 标 none ' +
+      '=你还没干完, 禁止提交——回去干(物尽其用穷追猛打, 不存在等授权); ' +
+      '只有物理不可达/凭据失效才有资格留未竟项。',
     executionMode: 'sequential',
     parameters: Type.Object({
       title: Type.String({
@@ -505,7 +511,11 @@ export function buildIntelTools(record, caps) {
       'is mandatory and rides on the revision for audit. Only the ' +
       'fields you pass change; omitted fields keep their current ' +
       'values. The original is never overwritten (append-only chain, ' +
-      'query_intel shows the current version). VULNERABILITY targets ' +
+      'query_intel shows the current version). 修订正文=完整现行版: 把原版' +
+      '内容与本次变更融合成一份独立完整的报告(读者只看得到你这条, 旧版被' +
+      '折叠隐藏)。反例(错): 「二轮深挖补充…承接本报告初版…本节为第二轮' +
+      '枚举实证」——增量叙事没头没尾。正例(对): 从头讲述的完整报告, 发现' +
+      '过程含全部轮次, 六节齐全。VULNERABILITY targets ' +
       'are rejected for non-writer agents — use ' +
       'request_vulnerability_revision (writer review) instead.',
     executionMode: 'sequential',
@@ -709,7 +719,9 @@ function buildRequestRevisionTool(record, caps) {
       'Request a revision of a PUBLISHED vulnerability. A writer agent ' +
       'reviews the original report plus your request, verifies necessity ' +
       'AND correctness, then either lands the revision (it decides the ' +
-      'final fields) or declines with reasons. The verdict returns in ' +
+      'final fields) or declines with reasons. 落地产出=完整现行版(原版内容' +
+      '与变更融合成独立完整报告, 读者只看得到这一条, 旧版折叠隐藏——增' +
+      '量/承接式叙事不成立)。 The verdict returns in ' +
       'this receipt. Vulnerabilities are never revised without writer ' +
       'review.',
     executionMode: 'sequential',
@@ -956,6 +968,8 @@ export function buildOrchestratorTools(record, caps) {
       engagementId: Type.Optional(Type.String({
         description: 'Defaults to your active engagement (auto-cleared once cancelled)',
       })),
+      // 2026-10-12 紧急消息: 紧急通道开关——打断接收方在飞回合。
+      urgent: Type.Optional(Type.Boolean({ description: 'true=紧急消息: 打断接收方当前回合立即处理(其在飞工具批作废, 处理完后自动继续原工作)。仅时效关键场景使用(如重复报告协调/紧急终止); 非紧急勿用——打断会作废对方当前工具批的工作成果' })),
     }),
     execute: async (_id, params) => {
       if (!params.sessionIds?.length && !params.agents?.length) {
@@ -972,7 +986,18 @@ export function buildOrchestratorTools(record, caps) {
           const sid = String(sidRaw).replace(/^sess:/, '');
           try {
             const rec2 = await caps.getRecord?.(sid);
-            if (rec2?.busy) {
+            // 2026-10-12 紧急消息: urgent=true 透传——接收方忙时走
+            // urgentSteer(打断其回合, 处理完自动续原工作), 空闲时
+            // urgentSteer 内部直达 prompt(与原空闲路径同效)。
+            if (params.urgent) {
+              if (caps.urgentSteerSession) {
+                await caps.urgentSteerSession(sid, `[DM from orchestrator] ${params.text}`);
+                sent.push(`${sid}(已投递·紧急打断)`);
+              } else {
+                await caps.steerSession?.(sid, `[DM from orchestrator] ${params.text}`);
+                sent.push(`${sid}(已注入·steer 即时)`);
+              }
+            } else if (rec2?.busy) {
               await caps.steerSession?.(sid, `[DM from orchestrator] ${params.text}`);
               sent.push(`${sid}(已注入·steer 即时)`);
             } else {
@@ -1150,7 +1175,7 @@ export function buildShellTools(record, caps) {
     name: 'shell',
     label: 'Shell 通道',
     description:
-      '[runs commands; side-effects] 操作 C2 植入产生的 shell 通道(经授权门)。' +
+      '[runs commands; side-effects] 操作 C2 植入产生的 shell 通道。' +
       'action=list 列出可用 shell(含 id/目标/系统指纹/任务数);action=exec 执行命令并返回' +
       ' stdout/stderr/退出码;action=read_file 读文件(web 传输=命令替换式语义——端点须能执行 cat 类命令,拒绝时原样返回端点响应正文;白名单类 webshell 端点读不到文件属预期,非通道故障);action=status 看 shell 元数据+最近任务;' +
       'action=close 关闭。每条命令进平台审计(证据链)。shell 可由 c2 agent 交付或运营注册,' +
@@ -1372,7 +1397,7 @@ export function buildChildTools(record, caps) {
 
   return [buildReportVulnerabilityTool(record, caps), publishIntel,
     buildRequestRevisionTool(record, caps), spawnAgent,
-    buildAuthRequestTool(record, caps)];
+    ];
 }
 
 /**
@@ -1384,113 +1409,7 @@ export function buildChildTools(record, caps) {
  * @param {object} record  direct session record
  * @param {object} caps    { emitBus, reportWriter, authorOf }
  */
-/** r47: 授权请求工具——agent 对清单外目标发起授权申请, 用户前端一键批/驳。
- * 全业务面挂载(编排器/席位): shell gate 被拒时按回执指引调用本工具。 */
-export function buildAuthRequestTool(record, caps) {
-  const authTool = {
-    name: 'request_authorization',
-    label: '申请渗透授权',
-    description:
-      '[creates event] 目标不在渗透授权清单(scope targets)被拦时, 向**用户**发起授权申请——' +
-      '用户在前端看到弹窗, 点击批准后目标立即入清单(register/exec 放行)并回执通知你。' +
-      '非滥用通道: 每个目标申请一次, 附清晰理由(任务必要性/目标归属)。',
-    executionMode: 'sequential',
-    parameters: Type.Object({
-      target: Type.String({ description: "目标名, 支持一次多目标(逗号/空格分隔, 如 '10.0.0.5, 172.28.11.0/24'——批量测绘对账场景); 单目标形如 10.0.0.5 或 host.example.com; 传 '*' 列出当前全部待批授权请求(只读查询); 传 'withdraw:seq' 或 'withdraw:all' 撤回自己发出的待批申请" }),
-      reason: Type.Optional(Type.String({ description: '为什么需要授权该目标(一句话任务理由)。target=* 查询模式可省' })),
-    }),
-    execute: async (_id, params) => {
-      // A14: 多目标支持——逗号/空格分隔拆分逐个走原逻辑, 末尾汇总。
-      const rawT = String(params.target ?? '').trim();
-      if (rawT !== '*' && /[,\s]/.test(rawT)) {
-        const items = [...new Set(rawT.split(/[,\s]+/).map(x => x.trim()).filter(Boolean))];
-        const lines = [];
-        for (const it of items) {
-          const r = await authTool.execute(_id, { target: it, reason: params.reason });
-          lines.push(`- ${it}: ${(r?.content?.[0]?.text ?? '(无回执)').split('\n')[0].slice(0, 160)}`);
-        }
-        return { content: [{ type: 'text', text: `多目标授权申请(${items.length} 个)逐项结果:\n${lines.join('\n')}` }] };
-      }
-      // A11: 子网覆盖去重——单机 IP 落在已批准/待批网段内则不发新申请
-      // (被网段覆盖=同一授权面, 重复申请纯噪声)。
-      const ipInCidr = (ip, cidr) => {
-        const m = /^(\d{1,3}(?:\.\d{1,3}){3})(?:\/(\d{1,2}))?$/.exec(cidr);
-        if (!m) return false;
-        const toL = (a) => a.split('.').map(Number).reduce((x, y) => ((x << 8) | y) >>> 0, 0) >>> 0;
-        const bits = m[2] === undefined ? 32 : Number(m[2]);
-        if (bits < 8 || bits > 32) return false;
-        const mask = bits === 0 ? 0 : ((0xffffffff << (32 - bits)) >>> 0);
-        return ((toL(ip) & mask) >>> 0) === ((toL(m[1]) & mask) >>> 0);
-      };
-      if (/^\d{1,3}(\.\d{1,3}){3}$/.test(rawT)) {
-        const covered = (caps.listScope?.() ?? { targets: [] }).targets
-          ?.find(t => t !== rawT && /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(t) && ipInCidr(rawT, t));
-        if (covered) {
-          return { content: [{ type: 'text', text: `${rawT} 已被授权清单内的网段 ${covered} 覆盖——无需申请, 直接执行。` }] };
-        }
-        const pendList = (caps.listPendingAuthRequests?.() ?? { live: [] });
-        const pendCov = (pendList.live ?? []).find?.(x => x.target !== rawT && /^\d{1,3}(\.\d{1,3}){3}\/\d{1,2}$/.test(x.target) && ipInCidr(rawT, x.target));
-        if (pendCov) {
-          return { content: [{ type: 'text', text: `${rawT} 已被待批网段申请 ${pendCov.target}(seq=${pendCov.seq}) 覆盖——请等待该申请获批, 勿重复申请。` }] };
-        }
-      }
-      // Q4: withdraw——撤回自己发出的待批请求(target 形如 withdraw:seq
-      // 或 withdraw:all)。OOB 判收等基建类申请作废时不再永久悬置
-      // (WebGoat循环2 9958/9959 实证: RCE 改写→读回后无撤回手段)。
-      if (/^withdraw:/i.test(rawT)) {
-        const wSeq = rawT.split(':')[1];
-        const pendAll = (caps.listPendingAuthRequests?.() ?? { live: [] }).live ?? [];
-        const mine = pendAll.filter(x2 => (x2.payloadRef === `sess:${record.id}` || x2.requester === (record.spawnName ?? record.agentKey))
-          && (wSeq === 'all' || String(x2.seq) === wSeq));
-        if (!mine.length) {
-          return { content: [{ type: 'text', text: `无可撤回的待批请求(${rawT})——用 target=* 查看待批列表核对 seq 与申请人。` }] };
-        }
-        for (const m of mine) {
-          try { caps.emitBus?.({ channel: 'audit', from: 'system', type: 'auth-request',
-            resolves: m.seq, status: 'withdrawn', target: m.target,
-            title: `授权申请已撤回: ${m.target}`,
-            summary: `${record.spawnName ?? record.agentKey} 撤回了 seq=${m.seq} 的授权申请(${m.target})——不再待批, 无需处理。`,
-            workSessionId: m.workSessionId ?? record.workSessionId ?? null }); } catch { /* 单条失败不阻断 */ }
-        }
-        return { content: [{ type: 'text', text: `已撤回 ${mine.length} 条待批请求: ${mine.map(m => `seq=${m.seq}(${m.target})`).join(', ')}——用户侧确认卡同步消失(resolves 语义)。` }] };
-      }
-      // loop36-QA: target='*' 只读查询全部待批(此前挂起请求无查询入口)
-      if (params.target === '*') {
-        const pr = caps.listPendingAuthRequests?.() ?? { live: [] };
-        const pend = Array.isArray(pr) ? pr : (pr.live ?? []);
-        const legacyN = Array.isArray(pr) ? 0 : (pr.legacyN ?? 0);
-        const legacyLine = legacyN > 0 ? `\n(另有 ${legacyN} 条无 target 字段的历史条目已折叠——字段早于白名单, 不可操作, TTL 到期自动过期)` : '';
-        return { content: [{ type: 'text', text: pend.length
-          ? `当前待批授权请求 ${pend.length} 条(用户未处理; 7 天自动过期):\n${pend.map(x => `- seq=${x.seq} ${x.target}(申请人:${x.requester ?? '?'}——${x.reason ?? '无理由'})`).join('\n')}${legacyLine}\n用户在前端确认卡批准后目标即入清单; 勿重复申请。`
-          : `当前无待批授权请求(7 天 TTL 内)。${legacyLine}` }] };
-      }
-      // loop36-QA: reason 仅申请路径必填(查询模式 '*' 豁免被 schema 拦)
-      if (!params.reason || !params.reason.trim()) {
-        return { content: [{ type: 'text', text: 'reason 必填(申请授权需一句话任务理由; 若只想查待批清单, 传 target=* 可省 reason)。' }] };
-      }
-      // 同目标去重: 已 pending 或已批准则不重复发
-      const dupRaw = caps.scanAuthRequests?.(record, params.target);
-      const dup = dupRaw && typeof dupRaw === 'object' ? dupRaw.state : dupRaw;
-      if (dup === 'pending') {
-        return { content: [{ type: 'text', text: `已有对 ${params.target} 的待批授权请求(seq=${dupRaw.seq}, 用户未处理, 7 天自动过期)——请等待, 勿重复申请。` }] };
-      }
-      if (dup === 'approved') {
-        return { content: [{ type: 'text', text: `${params.target} 已在授权清单中——直接执行即可, 无需申请。` }] };
-      }
-      const ev = caps.emitBus({
-        channel: 'dm', from: record.agentKey, to: 'user', type: 'auth-request',
-        target: params.target, reason: params.reason,
-        requester: record.spawnName ?? record.agentKey,
-        payloadRef: `sess:${record.id}`,
-        title: `授权请求: ${params.target}`,
-        summary: `${record.spawnName ?? record.agentKey} 申请渗透授权——${String(params.reason).slice(0, 80)}`,
-        workSessionId: record.workSessionId ?? null,
-      });
-      return { content: [{ type: 'text', text: `授权请求已提交用户(target=${params.target}, seq=${ev?.seq ?? '?'}): 用户批准后目标立即入清单, 你会收到 [授权已批准] 回执通知, 届时重试被拦操作即可。` }] };
-    },
-  };
-  return authTool;
-}
+// (request_authorization 工具已按用户令 2026-10-09 随授权机制移除)
 
 export function buildDirectTools(record, caps) {
   const publishVuln = {
@@ -1502,7 +1421,11 @@ export function buildDirectTools(record, caps) {
       'confirmed, real-harm, submittable vulnerabilities — speculative or ' +
       'merely useful info goes to publish_intel. Call once per distinct ' +
       'vulnerability — do not re-publish. You may still submit task ' +
-      'reports separately; this tool only records vulnerabilities.',
+      'reports separately; this tool only records vulnerabilities. ' +
+      // 2026-10-12 查重门: writer 规则入提示词面(简洁版, 详规在命中回执)
+      '落账前平台机械查重, 命中回执会给出处理规则——核心: 同洞已落账=驳回; ' +
+      '与编写中条目疑似同洞=按时间先后协调(你先照常提交; 你后用紧急消息与对方 ' +
+      'writer 通话确认, 同洞则由先到者合并两会话编写)。',
     executionMode: 'sequential',
     parameters: Type.Object({
       title: Type.String({ description: 'One-line vulnerability title' }),
@@ -1512,6 +1435,8 @@ export function buildDirectTools(record, caps) {
         Type.Literal('high'), Type.Literal('critical'),
       ], { description: 'Vulnerability severity: info/low/medium/high/critical' }),
       mergeInto: Type.Optional(Type.Number({ description: '已有报告覆盖此问题时的补充合并: 传该报告 seq——本条内容作为修订并入' })),
+      // 2026-10-12 查重门: 人工比对结论通道——'[已比对' 标记跳过机械门。
+      hint: Type.Optional(Type.String({ description: '查重协调备注: 机械门命中后重发时附比对结论, 末尾带 \'[已比对 seq=X/编写中条目, 判定: 不同漏洞, 理由: …]\' 即放行' })),
     }),
     execute: async (_id, params) => {
       if (params.mergeInto) {
@@ -1537,6 +1462,16 @@ export function buildDirectTools(record, caps) {
         return { content: [{ type: 'text',
           text: `[已归并] 报告 seq=${params.mergeInto} 已追加第 ${n} 次修订(seq=${rev?.seq ?? '?'})——内容并入完成, 引用一律用 seq=${params.mergeInto}。` }],
           details: { merged: true, targetSeq: params.mergeInto, revisionSeq: rev?.seq, n } };
+      }
+      // 2026-10-12 紧急消息/查重门: 落账 emit 前机械查重——同资产(域名/IP)
+      // 重合且(标题实质词≥3 或端点路径相同)即拦, 返回回执不报错; hint 带
+      // '[已比对' 标记(人工判定不同洞)跳过机械门直接落账。
+      const dupGate = vulnDedupGate(
+        (caps.listBus?.() ?? []).filter(e2 => e2.workSessionId === (record.workSessionId ?? null)),
+        { title: params.title, detail: params.text, hint: params.hint });
+      if (dupGate) {
+        return { content: [{ type: 'text', text: dupReceipt(dupGate) }],
+          details: { emitted: false, dup: { landed: dupGate.landed.length, drafts: dupGate.drafts.length } } };
       }
       const ev = caps.emitBus({
         channel: 'dm', from: record.agentKey, to: 'user',
@@ -1582,7 +1517,7 @@ export function buildDirectTools(record, caps) {
     // R31: report(writer)原 early-return 无 tooling 实例——撰写引用/
     // CVE 背景核验需要各持独立 search_web/fetch_url(共享工具铁律;
     // report 席位实测"search_web 终审缺席")。
-    return [publishVuln, publishIntel, buildAuthRequestTool(record, caps),
+    return [publishVuln, publishIntel,
       ...buildToolingTools({ agentKey: record.agentKey }, caps)];
   }
   // 共享工具铁律(AGENTS.md): 多智能体都需要的能力(如联网搜索/抓取)
@@ -1602,3 +1537,88 @@ export function buildDirectTools(record, caps) {
  */
 export const normTitle = s => String(s ?? '').toLowerCase()
   .replace(/[\s·,。,.;:;:()[\]()（）【】《》""''-]/g, '');
+
+// ── 2026-10-12 紧急消息/查重门: publish_vulnerability 机械查重原语 ──
+/** 资产标识提取: 域名/IP/主机名(含 .edu.cn 及一切点分形态), 小写集合。 */
+export const extractAssets = (s) => {
+  const out = new Set();
+  for (const m of String(s ?? '').toLowerCase()
+    .matchAll(/[a-z0-9][a-z0-9-]*(?:\.[a-z0-9][a-z0-9-]*)+/g)) {
+    out.add(m[0]);
+  }
+  return out;
+};
+
+const DEDUP_STOPWORDS = new Set(['www', 'com', 'cn', 'net', 'edu', 'org', 'http', 'https', 'html', 'index']);
+/** 标题实质词提取: 拉丁词(≥3 字符, 去停用词) + CJK 二元组(滑窗)。 */
+export const extractTitleWords = (s) => {
+  const t = String(s ?? '').toLowerCase();
+  const out = new Set();
+  for (const m of t.matchAll(/[a-z][a-z0-9-]{2,}/g)) {
+    if (!DEDUP_STOPWORDS.has(m[0])) out.add(m[0]);
+  }
+  for (const seg of t.match(/[\u4e00-\u9fff]+/g) ?? []) {
+    for (let i = 0; i + 1 < seg.length; i++) out.add(seg.slice(i, i + 2));
+  }
+  return out;
+};
+
+/** 端点路径提取: /a/b 形态的路径串(精确串比对用)。 */
+export const extractEndpoints = (s) => new Set(
+  String(s ?? '').match(/\/[A-Za-z0-9._~-]+(?:\/[A-Za-z0-9._~-]+)*/g) ?? []);
+
+/**
+ * 2026-10-12 紧急消息/查重门: publish_vulnerability 落账前机械比对。
+ * 保守判定(宁误拦不漏): 候选与库内现行版漏洞/在飞 draft 同资产(域名/IP
+ * 重合)且(标题实质词重合≥3 或 端点路径串相同)→ 疑似重复。
+ * @param {Array} wsEvents 本项目(workSessionId 过滤后)的全部 bus 事件
+ * @param {{title:string, detail:string, hint?:string}} cand 候选
+ * @returns {{landed: Array, drafts: Array}|null} 命中清单; 无命中或 hint
+ *   带 '[已比对' 标记(人工判定不同洞)时恒 null(跳过机械门直接放行)。
+ */
+export function vulnDedupGate(wsEvents, cand) {
+  if (String(cand.hint ?? '').includes('[已比对')) return null;
+  const isEntryLocal = e => entryKind(e) !== null;
+  const resolvedSet = new Set(wsEvents.filter(e => e.resolves).map(e => e.resolves));
+  const landed = foldRevisions(wsEvents.filter(e => isEntryLocal(e)))
+    .filter(e => entryKind(e.current ?? e) === 'vulnerability' && !e.current.void);
+  const drafts = wsEvents.filter(e => e.type === 'vuln-draft' && !e.resolves && !resolvedSet.has(e.seq));
+  const candAssets = extractAssets(`${cand.title ?? ''}\n${cand.detail ?? ''}`);
+  if (!candAssets.size) return null;  // 无资产标识=无从比对, 放行
+  const candWords = extractTitleWords(cand.title ?? '');
+  const candEps = extractEndpoints(`${cand.title ?? ''}\n${cand.detail ?? ''}`);
+  const hit = e => {
+    const assets = extractAssets(`${e.title ?? ''}\n${e.summary ?? ''}\n${e.detail ?? ''}`);
+    if (![...candAssets].some(a => assets.has(a))) return null;
+    const words = extractTitleWords(e.title ?? e.summary ?? '');
+    const shared = [...candWords].filter(w => words.has(w));
+    const eps = extractEndpoints(`${e.title ?? ''}\n${e.detail ?? ''}`);
+    const sameEp = [...candEps].some(p => p.length > 3 && eps.has(p));
+    return (shared.length >= 3 || sameEp) ? { shared, sameEp } : null;
+  };
+  const landedHits = landed.filter(e => hit(e.current));
+  const draftHits = drafts.filter(e => hit(e));
+  return (landedHits.length || draftHits.length)
+    ? { landed: landedHits, drafts: draftHits } : null;
+}
+
+/**
+ * 2026-10-12 查重门: 命中回执(不报错, 正常 content 返回——处理规则
+ * 由 writer 按回执执行, '[已比对' 标记的重发会跳过机械门)。
+ */
+export function dupReceipt(gate) {
+  const lines = ['疑似重复(平台机械比对命中):'];
+  for (const e of gate.landed) {
+    lines.push(`- 已落账: seq=${e.seq}《${e.current.title ?? e.title}》[${e.current.severity ?? e.severity ?? '?'}](payloadRef=${e.payloadRef ?? '?'})`);
+  }
+  for (const e of gate.drafts) {
+    lines.push(`- 编写中: 《${e.title ?? '?'}》(requester=${e.requester ?? '?'}, 上报于 ${String(e.ts ?? '').slice(0, 19).replace('T', ' ')}, payloadRef=${e.payloadRef ?? '?'})`);
+  }
+  lines.push(
+    `【处理规则(必读)】①若与已落账条目为同一漏洞: 本条不得提交(报失败/驳回) ` +
+    `②若与编写中条目疑似同一漏洞: 比较上报时间——你先: 照常重发 publish 且 hint 注明'已比对, 我先上报'; ` +
+    `对方先: 用 relay_to_agents(urgent=true) 向对方 writer 会话(payloadRef=sess:xxx)发消息询问是否同一漏洞——` +
+    `不同: 你重发 publish 注明'已比对, 对方确认不同'; 相同: 告知对方你由哪个会话唤起+原委, 由对方结合两个会话上下文编写报告, 你的任务结束`,
+    `判定为不同洞后重发 publish 时, hint 末尾附'[已比对 seq=X/编写中条目, 判定: 不同漏洞, 理由: …]'即可放行(检测到此标记跳过机械门)。`);
+  return lines.join('\n');
+}
