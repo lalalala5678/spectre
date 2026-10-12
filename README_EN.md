@@ -9,10 +9,6 @@
 **Multi-agent penetration testing platform** — discovery and verdict are separated (every lead is re-verified by an independent seat before it lands), fully auditable and replayable
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
-[![GitHub Watchers](https://img.shields.io/github/watchers/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/watchers)
-[![GitHub Forks](https://img.shields.io/github/forks/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/network/members)
-[![GitHub Issues](https://img.shields.io/github/issues/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/issues)
-[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/pulls)
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](https://github.com/lalalala5678/spectre/releases)
@@ -30,25 +26,25 @@
 
 ## Why SPECTRE
 
-**Type a target, then walk away.** Recon maps, weakcred cracks, api lays authz matrices, exploit builds chains, nday reconciles CVEs — all in parallel. Every lead is **re-verified by an independent report seat** before entering the ledger. A report with evidence chains, POCs, kill chains, and a negative-space list lands at the end.
+Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit builds chains, nday reconciles CVEs in parallel, and a final report lands with evidence chains, POCs, and a list of verified-no-finding items.
 
-**The AI that finds a hole isn't the AI that certifies it.** Discovery and judgment seats are separate — the verifier reproduces the evidence, reads the full context, checks the ledger: file it, merge it, or decline it with reasons. Across five real campaigns it has declined its own teammates' false positives. Our direct answer to "AI pentesting = hallucination gift packs."
+**Discovery and verdict are separated.** The seat that finds a vulnerability is not the seat that certifies it: the verifier reproduces the evidence, reads the full context, checks the ledger — then files it into the vulnerability store (referred to below as "ledger entry"), merges duplicates, or declines with reasons. During development campaigns it declined its own teammates' false positives.
 
-**235 real findings, every one traceable.** During development the platform ran five end-to-end campaigns against public ranges (116 findings); then — **in a single 24-hour run — completed 52 campaigns against 52 universities, producing 119 findings (8 critical / 28 high / 47 medium / 36 low)**. One university closed out every 28 minutes on average. Every output is in the ledger: POC, evidence chain, verification record, revision history.
+**Two bodies of field work.** Five end-to-end campaigns against public ranges during development (116 findings); then 52 campaigns against 52 universities in a single 24-hour run, producing 119 findings (8 critical / 28 high / 47 medium / 36 low) — one university closed out every 28 minutes on average. Every output is queryable in the ledger: POC, evidence chain, verification record, revision history.
 
-**The process dies; the campaign doesn't.** Write-ahead log on every mutation; deploys drain in-flight turns before restart; severed turns resume from the breakpoint; rate limits back off and retry. Not aspirations — each mechanism was machined from a real incident (see [Reliability engineering](#reliability-engineering)).
+**Interruption-recovery boundaries.** Sessions, events, and the bus are write-ahead-logged on every mutation; deploys drain in-flight turns before restart; severed turns resume from the breakpoint; provider rate limits back off and retry. **Recoverable**: all session transcripts and ledger entries. **Not recoverable**: tool calls in a severed turn whose results never returned (the model is told about the severance and decides its own retry). See [Reliability engineering](#reliability-engineering) for where each mechanism came from.
 
-**Bring any model.** OpenAI-compatible / Anthropic / Gemini — four fields in the console, connectivity-probed before saving; per-seat overrides on top of the default.
+**Model access.** OpenAI-compatible / Anthropic / Gemini — four fields in the console, connectivity-probed before saving; per-seat overrides on top of the default.
 
 ## Track record
 
 | Campaign | Stack | Findings | Highlights |
 |---|---|---|---|
-| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | 5 complete kill chains; default DB creds → total compromise |
+| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | 5 complete exploit chains; default DB credentials read every data store directly |
 | WebGoat 8 | Java / Spring | **29** | Five JWT forgeries, XXE, SQLi; 12/12 lessons |
-| vAPI | PHP / MySQL, OWASP API Top10 | **19** | 13/13 lessons; offline token forgery → full takeover |
-| Juice Shop 20 | Node / Angular | **22** (3 critical) | 24/116 challenges; deserialization RCE chain closed |
-| DVWA | PHP classic | **16** | 14/14 modules; dual-channel webshell persistence |
+| vAPI | PHP / MySQL, OWASP API Top10 | **19** | 13/13 lessons; offline token forgery grants every admin API |
+| Juice Shop 20 | Node / Angular | **22** (3 critical) | 24/116 challenges; deserialization chain walked end to end to command execution |
+| DVWA | PHP classic | **16** | 14/14 modules; webshell persistence end to end (register–execute–audit) |
 
 **116 total.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
@@ -58,9 +54,9 @@
 
 | Dimension | Data |
 |---|---|
-| Campaigns | **52 universities in 24 hours** (avg 2.3 findings each, single-target max **19** — an entire HPC portal family) |
-| Findings | **119 total**: **critical×8** / high×28 / medium×47 / low×36 — every one independently re-verified by the report agent before ledger entry |
-| Depth | Outer web to intranet: unthrottled CAS brute-force → credential reuse into SSL VPN → L3 tunnel (open-source client protocol re-implementation) → 137k-shot faculty-ID spray → vertical privilege escalation pulling 8,394 personnel records (ID numbers + password hashes) in a single request |
+| Campaigns | **52 universities in 24 hours** (avg 2.3 each; single-target max **19**, concentrated in file-write and access-control flaws of an HPC portal) |
+| Findings | **119 total**: **critical×8** / high×28 / medium×47 / low×36 — every one re-verified before entering the vulnerability store |
+| Depth | Outer web into internal systems: captcha-free CAS brute-force → credential login to VPN → L3 tunnel (open-source client protocol re-implementation) → faculty-ID dictionary (137k attempts) → vertical privilege escalation reading 8,394 personnel records (ID numbers + password hashes) in one request |
 
 **Representative findings** (by attack surface):
 
@@ -94,7 +90,7 @@ Every command, tool call, and event is traceable — the evidentiary backbone of
 
 ### 🐚 Shell console
 
-Command channels (webshells / implants) registered during engagements are managed centrally: status, validity, execution audit. OOB verdicts land on a read-only mount readable straight from the sandbox.
+Command channels (webshells / implants) registered during engagements are managed centrally: status, validity, execution audit. Out-of-band callback verification (OOB): callbacks land on a read-only mount, readable straight from the sandbox.
 
 ![shells](console/screenshots/panel-shells.png)
 
@@ -114,7 +110,7 @@ Model config (four fields, probed before saving), data-source credentials — al
 │                                                               └─ Docker sandbox: nuclei/hydra/nmap/fscan,
 │                                                                  installs ledgered, replayed on rebuild
 ├─ Temporal workflows (:7233) ── campaign orchestration / resumption / closeout
-└─ OOB collector (:19999) ── out-of-band verdicts, read-only mount at /oob/
+└─ OOB collector (:19999) ── out-of-band callback verification, read-only mount at /oob/
 ```
 
 <details>
@@ -127,16 +123,16 @@ Model config (four fields, probed before saving), data-source credentials — al
 | nday | CVE reconciliation / variants | | persistence | Footholds / mimicry |
 | weakcred | Cracking / reuse / spraying | | postex | Forensics / lateral mapping |
 | api | Authz matrices / mass assign / JWT | | report | Independent verification |
-| exploit | Research & chain construction | | config trio | skill/mcp/cli exclusive |
+| exploit | Research & chain construction | | config agents ×3 | skill/mcp/cli exclusive |
 
-The config trio holds all configuration tooling — business seats are never polluted by config prompts. A hard boundary, not a convention.
+The three config agents hold all configuration tooling; business seats never see config prompts (an architectural boundary — see the seat table).
 
 </details>
 
 ### Technology choices
 
-- **pi-agent-core as the per-seat skeleton, zero modifications.** The platform is an adaptation layer aligned item by item with the official contracts (FileError code table / ShellOutputView / TruncationResult) — framework upgrades don't break the adapter; a boundary proven across five campaigns.
-- **Temporal for orchestration, not a homegrown task queue.** A campaign is a durable workflow: seats resume after interruption, closeout reconciles automatically, ghost reports are marked provisional and auto-voided by real ones — semantics you'd rebuild from scratch on bare processes.
+- **pi-agent-core as the per-seat skeleton, zero modifications.** The platform is an adaptation layer aligned item by item with the official contracts (FileError code table / ShellOutputView / TruncationResult) — framework upgrades don't break the adapter.
+- **Temporal for orchestration, not a homegrown task queue.** A campaign is a durable workflow: seats resume after interruption, closeout reconciles automatically, system-drafted ghost reports are auto-voided by real ones — semantics you'd rebuild from scratch on bare processes.
 - **Write-ahead log; memory is not trusted.** Sessions, events, and the bus hit disk on every mutation before taking effect; restarts replay from the WAL with zero loss.
 
 ## Reliability engineering
@@ -149,7 +145,7 @@ Every row corresponds to a real incident class, fixed and validated in subsequen
 | Crash / power loss severing a turn | Post-replay severed-turn detection (tool batch done, zero output) with automatic resumption |
 | Provider 429 / network jitter | 45-60s backoff auto-retry; accounting messages no longer evaporate |
 | Workflow long-wait false deaths (three consecutive 5-minute misjudgments) | Single long-hang replaced with 60s polling probes |
-| Duplicate / dropped findings | Same-text idempotency + append-only revision chains; zero tolerance for double-entry |
+| Duplicate / dropped findings | Same-text idempotency + append-only revision chains; duplicates auto-merge |
 
 ## Quick start
 
@@ -167,7 +163,7 @@ One command: build, admin bootstrap, systemd services, TLS. Open the console, co
 
 ```bash
 # ① Backend (Node ≥ 22)
-cd backend && cp .env.example .env   # set INTERNAL_TOKEN (delete placeholder, first-wins)
+cd backend && cp .env.example .env   # set INTERNAL_TOKEN to a random string
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs
 
@@ -188,24 +184,22 @@ Open `http://127.0.0.1:8081/spectre/`, log in, configure the model in settings.
 ## Tests
 
 ```bash
-cd backend && npm test    # 65 cases: dedup mutex / session lifecycle / revision chains / idempotency / scope gates / line-count locks
+cd backend && npm test    # 67 cases: dedup mutex / session lifecycle / revision chains / idempotency / line-count locks
 ```
 
 ## FAQ
 
-**Can I trust AI-found vulnerabilities?** An independent report seat re-verifies every lead; it has declined its own teammates' false positives. Every filed finding ships a POC and evidence chain you can re-check.
+**Can I trust AI-found vulnerabilities?** Every lead is re-verified by an independent seat before filing (see "Discovery and verdict are separated" above); filed findings ship a POC and evidence chain you can re-check.
 
-**Crashes / rate limits / restarts?** See [Reliability engineering](#reliability-engineering) — five failure modes, five mechanisms machined from real incidents.
+**Crashes / rate limits / restarts?** See [Reliability engineering](#reliability-engineering) — five incident classes with their mechanisms.
 
-**Can I use my own model?** Any OpenAI-compatible / Anthropic / Gemini endpoint. Four fields, probed before saving, per-seat overrides supported.
+**Can I use my own model?** See "Model access" above.
 
 ## Contributing & Support
 
 - Bugs / features: [open an issue](https://github.com/lalalala5678/spectre/issues) with reproduction steps and log excerpts
 - PRs: sync `docs/ARCHITECTURE.md` line-count table for core-file changes (tests lock it) and pass `cd backend && npm test`
 - Security disclosures: private channels only — never post unredacted credentials in public issues
-
-## Compliance
 
 ## License
 

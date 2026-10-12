@@ -9,10 +9,6 @@
 **多智能体渗透测试平台** —— 漏洞发现与判定分离(每条线索由独立席位复核后才落账), 全程审计可回放
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
-[![GitHub Watchers](https://img.shields.io/github/watchers/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/watchers)
-[![GitHub Forks](https://img.shields.io/github/forks/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/network/members)
-[![GitHub Issues](https://img.shields.io/github/issues/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/issues)
-[![GitHub Pull Requests](https://img.shields.io/github/issues-pr/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/pulls)
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](https://github.com/lalalala5678/spectre/releases)
@@ -30,25 +26,25 @@
 
 ## 为什么是 SPECTRE
 
-**输入一个目标, 然后什么都不用管。** recon 测绘、weakcred 爆破、api 铺越权矩阵、exploit 构造利用链、nday 对账 CVE 全部并行推进; 每条漏洞线索由**独立的报告席位**重新验证后才落账; 最后一份带证据链、POC、杀伤链、负空间清单的终报交付给你。
+输入目标后, recon 测绘、weakcred 爆破、api 铺越权矩阵、exploit 构造利用链、nday 对账 CVE 并行推进, 最后交付一份带证据链、POC、已验证无漏洞项清单的终报。
 
-**AI 找的洞, AI 自己再证伪一遍。** 发现漏洞的席位和判定漏洞的席位是分开的——复核席位复现证据、读全文、对照库内, 成立才立账, 重复则合并, 不成立驳回并写明理由。五场实战战役里它驳回过自己人的误报。这是对"AI 渗透=幻觉大礼包"最直接的回答。
+**发现与判定分离。** 发现漏洞的席位和判定漏洞的席位是分开的: 复核席位复现证据、读全文、对照库内, 成立才写入漏洞库(下文称"落账"), 重复则合并, 不成立驳回并写明理由。开发期间的实战里它驳回过自己席位的误报。
 
-**235 项实战发现, 每项可回溯。** 平台开发期间对五个公开靶场跑了全流程战役(116 项); 随后**24 小时内对 52 所高校完成 52 场渗透战役, 产出 119 项漏洞(8 critical / 28 high / 47 medium / 36 low)**——平均每 28 分钟收官一所高校。全部产出在情报库中逐条可查: POC、证据链、独立复核记录、修订历史, 一个不少。
+**两种实战。** 平台开发期间对五个公开靶场跑了全流程战役(116 项); 随后 24 小时内对 52 所高校完成 52 场渗透战役, 产出 119 项漏洞(8 critical / 28 high / 47 medium / 36 low), 平均每 28 分钟收官一所。全部产出在情报库中逐条可查: POC、证据链、复核记录、修订历史。
 
-**进程死了, 战役不死。** 预写日志每变异落盘; 部署重启先排空在飞回合再退出; 智能体回合被腰斩自动从断点续跑; 接口限速自动退避重试。这些不是愿景——每一条机制都对应一次真实事故(见[可靠性工程](#可靠性工程))。
+**中断恢复的边界。** 会话、事件、总线每变异先落盘(WAL); 部署重启先排空在飞回合再退出; 智能体回合被腰斩后自动从断点续跑; 模型接口限速自动退避重试。**能恢复**: 全部会话记录与已落账产出。**不能恢复**: 被腰斩回合中未返回结果的工具调用(模型会被告知腰斩, 自行决定重试)。每条机制的由来见[可靠性工程](#可靠性工程)。
 
-**模型随便换。** OpenAI 兼容 / Anthropic / Gemini 三种线制, 控制台四字段配置, 保存前真实探测连通; 默认模型之上可按席位覆盖(报告席换更严谨的模型是常见用法)。
+**模型接入。** OpenAI 兼容 / Anthropic / Gemini 三种线制, 控制台四字段配置, 保存前真实探测连通; 默认模型之上可按席位覆盖。
 
 ## 实战战绩
 
 | 战役 | 目标栈 | 发现 | 亮点 |
 |---|---|---|---|
-| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | 5 条完整杀伤链; 默认 DB 凭据 → 全库沦陷 |
+| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | 5 条完整利用链; 默认数据库凭据可直接读取全部数据存储 |
 | WebGoat 8 | Java / Spring | **29 项** | JWT 五重伪造、XXE、SQLi; 12/12 课目 |
-| vAPI | PHP / MySQL, OWASP API Top10 | **19 项** | 13/13 课目; API Token 离线伪造 → 全库接管 |
-| Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 24/116 官方挑战; 反序列化 RCE 链闭合 |
-| DVWA | PHP 经典 | **16 项** | 14/14 模块; 双通道 webshell 权限维持 |
+| vAPI | PHP / MySQL, OWASP API Top10 | **19 项** | 13/13 课目; API Token 离线伪造后可调用全部管理接口 |
+| Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 24/116 官方挑战; 反序列化利用链从入口到命令执行完整走通 |
+| DVWA | PHP 经典 | **16 项** | 14/14 模块; webshell 权限维持全流程(注册-执行-审计) |
 
 **合计 116 项。** 一份脱敏终报样例: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
@@ -58,9 +54,9 @@
 
 | 维度 | 数据 |
 |---|---|
-| 战役 | **24 小时 52 所高校**(场均 2.3 项, 单目标最高 **19 项**——HPC 超算门户族一网打尽) |
+| 战役 | **24 小时 52 所高校**(场均 2.3 项; 单目标最高 **19 项**, 集中在 HPC 超算门户的文件写入与访问控制缺陷) |
 | 发现 | **119 项**: **critical×8** / high×28 / medium×47 / low×36, 全部经独立报告席复核落账 |
-| 攻击纵深 | 从外网打穿到内网: CAS 无防护爆破→凭据直登 VPN→L3 隧道(开源客户端协议复现)→教师工号喷雾(13.7 万次)→科研管理系统垂直越权, 单请求拉取 8394 人档案(含身份证号+口令哈希) |
+| 攻击纵深 | 从外网入口推进到内网系统: CAS 无验证码爆破→凭据登录 VPN→L3 隧道(开源客户端协议复现)→教师工号字典(13.7 万次尝试)→科研管理系统垂直越权, 单请求读取 8394 人档案(含身份证号+口令哈希) |
 
 **代表发现**(按攻击面):
 
@@ -94,7 +90,7 @@
 
 ### 🐚 Shell 控制台
 
-渗透过程中注册的命令通道(webshell/植入)统一管理: 状态、有效期、执行审计。OOB 判收落盘只读挂载, 沙箱内直读实收。
+渗透过程中注册的命令通道(webshell/植入)统一管理: 状态、有效期、执行审计。带外回调验证(OOB): 回调落盘为只读挂载, 沙箱内可直接读取实收结果。
 
 ![shells](console/screenshots/panel-shells.png)
 
@@ -114,7 +110,7 @@
 │                                                    └─ Docker 沙箱: nuclei/hydra/nmap/fscan,
 │                                                       安装账本化, 容器重建自动重放
 ├─ Temporal 工作流 (:7233) ── 战役调度 / 断点续跑 / 收尾对账
-└─ OOB 收集器 (:19999) ── 带外判收, 落盘只读挂 /oob/, 沙箱直读实收
+└─ OOB 收集器 (:19999) ── 带外回调验证, 落盘只读挂 /oob/, 沙箱直读实收
 ```
 
 <details>
@@ -127,16 +123,16 @@
 | nday | CVE 对账/变体绕过 | | persistence | 权限维持/拟态伪装 |
 | weakcred | 爆破/凭据复用/喷洒 | | postex | 取证/横向面测绘 |
 | api | 越权矩阵/批量赋值/JWT | | report | 独立复核: 立账/合并/驳回 |
-| exploit | 漏洞挖掘/利用链 | | 配置三键 | skill/mcp/cli 配置独占 |
+| exploit | 漏洞挖掘/利用链 | | 配置智能体×3 | skill/mcp/cli 配置独占 |
 
-配置三键持有全部配置工具, 业务席位永不被配置提示词污染——这是硬边界, 不是约定。
+三个配置智能体持有全部配置工具, 业务席位不接触配置类提示词(架构边界, 见席位表)。
 
 </details>
 
 ### 技术选型
 
-- **pi-agent-core 做单席位骨架, 零修改。** 平台在其上做适配层, 逐项对齐官方契约(FileError 码表 / ShellOutputView / TruncationResult)——框架升级不破坏适配, 五场战役验证过的边界。
-- **Temporal 做编排, 不是自建任务队列。** 战役是持久化工作流: 席位中断可续跑、收尾自动对账、代拟报告标记 provisional 且被真终报自动作废——这些语义在裸进程模型里要重造一遍。
+- **pi-agent-core 做单席位骨架, 零修改。** 平台在其上做适配层, 逐项对齐官方契约(FileError 码表 / ShellOutputView / TruncationResult), 框架升级不破坏适配。
+- **Temporal 做编排, 不是自建任务队列。** 战役是持久化工作流: 席位中断可续跑、收尾自动对账、系统代拟的报告会被真实终报自动作废——这些语义在裸进程模型里需要重造。
 - **WAL 预写日志, 不信任内存。** 会话、事件、总线每变异先落盘再生效; 重启从 WAL 重放, 零丢失。
 
 ## 可靠性工程
@@ -149,7 +145,7 @@
 | 进程崩溃/断电腰斩回合 | WAL 重放后检测腰斩形态(工具批完成但零产出), 自动注入续跑 |
 | 模型接口 429/网络抖动 | 45-60s 退避自动重试, 记账类消息不再随限速蒸发 |
 | 工作流长等待假死(三连 5 分钟误判) | 单次长挂改 60s 轮询探测, 根除传输层超时误报 |
-| 重复落账/漏账 | 同文幂等 + 修订链 append-only, 双账零容忍 |
+| 重复落账/漏账 | 同文幂等 + 修订链 append-only, 重复自动合并 |
 
 ## 快速开始
 
@@ -158,7 +154,7 @@ git clone https://github.com/lalalala5678/spectre && cd spectre
 sudo bash deploy/setup.sh    # 带域名: sudo bash deploy/setup.sh your.domain.com
 ```
 
-一条命令: 依赖构建、admin 建号、systemd 服务、TLS。打开控制台, 配置任意 OpenAI 兼容模型, 输入目标——看它自己打。
+一条命令完成: 依赖构建、admin 建号、systemd 服务、TLS。打开控制台, 配置任意 OpenAI 兼容模型, 输入目标开始。
 
 > ⚠️ 一键脚本整机独占(8090/8081/443 + /etc/spectre); 共享机走下方手工路径。
 
@@ -167,7 +163,7 @@ sudo bash deploy/setup.sh    # 带域名: sudo bash deploy/setup.sh your.domain.
 
 ```bash
 # ① 后端 (Node ≥ 22)
-cd backend && cp .env.example .env   # INTERNAL_TOKEN 填随机串(删占位行, first-wins)
+cd backend && cp .env.example .env   # INTERNAL_TOKEN 填随机串
 SPECTRE_DATA_DIR=/tmp/spectre-data npm i && npm test
 SPECTRE_DATA_DIR=/tmp/spectre-data node agent-runtime.mjs
 
@@ -193,19 +189,17 @@ cd backend && npm test    # 67 用例: 互斥去重/会话生命周期/修订链
 
 ## FAQ
 
-**AI 找的漏洞可信吗?** 独立报告席位逐条复核(复现证据+读全文+查库), 五场战役里驳回过自己人的误报; 每条落账漏洞带 POC 与证据链, 可逐条复验。
+**AI 找的漏洞可信吗?** 每条线索由独立席位复核后才落账(见上文"发现与判定分离"); 落账条目带 POC 与证据链, 可逐条复验。
 
-**崩了/限速/重启怎么办?** 见[可靠性工程](#可靠性工程)——五种死法五种对策, 全部从事故修成机制。
+**崩了/限速/重启怎么办?** 见[可靠性工程](#可靠性工程)的五类事故与对应机制。
 
-**能接自己的模型吗?** 任意 OpenAI 兼容 / Anthropic / Gemini; 四字段, 保存前真实探测, 支持单席位覆盖。
+**能接自己的模型吗?** 见上文"模型接入"。
 
 ## 贡献与支持
 
 - Bug / 功能建议: [提 Issue](https://github.com/lalalala5678/spectre/issues), 附复现步骤与日志片段
 - PR: 触及核心文件请同步 `docs/ARCHITECTURE.md` 行数表(测试会锁), 跑通 `cd backend && npm test`
 - 安全披露: 走私下渠道, 勿在公开 issue 贴未脱敏凭据
-
-## 合规声明
 
 ## License
 
