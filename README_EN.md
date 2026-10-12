@@ -4,9 +4,9 @@
 
 # SPECTRE
 
-### Built for China's real attack surface, with multi-step intrusion paths from outer web to intranet data that mirror real attacker playbooks; a full graphical Web UI — where pentesting tooling still lives on the command line
+### Built for China's real attack surface · multi-step intrusion paths that mirror real playbooks · a full graphical Web UI
 
-**Penetration testing platform** (multi-agent) — discovery and verdict are separated (every lead is re-verified by an independent seat before it lands), fully auditable and replayable
+**Penetration testing platform** — from outer web into intranet data; every lead re-verified by an independent seat before it lands; fully auditable and replayable; multi-agent at the core
 
 [![GitHub Stars](https://img.shields.io/github/stars/lalalala5678/spectre?style=flat-square)](https://github.com/lalalala5678/spectre/stargazers)
 
