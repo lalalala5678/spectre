@@ -58,6 +58,10 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 - **Gateways & keys**: WebVPN shipping its factory-default URL-rewrite key (key embedded in plaintext in every unauth response, cross-campus default corroborated) → unauthenticated proxy to whitelisted host; SSL VPN with deprecated TLS + 1024-bit keys
 - **Vertical app family**: ACM/OJ submitter real-IP leak + group-problem cross-tenant download; library SaaS admin endpoint unauthenticated; admissions/careers/finance systems with hardcoded AES keys, server-side captcha no-ops, XFF-spoofable lockouts
 
+### Range testing
+
+**5 public ranges, 3 cleared every lesson first pass without friction** (WebGoat / vAPI / DVWA); crAPI and Juice Shop yielded all core exploit chains. 116 findings total; a sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
+
 | Campaign | Stack | Findings | Highlights |
 |---|---|---|---|
 | crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | SQL injection reading the full database; default DB credentials connect to every data store; 5 end-to-end chains (entry → credentials → data) |

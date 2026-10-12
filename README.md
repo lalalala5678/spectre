@@ -58,6 +58,10 @@
 - **网关与密钥**: WebVPN 出厂默认 URL 重写密钥未修改(密钥明文内嵌每个未授权响应, 跨校同族默认值互证)→白名单主机零认证代理; SSL VPN 废弃 TLS+1024bit 弱密钥
 - **业务系统族**: ACM/OJ 提交者真实 IP 泄露+组题越权下载; 图书馆 SaaS 管理接口未授权; 招生/就业/财务系统前端硬编码 AES 密钥、验证码服务端零校验、XFF 伪造绕过锁定
 
+### 靶场测试
+
+**5 个公开靶场, 3 个全部关卡一次通过毫无阻碍**(WebGoat / vAPI / DVWA), crAPI 与 Juice Shop 拿下全部核心利用链。合计 116 项发现, 一份脱敏终报样例: [docs/samples/sample-report.md](docs/samples/sample-report.md)
+
 | 战役 | 目标栈 | 发现 | 亮点 |
 |---|---|---|---|
 | crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | SQL 注入读取全库; 默认数据库凭据直连全部数据存储; 5 条端到端利用链(入口→凭据→数据) |
@@ -66,7 +70,6 @@
 | Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 反序列化从入口到命令执行实现 RCE |
 | DVWA | PHP 经典 | **16 项** | 命令注入与文件上传双路径拿下 webshell(命令执行), 权限维持含注册-执行-审计全流程 |
 
-**合计 116 项。** 一份脱敏终报样例: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
 ## 界面一览
 
