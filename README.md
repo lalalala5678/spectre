@@ -38,17 +38,7 @@
 
 ## 实战战绩
 
-| 战役 | 目标栈 | 发现 | 亮点 |
-|---|---|---|---|
-| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | SQL 注入读取全库; 默认数据库凭据直连全部数据存储; 5 条端到端利用链(入口→凭据→数据) |
-| WebGoat 8 | Java / Spring | **29 项** | JWT 签名算法混淆伪造管理员会话; XXE 读取服务器文件; SQL 注入提取全表 |
-| vAPI | PHP / MySQL, OWASP API Top10 | **19 项** | 登录 SQL 注入绕过认证; API Token 离线伪造后可调用全部管理接口 |
-| Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 反序列化从入口到命令执行实现 RCE |
-| DVWA | PHP 经典 | **16 项** | 命令注入与文件上传双路径拿下 webshell(命令执行), 权限维持含注册-执行-审计全流程 |
-
-**合计 116 项。** 一份脱敏终报样例: [docs/samples/sample-report.md](docs/samples/sample-report.md)
-
-### EduSRC 教育行业实战(2026-10)
+### EduSRC 教育行业实战
 
 **24 小时 × 52 所高校 × 119 项漏洞**——资产测绘→指纹→验证→危害补强→独立复核落账, 平均每 28 分钟收官一所高校。
 
@@ -67,6 +57,16 @@
 - **RCE**: 可视化平台未授权命令注入(critical, 良性命令回显即停)
 - **网关与密钥**: WebVPN 出厂默认 URL 重写密钥未修改(密钥明文内嵌每个未授权响应, 跨校同族默认值互证)→白名单主机零认证代理; SSL VPN 废弃 TLS+1024bit 弱密钥
 - **业务系统族**: ACM/OJ 提交者真实 IP 泄露+组题越权下载; 图书馆 SaaS 管理接口未授权; 招生/就业/财务系统前端硬编码 AES 密钥、验证码服务端零校验、XFF 伪造绕过锁定
+
+| 战役 | 目标栈 | 发现 | 亮点 |
+|---|---|---|---|
+| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30 项**(7 critical) | SQL 注入读取全库; 默认数据库凭据直连全部数据存储; 5 条端到端利用链(入口→凭据→数据) |
+| WebGoat 8 | Java / Spring | **29 项** | JWT 签名算法混淆伪造管理员会话; XXE 读取服务器文件; SQL 注入提取全表 |
+| vAPI | PHP / MySQL, OWASP API Top10 | **19 项** | 登录 SQL 注入绕过认证; API Token 离线伪造后可调用全部管理接口 |
+| Juice Shop 20 | Node / Angular | **22 项**(3 critical) | 反序列化从入口到命令执行实现 RCE |
+| DVWA | PHP 经典 | **16 项** | 命令注入与文件上传双路径拿下 webshell(命令执行), 权限维持含注册-执行-审计全流程 |
+
+**合计 116 项。** 一份脱敏终报样例: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
 ## 界面一览
 

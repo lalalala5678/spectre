@@ -38,17 +38,7 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 
 ## Track record
 
-| Campaign | Stack | Findings | Highlights |
-|---|---|---|---|
-| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | SQL injection reading the full database; default DB credentials connect to every data store; 5 end-to-end chains (entry → credentials → data) |
-| WebGoat 8 | Java / Spring | **29** | JWT algorithm-confusion forging admin sessions; XXE reading server files; SQL injection extracting full tables |
-| vAPI | PHP / MySQL, OWASP API Top10 | **19** | Login SQL injection bypassing authentication; offline token forgery grants every admin API |
-| Juice Shop 20 | Node / Angular | **22** (3 critical) | Deserialization from entry to command execution (RCE) |
-| DVWA | PHP classic | **16** | Command injection and file upload each yield a webshell (command execution); persistence covers register–execute–audit |
-
-**116 total.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
-
-### EduSRC Higher-Education Campaigns (Oct 2026)
+### EduSRC Higher-Education Campaigns
 
 **24 hours × 52 universities × 119 findings** — asset mapping → fingerprinting → verification → impact reinforcement → independent review before ledger entry, one university closed out every 28 minutes on average.
 
@@ -67,6 +57,16 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 - **RCE**: visualization platform unauthenticated command injection (critical, benign-command echo then stop)
 - **Gateways & keys**: WebVPN shipping its factory-default URL-rewrite key (key embedded in plaintext in every unauth response, cross-campus default corroborated) → unauthenticated proxy to whitelisted host; SSL VPN with deprecated TLS + 1024-bit keys
 - **Vertical app family**: ACM/OJ submitter real-IP leak + group-problem cross-tenant download; library SaaS admin endpoint unauthenticated; admissions/careers/finance systems with hardcoded AES keys, server-side captcha no-ops, XFF-spoofable lockouts
+
+| Campaign | Stack | Findings | Highlights |
+|---|---|---|---|
+| crAPI v1.1.5 | Spring / Node / Mongo / PG | **30** (7 critical) | SQL injection reading the full database; default DB credentials connect to every data store; 5 end-to-end chains (entry → credentials → data) |
+| WebGoat 8 | Java / Spring | **29** | JWT algorithm-confusion forging admin sessions; XXE reading server files; SQL injection extracting full tables |
+| vAPI | PHP / MySQL, OWASP API Top10 | **19** | Login SQL injection bypassing authentication; offline token forgery grants every admin API |
+| Juice Shop 20 | Node / Angular | **22** (3 critical) | Deserialization from entry to command execution (RCE) |
+| DVWA | PHP classic | **16** | Command injection and file upload each yield a webshell (command execution); persistence covers register–execute–audit |
+
+**116 total.** A sanitized sample report: [docs/samples/sample-report.md](docs/samples/sample-report.md)
 
 ## Interface tour
 
