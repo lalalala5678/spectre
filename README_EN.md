@@ -46,7 +46,7 @@ Type a target and the orchestrator runs the engagement itself: it calls the reco
 
 | Dimension | Data |
 |---|---|
-| Campaigns | **52 universities in 24 hours** (avg 2.3 each; worst-case result: a single request read the sensitive records of **8,394 faculty members** at one Double First-Class university) |
+| Campaigns | **52 universities in 24 hours** (avg 2.3 each; worst-case result: a single unauthenticated GET pulled the name + ID number + bank card number + phone number of **2,357 students** and the full org chart of **436 faculty** at one Sino-foreign joint-venture university) |
 | Findings | **119 total**: **critical×8** / high×28 / medium×47 / low×36 |
 | Depth | One Double First-Class university fully breached: captcha-free brute-force on the SSO enumerated 14k student IDs → weak student credential → same credential logs into the SSL VPN → L3 tunnel via re-implemented open-source client bypassing gateway ACLs → 137k-attempt faculty-ID dictionary hits a teacher account → teacher JWT calls a research-management API beyond its role → one request dumps the full 8,394-person database, yielding a complete dataset of ID numbers and salted password hashes |
 
