@@ -38,6 +38,24 @@ export class Wal {
 
   open() {
     fs.mkdirSync(path.dirname(this.file), { recursive: true, mode: 0o700 });
+    // 2026-10-12 轮换缺口修复(用户故障注入实测): compact 流程是
+    // "主日志 rename→.1 → 写 tmp → tmp rename→主日志"。在两步之间崩溃时
+    // 主日志不存在/为空而 .wal.N 里是全量——此前启动流程直接读主日志=0 条,
+    // 备份孤悬无人接。恢复语义: 主日志空且存在非空备份代时, 把最新非空
+    // 一代回滚为主日志再继续(轮换窗口的崩溃由此零丢失)。
+    try {
+      const mainOk = fs.existsSync(this.file) && fs.statSync(this.file).size > 0;
+      if (!mainOk) {
+        for (const gen of [1, 2, 3]) {
+          const bak = `${this.file}.${gen}`;
+          if (fs.existsSync(bak) && fs.statSync(bak).size > 0) {
+            fs.copyFileSync(bak, this.file);  // copy 而非 rename: 备份保留, 复跑幂等
+            console.warn(`[wal-recovery] 主日志为空, 已从 ${bak} 恢复(轮换中断自愈)`);
+            break;
+          }
+        }
+      }
+    } catch { /* 恢复尽力而为, 打不开时走原错误路径 */ }
     let fd;
     try {
       fd = fs.openSync(this.file, 'a');

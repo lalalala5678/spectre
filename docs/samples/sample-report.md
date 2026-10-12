@@ -27,8 +27,8 @@
 ## 证据
 ## 漏洞正本 19 条(全部 report agent 独立复核落账)
 - **critical×1**: api8 登录 SQL 注入认证绕过(seq=10192)
-- **high×13**: api1 BOLA 读/写(10121)、api2 全表泄露(10149)+静态令牌(10156)、api3 属性级(10164)、api4 固定 OTP 重放(10170)、api5 BFLA+弱凭据(10136)、api6 批量赋值(10184)、api7 CORS 反射(10188)、api9 v1 无限流(10198)、api10 无鉴权(10200)、SSRF 任意文件读(10172)、JWT 验签缺失(10175)、MySQL root@% 弱口令(10119)、phpMyAdmin 弱口令(10123)、全库明文口令(10152)
-- **medium×5**: stickynotes 存储型 XSS(10202)、dashboard/flag 永真(10207)、/_ignition 调试面暴露(10165)等
+- **high×15**: api1 BOLA 读/写(10121)、api2 全表泄露(10149)+静态令牌(10156)、api3 属性级(10164)、api4 固定 OTP 重放(10170)、api5 BFLA+弱凭据(10136)、api6 批量赋值(10184)、api7 CORS 反射(10188)、api9 v1 无限流(10198)、api10 无鉴权(10200)、SSRF 任意文件读(10172)、JWT 验签缺失(10175)、MySQL root@% 弱口令(10119)、phpMyAdmin 弱口令(10123)、全库明文口令(10152)
+- **medium×3**: stickynotes 存储型 XSS(10202)、dashboard/flag 永真(10207)、/_ignition 调试面暴露(10165)
 - 关键 PoC 证据链: SSRF php://filter 读 .env(APP_KEY+DB 凭据)、MySQL INTO OUTFILE 受限目录写+LOAD_FILE 读回闭环、api8 `admin' %23`→authkey→secret、api5 普通用户 attacker5→/users 管理面全表、api6 credit=100000 写后读、api9 v1 200×8 vs v2 500×4 对照矩阵
 - flag 13/13(api1-10+jwt+xss)全部黑盒取得
 ## nday 阴性台账(有效产出)

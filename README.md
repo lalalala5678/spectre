@@ -16,7 +16,7 @@
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](https://github.com/lalalala5678/spectre/releases)
-[![Tests](https://img.shields.io/badge/tests-65%20passing-brightgreen?style=flat-square)](#测试)
+[![Tests](https://img.shields.io/badge/tests-67%20passing-brightgreen?style=flat-square)](#测试)
 [![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?style=flat-square&logo=docker&logoColor=white)](./deploy/README.md)
 
 [English](./README_EN.md) | [中文文档](./README.md)
@@ -188,7 +188,7 @@ INTERNAL_TOKEN=<同①> SPECTRE_DATA_DIR=/tmp/spectre-data \
 ## 测试
 
 ```bash
-cd backend && npm test    # 65 用例: 互斥去重/会话生命周期/修订链/幂等/行数锁
+cd backend && npm test    # 67 用例: 互斥去重/会话生命周期/修订链/幂等/行数锁
 ```
 
 ## FAQ

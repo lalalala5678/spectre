@@ -16,7 +16,7 @@
 
 [![GitHub License](https://img.shields.io/github/license/lalalala5678/spectre?style=flat-square)](./LICENSE)
 [![Version](https://img.shields.io/badge/version-v0.4.0-blue.svg?style=flat-square)](https://github.com/lalalala5678/spectre/releases)
-[![Tests](https://img.shields.io/badge/tests-65%20passing-brightgreen?style=flat-square)](#tests)
+[![Tests](https://img.shields.io/badge/tests-67%20passing-brightgreen?style=flat-square)](#tests)
 [![Docker](https://img.shields.io/badge/Docker-Sandbox-2496ED?style=flat-square&logo=docker&logoColor=white)](./deploy/README.md)
 
 [English](./README_EN.md) | [中文文档](./README.md)

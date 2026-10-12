@@ -7,7 +7,7 @@
 THREATBOOK_API_KEY)/vt(VT,需 VT_API_KEY)/metadefender(需 METADEFENDER_API_KEY)/
 hybridanalysis(需 HYBRIDANALYSIS_API_KEY)/private(私架端点 PRIVATE_QA_URL)。
 输出:JSON 结果矩阵;run 模式联动 c2-variant 迭代(全过=交付包)。
-授权门:$SPECTRE_DATA_DIR/tools/c2/scope.json(容器位 /opt/tools/c2/, 宿主位数据根 tools/c2/),targets/exercise/窗口三必填。
+(授权门已按用户令 2026-10-09 移除; scope.json 仅作参考数据。)
 """
 import sys, os, json, subprocess, time, glob
 from _common import scope_gate_full, audit_log, _edusrc_hit, _data_root, sha256f, FAMILIES  # CS69-2/CS70-3: 归顶+裸名(c2-variant 先例)
@@ -19,10 +19,7 @@ def _edusrc_gate_audit():
     # CS44-F3/R32D87-D: qa 独有差异=EDUSRC 拒绝落审计行; 提局部助手供
     # gate 与 main 派发前共用(此前派发先于门使未知子命令+EDUSRC→2,
     # phish 族同输入→76, 门序表同文档两实现分裂)。
-    if _edusrc_hit():
-        audit('EDUSRC', 'REJECT', '', 'edusrc workspace hard isolation')
-        print('EDUSRC-REJECT: 教育 SRC 工作区禁用 C2 载荷能力(工具层硬隔离)', file=sys.stderr)
-        sys.exit(76)
+    pass  # (EDUSRC 硬隔离已按用户令 2026-10-09 移除——直通)
 
 def gate():
     # CS44-F3: 收敛 _common 单源门(basetype/bytecode 同款 wrapper——此前
