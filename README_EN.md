@@ -30,9 +30,9 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 
 **Discovery and verdict are separated.** The seat that finds a vulnerability is not the seat that certifies it: the verifier reproduces the evidence, reads the full context, checks the ledger — then files it into the vulnerability store (referred to below as "ledger entry"), merges duplicates, or declines with reasons. During development campaigns it declined its own teammates' false positives.
 
-**Two bodies of field work.** Five end-to-end campaigns against public ranges during development (116 findings); then 52 campaigns against 52 universities in a single 24-hour run, producing 119 findings (8 critical / 28 high / 47 medium / 36 low) — one university closed out every 28 minutes on average. Every output is queryable in the ledger: POC, evidence chain, verification record, revision history.
+**Two bodies of field work.** Five end-to-end campaigns against public ranges during development (116 findings); then 52 campaigns against 52 universities in a single 24-hour run, producing 119 findings (8 critical / 28 high / 47 medium / 36 low) — one university closed out every 28 minutes on average.
 
-**Interruption-recovery boundaries.** Sessions, events, and the bus are write-ahead-logged on every mutation; deploys drain in-flight turns before restart; severed turns resume from the breakpoint; provider rate limits back off and retry. **Recoverable**: all session transcripts and ledger entries. **Not recoverable**: tool calls in a severed turn whose results never returned (the model is told about the severance and decides its own retry). See [Reliability engineering](#reliability-engineering) for where each mechanism came from.
+**Interruption-recovery boundaries.** Sessions, events, and the bus are write-ahead-logged on every mutation; deploys drain in-flight turns before restart; severed turns resume from the breakpoint; provider rate limits back off and retry. See [Reliability engineering](#reliability-engineering) for where each mechanism came from.
 
 **Model access.** OpenAI-compatible / Anthropic / Gemini — four fields in the console, connectivity-probed before saving; per-seat overrides on top of the default.
 
