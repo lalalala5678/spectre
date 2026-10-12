@@ -40,7 +40,7 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 
 ### EduSRC Higher-Education Campaigns
 
-**24 hours × 52 universities × 119 findings** — asset mapping → fingerprinting → verification → impact reinforcement → independent review before ledger entry, one university closed out every 28 minutes on average.
+**24 hours × 52 universities × 119 findings** — asset mapping → fingerprinting → verification → impact reinforcement → independent review before ledger entry, one university closed out every 28 minutes on average. A sanitized single-university sample report: [docs/samples/edusrc-sample-report.md](docs/samples/edusrc-sample-report.md)
 
 | Dimension | Data |
 |---|---|
@@ -50,13 +50,13 @@ Type a target; recon maps, weakcred cracks, api lays authz matrices, exploit bui
 
 **Representative findings** (by attack surface):
 
-- **SSO / identity family**: captcha-free enumeration oracle → admin weak credential → campus-wide SSO takeover (critical); remember-me cookie storing password-equivalent plaintext; faculty ID format extracted from a leaked user tree
-- **OA family**: Weaver e-cology VerifyQuickLogin unauthenticated admin takeover (critical); self-built PHP mail system login page found **actively backdoored by a third party** (critical — full payload chain reverse-engineered: hidden iframe → DES exfil engine → cross-site identity theft)
-- **Dev leftovers**: career-services platform exposing dev-login in production — POST a known netId, no password, receive system_admin JWT (critical); same platform's IDM export leaks full faculty PII (critical)
-- **Research computing**: HPC portal arbitrary-path file write (high, write→execute chain honestly downgraded after proving unreachable) / IDOR reading campus-wide job ledger / unfiltered full account tree; lab-safety system student-JWT vertical escalation
-- **RCE**: visualization platform unauthenticated command injection (critical, benign-command echo then stop)
-- **Gateways & keys**: WebVPN shipping its factory-default URL-rewrite key (key embedded in plaintext in every unauth response, cross-campus default corroborated) → unauthenticated proxy to whitelisted host; SSL VPN with deprecated TLS + 1024-bit keys
-- **Vertical app family**: ACM/OJ submitter real-IP leak + group-problem cross-tenant download; library SaaS admin endpoint unauthenticated; admissions/careers/finance systems with hardcoded AES keys, server-side captcha no-ops, XFF-spoofable lockouts
+- **SSO / identity family**: one Double First-Class university — captcha-free enumeration oracle → admin weak credential → campus-wide SSO takeover (critical); one 985 university — remember-me cookie storing password-equivalent plaintext; one Double First-Class university — faculty ID format extracted from a leaked user tree
+- **OA family**: one 985 university — Weaver e-cology VerifyQuickLogin unauthenticated admin takeover (critical); another 985 university — self-built PHP mail login page found **actively backdoored by a third party** (critical — full payload chain reverse-engineered: hidden iframe → DES exfil engine → cross-site identity theft)
+- **Dev leftovers**: one Sino-foreign joint-venture university — career-services platform exposing dev-login in production: POST a known netId, no password, receive system_admin JWT (critical); same platform's IDM export leaks full faculty PII (critical)
+- **Research computing**: one Double First-Class university — HPC portal arbitrary-path file write (high, write→execute chain honestly downgraded after proving unreachable) / IDOR reading campus-wide job ledger / unfiltered full account tree; lab-safety system student-JWT vertical escalation
+- **RCE**: one 211 university — visualization platform unauthenticated command injection (critical, benign-command echo then stop)
+- **Gateways & keys**: one 211 university — WebVPN shipping its factory-default URL-rewrite key (key embedded in plaintext in every unauth response, cross-campus default corroborated) → unauthenticated proxy to whitelisted host; one 985 university — SSL VPN with deprecated TLS + 1024-bit keys
+- **Vertical app family**: one 211 university — ACM/OJ submitter real-IP leak + group-problem cross-tenant download; library SaaS admin endpoint unauthenticated; one 985 university — admissions/careers/finance systems with hardcoded AES keys, server-side captcha no-ops, XFF-spoofable lockouts
 
 ### Range testing
 
