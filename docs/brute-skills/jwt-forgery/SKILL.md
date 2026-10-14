@@ -1,6 +1,6 @@
 ---
 name: jwt-forgery
-description: 目标用 JWT 认证(登录/token 响应、Authorization: Bearer eyJ...、cookie 中出现 eyJ...)时使用。本技能管 JWT 签名与密码学伪造(alg:none、RS256→HS256 密钥混淆、kid/jku/x5u/jwk 头注入、弱 HMAC 密钥破解、声明篡改); 登录面弱口令爆破归 web-login-brute, 完整账号接管(ATO)链编排归危害补强。
+description: "目标用 JWT 认证(登录/token 响应、Authorization: Bearer eyJ...、cookie 中出现 eyJ...)时使用。本技能管 JWT 签名与密码学伪造(alg:none、RS256→HS256 密钥混淆、kid/jku/x5u/jwk 头注入、弱 HMAC 密钥破解、声明篡改); 登录面弱口令爆破归 web-login-brute, 完整账号接管(ATO)链编排归危害补强。"
 ---
 
 # JWT 伪造 —— 可伪造任意身份的 JSON Web Token(A04 密码学失效)
