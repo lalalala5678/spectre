@@ -59,7 +59,9 @@ else
   IP_MODE=1
   echo "[setup-tls] 签发标识: $SITE"
 fi
-
+# Caddy 站点块多地址要求「逗号+空格」分隔(纯逗号 adapt 报错, 实测);
+# 轮询/展示仍用纯逗号串(IFS 切分)。
+SITE_CADDY="${SITE//,/, }"
 # ---------- 3) 配置(网关保持 127.0.0.1:8081——安全侧默认不动) ----------
 install -d -m 755 "$INSTALL_DIR"
 cat > "$INSTALL_DIR/Caddyfile" <<EOF
@@ -70,7 +72,7 @@ cat > "$INSTALL_DIR/Caddyfile" <<EOF
 
 # SPECTRE 对外 TLS(setup-tls.sh 生成; 手改后 systemctl restart spectre-caddy)
 # 内部链路: Caddy :443 --TLS--> gateway 127.0.0.1:8081 -->> runtime :8090
-$SITE {
+$SITE_CADDY {
 $TLS_BLOCK
 
 	encode gzip
