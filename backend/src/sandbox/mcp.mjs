@@ -321,6 +321,30 @@ const running = new Map(); // server name → rpc conn
 let mcpConfigSuspect = false;
 const connecting = new Map(); // server name → in-flight connect promise
 
+// ── Circuit breaker: 每 server 失败计数 + 冷却窗(fofa/quake 等九情报源
+//    挂一个就烧一轮席位回合——熔断让后续调用快速失败省回合预算; 半开
+//    恢复=冷却期满放一个探测调用过)。
+const CB_THRESHOLD = 3;        // 连续失败阈值
+const CB_COOLDOWN_MS = 60_000; // 冷却 60s
+const breakers = new Map();    // name → { fails, openUntil, halfOpen }
+
+function cbCheck(name) {
+  const b = breakers.get(name);
+  if (!b || b.fails < CB_THRESHOLD) return null;
+  if (Date.now() < b.openUntil) {
+    return `MCP「${name}」熔断中(连续失败 ${b.fails} 次, ${Math.ceil((b.openUntil - Date.now()) / 1000)}s 后恢复)——本次调用快速跳过, 勿在熔断窗内重试。`;
+  }
+  return null; // 冷却期满: 放行(半开探测)
+}
+function cbSuccess(name) { breakers.delete(name); }
+function cbFail(name) {
+  const b = breakers.get(name) ?? { fails: 0, openUntil: 0 };
+  b.fails += 1;
+  if (b.fails >= CB_THRESHOLD) b.openUntil = Date.now() + CB_COOLDOWN_MS;
+  breakers.set(name, b);  // P0 级: ?? 新建对象不入 Map 时状态永不持久
+}
+// 导出供测试机锁(生产消费只走 execute 闭包)
+export { cbCheck as _cbCheck, cbSuccess as _cbSuccess, cbFail as _cbFail };
 async function connection(server) {
   if (running.has(server.name)) return running.get(server.name);
   // single-flight: concurrent first-connects once double-spawned child
@@ -387,15 +411,23 @@ export async function mcpToolsForServer(server) {
       executionMode: 'sequential',
       parameters: t.inputSchema ?? Type.Object({}),
       execute: async (_toolCallId, params) => {
-        const result = await rpc.call('tools/call', {
-          name: t.name, arguments: params,
-        });
-        const text = (result?.content ?? [])
-          .filter(c => c.type === 'text').map(c => c.text).join('\n');
-        return {
-          content: [{ type: 'text', text: text || '(空输出)' }],
-          details: { isError: result?.isError ?? false },
-        };
+        const open = cbCheck(server.name);
+        if (open) return { content: [{ type: 'text', text: open }], isError: true, details: { circuitOpen: true } };
+        try {
+          const result = await rpc.call('tools/call', {
+            name: t.name, arguments: params,
+          });
+          cbSuccess(server.name);
+          const text = (result?.content ?? [])
+            .filter(c => c.type === 'text').map(c => c.text).join('\n');
+          return {
+            content: [{ type: 'text', text: text || '(空输出)' }],
+            details: { isError: result?.isError ?? false },
+          };
+        } catch (e) {
+          cbFail(server.name);
+          throw e; // 上抛保 pi 的错误渲染
+        }
       },
     }));
   } catch (err) {
