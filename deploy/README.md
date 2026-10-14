@@ -170,6 +170,17 @@ while true; do
 done
 ```
 
+## 流量桥(Chrome 扩展 → 情报库)
+
+```bash
+# ① 生成网关 API Key(跨站扩展带不了 SameSite=Strict 会话 cookie——专用密钥通道)
+sudo python3 gateway/spectre-apikey.py add traffic-bridge   # 打印 sk-…(只显示一次)
+# ② Chrome 加载 plugins/traffic-bridge/(F12 → SPECTRE 面板), popup 里填网关地址+Key
+```
+
+协议(任何机客户端同用): `POST /spectre/api/traffic`, 头 `X-Spectre-Key`,
+体 `{title?, workSessionId?, pairs:[{request:{method,url,headers?,body?},response:{status?,headers?,body?},note?}]}`(≤50 对/批)→ 每对落 intel-note(`from: operator`, 标题 `[流量] METHOD 短URL`), 席位经 `query_intel kind=intel q=[流量]` 消费。错误密钥 401 JSON。
+
 ## API 契约
 
 - `POST /api/sessions`(须 `Content-Type: application/json`——裸表单体不解析, R32D62-P4): 必填 `agentKey`(14 键之一: autopwn/recon/nday/weakcred/api/exploit/phish/c2/persistence/postex/report/skill-config/mcp-config/cli-config); 可选 `workSessionId`(项目归组)

@@ -89,6 +89,34 @@ class Security:
             return False
         return hmac.compare_digest(got, want)
 
+    def verify_api_key(self, key):
+        """X-Spectre-Key 校验(流量桥通道): 命中返回 keyid, 否则 None。
+
+        密钥为高熵生成值(spectre-apikey.py), 库存 sha256 摘要——与会话
+        token 同口径; 逐次读文件(改动即生效, 无需重启)。失败不计数不
+        锁定(密钥空间 2^256, 撞库无意义; 审计由调用侧记录)。
+        """
+        key = (key or "").strip()
+        if not key.startswith("sk-"):
+            return None
+        digest = hashlib.sha256(key.encode()).hexdigest()
+        try:
+            with open(config.APIKEYS_FILE, "r", encoding="utf-8") as handle:
+                for line in handle:
+                    line = line.strip()
+                    if line and not line.startswith("#"):
+                        keyid, _, want = line.partition(":")
+                        # 摘要形态先验(64 位小写 hex): 手改/损坏行直接跳
+                        # 过——compare_digest 对非 ASCII 抛 TypeError 会断
+                        # 连而非 401(姊妹 verify_credentials 的容错口径)。
+                        if len(want) == 64 and all(
+                                c in "0123456789abcdef" for c in want) \
+                                and hmac.compare_digest(digest, want):
+                            return keyid
+        except OSError:
+            pass
+        return None
+
     # ---------- lockout ----------
 
     def is_locked(self, ip):

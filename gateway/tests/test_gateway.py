@@ -149,3 +149,50 @@ class ProxyMalformedCL(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+PASSKEY = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                       "..", "spectre-apikey.py")
+
+
+class ApiKeyChannel(unittest.TestCase):
+    """流量桥通道: CLI 生成→sha256 库→verify_api_key 判定→del 失效。"""
+
+    def setUp(self):
+        self.dir = tempfile.mkdtemp(prefix="apikey-test-")
+        self.env = {**os.environ, "SPECTRE_AUTH_DIR": self.dir}
+
+    def _run(self, *args):
+        return subprocess.run(
+            [sys.executable, PASSKEY, *args],
+            env=self.env, capture_output=True, text=True, timeout=30)
+
+    def test_cli_and_verify_roundtrip(self):
+        r1 = self._run("add", "bridge1")
+        self.assertEqual(r1.returncode, 0, r1.stderr)
+        key = [l for l in r1.stdout.splitlines() if l.startswith("sk-")]
+        self.assertEqual(len(key), 1, "密钥应恰好打印一次")
+        key = key[0]
+        # 明文不落库(库存 sha256 摘要)
+        stored = open(os.path.join(self.dir, "apikeys"), encoding="utf-8").read()
+        self.assertNotIn(key, stored)
+        # 环境面: verify 命中 keyid(config 常量指临时库——CLI 子进程的
+        # env 隔离不影响本进程, 常量需同步指过去)
+        old_path = security.config.APIKEYS_FILE
+        security.config.APIKEYS_FILE = os.path.join(self.dir, "apikeys")
+        try:
+            sec = security.Security()
+            self.assertEqual(sec.verify_api_key(key), "bridge1")
+            # 错误密钥/非 sk- 前缀/空值均 None
+            self.assertIsNone(sec.verify_api_key("sk-" + "x" * 40))
+            self.assertIsNone(sec.verify_api_key(
+                key[:-1] + ("A" if key[-1] != "A" else "B")))
+            self.assertIsNone(sec.verify_api_key("password123"))
+            self.assertIsNone(sec.verify_api_key(""))
+            self.assertIsNone(sec.verify_api_key(None))
+            # del 后失效
+            r2 = self._run("del", "bridge1")
+            self.assertEqual(r2.returncode, 0, r2.stderr)
+            self.assertIsNone(sec.verify_api_key(key))
+        finally:
+            security.config.APIKEYS_FILE = old_path

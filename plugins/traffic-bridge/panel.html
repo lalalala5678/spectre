@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<style>
+  body { font: 12px/1.5 system-ui, sans-serif; margin: 8px; min-width: 480px; }
+  #bar { display: flex; gap: 6px; margin-bottom: 6px; align-items: center; }
+  #filter { flex: 1; padding: 3px 6px; }
+  #list { border: 1px solid #ccc; max-height: 340px; overflow-y: auto; }
+  .row { display: flex; gap: 6px; padding: 2px 6px; border-bottom: 1px solid #eee; cursor: pointer; }
+  .row:hover { background: #f5f8ff; }
+  .m { font-weight: 600; width: 46px; }
+  .s2 { width: 34px; text-align: right; }
+  .s2x, .s2e, .s2r { font-weight: 600; }
+  .s2x { color: #d33; } .s2e { color: #d80; } .s2r { color: #2a2; }
+  .u { flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  #status { margin-top: 6px; min-height: 16px; white-space: pre-wrap; }
+  #send { padding: 3px 12px; }
+  #title { padding: 3px 6px; width: 180px; }
+  .cfg-warn { color: #d33; }
+</style>
+</head>
+<body>
+<div id="bar">
+  <input id="filter" placeholder="过滤 URL 子串…">
+  <button id="refresh">刷新</button>
+  <span id="picked">0 条</span>
+</div>
+<div id="list"></div>
+<div id="bar" style="margin-top:6px">
+  <input id="title" placeholder="批次标题(可选)">
+  <button id="send">送入 SPECTRE</button>
+  <span id="count"></span>
+</div>
+<div id="status"></div>
+<script src="panel.js"></script>
+</body>
+</html>

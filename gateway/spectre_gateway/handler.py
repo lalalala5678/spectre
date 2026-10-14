@@ -130,6 +130,17 @@ class GatewayHandler(BaseHTTPRequestHandler):
             )
 
         if rel.startswith("/api/"):
+            # X-Spectre-Key 通道与写方法同权(GET 面: 流量桥轮询 bus/项目
+            # 清单都走读端点——只接写面会让机客户端读不到自己的产出)。
+            api_key = self.headers.get("X-Spectre-Key", "")
+            if api_key:
+                keyid = self.security.verify_api_key(api_key)
+                if keyid is None:
+                    audit("apikey_rejected", ip=self.client_ip(), path=rel)
+                    self._drain()  # R4-2 同纪律: 带体 GET 的早退须排空
+                    return self._send(401, b'{"error": "invalid X-Spectre-Key"}')
+                audit("apikey_ok", keyid=keyid, ip=self.client_ip(), path=rel)
+                return self._proxy(rel)
             if not self._session():
                 audit("auth_redirect", ip=self.client_ip(), path=rel)
                 self._drain()  # R4-2: keep-alive 体排空
@@ -221,6 +232,18 @@ class GatewayHandler(BaseHTTPRequestHandler):
         rel = _rel_with_query(split)
         if not rel.split('?')[0].startswith("/api/"):
             return None
+        # X-Spectre-Key 通道(流量桥): 会话 cookie SameSite=Strict 使跨站
+        # 客户端(Chrome 扩展等)无法携凭据——高熵 API Key 直接换内部令牌
+        # 代理。错误密钥给 401 JSON(非 303, 机客户端可判定)。
+        api_key = self.headers.get("X-Spectre-Key", "")
+        if api_key:
+            keyid = self.security.verify_api_key(api_key)
+            if keyid is None:
+                audit("apikey_rejected", ip=self.client_ip(), path=rel)
+                self._drain()
+                return self._send(401, b'{"error": "invalid X-Spectre-Key"}')
+            audit("apikey_ok", keyid=keyid, ip=self.client_ip(), path=rel)
+            return self._proxy(rel)
         if not self._session():
             audit("auth_redirect", ip=self.client_ip(), path=rel)
             self._drain()  # R4-2: keep-alive 体排空

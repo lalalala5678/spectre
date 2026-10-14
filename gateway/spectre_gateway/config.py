@@ -30,6 +30,7 @@ DIST_DIR = os.environ.get("GATEWAY_DIST_DIR", "../console/dist")
 #: Credentials and audit locations.
 AUTH_DIR = os.environ.get("SPECTRE_AUTH_DIR", "/etc/spectre-auth")
 PASSWD_FILE = os.path.join(AUTH_DIR, "passwd")
+APIKEYS_FILE = os.path.join(AUTH_DIR, "apikeys")  # X-Spectre-Key 通道(spectre-apikey.py 管理, 流量桥等非浏览器客户端)
 LOG_DIR = os.environ.get("GATEWAY_LOG_DIR", "/var/log/spectre-console")
 LOG_FILE = os.path.join(LOG_DIR, "auth.log")
 

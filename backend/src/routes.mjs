@@ -24,7 +24,7 @@ import { syncSourceKeyFiles } from './keyfiles.mjs';
 import { phishCampaignFunnel } from './phish-funnel.mjs';
 import { loadMcpConfig, testMcpServer } from './sandbox/mcp.mjs';
 import { maskSecret, isSecretLeaf, getSettings, saveSetting, hasSourceCredential, revealSetting, RECON_SOURCES_INTERNAL } from './agent-settings.mjs';
-import { applyLlmPrefs } from './pi.mjs';
+import { applyLlmPrefs, clipMarked } from './pi.mjs';
 import { writeFile, mkdir } from 'node:fs/promises';
 import { HOST } from './sandbox/exec-env.mjs';
 
@@ -144,6 +144,73 @@ function realRouter({ store, bus, caps, wal }) {
         meta: { workSessionId: body.workSessionId ?? null },
       });
       return json(res, sh.error ? 400 : 200, sh);
+    }
+
+    // ---------- traffic bridge (浏览器/Burp 流量对 → 情报库, 操作员入口) ----------
+    // 认证态目标(MFA/SSO 后面)的实测流量入口: Chrome 扩展(plugins/
+    // traffic-bridge)或 Burp 把请求/响应对 POST 到此, 落 intel-note 后
+    // api/exploit 席位经 query_intel 消费(traffic-bridge.test.mjs 机锁)。
+    if (path === '/api/traffic' && method === 'POST') {
+      const body = await readJson(req);
+      const pairs = Array.isArray(body?.pairs) ? body.pairs : null;
+      if (!pairs || !pairs.length)
+        return bad(res, 400, 'pairs 必填(非空数组: [{request:{method,url,headers?,body?},response:{status?,headers?,body?},note?}])');
+      if (pairs.length > 50)
+        return bad(res, 400, `pairs 单次上限 50(实收 ${pairs.length})——分批提交`);
+      for (const [i, p] of pairs.entries()) {
+        if (!p?.request?.url || !/^https?:\/\//i.test(String(p.request.url)))
+          return bad(res, 400, `pairs[${i}].request.url 必填(http/https)`);
+      }
+      // ws 守卫(姊妹路由同制式——裸收会让条目落进任何项目都查不到的
+      // 幽灵 ws, F54 前科); method 截断进 title(bus 白名单里 title 是
+      // 唯一无 clip 的字段, 不可放行无上限输入)。
+      const rawWs = body.workSessionId ?? getPrefs().currentWs ?? null;
+      const ws = rawWs == null ? null : String(rawWs);
+      if (ws != null && (!/^[\w-]{1,64}$/.test(ws)))
+        return bad(res, 400, 'workSessionId 仅允许 [a-zA-Z0-9_-]{1,64}');
+      const seqs = [];
+      const missedIdx = [];
+      for (const [i, p] of pairs.entries()) {
+        const rq = p.request ?? {};
+        const rs = p.response ?? {};
+        const m = String(rq.method || 'GET').toUpperCase().slice(0, 16);
+        const u = String(rq.url);
+        const short = u.replace(/^[a-z]+:\/\//i, '').slice(0, 80);
+        const hdr = (obj) => Object.entries(obj ?? {}).slice(0, 30)
+          .map(([k, v]) => clipMarked(`${k}: ${Array.isArray(v) ? v.join(', ') : String(v)}`, 300));
+        // 围栏消毒: 捕获内容里的 ``` 会提前闭合 ```http 围栏, 后续内容
+        // 以顶级 markdown 呈现(伪造标题/链接)——插入零宽空格使其不再成栅。
+        const fence = (s) => s.replace(/`{3,}/g, '`\u200b`\u200b`');
+        const detail = [
+          '**请求**', '```http',
+          fence(clipMarked(`${m} ${u}`, 2000)),
+          ...hdr(rq.headers).map(fence),
+          ...(rq.body != null && String(rq.body) !== ''
+            ? ['', fence(clipMarked(String(rq.body), 8000, '请求体超长已截断——原文见抓包端'))]
+            : []),
+          '```', '**响应**', '```http',
+          fence(`HTTP ${String(rs.status ?? '?').replace(/\s+/g, ' ').slice(0, 32)}`),
+          ...hdr(rs.headers).map(fence),
+          ...(rs.body != null && String(rs.body) !== ''
+            ? ['', fence(clipMarked(String(rs.body), 8000, '响应体超长已截断——原文见抓包端'))]
+            : []),
+          '```',
+          ...(p.note ? [`**备注**: ${fence(String(p.note).slice(0, 200))}`] : []),
+        ].join('\n');
+        // 逐对容错: 单对 emit 抛错(WAL 磁盘满等)不炸整批——已落 seqs
+        // 全量披露, 失败对下标明示, 重发只补缺(对账审查 P3-9)。
+        try {
+          const ev = bus.emit({
+            channel: 'share', from: 'operator', type: 'intel-note',
+            title: `${body.title ? `${String(body.title).slice(0, 60)} · ` : ''}[流量] ${m} ${short}`,
+            summary: `流量对(${m}, HTTP ${rs.status ?? '?'})——${short}`.slice(0, 500),
+            detail, payloadRef: null, workSessionId: ws,
+          });
+          if (ev?.seq) seqs.push(ev.seq); else missedIdx.push(i);
+        } catch { missedIdx.push(i); }
+      }
+      return json(res, 200, { ok: true, filed: seqs.length, seqs, workSessionId: ws,
+        ...(missedIdx.length ? { note: `${missedIdx.length} 条未确认(pairs 下标 ${missedIdx.join(',')}——通道/磁盘异常); 已落 ${seqs.length} 条, 重发只需补缺` } : {}) });
     }
     if (path.startsWith('/api/shells/') && path.endsWith('/read-file') && method === 'POST') {
       const id = path.split('/')[3];

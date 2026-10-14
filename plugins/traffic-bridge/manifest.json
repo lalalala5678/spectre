@@ -1,0 +1,10 @@
+{
+  "manifest_version": 3,
+  "name": "SPECTRE Traffic Bridge",
+  "version": "0.1.0",
+  "description": "把 DevTools 里的认证态流量对送进 SPECTRE 情报库(api/exploit 席位经 query_intel 消费)",
+  "permissions": ["storage"],
+  "host_permissions": ["<all_urls>"],
+  "devtools_page": "devtools.html",
+  "action": { "default_popup": "popup.html" }
+}
