@@ -490,7 +490,7 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
         )}
       </div>
 
-      <ChatInput placeholder={placeholder} busy={busy} onSend={send} />
+      <ChatInput placeholder={placeholder} sessionId={sessionId} busy={busy} onSend={send} />
     </div>
   );
 }

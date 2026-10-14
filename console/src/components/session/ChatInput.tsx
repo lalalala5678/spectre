@@ -6,15 +6,28 @@ import { Kbd } from '../ui/Kbd';
 /** CLI-style chat input used by live sessions. */
 export function ChatInput({
   placeholder,
+  sessionId,
   busy = false,
   onSend,
 }: {
   placeholder: string;
+  sessionId?: string | null;
   busy?: boolean;
   onSend: (text: string, mode: 'prompt' | 'steer') => void;
 }) {
-  const [value, setValue] = useState('');
+  const draftKey = `spectre-draft:${sessionId ?? 'anon'}`;
+  const [value, setValue] = useState(() => localStorage.getItem(draftKey) ?? '');
   const [uploading, setUploading] = useState(false);
+  // 草稿持久化: 500ms 防抖写 localStorage, 切会话/刷新恢复
+  const draftTimer = useRef<number>(0);
+  useEffect(() => {
+    clearTimeout(draftTimer.current);
+    draftTimer.current = setTimeout(() => {
+      if (value.trim()) localStorage.setItem(draftKey, value);
+      else localStorage.removeItem(draftKey);
+    }, 500);
+    return () => clearTimeout(draftTimer.current);
+  }, [value, draftKey]);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   // 用户令: Ctrl+Z/Ctrl+Y(及 Ctrl+Shift+Z)撤销重做——受控组件+程序性
@@ -71,6 +84,7 @@ export function ChatInput({
     if (!text) return;
     onSend(text, busy || steer ? 'steer' : 'prompt');
     setVal('');
+    localStorage.removeItem(draftKey); // 发出即清草稿
     // FEVERIFY-P3-3: 高度经 onChange 自管, 清值不经 onChange→残留, 显式复位。
     requestAnimationFrame(() => {
       const ta = document.activeElement as HTMLTextAreaElement | null;
