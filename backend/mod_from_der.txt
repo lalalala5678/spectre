@@ -1,0 +1,3 @@
+could not open file or uri for loading public key from spki_py.der
+40a7d6ab12750000error16000069STORe routinesossl_store_get0_loader_intunregistered scheme../crypto/store/store_register.c237scheme=file
+40a7d6ab12750000error80000002system libraryfile_openNo such file or directory../providers/implementations/storemgmt/file_store.c267calling stat(spki_py.der)
