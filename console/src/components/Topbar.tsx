@@ -3,6 +3,8 @@ import { Menu, Activity, Bell, Search, Palette } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
+import { useListboxNavigation } from '../utils/useListboxNavigation';
+import { cn } from '../utils/cn';
 
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -66,6 +68,22 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
   const [sessTotal, setSessTotal] = useState(0);  // R32D31-N3: 截断计数提示
   const [busHits, setBusHits] = useState<BusEvt[]>([]);
   const boxRef = useRef<HTMLDivElement>(null);
+
+  // P3#10: 搜索结果键盘导航(↑↓ Enter)
+  const totalHits = sessHits.length + busHits.length;
+  const pickSearch = (idx: number) => {
+    if (idx < sessHits.length) {
+      const s = sessHits[idx];
+      setOpen(false);
+      if (go(s.agentKey)) setPendingOpen(s.agentKey, s.id);
+    } else {
+      const e = busHits[idx - sessHits.length];
+      setOpen(false);
+      go(e.type === 'task-report' ? 'reports' : 'audit');
+    }
+  };
+  const { activeIdx: navIdx, onKeyDown: handleNavKey, listRef: searchListRef } =
+    useListboxNavigation(totalHits, pickSearch, open);
 
   // F70: 通知
   const [notices, setNotices] = useState<Notice[]>([]);
@@ -187,7 +205,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           value={q}
           onChange={e => setQ(e.target.value)}
           onFocus={() => { if (q.trim().length >= 2) setOpen(true); }}
-          onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQ(''); } }}
+          onKeyDown={e => { if (e.key === 'Escape') { setOpen(false); setQ(''); return; } handleNavKey(e); }}
           placeholder="搜索会话 / 资产 / 发现 / CVE…"
           ref={searchRef}
           className="pl-8 pr-12 border-chrome-line bg-chrome-surface-2 text-chrome-primary placeholder:text-chrome-tertiary focus:border-chrome-accent-text"
@@ -199,7 +217,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
           </div>
         )}
         {open && (sessHits.length > 0 || busHits.length > 0) && (
-          <div className="animate-enter absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
+          <div ref={searchListRef} role="listbox" aria-label="搜索结果" className="animate-enter absolute left-0 top-full z-30 mt-1 w-[26rem] rounded-lg border border-chrome-line bg-chrome-surface p-1 shadow-lg">
             {sessHits.length > 0 && (
               <div className="px-2.5 py-1 text-xs font-medium text-chrome-tertiary">会话</div>
             )}
@@ -209,8 +227,8 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
             {sessTotal > sessHits.length && (
               <p className="px-2.5 pb-1 text-xs text-chrome-tertiary">会话命中 {sessTotal} 条, 仅显示前 {sessHits.length}(换更精确关键词)</p>
             )}
-            {sessHits.map(s => (
-              <button key={s.id} onClick={() => {
+            {sessHits.map((s, si) => (
+              <button key={s.id} data-idx={si} role="option" aria-selected={navIdx === si} onClick={() => {
                 // R32D29-N2: 走 pendingOpen 通道——URL hash 双赋值方案
                 // 里旧页消费 effect 会抢在路由提交前洗掉 ?s=(≈50% 丢)。
                 const key = s.agentKey;  // CS3-N20: 恒等三元删除
@@ -222,7 +240,7 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
                 // 手动进该 agent 会被钻进旧目标会话
                 if (go(key)) setPendingOpen(key, s.id);
               }}
-                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary">
+                className={cn('flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm', navIdx === si ? 'bg-chrome-surface-2 text-chrome-primary' : 'text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary')}>
                 <span className="shrink-0 font-mono text-xs text-chrome-tertiary">{s.agentKey}</span>
                 <span className="min-w-0 truncate">{s.title ?? s.id}</span>
               </button>
@@ -230,13 +248,16 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
             {busHits.length > 0 && (
               <div className="mt-1 px-2.5 py-1 text-xs font-medium text-chrome-tertiary">总线条目</div>
             )}
-            {busHits.map(e => (
-              <button key={e.seq} onClick={() => go(e.type === 'task-report' ? 'reports' : 'audit')}
-                className="flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary">
+            {busHits.map((e, bi) => {
+              const gi = sessHits.length + bi;
+              return (
+              <button key={e.seq} data-idx={gi} role="option" aria-selected={navIdx === gi} onClick={() => go(e.type === 'task-report' ? 'reports' : 'audit')}
+                className={cn('flex min-h-9 w-full items-center gap-2 rounded-md px-2.5 py-1 text-left text-sm', navIdx === gi ? 'bg-chrome-surface-2 text-chrome-primary' : 'text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary')}>
                 <span className="shrink-0 font-mono text-xs text-chrome-tertiary">#{e.seq}</span>
                 <span className="min-w-0 truncate">{e.title ?? e.summary ?? ''}</span>
               </button>
-            ))}
+              );
+            })}
           </div>
         )}
       </div>
