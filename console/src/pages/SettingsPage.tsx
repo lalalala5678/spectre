@@ -278,8 +278,8 @@ export function SettingsPage() {
   // FEVERIFY11-P3: scroll-spy 高亮 + <lg 横向 chips(窄屏不整体消失)
   const SECTIONS = [
     { id: 'sec-common', label: '通用与模型' },
-    { id: 'sec-agentllm', label: '按智能体换模型' },
     { id: 'sec-agents', label: '智能体专属配置' },
+    { id: 'sec-agentllm', label: '按智能体换模型' },
   ];
   const [activeSec, setActiveSec] = useState('sec-common');
   const scrollHostRef = useRef<HTMLDivElement>(null);
@@ -387,6 +387,25 @@ export function SettingsPage() {
         </div>
       </section>
 
+      {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
+      <div id="sec-agents" className="scroll-mt-4" />
+      {otherAgents.map((agent) => (
+        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
+          <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
+            <span className="text-[13px] font-medium text-primary">{String(agent.label).replace(/\s*[（(][^）)]*[）)]/g, '')}</span>
+          </div>
+          {/* 用户令: 说明不渲染 */}
+          {agent.sources.length === 0 ? (
+            <div className="px-4 py-3 text-[13px] text-tertiary">该智能体无独立数据源配置。</div>
+          ) : (
+            <div className="divide-y divide-line">
+              {agent.sources.map((src) => (
+                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
+              ))}
+            </div>
+          )}
+        </section>
+      ))}
       {/* ---------- R32D44: 单 Agent 大模型供应商覆盖 ---------- */}
       <section id="sec-agentllm" className="mb-8 scroll-mt-4 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
         <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
@@ -410,25 +429,6 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
-      <div id="sec-agents" className="scroll-mt-4" />
-      {otherAgents.map((agent) => (
-        <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
-          <div className="flex items-center gap-2 border-b border-line bg-surface-2/50 px-4 py-3">
-            <span className="text-[13px] font-medium text-primary">{String(agent.label).replace(/\s*[（(][^）)]*[）)]/g, '')}</span>
-          </div>
-          {/* 用户令: 说明不渲染 */}
-          {agent.sources.length === 0 ? (
-            <div className="px-4 py-3 text-[13px] text-tertiary">该智能体无独立数据源配置。</div>
-          ) : (
-            <div className="divide-y divide-line">
-              {agent.sources.map((src) => (
-                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
-              ))}
-            </div>
-          )}
-        </section>
-      ))}
       <div id="sec-scope" className="scroll-mt-4" />
       </div>
     </div>
