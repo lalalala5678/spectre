@@ -4,6 +4,7 @@ import { api } from './api/client';
 import { Sidebar } from './components/Sidebar';
 import { Topbar } from './components/Topbar';
 import { AgentWorkspacePage } from './pages/AgentWorkspacePage';
+import { OverviewPage } from './pages/OverviewPage';
 import { getAgent } from './api/agentMeta';
 import { SkillsPage } from './pages/SkillsPage';
 import { McpPage } from './pages/McpPage';
@@ -17,6 +18,7 @@ import type { RouteKey } from './types';
 import { setPendingOpen } from './api/openSessionChannel';
 
 const STAGE_ROUTES: RouteKey[] = [
+  'overview',
   'autopwn', 'recon', 'nday', 'weakcred', 'api', 'exploit', 'phish', 'c2', 'persistence', 'postex', 'report',
 ];
 // R32D39-N1: 配置三键也是 agent 会话——此前不进路由表, 全局搜索点击
@@ -31,7 +33,7 @@ export default function App() {
     // R26: hash 可携带 ?s=<sessionId> 深链——路由只取 base 段
     const h = window.location.hash.replace('#', '').split('?')[0] as RouteKey;
     const valid = VALID_ROUTES;
-    return valid.includes(h) ? h : 'autopwn';
+    return valid.includes(h) ? h : 'overview';
   });
 
   const nav = (r: RouteKey) => {
@@ -73,7 +75,7 @@ export default function App() {
         // 重新触发本分支, 冷加载走挂载期读取。
         setPendingOpen(h, s);
       }
-      const resolved = valid.includes(h) ? h : 'autopwn';
+      const resolved = valid.includes(h) ? h : 'overview';
       setRoute(resolved);
       // R32D41-N4: 无效 hash 此前渲染回落 autopwn 但地址栏保留垃圾
       // 路由名——replaceState 仅清无效段(?s= 参数分支刻意不清, 见上)。
@@ -193,7 +195,9 @@ export default function App() {
         {/* EQ-9: 深壳→浅内容过渡条(黑到白硬切生硬) */}
         <div aria-hidden="true" className="h-2.5 shrink-0 bg-gradient-to-b from-chrome-surface to-bg" />
         <main className="min-h-0 flex-1 overflow-hidden bg-bg">
-          {[...STAGE_ROUTES, ...CONFIG_AGENT_ROUTES].includes(route) ? (
+          {route === 'overview' ? (
+            <OverviewPage />
+          ) : [...STAGE_ROUTES.filter(r => r !== 'overview'), ...CONFIG_AGENT_ROUTES].includes(route) ? (
             <AgentWorkspacePage key={route} agent={getAgent(route)} />
           ) : ['skills', 'mcp', 'cli'].includes(route) ? (
             // CS1-R9: 三配置页同构外壳收敛(页面组件查表)

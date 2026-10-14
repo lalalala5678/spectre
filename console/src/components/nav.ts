@@ -1,6 +1,6 @@
 import {
   Radar, Bug, KeyRound, Braces, Swords, Fish, Radio, Anchor, Network, FileText,
-  Puzzle, Plug, Zap, ClipboardList, TerminalSquare } from 'lucide-react';
+  Puzzle, Plug, Zap, ClipboardList, TerminalSquare, Gauge } from 'lucide-react';
 import type React from 'react';
 import type { RouteKey } from '../types';
 
@@ -10,6 +10,7 @@ export const NAV: {
   key: RouteKey; label: string; sub: string;
   icon: React.ElementType; group: 'mode' | 'stage' | 'system';
 }[] = [
+  { key: 'overview', label: '总览', sub: '项目态势仪表盘', icon: Gauge, group: 'mode' },
   { key: 'autopwn', label: 'AutoPwn', sub: '一体式自主渗透', icon: Zap, group: 'mode' },
   { key: 'recon', label: '资产测绘 & 指纹', sub: 'Recon Agent', icon: Radar, group: 'stage' },
   { key: 'nday', label: 'N-Day & 变体', sub: 'NDay Agent', icon: Bug, group: 'stage' },

@@ -1,6 +1,7 @@
 /** Console 共享类型——仅存活的消费面(CS3-N6: mock 时代 ~130 行死类型
  * 已清, 含与 McpPage 局部类型同名冲突的 McpServer)。 */
 export type RouteKey =
+  | 'overview'       // 项目总览仪表盘(默认路由)
   | 'autopwn'        // AutoPwn 一体式自主渗透（Orchestrator 主控）
   | 'recon'          // 资产测绘 & 指纹识别
   | 'nday'           // N-Day & 变体（PoC 验证）
