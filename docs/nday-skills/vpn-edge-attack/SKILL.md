@@ -325,7 +325,7 @@ nuclei -u https://target/ \
 
 - **`cve-triage`** — 指纹命中厂商+版本后, 建 CVE 候选台账并逐行研判可利用性(EPSS×可达性排序)
 - **`poc-adapt` / `poc-verify`** — 链路原语: VPN 设备 CVE(如 Ivanti ICS CVE-2024-21887、Citrix Bleed CVE-2023-4966、Fortinet CVE-2024-21762)→ pre-auth 路径遍历 → 任意文件写入 web-root → 请求该文件 → 以 `root` 权限代码执行 → 提取 VPN 配置 + LDAP bind 凭据。验证按安全线: RCE 只 echo 标记, 禁止落地 web-shell
-- **`lateral-movement`** — VPN 立足点后的自然下一步: 从 VPN 设备配置提取凭据(LDAP bind、RADIUS shared secret)复用进内网
+- **`lateral-movement`** — VPN 立足点后的自然下一步: 从 VPN 设备配置提取凭据(LDAP bind、RADIUS shared secret)→ 复用进内网打 vCenter 支点 → 授权范围允许时升级到数据中心接管(datacenter takeover)
 - SAML 链路原语: 设备已修补最新 CVE 但 `/saml/metadata` 可达 → 指纹识别 IdP → XSW 或注释注入伪造 assertion → 无密码/MFA 建立 VPN 会话(SPECTRE 暂无专门 SAML 技能, 上述手法保留在本技能第 3 节自查)
 - NTLM 链路原语: 部分 VPN 设备管理路径暴露匿名 NTLM → NTLM Type-2 捕获 → AV_PAIR 解码 → 内部 AD 林名 → 对同步租户做凭据喷洒
 - **`nday-report`** — VPN 设备 CVE 利用噪音大、SOC 响应快: 确认 CVE 后先取基线; 若测试中途设备更新, 把修补后状态作为第二个发现记录; 两个发现都走验证后落账, 并显式标注关键基础设施影响
