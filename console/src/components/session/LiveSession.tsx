@@ -1,5 +1,5 @@
 import { memo, useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Bot, Check, ChevronDown, Loader2, User, X, TriangleAlert } from 'lucide-react';
+import { Bot, Check, ChevronDown, Copy, Loader2, TriangleAlert, User, X, Download } from 'lucide-react';
 
 import {
   api,
@@ -395,16 +395,37 @@ export function LiveSession({ agentKey, sessionId, onGone, heading }: {
         <span className="truncate text-xs font-medium text-secondary" title={sessionId ?? undefined}>
           {heading ?? sessionId ?? '会话'}
         </span>
-        <span className={cn(
-          'flex items-center gap-1.5 text-xs',
-          busy ? 'text-warning-text' : 'text-tertiary',
-        )}>
+        <div className="flex items-center gap-2">
           <span className={cn(
-            'h-1.5 w-1.5 rounded-full',
-            busy ? 'animate-pulse bg-warning-text' : 'bg-faint',
-          )} />
-          {busy ? '运行中' : '空闲'}
-        </span>
+            'flex items-center gap-1.5 text-xs',
+            busy ? 'text-warning-text' : 'text-tertiary',
+          )}>
+            <span className={cn(
+              'h-1.5 w-1.5 rounded-full',
+              busy ? 'animate-pulse bg-warning-text' : 'bg-faint',
+            )} />
+            {busy ? '运行中' : '空闲'}
+          </span>
+          {messages.length > 0 && (
+            <button
+              onClick={() => {
+                const md = messages.map(m =>
+                  `[${m.role === 'user' ? (m.source === 'system' ? 'system' : m.source === 'agent' ? 'DM' : 'user') : m.role}] ${m.text ?? ''}`
+                ).join('\n\n---\n\n');
+                const blob = new Blob([`# ${heading ?? sessionId ?? '会话'}\n\n${md}`], { type: 'text/markdown' });
+                const a = document.createElement('a');
+                a.href = URL.createObjectURL(blob);
+                a.download = `${(heading ?? sessionId ?? 'session').replace(/[\\/:*?"<>|#]/g, '_').slice(0, 60)}.md`;
+                a.click();
+                URL.revokeObjectURL(a.href);
+              }}
+              className="rounded p-1 text-faint transition-colors hover:text-tertiary"
+              title="导出会话 .md"
+            >
+              <Download className="h-3.5 w-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -801,7 +822,7 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
 
   // assistant reply
   return (
-     <div className="max-w-[92%]">
+     <div className="group relative max-w-[92%]">
        <ThinkingBlock
          thinking={message.thinking}
          active={message.streamingThinking === true}
@@ -822,9 +843,30 @@ const MessageBubble = memo(function MessageBubble({ message }: { message: ApiMes
           {message.text + (message.streaming ? ' ▍' : '')}
         </Markdown>
       </div>
+      {!message.streaming && message.text && (
+        <BubbleCopyButton text={message.text} />
+      )}
     </div>
   );
 });
+
+function BubbleCopyButton({ text }: { text: string }) {
+  const [ok, setOk] = useState(false);
+  return (
+    <button
+      onClick={() => {
+        void navigator.clipboard.writeText(text).then(() => {
+          setOk(true);
+          setTimeout(() => setOk(false), 2000);
+        });
+      }}
+      className="absolute -right-1 -top-1 rounded border border-line bg-surface p-1 text-faint opacity-0 shadow-xs transition-opacity hover:text-tertiary group-hover:opacity-100"
+      title="复制"
+    >
+      {ok ? <Check className="h-3 w-3 text-success-text" /> : <Copy className="h-3 w-3" />}
+    </button>
+  );
+}
 
 /**
  * Reasoning panel: fully expanded while streaming (no height cap — a

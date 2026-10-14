@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { CornerUpLeft, History, Loader2, PencilLine, SendHorizontal } from 'lucide-react';
+import { CornerUpLeft, History, Loader2, PencilLine, SendHorizontal, Copy, Download } from 'lucide-react';
 import { api, subscribeBus, getBusCache, type ApiBusEvent } from '../../api/client';
 
 import { foldEntries, reviseEntryDirect, reviseEntryViaAgent } from '../../api/client';
@@ -129,9 +129,29 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   };
   return (
     <div className="animate-enter flex min-h-0 flex-1 flex-col gap-2">
-      <Button onClick={onBack} variant="secondary" size="sm" className="w-fit">
-        <CornerUpLeft className="h-3.5 w-3.5" /> 返回对话
-      </Button>
+      <div className="flex items-center gap-2">
+        <Button onClick={onBack} variant="secondary" size="sm" className="w-fit">
+          <CornerUpLeft className="h-3.5 w-3.5" /> 返回对话
+        </Button>
+        <div className="flex-1" />
+        <Button onClick={() => {
+          const md = buildEntryMarkdown(folded, current, title, severity, revisions);
+          void navigator.clipboard.writeText(md);
+        }} variant="ghost" size="sm" title="复制为 Markdown">
+          <Copy className="h-3.5 w-3.5" />
+        </Button>
+        <Button onClick={() => {
+          const md = buildEntryMarkdown(folded, current, title, severity, revisions);
+          const blob = new Blob([md], { type: 'text/markdown' });
+          const a = document.createElement('a');
+          a.href = URL.createObjectURL(blob);
+          a.download = `${title.replace(/[\\/:*?"<>|]/g, '_').slice(0, 60)}.md`;
+          a.click();
+          URL.revokeObjectURL(a.href);
+        }} variant="ghost" size="sm" title="导出 .md">
+          <Download className="h-3.5 w-3.5" />
+        </Button>
+      </div>
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-line bg-bg p-4">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           {isReport && <StatusBadge status={current.status ?? 'no-result'} />}
@@ -415,4 +435,36 @@ function EditForm({ kind, current, busy, onCancel, onSave }: {
       </div>
     </div>
   );
+}
+
+function buildEntryMarkdown(
+  folded: { revisedCount: number },
+  current: ApiBusEvent,
+  title: string,
+  severity: string,
+  revisions: ApiBusEvent[],
+): string {
+  const lines: string[] = [
+    `# ${title}`,
+    '',
+    `- **严重程度**: ${severity}`,
+    `- **时间**: ${current.ts?.replace('T', ' ').slice(0, 19) ?? ''}`,
+    `- **来源**: ${current.from ?? ''}`,
+    current.author ? `- **发现者**: ${current.author.name} (${current.author.typeLabel})` : '',
+    current.requester ? `- **请求者**: ${current.requester.name}` : '',
+    current.engagement ? `- **战役**: ${current.engagement}` : '',
+    folded.revisedCount > 0 ? `- **修订**: ${folded.revisedCount} 次` : '',
+    current.void ? '- **状态**: 已作废' : '',
+    '',
+    '---',
+    '',
+    current.detail ?? current.summary ?? '',
+  ];
+  if (revisions.length > 0) {
+    lines.push('', '## 修订历史', '');
+    for (const r of revisions) {
+      lines.push(`- 第 ${r.revision?.n ?? '?'} 次 (${r.ts?.slice(0, 10) ?? ''}): ${r.revision?.reason ?? '(未注明)'} — ${r.revision?.requestedBy?.name ?? r.from ?? '?'}`);
+    }
+  }
+  return lines.filter(Boolean).join('\n');
 }
