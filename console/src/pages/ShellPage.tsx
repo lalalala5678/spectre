@@ -193,6 +193,12 @@ export function ShellPage({ wsId }: { wsId: string | null }) {
                 .then(r => { setLines(l => [...l, { dir: 'sys', text: '── status ──\n' + JSON.stringify(r.shell, null, 1) }]); })}>
               状态</Button>
             <Button size="sm" variant="ghost" className="ml-1" onClick={() => setReadOpen(v => !v)}>读文件</Button>
+            {/* 快捷命令 chip 行: 一键填充+执行常用侦察命令 */}
+            {['id', 'whoami', 'uname -a', 'hostname', 'ifconfig | head -5', 'ps aux | head -10'].map(c => (
+              <button key={c} onClick={() => { setCmd(c); }}
+                className="ml-1 shrink-0 rounded-full border border-line bg-surface px-2 py-0.5 font-mono text-[11px] text-secondary transition-colors hover:border-line-strong hover:text-primary"
+                title="点击填入命令栏">{c.split(' ')[0]}</button>
+            ))}
           </div>
           <div ref={scrollRef} tabIndex={0} aria-label="终端输出" className="min-h-0 flex-1 overflow-y-auto p-3 font-mono text-[13px] leading-6">
             {lines.map((l, i) => (
