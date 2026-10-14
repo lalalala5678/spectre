@@ -138,11 +138,9 @@
   --chrome-text-primary:   #dcd5ec;
   --chrome-text-secondary: #a095c0;
   --chrome-text-tertiary:  #726a94;
-  --chrome-accent-text:    #a78bfa;
   --chrome-danger-text:    #fca5a5;
   --chrome-warning-text:   #fcd34d;
 }
-
 /* ---------- 工具类 → token(类名直接引用 CSS 变量, 随 data-theme 自动切换) ---------- */
 @theme inline {
   --color-bg: var(--bg);
@@ -198,8 +196,8 @@
 *::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
 /* ---------- 全局基线 ---------- */
-html { background-color: var(--bg); }
-body { font-family: var(--app-font-sans); }
+html { background-color: var(--bg); min-height: 100dvh; }
+body { font-family: var(--app-font-sans); min-height: 100dvh; }
 
 /* 主题切换过渡 */
 html { transition: background-color 120ms ease, color 120ms ease; }
