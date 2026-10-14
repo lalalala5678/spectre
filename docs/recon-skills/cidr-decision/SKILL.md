@@ -34,7 +34,7 @@ cut -d' ' -f2 resolved.txt | awk -F. '{print $1"."$2"."$3".0/24"}' | sort | uniq
 | IP 是 CDN/云厂商 ASN(cloudflare/阿里云CDN/腾讯CDN) | **不探测段**——段是厂商的,目标租户混在里面,爆段=打到无关客户 |
 | 共享托管(机房 desc 含 hosting/cloud) | 不爆段,只测已确认归属的 IP |
 
-CDN/托管判定:多 A 记录散布+`dig CNAME` 出现 cdn 关键词,或 whois descr 是云厂商(见 cdn-bypass 技能)。
+CDN/托管判定:多 A 记录散布+`dig CNAME` 出现 cdn 关键词,或 whois descr 是云厂商(见 infra-analysis 技能)。
 
 ## 4. 轻量段探测方法(决策为"探"时)
 

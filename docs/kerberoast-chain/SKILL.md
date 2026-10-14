@@ -31,7 +31,7 @@ description: Kerberoast/AS-REP 全链——SPN 请求→hashcat 离线破解→�
 ## 第三段·破解后回灌
 
 - 命中 → 弱口令凭据进 publish_intel(标注来源账户/SPN 服务, 供
-  weakcred 复用面与 lateral-exec 直接消费);
+  weakcred 复用面与 lateral-movement 直接消费);
 - 服务账户密码命中常是 critical 前奏: 检查该账户是否域管/可委派
   (回 bloodhound-ad 的 adminCount/路径数据交叉)——这决定定级;
 - 未命中 → hash 留档, 后续拿到更大字典再跑(台账留 hashcat 命令行)。
