@@ -53,3 +53,6 @@ weakcred/nmap-cheatsheet|docs/nmap-cheatsheet
 weakcred/service-brute|docs/brute-skills/service-brute
 weakcred/weakcred-method|docs/brute-skills/weakcred-method
 weakcred/web-login-brute|docs/brute-skills/web-login-brute
+postex/lateral-exec|docs/lateral-exec
+postex/kerberoast-chain|docs/kerberoast-chain
+postex/ad-abuse|docs/ad-abuse

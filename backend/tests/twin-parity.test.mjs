@@ -32,7 +32,7 @@ test('tools/bin ↔ docs: 期望清单内逐字节一致且双侧必须存在', 
   assert.deepEqual(missing, [], `双胞胎缺侧: ${missing.join(', ')}`);
   assert.deepEqual(drifted, [], `双胞胎漂移(docs 为权威): ${drifted.join(', ')}`);
 });
-// 技能双胞胎期望清单(CS10-2: 全量 49 对枚举锁定(CS66-A1: exploit 四对并入后同步计数)(skills-root 运行时发现)——
+// 技能双胞胎期望清单(CS10-2: 全量 52 对枚举锁定(CS66-A1: exploit 四对+postex 三对并入后同步计数)(skills-root 运行时发现)——
 // 新增双胞胎须入表;
 // skills-root 独有件(无顶层双胞胎)不受约, 删侧逃避因双侧存在性断言封死)。
 const EXPECTED_SKILL_TWINS = [
@@ -70,8 +70,11 @@ const EXPECTED_SKILL_TWINS = [
   'phish-skills/landing-page',
   'phish-skills/smtp-send',
   'phish-skills/track-report',
+  'postex-skills/ad-abuse',
   'postex-skills/file-ops',
   'postex-skills/host-recon',
+  'postex-skills/kerberoast-chain',
+  'postex-skills/lateral-exec',
   'postex-skills/lateral-prep',
   'postex-skills/priv-enum',
   'recon-skills/attribution-hunt',

@@ -35,5 +35,5 @@ cp -v docs/payload-specs/*.json "$DST/tools/c2/payload-specs/" 2>/dev/null || tr
 [ -f docs/nday-skills/mcp-nday-intel.mjs ] && cp -v docs/nday-skills/mcp-nday-intel.mjs "$DST/"
 # NEW-A(十一轮): 沙箱引导脚本同步——容器内 /opt/tools 即数据根挂载,
 # deploy/README 第 6 步引用的 /opt/tools/bootstrap-sandbox.sh 由这里交付
-cp -v deploy/bootstrap-sandbox.sh deploy/fetch-jars.sh "$DST/tools/" || { echo "[tools-sync] 引导脚本同步失败" >&2; exit 1; }
+cp -v deploy/bootstrap-sandbox.sh deploy/fetch-jars.sh deploy/fetch-adkit.sh "$DST/tools/" || { echo "[tools-sync] 引导脚本同步失败" >&2; exit 1; }
 echo "[tools-sync] 完成 → $DST (沙箱容器重建后经平台 installCli 账本恢复系统包)"

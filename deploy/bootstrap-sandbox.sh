@@ -19,7 +19,8 @@ fi
 echo "[bootstrap] 系统包(面杀引擎+JDK+运行时)"
 apt-get update -qq
 apt-get install -y -qq clamav yara openjdk-17-jdk-headless \
-  nodejs npm python3-pip git curl unzip jq build-essential php-cli
+  nodejs npm python3-pip git curl unzip jq build-essential php-cli \
+  hashcat krb5-user smbclient ldap-utils
 
 echo "[bootstrap] ClamAV 病毒库 → 持久挂载(容器重建不重下)"
 mkdir -p /opt/tools/c2/clamav-db

@@ -1,6 +1,6 @@
 #!/bin/bash
 # 技能播种: 仓库 docs/ → 运行时 skills 树(新装机器此前 0 挂载, 部署审计 F2)
-# 映射表 skills-seed.map 以平台 canonical 清单为准(9 agent / 55 技能)
+# 映射表 skills-seed.map 以平台 canonical 清单为准(9 agent / 58 技能)
 set -e  # CS45-N6: 族制式——即时式(sync/seed/bootstrap)=set -e 失败即停
 DST="${1:-${SPECTRE_DATA_DIR:-/var/lib/spectre}}"
 # NEW-B(十一轮): 未显式指定数据根而解析为生产缺省路径时拦截——六轮 G4/
