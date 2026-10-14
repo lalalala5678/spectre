@@ -107,10 +107,17 @@ export function buildIntelTools(record, caps) {
       limit: Type.Optional(Type.Number({
         description: 'Max entries shown, default 10, cap 50 (F35; total match count is always reported)',
       })),
+      scope: Type.Optional(Type.Union([
+        Type.Literal('all'),
+      ], { description: "缺省=本项目(F33); 'all'=跨项目索引面——可检索全部项目条目的标题/摘要(命中他项目条目标 [ws:<id>]), 但 seq 全文与修订仍按项目边界(去源项目操作)" })),
     }),
     execute: async (_id, params) => {
-      const rawWs = (caps.listBus?.() ?? [])
-        .filter(e => e.workSessionId === (record.workSessionId ?? null));
+      const crossAll = String(params.scope ?? '') === 'all';
+      // F33 防火墙不动: scope 缺省仍严格按 workSessionId 过滤; 'all' 只
+      // 开索引窗(列表/摘要面), seq 全文与修订在下方各自拒绝跨项目。
+      const rawWs = crossAll ? (caps.listBus?.() ?? [])
+        : (caps.listBus?.() ?? [])
+          .filter(e => e.workSessionId === (record.workSessionId ?? null));
       const isEntry = e => entryKind(e) !== null;
       // Fold: originals + their CURRENT (newest revision) versions.
       // Filters below see current titles/severities/status/detail.
@@ -141,9 +148,21 @@ export function buildIntelTools(record, caps) {
 
       // Single-entry full fetch: no silent truncation anywhere.
       const extraFilters = (params.kind || params.q || params.author || params.agentType || params.status || params.severity) != null;
+      // scope='all' 单条全文: 仅拒**他项目**条目(索引面契约); 本项目
+      // seq 在跨项目会话里照常取全文(否则回执会把本项目谎称"他项目",
+      // LLM 被指引去不存在的源项目死循环)。
+      if (params.seq != null && crossAll) {
+        const any = (caps.listBus?.() ?? [])
+          .find(e2 => e2.seq === Number(params.seq) && entryKind(e2) !== null);
+        const mine = any && (any.workSessionId ?? null) === (record.workSessionId ?? null);
+        if (any && !mine) {
+          return { content: [{ type: 'text',
+            text: `seq=${params.seq} 属于他项目(ws:${any.workSessionId ?? '∅'})——scope=all 是跨项目索引面, 全文不跨项目。命中价值时去该项目会话内 query_intel(seq=…), 或让编排者经 relay 协调。` }] };
+        }
+        // 本项目/未找到 → 落入下方正常路径(未找到有既有"本项目内不存在"回执)
+      }
       if (params.seq != null) {
         const target = Number(params.seq);
-        // A revision seq or its original both resolve to the CURRENT view.
         const orig = rawWs.find(x => x.seq === target);
         const viaRev = orig?.revises ? rawWs.find(x => x.seq === orig.revises) : null;
         const rootEntry = viaRev ?? orig;
@@ -207,7 +226,14 @@ export function buildIntelTools(record, caps) {
           if (!q) return true;
         // 2026-10-12 查重门补强: 检索面加入 payloadRef 与 requester——
         // 搜 'sess-xxx'/上报者名可命中对应条目(查重协调时定位对方会话)。
-        const hay = `${e.title ?? ''}\n${e.summary ?? ''}\n${e.detail ?? ''}\n${e.payloadRef ?? ''}\n${e.requester ?? ''}`.toLowerCase();
+        // scope=all 索引面契约: 他项目条目只搜标题/摘要——detail 全文
+        // 不进跨项目检索面(与预览收敛同一条契约, 审查 P1)。
+        const foreignHay = crossAll
+          && (e.workSessionId ?? null) !== (record.workSessionId ?? null);
+        const hay = (foreignHay
+          ? `${e.title ?? ''}\n${e.summary ?? ''}`
+          : `${e.title ?? ''}\n${e.summary ?? ''}\n${e.detail ?? ''}\n${e.payloadRef ?? ''}\n${e.requester ?? ''}`
+        ).toLowerCase();
         return hay.includes(q);
       })
       .sort((a, b) => b.seq - a.seq);
@@ -231,22 +257,27 @@ export function buildIntelTools(record, caps) {
       // 原事件自身字段不变——用指向集合判定在飞。
       const resolvedSet = new Set(rawWs.filter(e => e.resolves).map(e => e.resolves));
       const drafts = (kindNorm === 'vulnerability' || kindNorm === 'both' || kindNorm === 'vuln')
-        ? inWs.filter(e => e.type === 'vuln-draft' && !e.resolves && !resolvedSet.has(e.seq)).slice(0, 20)
+        // crossAll 下编写中占位收敛到本项目(他项目在飞 draft 的
+        // requester/payloadRef 属会话细节, 不进跨项目索引面, 审查 P3)。
+        ? inWs.filter(e => e.type === 'vuln-draft' && !e.resolves && !resolvedSet.has(e.seq)
+          && (!crossAll || (e.workSessionId ?? null) === (record.workSessionId ?? null))).slice(0, 20)
         : [];
       // 2026-10-12 查重门补强: 编写中占位带上报时间戳(先后判定依据)。
       const draftLine = e => `[编写中]《${e.title ?? e.summary}》——撰写申请由 ${e.requester ?? e.from} 于 ${String(e.ts ?? '').slice(0, 19).replace('T', ' ')} 提交, writer 处理中(payloadRef=${e.payloadRef ?? '?'})`;
-      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,库内最新 seq=${latestSeq})${drafts.length ? `,另有编写中 ${drafts.length} 条` : ''}:`
+      const countLine = `匹配 ${before ? `seq<${before} 内 ` : ''}${paged.length} 条,显示最新 ${hits.length} 条(新→旧,${crossAll ? '全库最新' : `库内最新 seq=${latestSeq}`})${drafts.length ? `,另有编写中 ${drafts.length} 条` : ''}${crossAll ? ';scope=all 跨项目索引面——他项目条目仅标题/摘要, 全文与修订按项目边界' : ''}:`
         + (drafts.length ? `\n` + drafts.map(e => draftLine(e) + '; 完成后此处被正式条目取代').join('\n') : '');
       const footLine = olderLeft > 0
         ? `\n\n↓ 还有更旧 ${olderLeft} 条——续翻下一页(更旧)传 before=${hits[hits.length - 1].seq}; ↑ 回到最新一页去掉 before;单条全文传 seq=…`
-        : (before ? `\n\n↑ 已到 before=${before} 之前的末页。注意:before 是排他上界(只看 seq<before 的更旧条目)——要看最新请去掉 before(库内最新 seq=${latestSeq})。` : '');
+        : (before ? `\n\n↑ 已到 before=${before} 之前的末页。注意:before 是排他上界(只看 seq<before 的更旧条目)——要看最新请去掉 before(${crossAll ? `全库` : `库内`}最新 seq=${latestSeq})。` : '');
 
       if (hits.length === 0) {
         if (drafts.length) {
           return { content: [{ type: 'text', text: `无已落账条目, 但有 ${drafts.length} 条报告正在编写中(完成后此处可见正式条目):\n`
             + drafts.map(e => draftLine(e)).join('\n') }] };
         }
-        const scope = inWs.filter(e => isEntry(e) && !e.void);
+        const scope = (crossAll
+          ? inWs.filter(e => (e.workSessionId ?? null) === (record.workSessionId ?? null))
+          : inWs).filter(e => isEntry(e) && !e.void);
         const reports = scope.filter(e => e.type === 'task-report').length;
         const vulns = scope.filter(e => entryKind(e) === 'vulnerability').length;
         const notes = scope.filter(e => entryKind(e) === 'intel-note').length;
@@ -282,19 +313,25 @@ export function buildIntelTools(record, caps) {
             : `[seq=${e.seq}][情报] ${prov}`;
         const hasDetail = Boolean(e.detail);
         const full = String(e.detail ?? e.summary ?? '');
+        const foreign = crossAll && (e.workSessionId ?? null) !== (record.workSessionId ?? null);
         // r10v3 打磨: 列表态预览剥正文首行历史状态声明(全文态有注记,
         // 列表态 400 字内曾露出与现行不符的旧状态行)
         const firstL = full.split('\n').find(l => l.trim()) ?? '';
         const stDeclared = /\*\*状态\*\*[:：]\s*[a-z-]+/i.test(firstL)
           && (e.revisedCount ?? 0) > 0;
-        const body = (stDeclared
-          ? full.split('\n').slice(1).join('\n') : full).slice(0, 400).replace(/^\s+/, '');
+        // scope=all 索引面契约: 他项目条目只出标题/摘要(summary 面,
+        // 200 字)——正文(detail)前 400 字不跨项目(POC/凭据/内网名不泄漏,
+        // 三处自述"仅标题/摘要"就此对齐, 审查 P1)。
+        const body = foreign
+          ? String(e.summary ?? '').slice(0, 200).replace(/^\s+/, '')
+          : (stDeclared
+            ? full.split('\n').slice(1).join('\n') : full).slice(0, 400).replace(/^\s+/, '');
         // Never cut silently (repo rule): shown/total + 可行动补全手段
         // (AGENTS.md:39-44)。CS44-F2/CS45-N2: 消费 emit 的 summaryClipped
         // 标志分三态——detail 在=seq 可取全文; detail 缺+emit 已截=如实
         // 声明不可恢复; detail 缺+未截但本处超 400=seq 仍可取。
         let mark = '';
-        if (full.length > 400) {
+        if (!foreign && full.length > 400) {
           if (hasDetail || !e.summaryClipped) {
             mark = `\n(正文 ${body.length}/${full.length} 字符,传 seq=${e.seq} 取全文)`;
           } else {
@@ -304,7 +341,13 @@ export function buildIntelTools(record, caps) {
         const voidTag = e.void ? '[已作废——本条不再出现在常规查询中]' : '';
         const revTag = e.revisedCount
           ? ` ⟳已修订${e.revisedCount}次(seq=${e.seq} 为原始条目,现行版为修订后的内容)` : '';
-        return `${head}${revTag}${voidTag}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${mark}`;
+        const wsTag = foreign ? `[ws:${e.workSessionId ?? '∅'}]` : '';
+        // foreign 的两态补全指引("取全文"/"emit 已截断重发")都跨项目
+        // 不可达——统一换成项目边界指引(审查 P3)。
+        const markFixed = foreign && (mark.includes('取全文') || mark.includes('重发'))
+          ? `\n(跨项目索引面——全文在项目 ${e.workSessionId ?? '∅'} 内, 去该项目会话 query_intel(seq=${e.seq}))`
+          : (foreign ? `\n(跨项目索引面摘要, 全文按项目边界)` : mark);
+        return `${wsTag}${head}${revTag}${voidTag}\n《${e.title ?? e.summary}》${e.payloadRef ? ` payloadRef=${e.payloadRef}` : ''}\n${body}${markFixed}`;
       });
       return {
         content: [{
@@ -610,13 +653,16 @@ export function buildIntelTools(record, caps) {
       const last = Math.min(Math.max(Number(params.last) || 10, 1), 30);
       // Access the session store via caps — injected by the composition root
       const messages = caps.readSessionMessages?.(sid, last, record.workSessionId ?? null);
+      // null 守卫必须先于 total/lastTs 的解引用——跨项目 payloadRef
+      // (scope=all 命中行的下一跳)会走到这里, R12-F1 门返回 null 后
+      // 曾是 TypeError 断流而非优雅回执(审查 P2)。
+      if (!messages) {
+        return { content: [{ type: 'text',
+          text: `会话 ${sid} 不存在或不可读(跨项目会话按项目边界——scope=all 命中的他项目 payloadRef 不可读, 该条目正文请去源项目操作)。payloadRef 形如 "sess:sess-xxx"——直接传或传整个 payloadRef 均可(仅剥 sess: 段, ID 本体 sess- 段保留)。` }] };
+      }
       // QA建议2: 会话规模与新鲜度随行(判断"读到的是否全量/是否还在长")
       const total = caps.readSessionCount?.(sid, record.workSessionId ?? null) ?? messages.length;
       const lastTs = messages.length ? (messages[messages.length - 1].ts ?? null) : null;
-      if (!messages) {
-        return { content: [{ type: 'text',
-          text: `会话 ${sid} 不存在或不可读。payloadRef 形如 "sess:sess-xxx"——直接传或传整个 payloadRef 均可(仅剥 sess: 段, ID 本体 sess- 段保留)。` }] };
-      }
       if (messages.length === 0) {
         return { content: [{ type: 'text', text: `会话 ${sid} 无消息。` }] };
       }

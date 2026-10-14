@@ -81,7 +81,7 @@
 
 | 工具 | 会话类型 | 副作用 | 说明 |
 |---|---|---|---|
-| `query_intel` | 业务面全部(配置三键除外) | [read-only] | 查询项目条目(kind=vulnerability/intel/task-report) |
+| `query_intel` | 业务面全部(配置三键除外) | [read-only] | 查询项目条目(kind=vulnerability/intel/task-report); scope=all 跨项目索引面(仅标题/摘要+ws 标记, 全文/修订按项目边界) |
 | `read_session` | 业务面全部(配置三键除外) | [read-only] | 按 sessionId/payloadRef 读源会话消息 |
 | `submit_task_report` | 业务面全部(配置三键除外) | [creates event] | 提交任务报告(status 可选+推断;vulns 字段引用漏洞标题) |
 | `report_vulnerability` | 编排器+子任务+非report直连 | [runs writer; synchronous] | 一句话上报漏洞线索——报告agent 读发现者会话上下文、验证后落账或驳回(回执判定) |
