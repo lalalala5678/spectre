@@ -134,6 +134,8 @@ export function OverviewPage() {
 
   useEffect(() => {
     if (!ws) return;
+    // R20-F2 同款: 切项目清空三态, 旧项目内容不得在新项目名下残闪
+    setBusEvents([]); setBusLoaded(false); setTreeSess(null);
     let stopped = false;
     const fetchTree = async () => {
       try {
@@ -171,14 +173,16 @@ export function OverviewPage() {
 
   /* 项目切换(照 AgentWorkspacePage pickWorkSession 范式) */
   const pickProject = useCallback(async (id: string) => {
-    const next = await switchWorkSession(id);
+    const next = await switchWorkSession(id).catch(() => null);
+    if (!next) return; // 项目已删/网络异常: 保持当前(防 setWs(null) 永骨架)
     setWs(next);
     setProjects(await listWorkSessions());
     setProjOpen(false);
   }, []);
   const createProject = useCallback(async () => {
     const name = `项目 ${new Date().toLocaleDateString('zh-CN')}`;
-    const next = await newWorkSession(name);
+    const next = await newWorkSession(name).catch(() => null);
+    if (!next) return;
     setWs(next);
     setProjects(await listWorkSessions());
     setProjOpen(false);

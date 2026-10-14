@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Menu, Activity, Bell, LogOut, Search, Palette } from 'lucide-react';
+import { Menu, Activity, Bell, Search, Palette } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';

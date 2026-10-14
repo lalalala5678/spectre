@@ -17,6 +17,7 @@ import { EntryDetail } from '../components/session/EntryDetail';
 import { DispatchTreePanel } from '../components/session/DispatchTreePanel';
 import { IntelNotesPanel } from '../components/session/IntelNotesPanel';
 import { PhishCampaignsPanel } from '../components/session/PhishCampaignsPanel';
+import { ScopePanel } from '../components/session/ScopePanel';
 import { BusView } from './BusView';
 import { cn } from '../utils/cn';
 import {
@@ -670,7 +671,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                       drillSession 残留使渲染链停在会话, 点条目'不跳转' */}
                   <VulnPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
                   <IntelNotesPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
-                  <ScopePanel agentKey={agent.id} workSessionId={workSession.id} onOpen={seq => { setEntryView(e => ({ ...e, seq } as typeof e)); setDrillSession(null); }} />
+                  <ScopePanel workSessionId={workSession.id} onOpen={seq => { setEntryView(e => ({ ...e, seq } as typeof e)); setDrillSession(null); }} />
                 </PanelStack>
               ) : (
                 <PanelStack storageKey="spectre.panel.stackRatios.stage">
@@ -691,7 +692,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     workSessionId={workSession.id}
                     onOpen={e => { setEntryView(e); setDrillSession(null); }}
                   />
-                  <ScopePanel agentKey={agent.id} workSessionId={workSession.id} onOpen={seq => { setEntryView(e => ({ ...e, seq } as typeof e)); setDrillSession(null); }} />
+                  <ScopePanel workSessionId={workSession.id} onOpen={seq => { setEntryView(e => ({ ...e, seq } as typeof e)); setDrillSession(null); }} />
                   {agent.id === 'phish' && <PhishCampaignsPanel />}
                 </PanelStack>
               )}

@@ -4,12 +4,11 @@
  * 每条 = 一个资产(IP/域名): 端口/服务/版本/开源项目/OS/CDN/标签。
  */
 import { useMemo } from 'react';
-import { Globe, Server, Cpu, Shield, Tag } from 'lucide-react';
+import { Globe, Server, Cpu, Shield } from 'lucide-react';
+import { Badge } from '../ui/Badge';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
-import { Badge, Dot } from '../ui/Badge';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
-import { cn } from '../../utils/cn';
 
 interface ScopePort {
   port: number;
@@ -34,14 +33,12 @@ interface ScopeEntry {
   tags: string[];
 }
 
-export function ScopePanel({ agentKey, workSessionId, onOpen }: {
-  agentKey: string;
+export function ScopePanel({ workSessionId, onOpen }: {
   workSessionId: string | null;
   onOpen?: (seq: number) => void;
 }) {
-  const { entries, loading } = useBusPanelEntries({
-    agentKey, workSessionId, accept: (e) => e.type === 'scope',
-  });
+  const { events: entries, loaded: loading } = useBusPanelEntries(
+    (e) => e.type === 'scope', { ws: workSessionId ?? undefined });
 
   const scopes = useMemo(() => {
     // 同 target 取最新现行版(修订链折叠)
@@ -66,9 +63,9 @@ export function ScopePanel({ agentKey, workSessionId, onOpen }: {
   if (scopes.length === 0) {
     return (
       <EmptyState
-        icon={<Globe className="h-6 w-6 text-faint" />}
+        icon={Globe}
         title="无资产档案"
-        subtitle="recon 测绘后逐资产 publish_scope 落地"
+        hint="recon 测绘后逐资产 publish_scope 落地"
       />
     );
   }
@@ -91,7 +88,7 @@ export function ScopePanel({ agentKey, workSessionId, onOpen }: {
               {data.target}
             </span>
             {data.cdn && (
-              <Badge variant="outline" className="text-[10px]">
+              <Badge tone="info" className="text-[10px]">
                 <Shield className="mr-0.5 h-3 w-3" />{data.cdn}
               </Badge>
             )}
@@ -128,7 +125,7 @@ export function ScopePanel({ agentKey, workSessionId, onOpen }: {
           {data.projects?.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
               {data.projects.slice(0, 4).map((p, i) => (
-                <Badge key={i} variant="default" className="gap-0.5 text-[10px]">
+                <Badge key={i} tone="accent" className="gap-0.5 text-[10px]">
                   <Server className="h-3 w-3" />
                   {p.name ?? p.repo}
                   {p.version && <span className="text-faint">@{p.version}</span>}
