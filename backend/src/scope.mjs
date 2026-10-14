@@ -91,7 +91,7 @@ export function emitScopeEntry(bus, callerRecord, params, authorOf) {
       target: existing,
       fields: { title, text: detail },
       reason: `资产档案更新(${callerRecord.agentKey})`,
-      requestedBy: callerRecord.agentKey, approvedBy: callerRecord.agentKey,
+      requestedBy: authorOf?.(callerRecord) ?? null, approvedBy: authorOf?.(callerRecord) ?? null,
     });
     return { ok: true, seq: existing.seq, revision: rev.revision.n, entry };
   }

@@ -56,7 +56,7 @@ test('publish_scope → query_intel kind=scope 端到端', async () => {
 
   const revEvt = bus.list().find(e => e.type === 'scope' && e.revises === r1.seq);
   assert.ok(revEvt, '应产生 revises 指向原条的修订事件');
-  assert.equal(revEvt.revision?.requestedBy, 'recon', '修订归因 requestedBy(F1-3 附带回归)');
+  assert.equal(revEvt.revision?.requestedBy?.name, 'op', '修订归因 requestedBy 对象形(EntryDetail 读 .name)');
   const revDetail = JSON.parse(revEvt.current?.detail ?? revEvt.detail);
   assert.ok(revDetail.ports.some(p => p.port === 8080),
     '修订事件现行版 detail 应含新端口 8080(fields.text 契约)');
