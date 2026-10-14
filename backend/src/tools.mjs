@@ -926,17 +926,49 @@ export function buildOrchestratorTools(record, caps) {
       'inside a durable Temporal engagement and share results over the bus.',
     executionMode: 'sequential',
     parameters: Type.Object({
-      instruction: Type.String({
-        description: 'Full task instruction for the stage agents',
-      }),
-      agents: Type.Array(stageEnum, {
-        description: 'Stage agent keys to dispatch, e.g. ["recon","nday"]',
-      }),
+      instruction: Type.Optional(Type.String({
+        description: 'Full task instruction for the stage agents(template= 复用时可省——模板值兜底)',
+      })),
+      agents: Type.Optional(Type.Array(stageEnum, {
+        description: 'Stage agent keys to dispatch, e.g. ["recon","nday"](template= 复用时可省——模板值兜底; 显式传覆盖模板)',
+      })),
       sharedContext: Type.Optional(Type.String({
-        description: '循环2-新5: Optional engagement-level shared block (scope/凭据/边界/判收纪律等所有成员共用的参数)——平台自动以「共享参数区」标题附加到每个成员的派发指令尾部, 漂移风险由平台兜底; 变更仍走 relay。',
+        description: 'Optional engagement-level shared block (scope/凭据/边界/判收纪律等所有成员共用的参数)——平台自动以「共享参数区」标题附加到每个成员的派发指令尾部, 漂移风险由平台兜底; 变更仍走 relay。',
+      })),
+      template: Type.Optional(Type.String({
+        description: '复用已存战役模板名——展开其 agents/instruction/sharedContext(显式传的字段覆盖模板同名项); 名不存在时回执列出全部可用模板',
+      })),
+      saveAsTemplate: Type.Optional(Type.String({
+        description: '把本次(成功的)instruction+agents+sharedContext 存为该名模板, 下次 template= 名一键开战(≤64 字符)',
       })),
     }),
     execute: async (_id, params) => {
+      // 战役模板: template= 展开为缺省(显式参数优先); 不存在→列出全部
+      // (发现面)。模板是跨项目资产("泛微专项"不隶属某校)。
+      if (params.template && typeof caps.getTemplate === 'function') {
+        const tpl = await caps.getTemplate(params.template);
+        if (!tpl) {
+          const all = typeof caps.listTemplates === 'function' ? await caps.listTemplates() : [];
+          return { content: [{ type: 'text',
+            text: `模板「${params.template}」不存在。可用模板(${all.length}):\n`
+              + (all.map(t => `- ${t.name} → [${(t.agents ?? []).join(',')}]`).join('\n') || '(无——先一次成功派发带 saveAsTemplate 存)')
+              + '\n重派请带 template= 上述名之一, 或直接传 instruction+agents。' }] };
+        }
+        params = {
+          ...tpl,
+          ...params,
+          agents: params.agents?.length ? params.agents : tpl.agents,
+          instruction: params.instruction || tpl.instruction,
+          sharedContext: params.sharedContext ?? tpl.sharedContext,
+          template: undefined,
+        };
+      }
+      // 模板/保存都消费**原始三元组**(平台标注与共享区注入前)——存错
+      // 层级会让复用时双重标注(链式保存逐轮叠加, 对抗审查 P2)。
+      const raw = {
+        instruction: params.instruction, agents: params.agents,
+        sharedContext: params.sharedContext,
+      };
       // 循环2-新5: 共享参数区——每成员指令尾部统一附加(单一事实源,
       // 9 份派发指令手工复制同一凭据块的漂移风险由平台兜底)。
       // 循环3-④: 平台自有资产自动标注(此前靠编排者 sharedContext 手工
@@ -945,6 +977,13 @@ export function buildOrchestratorTools(record, caps) {
       const withShared = { ...params,
         instruction: `${params.instruction}\n\n【平台自有资产(自动标注, 勿打)】宿主端口: ${platformPorts}——以上为平台自身服务面, 非目标资产; 误打=攻击平台自身。` + (params.sharedContext ? `\n\n【共享参数区(engagement 级, 全员一致——以本区为准, 勿自行改写)】\n${params.sharedContext}` : '') };
       params = withShared;
+      const tplSave = async () => {
+        if (!params.saveAsTemplate || typeof caps.saveTemplate !== 'function') return '';
+        const saved = await caps.saveTemplate(params.saveAsTemplate, raw);
+        return saved?.ok
+          ? `\n已存为模板「${saved.name ?? params.saveAsTemplate}」——下次 template=${saved.name ?? params.saveAsTemplate} 一键开战(显式参数可覆盖)。${saved.warn ?? ''}`
+          : `\n⚠ 模板未存: ${saved?.error ?? '未知原因'}(派发不受影响)。`;
+      };
       // Fix-B (A1): quota applies to BOTH dispatch entry points. A batch
       // that would push the tree past the cap is refused up front — the
       // project-3 lockout started exactly here (7+3=10>8 accepted).
@@ -986,8 +1025,9 @@ export function buildOrchestratorTools(record, caps) {
           }
         }
         const gapNoteW = await capabilityGapNote(params.agents, caps);
+        const tplNoteW = await tplSave();  // 分波路径同样生效(P2: 曾静默丢弃)
         return {
-          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席——r52/loop1 前旧中断数据的历史口径, 假死根因(/idle 长挂撞 headersTimeout)已拔除, 7 席/波实测存活 7min+; 上限保留为资源节流而非可靠性约束, 大波次可按需放宽); 波间错峰 90s(总并发会话的资源因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` + gapNoteW }],
+          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席——r52/loop1 前旧中断数据的历史口径, 假死根因(/idle 长挂撞 headersTimeout)已拔除, 7 席/波实测存活 7min+; 上限保留为资源节流而非可靠性约束, 大波次可按需放宽); 波间错峰 90s(总并发会话的资源因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` + gapNoteW + tplNoteW }],
           details: { waves: started2.map(x => x.engagementId) },
         };
       }
@@ -1013,6 +1053,7 @@ export function buildOrchestratorTools(record, caps) {
       record.activeEngagement = started;
       caps.persistMetaNow?.(record);  // r20-②: 即时落 WAL(重启可恢复)
       const gapNote = await capabilityGapNote(params.agents, caps);
+      const tplNote = await tplSave();  // 原始三元组已在 raw(标注前)
       return {
         content: [{
           type: 'text',
@@ -1020,7 +1061,7 @@ export function buildOrchestratorTools(record, caps) {
             `${started.agents.join(', ')} running. Results will be ` +
             `reported to you as [DM] messages — relay them with ` +
             `relay_to_agents when other agents need to know. 并发建议: 上游 LLM 有限速, 单波 ≤5 席(loop41 实测 7 席/波仍 7/10 中断; 10 并发曾 3 席 429 击杀)——更大编队自动分波。` +
-            (verdict.warn ? `\n${verdict.warn}` : '') + gapNote,
+            (verdict.warn ? `\n${verdict.warn}` : '') + gapNote + tplNote,
         }],
         details: started,
       };

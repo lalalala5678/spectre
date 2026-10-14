@@ -29,6 +29,7 @@ import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
 import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
 import { loadSandboxConfig, ensureSandbox, probeCliTools } from './src/sandbox/container.mjs';
+import { templatesFromWal, saveTemplate, getTemplate, listTemplates } from './src/templates.mjs';
 import { projectsFromWal, listProjects, getPrefs, tombstonesAll } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
@@ -125,8 +126,11 @@ if (migratedLlm) {
 // live model, 迁移后任何重启不再走迁移分支, live model 的 baseUrl 停留
 // 构建期空值→OpenAI SDK 默认 api.openai.com(平台密钥外发第三方,
 // 抓包实证)。此前仅设置页保存触发过热更, 掩盖了纯重启路径。
-await applyLlmPrefs();
 spawnSettingsFromWal(entries);  // F68: spawn policy WAL replay
+templatesFromWal(entries);      // 战役模板 WAL 回放(t:'tpl' 载体)
+// P0 复盘(对抗审查): 此行曾在模板接线中被误删——删后每次重启 live model
+// 停留构建期空值, LLM 全线打 OpenAI 默认端点(密钥外发)。
+await applyLlmPrefs();
 const bus = new Bus(wal);
 bus.load(replay.busEvents);
 
@@ -234,6 +238,9 @@ const caps = {
   // 派发前能力对账面(dispatch_agents 回执的缺口披露): 定向探测, 失败=null(对账跳过)。
   probeCliTools: async (names) => probeCliTools(names),
   signalEngagement,
+  saveTemplate: (name, payload) => saveTemplate(wal, name, payload),
+  getTemplate,
+  listTemplates,
   // r29-#2: vuln 落账互斥——emit 前预检, 短窗高重叠拦截(非吞并),
   // 返回 {blocked, dupSeq} 供 publish_vulnerability 回执指引 revise。
   emitBus: (entry) => {
