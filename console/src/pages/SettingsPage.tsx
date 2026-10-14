@@ -170,11 +170,9 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
   onDirtyChange?: (dirty: boolean) => void;  // FEVERIFY6-P3: 透传脏态
 }) {
   const [open, setOpen] = useState(true);
-  const isParams = src.id === 'brute';
-  const paramCount = Object.values(cfg ?? {}).filter(v => String(v ?? '').length > 0).length;
   // CS17-4: 谓词镜像后端 hasSourceCredential 单源(key/token/secret/
   // password + 组特例 smtp.user; id 是参数型字段不算)。
-  const mounted = isParams ? paramCount > 0 : hasCred(cfg, src.id);
+  const mounted = hasCred(cfg, src.id);
   const tier = TIER_STYLE[src.tier ?? 'P2'];
   const verifyState = verify;
   return (
@@ -188,7 +186,6 @@ function SourceCard({ src, cfg, onSave, verify, onDirtyChange }: {
         <Badge tone={verifyState && !verifyState.ok ? 'danger' : mounted ? 'success' : 'neutral'} className="ml-auto shrink-0">
           {verifyState && !verifyState.ok
             ? 'key 已失效 · 不注入'
-            : isParams ? `参数组 · ${paramCount} 项已注入`
             : mounted ? (verifyState ? '已验证 · 已注入' : '已挂载 MCP') : '未配置 · 不注入'}
         </Badge>
         {verifyState && !verifyState.ok && verifyState.error && (
@@ -316,7 +313,6 @@ export function SettingsPage() {
   const groups = data.schema.agents ?? [];
   // 用户令: 资产测绘数据源=资产测绘 agent 专属配置——并入智能体专属分组
   const otherAgents = groups;
-  const groupOf = (agentKey: string) => (agentKey === 'weakcred' ? 'weakcred' : 'recon-source');
 
   return (
     <div className="flex h-full min-h-0">
@@ -387,7 +383,7 @@ export function SettingsPage() {
         </div>
       </section>
 
-      {/* ---------- 其它 Agent 参数/数据源组(爆破参数·NDay 等) ---------- */}
+      {/* ---------- 其它 Agent 数据源组(NDay 情报源·资产测绘数据源等) ---------- */}
       <div id="sec-agents" className="scroll-mt-4" />
       {otherAgents.map((agent) => (
         <section key={agent.agentKey} className="mb-8 overflow-hidden rounded-lg border border-line bg-surface shadow-xs">
@@ -400,7 +396,7 @@ export function SettingsPage() {
           ) : (
             <div className="divide-y divide-line">
               {agent.sources.map((src) => (
-                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, groupOf(agent.agentKey))} />
+                <SourceCard onDirtyChange={bumpDirty} key={src.id} src={src} cfg={data.reconSources[src.id]} verify={verify?.[src.id]} onSave={saveSource(src.id, 'recon-source')} />
               ))}
             </div>
           )}

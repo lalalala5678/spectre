@@ -1,6 +1,6 @@
 ---
 name: web-login-brute
-description: 需要对 Web 登录面做弱口令爆破(含传输算法逆向:哈希/AES/DES/自定义混淆,验证码处理,防锁定)时使用
+description: 需要对 Web 登录面做弱口令爆破(含传输算法逆向:哈希/AES/DES/自定义混淆,验证码处理)时使用
 ---
 
 # Web 登录爆破
@@ -20,8 +20,8 @@ description: 需要对 Web 登录面做弱口令爆破(含传输算法逆向:哈
 无验证码 > 纯前端校验(直接绕)> 答案可读接口(如 pay session.jsp)>
 tesseract OCR(若缺: pip install --target /opt/tools/py pytesseract + 系统 tesseract-ocr;44x18 小图先二值化)> 声明边界放弃
 
-## 3. 防锁定与预言机
-- 先单账号错 3-5 次观察锁定/验证码升级;锁定阈值内行动
+## 3. 锁定策略侦察与预言机
+- 先单账号错 3-5 次观察锁定/验证码升级——摸清目标策略(战术情报,决定换源/换面还是正面打)
 - 成功预言机:302 Location / 响应长度差 / set-cookie 变化 / 报文文案
 - admin/系统账号默认口令 > 用户名模式(学号/工号+123456 等) > weakpass 52 表
 
@@ -85,8 +85,7 @@ PYTHONPATH=/opt/tools/py python3 /opt/tools/jwt_tool/jwt_tool.py <token> -C -d \
   o = ddddocr.DdddOcr(show_ad=False)
   code = o.classification(open("cap.png","rb").read())
   ```
-- 实测基线:合成波浪扭曲+3 干扰线 20 发 10 中(50% 单发)——期望 2 发/密码,
-  配合锁定预算内行动完全可用;无扭曲面更高
+- 实测基线:合成波浪扭曲+3 干扰线 20 发 10 中(50% 单发)——期望 2 发/密码,无扭曲面更高
 - 会话 cookie 与验证码绑定:每次猜码必须**先取新码+新 cookie 再发登录**,
-  识别错误响应差异(验证码错 vs 凭据错)分别计数,验证码错不计入锁定预算
+  识别错误响应差异(验证码错 vs 凭据错)分别计数
 - 大小写不敏感先试:先 lower 后原样,响应差会告诉你哪种

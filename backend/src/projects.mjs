@@ -7,7 +7,7 @@
  *
  * Project record: { id, label, createdAt, lastSessions: {agentKey: sessionId} }
  * Prefs record:   { currentWs, ui: { rightRatio, stackRatios },
- *                   commonSettings, reconApiKeys, bruteParams }
+ *                   commonSettings, reconApiKeys }
  */
 
 let projects = new Map();   // id → project

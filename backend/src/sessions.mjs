@@ -15,7 +15,7 @@ import { Agent, formatSkillsForSystemPrompt } from '@earendil-works/pi-agent-cor
 
 import { CONFIG } from './config.mjs';
 import { typeLabelOf, CONFIG_AGENT_KEYS } from './agents.mjs';
-import { effectiveCommon, effectiveBruteParams } from './agent-settings.mjs';
+import { effectiveCommon } from './agent-settings.mjs';
 import { ORCHESTRATOR_PROMPT, STAGE_PROMPT, RECON_PROMPT, NDAY_PROMPT, BRUTE_PROMPT, API_PROMPT, VULNHUNT_PROMPT, C2_PROMPT, PERSIST_PROMPT, POSTEX_PROMPT, PHISH_PROMPT, TOOLS_GUIDE, SKILL_CONFIG_PROMPT, MCP_CONFIG_PROMPT, CLI_CONFIG_PROMPT, clipMarked, normalizeMessage, noteRateLimit, truncateText, sessionBootRules } from './pi.mjs';
 import { mountForSession, skillsCached } from './sandbox/mount.mjs';
 import { buildToolingTools } from './sandbox/tooling.mjs';
@@ -255,8 +255,7 @@ export class SessionStore {
           `${TOOLS_PROMPTS[record.agentKey] ? ''
             : TOOLS_GUIDE + '\n'}` +
           `${tools.map(t => `- ${t.name}`).join('\n')}` +
-          (skillIndexBlock ? `\n\n${skillIndexBlock}` : '') +
-          (record.agentKey === 'weakcred' ? `\n\n# 当前爆破参数(用户配置,实时生效)\n${JSON.stringify(effectiveBruteParams())}` : ''),
+          (skillIndexBlock ? `\n\n${skillIndexBlock}` : ''),
         model: this.modelForAgent?.(record.agentKey) ?? this.model,
         tools,
         // Thinking effort is user-configurable (settings bar); pi levels

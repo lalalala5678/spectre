@@ -357,19 +357,6 @@ export function settingsSchema() {
           })),
       },
       {
-        agentKey: 'weakcred', label: '爆破 Agent · 爆破参数(实时生效)',
-        hint: '爆破速度与字典选择;保存后新会话生效。',
-        sources: [{
-          id: 'brute', label: '爆破约束', defaultBase: '',
-          fields: [
-            { id: 'brute.delaySec', label: '每账号尝试间隔(秒)', type: 'number', check: num(1, 120), default: 3, hint: '防锁定:登录面每账号两次尝试之间的最小间隔' },
-            { id: 'brute.maxConc', label: '单登录面并发', type: 'number', check: num(1, 16), default: 2 },
-            { id: 'brute.lockBudget', label: '单账号错误预算(锁定阈值内)', type: 'number', check: num(1, 50), default: 5, hint: '先探测锁定策略,预算内行动' },
-            { id: 'brute.hydraThreads', label: '服务爆破线程(hydra -t)', type: 'number', check: num(1, 32), default: 4 },
-          ],
-        }],
-      },
-      {
         agentKey: 'nday', label: 'NDay Agent · 情报源',
         hint: '本地情报层零 key(cvelistV5/模板库/EPSS);NVD key 提速 CVE 拉取;GitHub token 在资产测绘组配置后同样生效。',
         sources: Object.entries(RECON_SOURCES)
@@ -436,7 +423,6 @@ function unmaskSecret(stored, incoming) {
 
 export function getSettings() {
   const p = getPrefs();
-  const bp = p.bruteParams ?? {};
   // CS37-F1 修正: 掩码下钻到叶(此前整源字典塌成 '••••' 字符串, 全字段
   // 回显空+徽标误报)。仅凭据叶掩码(isSecretLeaf 单源谓词);
   // baseUrl/email/id 等非凭据叶原样回显。
@@ -446,8 +432,6 @@ export function getSettings() {
       ? maskSecret(fv) : fv]));
   const reconSources = Object.fromEntries(
     Object.entries({ ...p.reconApiKeys }).map(([k, v]) => [k, maskSrc(v, k)]));
-  // weakcred brute params ride in reconSources under the pseudo-source id(CS3-N14 拼写)
-  reconSources.brute = bp;
   const maskLlm = (cfg) => (cfg && typeof cfg === 'object')
     ? { ...cfg, apiKey: cfg.apiKey ? maskSecret(cfg.apiKey) : cfg.apiKey } : cfg;
   const common = p.commonSettings ? {
@@ -610,29 +594,6 @@ export async function saveSetting({ group, field, value }, wal) {
     return { ok: true };
   }
 
-  if (group === 'weakcred') {
-    const cur = { ...getPrefs().bruteParams };
-    const [top, leaf] = field.split('.');
-    if (top !== 'brute') return { ok: false, error: '未知配置项' };
-    const v = Number(clean(value));
-    if (['delaySec', 'maxConc', 'lockBudget', 'hydraThreads'].includes(leaf)) {
-      if (!Number.isFinite(v) || v < 1) return { ok: false, error: '必须 ≥1' };
-      cur[leaf] = v;
-    } else if (leaf === 'dirWordlist') {
-      if (!['common', 'medium', 'raft'].includes(String(clean(value)))) return { ok: false, error: 'common/medium/raft' };
-      cur[leaf] = String(clean(value));
-    } else if (leaf === 'userDict') {
-      if (!['auto', 'xato', 'pinyin', 'staff-id'].includes(String(clean(value)))) return { ok: false, error: 'auto/xato/pinyin/staff-id' };
-      cur[leaf] = String(clean(value));
-    } else if (leaf === 'passDict') {
-      if (!['both', 'semantic', 'rockyou'].includes(String(clean(value)))) return { ok: false, error: 'both/semantic/rockyou' };
-      cur[leaf] = String(clean(value));
-    } else if (leaf === 'baseWords') {
-      cur[leaf] = String(clean(value)).slice(0, 500);
-    } else return { ok: false, error: '未知配置项' };
-    setPrefs({ bruteParams: cur }, wal);
-    return { ok: true };
-  }
   if (group === 'recon-source') {
     // R32D46-NEW-5/CS20/R32D47-P3: 畸形 field 守卫——无点(leaf=undefined
     // 垃圾)、尾点(leaf='')、多点(a.b.c 静默截断落错字段)全拒; 叶子须在
@@ -771,22 +732,3 @@ export function enabledReconSources() {
   return out;
 }
 
-/** Effective brute params with defaults (injected into weakcred prompts). */
-export function effectiveBruteParams() {
-  const bp = getPrefs().bruteParams ?? {};
-  const wl = { common: '/opt/tools/seclists/Discovery/Web-Content/common.txt',
-    medium: '/opt/tools/seclists/Discovery/Web-Content/directory-list-2.3-medium.txt',
-    raft: '/opt/tools/seclists/Discovery/Web-Content/raft-medium-words.txt' };
-  return {
-    delaySec: Number(bp.delaySec) || 3,
-    maxConc: Number(bp.maxConc) || 2,
-    lockBudget: Number(bp.lockBudget) || 5,
-    hydraThreads: Number(bp.hydraThreads) || 4,
-    dirWordlist: wl[bp.dirWordlist] ?? wl.common,
-    baseWords: typeof bp.baseWords === 'string' && bp.baseWords.trim()
-      ? bp.baseWords.split(/[,，\s]+/).filter(Boolean).slice(0, 32)
-      : ['password', 'admin', 'service', 'redis', 'china', 'secret', 'api', 'manager', 'root', 'test'],
-    userDict: bp.userDict ?? 'auto',
-    passDict: bp.passDict ?? 'both',
-  };
-}

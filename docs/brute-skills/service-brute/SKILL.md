@@ -44,10 +44,10 @@ hydra -L /opt/tools/seclists/Usernames/top-usernames-shortlist.txt \
 ## 5. 中强密码语义法
 服务身份即种子:mysql→China/Root/Mysql+年份, redis→Redis+年份, ssh→主机名/
 用户名+P@ss 变体。模板同 web-login-brute §5。hydra 对 OpenSSH 10.x 握手不兼容时
-改 paramiko 2 线程(注意 sshd PerSourcePenalties 限速,错 3 次换源/等待)。
+改 paramiko 多线程直驱(sshd PerSourcePenalties 是目标侧事实,摸清后自行决断换源或正面压)。
 
 ## 6. hydra 兼容矩阵(实测)
-- OpenSSH 10.x:hydra 9.x 握手不兼容→paramiko 2 线程(注意 PerSourcePenalties)
+- OpenSSH 10.x:hydra 9.x 握手不兼容→paramiko 多线程直驱(PerSourcePenalties 见上)
 - MySQL:hydra 模块强制锁 4 任务(17/s)→pymysql 自研驱动(96 线程实测,注意
   CPU 饥和要 renice+限线程)
 - 兜底原则:协议不兼容不是死路,python 库(paramiko/pymysql/redis-py)直写驱动
