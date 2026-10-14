@@ -173,7 +173,10 @@ export function buildIntelTools(record, caps) {
       const kind = normKind === 'both' ? 'both'
         : (normKind === 'vulnerability' || normKind === 'vuln'
           || normKind === 'vulnerabilities') ? 'vulnerability'
-        : (normKind === 'intel' || normKind === 'notes') ? 'intel-note' : 'task-report';
+        : (normKind === 'intel' || normKind === 'notes') ? 'intel-note'
+        : (normKind === 'scope' || normKind === 'asset'
+          || normKind === 'assets') ? 'scope'
+        : 'task-report';
       const status = params.status ? String(params.status).toLowerCase() : null;
       const severity = params.severity ? String(params.severity).toLowerCase() : null;
       const q = params.q ? params.q.toLowerCase() : null;

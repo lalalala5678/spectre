@@ -79,7 +79,7 @@ export function emitScopeEntry(bus, callerRecord, params, authorOf) {
   const { ok, entry, error } = buildScopeEntry(params);
   if (!ok) return { ok: false, error };
   const ws = callerRecord.workSessionId ?? null;
-  const existing = (bus.list ?? bus.events ?? [])
+  const existing = (bus.list?.() ?? bus.events ?? [])
     .filter(e => e.type === 'scope' && !e.revises
       && e.workSessionId === ws
       && normalizeScopeTarget(e.target) === entry.target)
@@ -89,10 +89,8 @@ export function emitScopeEntry(bus, callerRecord, params, authorOf) {
   if (existing) {
     const rev = emitRevision(bus, {
       target: existing,
-      fields: { title, detail },
+      fields: { title, text: detail },
       reason: `资产档案更新(${callerRecord.agentKey})`,
-      requestedBy: authorOf?.(callerRecord) ?? null,
-      approvedBy: authorOf?.(callerRecord) ?? null,
       origin: 'agent',
     });
     return { ok: true, seq: existing.seq, revision: rev.revision.n, entry };

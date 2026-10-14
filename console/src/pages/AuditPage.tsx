@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { api } from '../api/client';
 import type { ApiBusEvent } from '../api/client';
@@ -21,18 +21,33 @@ export function AuditPage() {
   const [err, setErr] = useState('');
   const [limit, setLimit] = useState(50);
   const [exportTick, setExportTick] = useState(0);
-  // 通知深链: ?seq=N 定位+高亮目标条目
-  const highlightSeq = useMemo(() => {
+  // 通知深链: ?seq=N 定位+高亮(hashchange 响应——同页再点通知也生效)
+  const [highlightSeq, setHighlightSeq] = useState<number | null>(() => {
     const q = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
     const s = Number(q.get('seq'));
     return s > 0 ? s : null;
-  }, []);
+  });
   const highlightRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    const onHash = () => {
+      const q = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+      const s = Number(q.get('seq'));
+      setHighlightSeq(s > 0 ? s : null);
+    };
+    window.addEventListener('hashchange', onHash);
+    return () => window.removeEventListener('hashchange', onHash);
+  }, []);
   useEffect(() => {
     if (highlightSeq && highlightRef.current) {
       highlightRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
     }
-  }, [highlightSeq, events]);
+  }, [highlightSeq, events, limit]);
+  // 深链 seq 在默认 50 行窗口外时自动扩 limit(F9-2)
+  useEffect(() => {
+    if (!highlightSeq || !events) return;
+    const idx = events.findIndex(e => e.seq === highlightSeq);
+    if (idx >= limit) setLimit(idx + 10);
+  }, [highlightSeq, events, limit]);
 
   useEffect(() => {
     api<ApiBusEvent[]>('/bus')

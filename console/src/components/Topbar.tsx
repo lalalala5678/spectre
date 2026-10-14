@@ -43,7 +43,7 @@ function noticeOf(e: BusEvt): Notice | null {
   if (e.type === 'task-report' && e.status === 'failed') {
     return { seq: e.seq, kind: 'report-failed',
       text: `${e.title ?? e.summary ?? ''}`,
-      hash: `reports?seq=${e.seq}`, at: e.ts ?? '' };
+      hash: `audit?seq=${e.seq}`, at: e.ts ?? '' };
   }
   return null;
 }
