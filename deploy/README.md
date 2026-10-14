@@ -101,7 +101,7 @@ bash deploy/fetch-fingerprints.sh   # 指纹库 nt-technologies+plugins-0x727(Fi
 bash deploy/fetch-wordlists.sh      # 爆破字典 seclists+rockyou+jwt_tool(约 0.7GB, 实测 705-706MB; R32D57-NEW6; 落 $SPECTRE_DATA_DIR/tools, 容器内挂载为 /opt/tools)
 bash deploy/fetch-adkit.sh          # 内网纵深弹药: impacket 0.12.0(62 入口薄壳)+Responder v3.1.4.0(netifaces 同装; hashcat 经 bootstrap-sandbox.sh apt 装)
 docker exec "$SBX" bash /opt/tools/fetch-adkit.sh /opt        # ↑ 容器部署的权威构建位: 以容器解释器建共享层($1=容器内有效根 /opt, 层落 /opt/tools; 宿主直跑会以宿主 python ABI 落 C 扩展, 容器内死载——脚本经 tools-sync 交付)
-SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 51 技能; 三变量与 runtime 同源
+SPECTRE_DATA_DIR=/tmp/spectre-data PORT=<与步骤 1 同值> INTERNAL_TOKEN=<同 backend/.env 值> bash deploy/skills-seed.sh  # 56 技能; 三变量与 runtime 同源
 
 # 7) 数据源凭据
 #    控制台「设置」页填入(验证通过才落盘, 未配置不注入);
