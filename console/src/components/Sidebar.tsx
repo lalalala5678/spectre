@@ -2,7 +2,9 @@ import type { RouteKey } from '../types';
 import { cn } from '../utils/cn';
 import { NAV } from './nav';  // CS1-oxlint: 挪出的导航表
 import { Dot } from './ui/Badge';
+import { useTranslation } from 'react-i18next';
 import { SpectreMark } from './SpectreMark';
+
 
 
 export function Sidebar({
@@ -14,6 +16,7 @@ export function Sidebar({
   onRoute: (r: RouteKey) => void;
   runningCount: number;
 }) {
+  const { t } = useTranslation();
   const groups: { id: 'mode' | 'stage' | 'system'; label: string }[] = [
     { id: 'mode', label: '自主模式' },
     { id: 'stage', label: '渗透阶段' },
@@ -55,7 +58,7 @@ export function Sidebar({
                     )}
                   >
                     <Icon className={cn('h-4 w-4 shrink-0', active ? 'text-chrome-accent-text' : 'text-chrome-tertiary group-hover:text-chrome-secondary')} />
-                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{n.label}</span>
+                    <span className="min-w-0 flex-1 truncate text-sm font-medium">{t(n.labelKey)}</span>
                     {n.key === 'autopwn' && runningCount > 0 && <Dot tone="accent" pulse />}
                   </button>
                 );

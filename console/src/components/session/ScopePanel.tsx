@@ -45,7 +45,7 @@ export function ScopePanel({ workSessionId, onOpen }: {
     const byTarget = new Map<string, { seq: number; data: ScopeEntry; revised: number }>();
     for (const e of entries) {
       try {
-        const data = JSON.parse(e.detail ?? '{}') as ScopeEntry;
+        const data = JSON.parse(e.current?.detail ?? e.detail ?? '{}') as ScopeEntry;
         if (!data.target) continue;
         const prev = byTarget.get(data.target);
         const rev = e.revisedCount ?? 0;

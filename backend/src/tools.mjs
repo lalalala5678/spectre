@@ -316,6 +316,7 @@ export function buildIntelTools(record, caps) {
         const reports = scope.filter(e => e.type === 'task-report').length;
         const vulns = scope.filter(e => entryKind(e) === 'vulnerability').length;
         const notes = scope.filter(e => entryKind(e) === 'intel-note').length;
+        const assets = scope.filter(e => entryKind(e) === 'scope').length;
         // F35: 提示只列真正在用的过滤维度——未传 q 不说"去掉 q"(误导排查)
         const relax = [];
         if (kind !== 'both') relax.push('kind');
@@ -324,8 +325,8 @@ export function buildIntelTools(record, caps) {
         if (severity) relax.push('severity');
         if (params.author) relax.push('author');
         if (q) relax.push('q');
-        const hasAny = reports + vulns + notes > 0;
-        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条(作废条目默认排除——审计需 includeVoid: true)。(注: seq 非连续系日志滚动上限与查重合并所致, 空洞非数据丢失)`;
+        const hasAny = reports + vulns + notes + assets > 0;
+        let hint = `无匹配条目。当前项目内:任务报告 ${reports} 条 / 漏洞 ${vulns} 条 / 情报 ${notes} 条 / 资产 ${assets} 条(作废条目默认排除——审计需 includeVoid: true)。(注: seq 非连续系日志滚动上限与查重合并所致, 空洞非数据丢失)`;
         hint += relax.length
           ? (hasAny ? `当前过滤(${relax.join('/')})过窄,可放宽或去掉。` : `项目本身为空——过滤(${relax.join('/')})不是原因。`)
           : (hasAny ? '' : '项目尚无任何产出。');
@@ -345,7 +346,9 @@ export function buildIntelTools(record, caps) {
           ? `[seq=${e.seq}][任务报告|${e.status ?? '?'}] ${prov}`
           : entryKind(e) === 'vulnerability'
             ? `[seq=${e.seq}][漏洞|${e.severity ?? '?'}] ${prov}`
-            : `[seq=${e.seq}][情报] ${prov}`;
+            : entryKind(e) === 'scope'
+              ? `[seq=${e.seq}][资产|${e.target ?? '?'}] ${prov}`
+              : `[seq=${e.seq}][情报] ${prov}`;
         const hasDetail = Boolean(e.detail);
         const full = String(e.detail ?? e.summary ?? '');
         const foreign = crossAll && (e.workSessionId ?? null) !== (record.workSessionId ?? null);
