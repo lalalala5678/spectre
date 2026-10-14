@@ -1,9 +1,14 @@
 @import "tailwindcss";
 
-/* §3-C/§4.1: dark 变体挂 data-theme(与 prefers-color-scheme 默认 + 手动切换共存) */
-@custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
+/* ═══════════════════════════════════════════════════════════════
+   SPECTRE Design System v2 — 三主题: light / carbon / abyss
+   每套独立调色, 非反转变换。切换走 <html data-theme="…">。
+   ═══════════════════════════════════════════════════════════════ */
 
-/* ---------- 字体栈(§4.3): latin 走自托管 Inter/JBM, 中文永远走系统栈 ---------- */
+@custom-variant dark (&:where([data-theme="carbon"], [data-theme="carbon"] *,
+                               [data-theme="abyss"], [data-theme="abyss"] *));
+
+/* ---------- 字体栈: 自托管 Inter/JBM, 中文走系统栈 ---------- */
 :root {
   --app-font-sans: 'Inter', 'Inter var', system-ui, -apple-system, 'Segoe UI',
     'PingFang SC', 'HarmonyOS Sans SC', 'MiSans', 'Noto Sans SC',
@@ -29,49 +34,116 @@
   unicode-range: U+0000-00FF, U+2000-206F;
 }
 
-/* ---------- 语义 token: 浅色(默认, §4.1/§4.2 全部实测达标) ---------- */
-:root {
+/* ═══ Light(默认) — 暖白·专业蓝 ═══ */
+:root, [data-theme="light"] {
   color-scheme: light;
-  --bg:            #f8f9fb;  /* 页面底 */
-  --surface:       #ffffff;  /* 卡片/面板/输入框 */
-  --surface-2:     #f1f3f5;  /* 次级填充: hover/表头/芯片底 */
-  --surface-3:     #e9edf1;  /* 按压/选中填充 */
-  --line:          #e2e5ea;  /* 装饰性分隔线 */
-  --line-strong:   #8b95a5;  /* 交互控件边界(≥3:1, §7-4) */
-  --text-primary:   #1a1f28;
+  --bg:            #fafbfc;
+  --surface:       #ffffff;
+  --surface-2:     #f3f4f6;
+  --surface-3:     #e8eaed;
+  --line:          #e5e7eb;
+  --line-strong:   #9ca3af;
+  --text-primary:   #111827;
   --text-secondary: #4b5563;
-  --text-tertiary:  #616b7a;  /* 4.64:1 on surface-2 */
-  --text-faint:     #9ca3af;  /* 仅 disabled/装饰, 禁止承载信息 */
-  --accent:        #4f46e5;  /* 主色 indigo-600: 白字 6.29:1 */
-  --accent-hover:  #4338ca;
-  --accent-subtle: #eef2ff;  /* 选中态底色 */
-  --accent-text:   #4338ca;  /* 浅底上的链接/强调文字 7.9:1 */
-  --ring:          #4f46e5;
-  --success-text: #047857; --success-bg: #ecfdf5; --success-line: #a7f3d0;
+  --text-tertiary:  #6b7280;
+  --text-faint:     #9ca3af;
+  --accent:        #2563eb;
+  --accent-hover:  #1d4ed8;
+  --accent-subtle: #eff6ff;
+  --accent-text:   #1d4ed8;
+  --ring:          #2563eb;
+  --success-text: #065f46; --success-bg: #ecfdf5; --success-line: #a7f3d0;
   --warning-text: #92400e; --warning-bg: #fffbeb; --warning-line: #fde68a;
-  --danger-text:  #b91c1c; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
-  --info-text:    #0369a1; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
-  --shadow-color: 16 24 40;
-}
-
-/* ---------- 壳 token(单一混合主题: 深色壳+浅色内容面) ----------
- * 用户裁定(2026-10-03): 不做深浅两套切换——一套方案内既有深色(导航壳)
- * 也有浅色(内容面)。chrome-* 仅由 Sidebar/Topbar 消费; 内容面 token 不变。
- * 对比度实测: chrome-text-secondary on #161a22 = 7.98, chrome-tertiary = 5.6。 */
-:root {
-  --chrome-bg:            #0f1115;
-  --chrome-surface:       #161a22;
-  --chrome-surface-2:     #1d222c;
-  --chrome-line:          #272d38;
-  --chrome-text-primary:   #e6e9ef;
-  --chrome-text-secondary: #a8b0bd;
+  --danger-text:  #991b1b; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
+  --info-text:    #075985; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
+  --shadow-color: 15 23 42;
+  --shadow-opacity: 1;
+  /* chrome(导航壳): 浅色模式壳=内容同色系 */
+  --chrome-bg:            #f0f1f3;
+  --chrome-surface:       #ffffff;
+  --chrome-surface-2:     #f5f6f8;
+  --chrome-line:          #e2e4e8;
+  --chrome-text-primary:   #1a1f28;
+  --chrome-text-secondary: #556070;
   --chrome-text-tertiary:  #8791a0;
-  --chrome-accent-text:    #818cf8;  /* 5.84:1 on chrome-surface */
-  --chrome-danger-text:    #f87171;  /* 6.30:1 on chrome-surface */
-  --chrome-warning-text:   #fbbf24;  /* 8.9:1 on chrome-surface */
+  --chrome-accent-text:    #2563eb;
+  --chrome-danger-text:    #dc2626;
+  --chrome-warning-text:   #d97706;
 }
 
-/* 工具类 → token(@theme inline: 类名直接引用 CSS 变量, 随 data-theme 自动切换) */
+/* ═══ Carbon(暗色) — 深炭·冷蓝调 ═══ */
+[data-theme="carbon"] {
+  color-scheme: dark;
+  --bg:            #0c0e12;
+  --surface:       #141721;
+  --surface-2:     #1c202c;
+  --surface-3:     #252a38;
+  --line:          #2a2f3d;
+  --line-strong:   #4b5262;
+  --text-primary:   #e4e7ed;
+  --text-secondary: #a8b0bd;
+  --text-tertiary:  #7e8797;
+  --text-faint:     #535d6e;
+  --accent:        #5b9dff;
+  --accent-hover:  #7ab3ff;
+  --accent-subtle: #16233a;
+  --accent-text:   #7ab3ff;
+  --ring:          #5b9dff;
+  --success-text: #4ade80; --success-bg: #052e1a; --success-line: #166534;
+  --warning-text: #fbbf24; --warning-bg: #2d2005; --warning-line: #92400e;
+  --danger-text:  #f87171; --danger-bg:  #2d0f0f; --danger-line:  #7f1d1d;
+  --info-text:    #67e8f9; --info-bg:    #0c2233; --info-line:    #155e75;
+  --shadow-color: 0 0 0;
+  --shadow-opacity: 0;
+  --chrome-bg:            #090b0e;
+  --chrome-surface:       #111420;
+  --chrome-surface-2:     #181c28;
+  --chrome-line:          #1f2430;
+  --chrome-text-primary:   #dee3ea;
+  --chrome-text-secondary: #9aa3b2;
+  --chrome-text-tertiary:  #6d7788;
+  --chrome-accent-text:    #5b9dff;
+  --chrome-danger-text:    #f87171;
+  --chrome-warning-text:   #fbbf24;
+}
+
+/* ═══ Abyss(深海) — 深蓝紫·柔和 ═══ */
+[data-theme="abyss"] {
+  color-scheme: dark;
+  --bg:            #12101f;
+  --surface:       #1a1730;
+  --surface-2:     #232040;
+  --surface-3:     #2d2950;
+  --line:          #302a52;
+  --line-strong:   #504878;
+  --text-primary:   #e2dfee;
+  --text-secondary: #a89ec2;
+  --text-tertiary:  #7e74a0;
+  --text-faint:     #554d72;
+  --accent:        #a78bfa;
+  --accent-hover:  #c4b0fd;
+  --accent-subtle: #221d3d;
+  --accent-text:   #c4b0fd;
+  --ring:          #a78bfa;
+  --success-text: #6ee7b7; --success-bg: #0a2e26; --success-line: #065f46;
+  --warning-text: #fcd34d; --warning-bg: #2d240a; --warning-line: #92400e;
+  --danger-text:  #fca5a5; --danger-bg:  #2d1010; --danger-line:  #7f1d1d;
+  --info-text:    #93c5fd; --info-bg:    #0e1e3a; --info-line:    #1e40af;
+  --shadow-color: 0 0 0;
+  --shadow-opacity: 0;
+  --chrome-bg:            #0d0b18;
+  --chrome-surface:       #151227;
+  --chrome-surface-2:     #1c1835;
+  --chrome-line:          #252042;
+  --chrome-text-primary:   #dcd5ec;
+  --chrome-text-secondary: #a095c0;
+  --chrome-text-tertiary:  #726a94;
+  --chrome-accent-text:    #a78bfa;
+  --chrome-danger-text:    #fca5a5;
+  --chrome-warning-text:   #fcd34d;
+}
+
+/* ---------- 工具类 → token(类名直接引用 CSS 变量, 随 data-theme 自动切换) ---------- */
 @theme inline {
   --color-bg: var(--bg);
   --color-surface: var(--surface);
@@ -90,8 +162,8 @@
   --color-ring: var(--ring);
   --color-success-text: var(--success-text);  --color-success-bg: var(--success-bg);  --color-success-line: var(--success-line);
   --color-warning-text: var(--warning-text);  --color-warning-bg: var(--warning-bg);  --color-warning-line: var(--warning-line);
-  --color-danger-text: var(--danger-text);   --color-danger-bg: var(--danger-bg);    --color-danger-line: var(--danger-line);
-  --color-info-text: var(--info-text);       --color-info-bg: var(--info-bg);        --color-info-line: var(--info-line);
+  --color-danger-text: var(--danger-text);    --color-danger-bg: var(--danger-bg);    --color-danger-line: var(--danger-line);
+  --color-info-text: var(--info-text);        --color-info-bg: var(--info-bg);        --color-info-line: var(--info-line);
   --color-chrome-bg: var(--chrome-bg);
   --color-chrome-surface: var(--chrome-surface);
   --color-chrome-surface-2: var(--chrome-surface-2);
@@ -104,56 +176,39 @@
   --color-chrome-warning-text: var(--chrome-warning-text);
   --font-sans: var(--app-font-sans);
   --font-mono: var(--app-font-mono);
-  /* 海拔(§4.5): 浅色用阴影, 暗色 shadow-color=0 0 0 → 透明, 层级由 surface 分层承担 */
-  --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / 0.05);
-  --shadow-sm: 0 1px 3px rgb(var(--shadow-color) / 0.10), 0 1px 2px rgb(var(--shadow-color) / 0.06);
-  --shadow-lg: 0 12px 32px -8px rgb(var(--shadow-color) / 0.24);
+  --shadow-xs: 0 1px 2px rgb(var(--shadow-color) / calc(0.05 * var(--shadow-opacity)));
+  --shadow-sm: 0 1px 3px rgb(var(--shadow-color) / calc(0.10 * var(--shadow-opacity))), 0 1px 2px rgb(var(--shadow-color) / calc(0.06 * var(--shadow-opacity)));
+  --shadow-lg: 0 12px 32px -8px rgb(var(--shadow-color) / calc(0.24 * var(--shadow-opacity)));
 }
 
-
-/* ---------- 入场微动效: 面板/下拉 150ms fade + 2px 上移(§4.5) ----------
- * prefers-reduced-motion 由文件末尾同名块归零(简写特异性需重申)。 */
+/* ---------- 入场微动效 ---------- */
 @keyframes spectre-enter {
   from { opacity: 0; transform: translateY(2px); }
 }
 .animate-enter { animation: spectre-enter 150ms ease-out both; }
-/* ---------- 滚动条标准化(§6.1-0): 默认可见细条, 随主题着色 ---------- */
+
+/* ---------- 滚动条 ---------- */
 * {
   scrollbar-width: thin;
   scrollbar-color: var(--line-strong) transparent;
 }
-*::-webkit-scrollbar {
-  width: 8px;
-  height: 8px;
-}
-*::-webkit-scrollbar-track {
-  background: transparent;
-}
-*::-webkit-scrollbar-thumb {
-  background: var(--line-strong);
-  border-radius: 9999px;
-}
-*::-webkit-scrollbar-thumb:hover {
-  background: var(--text-faint);
-}
+*::-webkit-scrollbar { width: 8px; height: 8px; }
+*::-webkit-scrollbar-track { background: transparent; }
+*::-webkit-scrollbar-thumb { background: var(--line-strong); border-radius: 9999px; }
+*::-webkit-scrollbar-thumb:hover { background: var(--text-faint); }
 
-/* ---------- 全局基线(§4.3/§4.5) ---------- */
-html {
-  background-color: var(--bg); /* 防 React 挂载前暗色下白底闪烁 */
-}
-body {
-  font-family: var(--app-font-sans);
-}
+/* ---------- 全局基线 ---------- */
+html { background-color: var(--bg); }
+body { font-family: var(--app-font-sans); }
+
+/* 主题切换过渡 */
+html { transition: background-color 120ms ease, color 120ms ease; }
+body, body * { transition: background-color 120ms ease, border-color 120ms ease; }
+
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  *, *::before, *::after {
     transition-duration: 0ms;
     animation-duration: 0ms;
   }
-  /* .animate-enter 的 animation 简写以类选择器特异性盖过上面的 * 规则,
-   * 此处同特异性置后重申, 保证 reduce 下入场动效同样归零。 */
-  .animate-enter {
-    animation-duration: 0ms;
-  }
+  .animate-enter { animation-duration: 0ms; }
 }

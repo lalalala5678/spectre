@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Menu, Activity, Bell, LogOut, Search } from 'lucide-react';
+import { Menu, Activity, Bell, LogOut, Search, Palette } from 'lucide-react';
 
 import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
@@ -263,16 +263,22 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
 
       <div className="flex-1" />
 
+      {/* 主题切换: light → carbon → abyss 循环 */}
       <Button
         variant="ghostChrome"
         size="icon"
-        onClick={() => { window.location.href = '/spectre/logout'; }}
-        title="登出"
+        onClick={() => {
+          const order = ['light', 'carbon', 'abyss'];
+          const cur = document.documentElement.dataset.theme ?? 'light';
+          const next = order[(order.indexOf(cur) + 1) % order.length];
+          document.documentElement.dataset.theme = next;
+          localStorage.setItem('spectre-theme', next);
+        }}
+        title="切换主题(浅色 / 暗色 / 深海)"
       >
-        <LogOut className="h-4 w-4" />
+        <Palette className="h-4 w-4" />
       </Button>
 
-      {/* F70: 通知(实装) */}
       <div ref={bellRef} className="relative"
            onKeyDown={e => { if (e.key === 'Escape') setBellOpen(false); }}>  {/* FEVERIFY8: 铃铛 Esc */}
         <Button

@@ -32,13 +32,12 @@ test('tools/bin ↔ docs: 期望清单内逐字节一致且双侧必须存在', 
   assert.deepEqual(missing, [], `双胞胎缺侧: ${missing.join(', ')}`);
   assert.deepEqual(drifted, [], `双胞胎漂移(docs 为权威): ${drifted.join(', ')}`);
 });
-// 技能双胞胎期望清单(CS10-2: 全量 52 对枚举锁定(CS66-A1: exploit 四对+postex 三对并入后同步计数)(skills-root 运行时发现)——
+// 技能双胞胎期望清单(CS10-2: 全量 43 对枚举锁定(七组技能合并: cve-intel+exploit-triage→cve-triage、variant-bypass→poc-adapt、source-acquire+surface-map→source-surface、lateral-prep+lateral-exec→lateral-movement、email-craft+smtp-send→email-send、cdn-bypass+web-topology→infra-analysis、payload-gen+variant-engine→payload-pipeline; scope-gate 废止; new-skills 同内容滞留副本连带清)(skills-root 运行时发现)——
 // 新增双胞胎须入表;
 // skills-root 独有件(无顶层双胞胎)不受约, 删侧逃避因双侧存在性断言封死)。
 const EXPECTED_SKILL_TWINS = [
   'exploit/poc-verify',
-  'exploit/source-acquire',
-  'exploit/surface-map',
+  'exploit/source-surface',
   'exploit/taint-audit',
   'api-skills/api-inject',
   'api-skills/api-logic',
@@ -49,36 +48,29 @@ const EXPECTED_SKILL_TWINS = [
   'api-skills/pdf-skill',
   'brute-skills/nmap-cheatsheet',
   'c2-skills/accept-gate',
-  'c2-skills/payload-gen',
+  'c2-skills/payload-pipeline',
   'c2-skills/qa-loop',
-  'c2-skills/scope-gate',
-  'c2-skills/variant-engine',
-  'nday-skills/cve-intel',
-  'nday-skills/exploit-triage',
+  'nday-skills/cve-triage',
   'nday-skills/nday-report',
   'nday-skills/poc-adapt',
-  'nday-skills/variant-bypass',
   'new-skills/asset-db',
   'new-skills/bloodhound-ad',
-  'new-skills/exploit-triage',
   'new-skills/openapi-recon',
   'new-skills/payload-spec',
   'new-skills/phishlet',
   'new-skills/semgrep-scan',
   'new-skills/spectre-nuclei',
-  'phish-skills/email-craft',
+  'phish-skills/email-send',
   'phish-skills/landing-page',
-  'phish-skills/smtp-send',
   'phish-skills/track-report',
   'postex-skills/ad-abuse',
   'postex-skills/file-ops',
   'postex-skills/host-recon',
   'postex-skills/kerberoast-chain',
-  'postex-skills/lateral-exec',
-  'postex-skills/lateral-prep',
+  'postex-skills/lateral-movement',
   'postex-skills/priv-enum',
   'recon-skills/attribution-hunt',
-  'recon-skills/cdn-bypass',
+  'recon-skills/infra-analysis',
   'recon-skills/cidr-decision',
   'recon-skills/host-profile',
   'recon-skills/nmap-cheatsheet',
@@ -87,7 +79,6 @@ const EXPECTED_SKILL_TWINS = [
   'recon-skills/recon-report',
   'recon-skills/subdomain-sweep',
   'recon-skills/vhost-collide',
-  'recon-skills/web-topology',
 ];
 
 test('技能双胞胎全量一致(期望清单, 双侧必须存在)', () => {

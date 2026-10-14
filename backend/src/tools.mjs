@@ -110,8 +110,8 @@ export function buildIntelTools(record, caps) {
         Type.Literal('task-report'), Type.Literal('vulnerability'),
         Type.Literal('intel'), Type.Literal('both'), Type.Literal('reports'),
         Type.Literal('vuln'), Type.Literal('vulnerabilities'), Type.Literal('notes'),
-        Type.Literal('task_report'),
-      ], { description: 'Entry kind: task-report(=reports) / vulnerability(=vuln) / intel(=notes) / both. Default both. 编写中报告占位(kind=vuln-draft)随 vulnerability/both 一并显示(标题+申请人, 无正文), 无需单独指定。注意: seq 为事件序号而非条目创建时序(非单调)——低 seq 不必然先于高 seq 条目存在, 排他推断勿依赖 seq 顺序' })),
+        Type.Literal('task_report'), Type.Literal('scope'), Type.Literal('asset'), Type.Literal('assets'),
+      ], { description: 'Entry kind: task-report(=reports) / vulnerability(=vuln) / intel(=notes) / scope(=asset, 资产档案) / both. Default both. 编写中报告占位(kind=vuln-draft)随 vulnerability/both 一并显示(标题+申请人, 无正文), 无需单独指定。注意: seq 为事件序号而非条目创建时序(非单调)——低 seq 不必然先于高 seq 条目存在, 排他推断勿依赖 seq 顺序' })),
       seq: Type.Optional(Type.Number({
         description: 'Fetch ONE entry in full detail by its seq (from a previous listing)',
       })),
@@ -730,7 +730,72 @@ export function buildIntelTools(record, caps) {
     },
   };
 
-  return [submitTaskReport, queryIntel, readSession, reviseEntry];
+  return [submitTaskReport, queryIntel, readSession, reviseEntry, buildPublishScopeTool(record, caps)];
+}
+
+/** publish_scope — 目标资产档案(每 IP/域名一条)。recon 席位七阶段测绘
+ *  的落地面; 同 target 后续发布=修订(upsert), 全席位经 query_intel
+ *  kind=scope 消费(nday/exploit 拿到"什么端口部署了什么项目什么版本"
+ *  直接开工)。[creates event; upsert] */
+function buildPublishScopeTool(record, caps) {
+  return {
+    name: 'publish_scope',
+    label: '发布资产档案',
+    description:
+      '[creates event; upsert] 发布/更新目标资产档案(每 IP/域名一条, 同 target 再次发布=修订不建新条)。'
+      + 'ports 支持数组或宽松字符串; projects 填开源项目(GitHub repo+version)。'
+      + 'recon 席位在七阶段测绘完成后应逐资产发布; 其它席位发现新资产信息也可更新。'
+      + '全部席位经 query_intel(kind=scope) 读取。',
+    executionMode: 'sequential',
+    parameters: Type.Object({
+      target: Type.String({ description: 'IP 或域名(自动规范化: 剥协议/路径/端口/www 前缀)' }),
+      ports: Type.Optional(Type.Union([
+        Type.Array(Type.Object({
+          port: Type.Number({ description: '端口号 1-65535' }),
+          service: Type.Optional(Type.String({ description: '协议/服务(http/ssh/mysql…)' })),
+          version: Type.Optional(Type.String({ description: '版本(nginx 1.24/OpenSSH 8.9…)' })),
+          product: Type.Optional(Type.String({ description: '产品名(nginx/OpenSSH…)' })),
+        })),
+        Type.String({ description: '宽松格式: "80/http, 443/https/nginx 1.24, 3306/mysql"' }),
+      ], { description: '开放端口+服务+版本(≤50 端口)' })),
+      os: Type.Optional(Type.String({ description: '操作系统+版本(Linux 6.8/Ubuntu 22.04/Windows Server 2019…)' })),
+      projects: Type.Optional(Type.Union([
+        Type.Array(Type.Object({
+          name: Type.Optional(Type.String({ description: '项目名(Ghost/若依/泛微 e-cology…)' })),
+          repo: Type.Optional(Type.String({ description: '仓库地址(github.com/TryGhost/Ghost…)' })),
+          version: Type.Optional(Type.String({ description: '版本号(v6.0.0/4.6.3…)' })),
+        })),
+        Type.String({ description: '项目名(单项目简写)' }),
+      ], { description: '识别到的开源项目(指纹铁律产出)' })),
+      cdn: Type.Optional(Type.String({ description: 'CDN 厂商(Cloudflare/阿里云 CDN/null=无)' })),
+      ip: Type.Optional(Type.String({ description: '解析 IP(域名目标时填; 与 target 二选一或同填)' })),
+      title: Type.Optional(Type.String({ description: '页面标题/业务系统名' })),
+      notes: Type.Optional(Type.String({ description: '补充信息(拓扑关系/登录面/特殊配置…)' })),
+      tags: Type.Optional(Type.Array(Type.String({ description: '标签(≤8, 如 ["web","admin","vpn"])' }))),
+    }),
+    execute: async (_id, params) => {
+      if (!caps.emitScopeEntry) {
+        return { content: [{ type: 'text', text: '资产档案服务不可用(capability 缺失)。可用 publish_intel 留存线索。' }] };
+      }
+      try {
+        const r = caps.emitScopeEntry(record, params);
+        if (!r.ok) return { content: [{ type: 'text', text: `✗ ${r.error}` }] };
+        const e = r.entry;
+        const portStr = e.ports.length
+          ? e.ports.map(p => `${p.port}/${p.service ?? '?'}${p.version ? ` ${p.version}` : ''}`).join(', ')
+          : '(无端口)';
+        const projStr = e.projects.length
+          ? e.projects.map(p => `${p.name ?? p.repo}${p.version ? `@${p.version}` : ''}`).join(', ')
+          : '(未识别)';
+        return { content: [{ type: 'text',
+          text: `${r.revision > 0 ? '已更新' : '已发布'} 资产档案 ${e.target}(seq=${r.seq}${r.revision > 0 ? `, 第 ${r.revision} 次修订` : ''}):\n`
+            + `- 端口: ${portStr}\n- 系统: ${e.os ?? '?'}\n- 项目: ${projStr}\n`
+            + `- CDN: ${e.cdn ?? '无'}\n- 全席位经 query_intel(kind=scope) 可查` }] };
+      } catch (err) {
+        return { content: [{ type: 'text', text: `资产档案异常: ${String(err?.message ?? err).slice(0, 200)}` }] };
+      }
+    },
+  };
 }
 
 /**
@@ -1420,6 +1485,7 @@ export function entryKind(e) {
   if (e.type === 'vulnerability' || e.type === 'intel') return 'vulnerability';
   if (e.type === 'intel-note') return 'intel-note';
   if (e.type === 'task-report') return 'task-report';
+  if (e.type === 'scope') return 'scope';
   // 编写中占位(vuln-draft): 计入条目域(query_intel 可见), 但 kind 归
   // 类独立——不混入 vulnerability/intel 计数, 由 drafts 段单独渲染。
   if (e.type === 'vuln-draft') return 'vuln-draft';
@@ -1431,6 +1497,7 @@ function entryLabel(e) {
   if (k === 'vulnerability') return `漏洞|${e.severity ?? '?'}`;
   if (k === 'intel-note') return '情报';
   if (k === 'task-report') return `任务报告|${e.status ?? '?'}`;
+  if (k === 'scope') return `资产|${e.target ?? '?'}`;
   return e.type ?? '?';
 }
 

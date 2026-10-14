@@ -30,6 +30,7 @@ import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
 import { loadSandboxConfig, ensureSandbox, probeCliTools } from './src/sandbox/container.mjs';
 import { templatesFromWal, saveTemplate, getTemplate, listTemplates } from './src/templates.mjs';
+import { emitScopeEntry } from './src/scope.mjs';
 import { projectsFromWal, listProjects, getPrefs, tombstonesAll } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
@@ -239,6 +240,7 @@ const caps = {
   probeCliTools: async (names) => probeCliTools(names),
   signalEngagement,
   saveTemplate: (name, payload) => saveTemplate(wal, name, payload),
+  emitScopeEntry: (record, params) => emitScopeEntry(bus, record, params, (r) => store.authorOf(r)),
   getTemplate,
   listTemplates,
   // r29-#2: vuln 落账互斥——emit 前预检, 短窗高重叠拦截(非吞并),

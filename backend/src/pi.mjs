@@ -221,7 +221,10 @@ export const STAGE_PROMPT = [
   '执行无害命令, 首选 id(其次 whoami/uname -a/hostname); 2) 禁止空口声称',
   'RCE——无命令输出=未证明; 3) 禁止执行有害命令(删/写文件、反弹 shell、',
   '下载投递、提权动作一律禁止), 拿到无害回显即停、即报。',
-  'In direct conversation with the user, submit a report when appropriate —',
+  'When your task lacks context (targets, platforms, credentials, scope), FIRST',
+  'call query_intel to read other agents\' task reports, vulnerabilities, intel',
+  'notes and asset scope entries (kind=scope for asset profiles:',
+  'ports/services/versions/open-source projects/OS).',
   'e.g. when the user asks or when a meaningful unit of work concludes.',
   'Report content: what you did, the outcome or why it failed, and everything',
   'downstream agents need.',
@@ -514,13 +517,14 @@ export function textOf(content) {
  */
 export const TOOLS_GUIDE = [
   '## 本会话注册工具(以此清单为准,描述见各工具 schema)',
-  '- query_intel: [read-only] 查项目情报库(漏洞/情报/任务报告,折叠显示现行版)',
+  '- query_intel: [read-only] 查项目条目(kind=vulnerability/intel/task-report/scope,折叠显示现行版)',
   '- read_session: [read-only] 按 sessionId/payloadRef 读源会话',
   '- submit_task_report: 派发任务结束前必交(status 可推断;vulns 引用漏洞标题)',
   '- report_vulnerability: 一句话上报漏洞线索——报告agent 读你的会话上下文、',
   '  独立验证后落账或驳回,同步回执判定。你绝不自己写漏洞记录。',
   '- publish_intel: 任何可能对任务有利的信息,低门槛,直接发布',
-  '- revise_entry: 修订情报/任务报告(任意agent,reason留审计);writer 可修订漏洞',
+  '- publish_scope: [creates event; upsert] 发布资产档案(每 IP/域名一条: 端口/服务/版本/开源项目/OS/CDN)——同 target 再发=修订',
+  '- revise_entry: 修订情报/任务报告/资产档案(任意agent,reason留审计);writer 可修订漏洞',
   '- request_vulnerability_revision: 漏洞修订申请——writer 审核必要性与正确性',
   '- spawn_agent / dispatch_agents / relay_to_agents: 派生/批量调度/定向转发',
   '  (spawn 编排器/派生会话持有; dispatch/relay 仅编排器持有——直连会话没有,以提示词末尾实际注册清单为准)',
@@ -678,9 +682,9 @@ export const RECON_PROMPT = [
   '  多 411 名,爆破再加 42 名内部命名资产)。',
   '',
   '# 落账',
-  '测绘产物按阶段用 publish_intel 落账(资产总表/拓扑/CDN/主机矩阵/OSINT',
-  '分条目,下游 query_intel 可读);任务结束 submit_task_report 总结七阶段',
-  '完成度与证据链。',
+  '测绘产物按阶段用 publish_intel 落账; 每个确认资产 publish_scope',
+  '(端口/服务/版本/开源项目+版本/OS/CDN, 同 target 再发=修订);',
+  '任务结束 submit_task_report 总结七阶段完成度与证据链。',
 ].join('\n');
 
 // ═══ NDay 即变体 agent 专用业务提示词(与 recon 同一挂载语义) ═══

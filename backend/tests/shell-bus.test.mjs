@@ -84,7 +84,7 @@ test('CS27-15: targetMatches 语义机锁(通配/裸目标子域/大小写)', ()
     });
     if (r.status !== 0) throw new Error(`exit ${r.status}: ${r.stderr}`);
     const out = JSON.parse(r.stdout);
-    assert.ok(out.ok, `targetMatches 语义回归: ${JSON.stringify(out.results)}——改匹配器须同步 scope-gate SKILL 与本锁`);
+    assert.ok(out.ok, `targetMatches 语义回归: ${JSON.stringify(out.results)}——改匹配器须同步本锁`);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
