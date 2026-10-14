@@ -41,4 +41,4 @@ description: Kerberoast/AS-REP 全链——SPN 请求→hashcat 离线破解→�
 - 采集段: SPN 账户清单 + 每账户一条 hash 凭据(kerb.txt 行数=账户数);
 - 破解段: hashcat 输出摘要(Recovered x/y + 用时)原文留证;
 - 保密: 破解出的明文只进情报库(自动留痕), 不在报告正文全文罗列
-  (采样证明即可——同泄露类双证明纪律)。
+  (采样量以证明危害为准)。

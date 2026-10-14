@@ -16,7 +16,7 @@ description: AD 权限滥用落地——bloodhound 路径→DCSync/GPP/ACL/委�
   已被滥用的 ACL 授予——bloodhound 路径应已标明边的来源);
 - 执行: `secretsdump.py -just-dc-user krbtgt -dc-ip <dc>
   '<域>/<账:密或 -hashes>'`——**只取 krbtgt 一个账户**(证明金票
-  能力即停), 禁全量 `-just-dc`(=拖库, 同泄露类红线);
+  能力即停), 禁全量 `-just-dc`(禁止导出全量数据文件——krbtgt 单条即完整取证);
 - 证明: krbtgt NT hash 入情报库(标注"DCSync 已实证"), 报告定级
   critical 候选; 不铸造金票(能力证明≠必须使用)。
 
