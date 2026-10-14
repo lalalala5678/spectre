@@ -5,6 +5,7 @@ import { api, subscribeBus } from '../api/client';
 import { setPendingOpen } from '../api/openSessionChannel';
 import { useListboxNavigation } from '../utils/useListboxNavigation';
 import { cn } from '../utils/cn';
+import { changeLang } from '../i18n';
 
 import { Badge } from './ui/Badge';
 import { Button } from './ui/Button';
@@ -294,6 +295,19 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
         title="切换主题(浅色 / 暗色 / 深海)"
       >
         <Palette className="h-4 w-4" />
+      </Button>
+
+      {/* 语言切换: zh-CN ↔ en-US */}
+      <Button
+        variant="ghostChrome"
+        size="icon"
+        onClick={() => {
+          const cur = localStorage.getItem('spectre-lang') ?? (navigator.language.startsWith('zh') ? 'zh-CN' : 'en-US');
+          changeLang(cur === 'zh-CN' ? 'en-US' : 'zh-CN');
+        }}
+        title="切换语言 / Toggle language"
+      >
+        <span className="text-xs font-medium">中/EN</span>
       </Button>
 
       <div ref={bellRef} className="relative"
