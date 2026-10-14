@@ -36,19 +36,28 @@ if systemctl is-active --quiet caddy 2>/dev/null; then
   systemctl disable --now caddy >/dev/null 2>&1 || true
 fi
 
-# ---------- 2) 站点地址: 域名→自动 ACME; 无→公网 IP + tls internal ----------
+# ---------- 2) 站点地址: 域名→自动 ACME; 无→全局地址枚举 + tls internal ----------
 if [ -n "$DOMAIN" ]; then
   SITE="$DOMAIN"
   TLS_BLOCK='    # 自动 ACME(Caddy 缺省行为——80/443 须公网可达)'
 else
-  echo '[setup-tls] 未传域名——探测公网 IP(内部 CA, 浏览器首次访问须手动信任)'
-  DOMAIN="$(curl -fs --max-time 6 ifconfig.me 2>/dev/null || curl -fs --max-time 6 ip.sb 2>/dev/null || true)"
-  [ -n "$DOMAIN" ] || { echo '[setup-tls] FATAL: 探测公网 IP 失败——请手动传: sudo bash deploy/setup-tls.sh <域名或IP>' >&2; exit 1; }
-  # IP 作站点地址(tls internal 为其发 IP SAN 证书; 无主机名的 :443
-  # 无证书可发→握手 internal error, 实测)。
-  SITE="$DOMAIN"
+  # 部署缺陷修复②: 此前仅取 ifconfig.me 单值——curl 出口偏 v6 时只签 v6,
+  # 双栈机的公网 IPv4 入口无证书 → TLS 握手失败(实测)。改为枚举本机全部
+  # 全局地址(v4 优先)再并出网探测 IP(NAT 场景保留旧行为), 去重后全部入签。
+  echo '[setup-tls] 未传域名——枚举本机全局地址 + 出口 IP(内部 CA, 浏览器首次访问须手动信任)'
+  IDS=""
+  add_id() { case ",$IDS," in *",$1,"*) ;; *) IDS="${IDS:+$IDS,}$1" ;; esac; }
+  while IFS= read -r a; do [ -n "$a" ] && add_id "$a"; done \
+    < <(ip -o -4 addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+  while IFS= read -r a; do [ -n "$a" ] && add_id "$a"; done \
+    < <(ip -o -6 addr show scope global 2>/dev/null | awk '{print $4}' | cut -d/ -f1)
+  OUT_IP="$(curl -fs --max-time 6 ifconfig.me 2>/dev/null || curl -fs --max-time 6 ip.sb 2>/dev/null || true)"
+  [ -n "$OUT_IP" ] && add_id "$OUT_IP"
+  [ -n "$IDS" ] || { echo '[setup-tls] FATAL: 未发现任何全局地址且出口探测失败——请手动传: sudo bash deploy/setup-tls.sh <域名或IP>' >&2; exit 1; }
+  SITE="$IDS"
   TLS_BLOCK='    tls internal'
   IP_MODE=1
+  echo "[setup-tls] 签发标识: $SITE"
 fi
 
 # ---------- 3) 配置(网关保持 127.0.0.1:8081——安全侧默认不动) ----------
@@ -108,16 +117,27 @@ systemctl daemon-reload
 systemctl enable spectre-caddy >/dev/null 2>&1
 systemctl restart spectre-caddy
 
-# ---------- 5) 验证 + 下一步指引(R32D100-F3: 失败必须 exit 1+单元活性双查) ----------
-sleep 2
-FAIL=0
-systemctl is-active --quiet spectre-caddy || FAIL=1
-if [ "$FAIL" = 0 ] && { curl -fsk --max-time 8 "https://${DOMAIN}/spectre/" -o /dev/null 2>/dev/null \
-   || curl -fsk --max-time 8 "https://127.0.0.1/spectre/" -o /dev/null 2>/dev/null; }; then
-  echo "[setup-tls] ✓ TLS 入口就绪: https://${DOMAIN}/spectre/"
+# ---------- 5) 验证 + 下一步指引(R32D100-F3: 失败必须 exit 1) ----------
+# 部署缺陷修复③: 此前 sleep 2 后单次 curl——内部 CA 首签常超 2s, 且裸
+# IPv6 作 URL 主机是非法语法(需 [v6] 括号)——两因叠加把能成的部署误报
+# FATAL(实测)。改为: 括号包裹 v6 + 轮询至多 30s, 逐标识探测。
+tls_url() { case "$1" in *:*) echo "https://[$1]/spectre/" ;; *) echo "https://$1/spectre/" ;; esac; }
+OK_ID=""
+for _ in $(seq 1 15); do
+  systemctl is-active --quiet spectre-caddy || { sleep 2; continue; }
+  OLDIFS="$IFS"; IFS=','
+  for id in $SITE; do
+    if curl -fsk --max-time 4 "$(tls_url "$id")" -o /dev/null 2>/dev/null; then OK_ID="$id"; break; fi
+  done
+  IFS="$OLDIFS"
+  [ -n "$OK_ID" ] && break
+  sleep 2
+done
+if [ -n "$OK_ID" ]; then
+  echo "[setup-tls] ✓ TLS 入口就绪: $(tls_url "$OK_ID") (全部标识: $SITE)"
   [ -n "${IP_MODE:-}" ] && echo '[setup-tls] 无域名模式: 内部 CA 证书——浏览器首访「高级→继续访问」; Caddy 已尝试把内部根装入系统信任库'
 else
-  echo '[setup-tls] FATAL: 自检未通——journalctl -u spectre-caddy -n 20; 常见: 80/443 防火墙或安全组未放行' >&2
+  echo '[setup-tls] FATAL: 自检未通(轮询 30s)——journalctl -u spectre-caddy -n 20; 常见: 80/443 防火墙或安全组未放行' >&2
   exit 1
 fi
-echo "[setup-tls] 浏览器访问 https://${DOMAIN}/spectre/ 并用 admin 登录(一键: 密码 cat /root/spectre-admin-cred.txt; 手工: spectre-passwd.py add 所设)"
+echo "[setup-tls] 浏览器访问 $(tls_url "$OK_ID") 并用 admin 登录(一键: 密码 cat /root/spectre-admin-cred.txt; 手工: spectre-passwd.py add 所设)"

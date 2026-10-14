@@ -17,6 +17,14 @@ LOG_DIR=/var/log/spectre-console
 say() { echo "[setup] $*"; }
 die() { echo "[setup] FATAL: $*" >&2; exit 1; }
 
+# 部署缺陷修复①: 仓库落在 PrivateTmp 隔离区(/tmp、/var/tmp)时, systemd 单元
+# (PrivateTmp=true)内的服务看不到该路径——runtime 会 cd 失败崩溃循环(实测)。
+# 在写任何系统态之前拒绝(spectre-env 模板推荐 /opt/spectre)。
+case "$REPO" in
+  /tmp|/tmp/*|/var/tmp|/var/tmp/*)
+    die "仓库位于 $REPO——systemd 单元 PrivateTmp=true 隔离该路径, 服务无法访问(将崩溃循环)。请移至持久路径(推荐: git clone 到 /opt/spectre 后重跑)" ;;
+esac
+
 # ---------- 1) 基础依赖: python3 必在; Node ≥22(缺则 NodeSource 装; 装后复核) ----------
 command -v python3 >/dev/null || die 'python3 缺失(apt install python3)'
 command -v openssl >/dev/null || die 'openssl 缺失(apt install openssl)——令牌/密码生成依赖它'
@@ -110,8 +118,11 @@ TLS_OK=yes
 bash "$REPO/deploy/setup-tls.sh" "${1:-}" || TLS_OK=no
 
 # ---------- 7) 收尾指引(如实反映 TLS 状态, F3/F8) ----------
-PUBIP="$(curl -fs --max-time 6 ifconfig.me 2>/dev/null || echo '本机IP')"
-ENTRY="https://${1:-$PUBIP}/spectre/"
+# 部署缺陷修复①附: IPv6 字面量作 URL 主机必须括号包裹(裸 v6 是非法 URL,
+# curl/浏览器均解析失败——首部署自检误报的另一半根因)。
+urlhost() { case "$1" in *:*) printf '[%s]' "$1" ;; *) printf '%s' "$1" ;; esac; }
+PUBIP="$(curl -fs --max-time 6 ifconfig.me 2>/dev/null || echo '127.0.0.1')"
+ENTRY="https://$(urlhost "${1:-$PUBIP}")/spectre/"
 if [ "$TLS_OK" = yes ]; then
   TLS_NOTE="对外 TLS 就绪(https 入口; 无域名时证书为内部 CA——浏览器首访「高级→继续」, Caddy 已尝试把内部根装入系统信任库)"
 else
