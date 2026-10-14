@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { Download } from 'lucide-react';
 import { api } from '../api/client';
 import type { ApiBusEvent } from '../api/client';
@@ -9,17 +9,30 @@ import { SplitPane } from '../components/ui/SplitPane';
 import { Panel } from '../components/ui/Panel';
 import { Skeleton } from '../components/ui/Skeleton';
 import { usePageTitle } from '../utils/usePageTitle';
+import { cn } from '../utils/cn';
 
 /** 审计与证据链页 —— F23: 原为 mock 假数据,接真实 bus 事件流(WAL 持久审计源) */
 // CS67-5: 类型复用 ApiBusEvent 单源(此前手抄窄版且 to?/engagement?
 // 两死字段零读取——违 CS44-F16 手抄类型先例)。
 
 export function AuditPage() {
-  usePageTitle('审计与证据链'); // FEVERIFY-N3
+  usePageTitle('审计与证据链');
   const [events, setEvents] = useState<ApiBusEvent[] | null>(null);
   const [err, setErr] = useState('');
   const [limit, setLimit] = useState(50);
   const [exportTick, setExportTick] = useState(0);
+  // 通知深链: ?seq=N 定位+高亮目标条目
+  const highlightSeq = useMemo(() => {
+    const q = new URLSearchParams(window.location.hash.split('?')[1] ?? '');
+    const s = Number(q.get('seq'));
+    return s > 0 ? s : null;
+  }, []);
+  const highlightRef = useRef<HTMLTableRowElement>(null);
+  useEffect(() => {
+    if (highlightSeq && highlightRef.current) {
+      highlightRef.current.scrollIntoView({ block: 'center', behavior: 'smooth' });
+    }
+  }, [highlightSeq, events]);
 
   useEffect(() => {
     api<ApiBusEvent[]>('/bus')
@@ -76,7 +89,7 @@ export function AuditPage() {
           </thead>
           <tbody className="divide-y divide-line">
             {shown.map((r) => (
-              <tr key={r.seq} className="odd:bg-surface-2/50 hover:bg-surface-2">
+              <tr key={r.seq} ref={r.seq === highlightSeq ? highlightRef : undefined} className={cn('odd:bg-surface-2/50 hover:bg-surface-2', r.seq === highlightSeq && 'ring-2 ring-inset ring-accent bg-accent-subtle')}>
                 <td className="px-3 py-2.5 text-right font-mono text-xs tabular-nums text-tertiary">#{r.seq}</td>
                 <td className="px-3 py-2.5 font-mono text-xs tabular-nums text-tertiary">{r.ts?.slice(5, 19).replace('T', ' ')}</td>
                 <td className="px-3 py-2.5">

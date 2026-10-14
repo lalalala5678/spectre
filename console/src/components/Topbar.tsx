@@ -26,10 +26,6 @@ const SEARCHABLE = new Set(['intel', 'intel-note', 'vulnerability', 'task-report
  * - 数据面零新增: 复用 subscribeBus 全局单例(boot 快照取漏掉的) */
 interface Notice { seq: number; kind: 'vulnerability' | 'report-failed'; text: string; hash: string; at: string }
 
-const NOTICE_HASH: Record<Notice['kind'], string> = {
-  vulnerability: 'audit',
-  'report-failed': 'reports',
-};
 
 function noticeOf(e: BusEvt): Notice | null {
   // R19-F2: 修订事件(revises 指针, type 继承原始)不触发通知——同一
@@ -39,12 +35,12 @@ function noticeOf(e: BusEvt): Notice | null {
   if (e.type === 'vulnerability') {
     return { seq: e.seq, kind: 'vulnerability',
       text: `[${e.severity ?? '?'}] ${e.title ?? e.summary ?? ''}`,
-      hash: NOTICE_HASH.vulnerability, at: e.ts ?? '' };
+      hash: `audit?seq=${e.seq}`, at: e.ts ?? '' };
   }
   if (e.type === 'task-report' && e.status === 'failed') {
     return { seq: e.seq, kind: 'report-failed',
       text: `${e.title ?? e.summary ?? ''}`,
-      hash: NOTICE_HASH['report-failed'], at: e.ts ?? '' };
+      hash: `reports?seq=${e.seq}`, at: e.ts ?? '' };
   }
   return null;
 }
