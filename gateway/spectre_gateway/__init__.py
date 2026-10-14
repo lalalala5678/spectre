@@ -5,4 +5,4 @@ backend API (including SSE) — the only path between the public caddy
 frontend and the loopback-only agent runtime.
 """
 
-__version__ = "0.5.1"  # CS20-8: 与 backend/console/lockfile 对齐
+__version__ = "0.6.0"  # CS20-8: 与 backend/console/lockfile 对齐
