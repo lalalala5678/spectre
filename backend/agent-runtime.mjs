@@ -28,7 +28,7 @@ import { rebuildMounts } from './src/sandbox/mount.mjs';
 import { getSpawnSettings, spawnSettingsFromWal } from './src/settings.mjs';
 import { makeSpawnPolicy } from './src/spawn-policy.mjs';
 import { Wal } from './src/persist.mjs';
-import { loadSandboxConfig, ensureSandbox } from './src/sandbox/container.mjs';
+import { loadSandboxConfig, ensureSandbox, probeCliTools } from './src/sandbox/container.mjs';
 import { projectsFromWal, listProjects, getPrefs, tombstonesAll } from './src/projects.mjs';
 import { AGENT_KEYS } from './src/agents.mjs';
 import path from 'node:path';
@@ -231,6 +231,8 @@ const caps = {
   persistMetaNow: (record) => store.persistMetaNow?.(record),  // r20-②
   shells: shellRegistry,
   dispatch: (input) => startAutopwn(input),
+  // 派发前能力对账面(dispatch_agents 回执的缺口披露): 定向探测, 失败=null(对账跳过)。
+  probeCliTools: async (names) => probeCliTools(names),
   signalEngagement,
   // r29-#2: vuln 落账互斥——emit 前预检, 短窗高重叠拦截(非吞并),
   // 返回 {blocked, dupSeq} 供 publish_vulnerability 回执指引 revise。

@@ -323,6 +323,25 @@ export async function listInstalledTools() {
   return res.code === 0 ? res.out.split('\n').filter(Boolean) : [];
 }
 
+/** 定向命令存在性探测(dispatch 能力对账面)。不复用 listInstalledTools
+ *  ——那是显示节选 API(head -400 会截掉字母序后半, 拿来做精确成员
+ *  判定在生产恒报假缺口)。
+ * @param {string[]} names 待探测命令名
+ * @returns {Promise<string[]|null>} 命中的命令清单; **null=探测失败**
+ *  (沙箱失联等, runInSandbox 对失败 resolve code!=0)——调用方须跳过
+ *  对账而非当作"全缺"。 */
+export async function probeCliTools(names) {
+  if (!names?.length) return [];
+  // 逐段自吞退出码+回显裸名: `command -v x` 直接回显完整路径(成员
+  // 判定按裸名会恒不命中), 且拼接串退出码取末位(末位真缺=整串 code!=0
+  // →被误判"探测失败")。echo 裸名 + `|| :` 使整串恒 code=0——code!=0
+  // 只留给真正的探测失败(沙箱失联)。
+  const probe = names.map(n => `command -v ${n} >/dev/null 2>&1 && echo ${n} || :`).join('; ');
+  const res = await runInSandbox(cfg, probe, { hostTimeoutSec: 30, noInnerTimeout: true });
+  if (res.code !== 0) return null;
+  return [...new Set(res.out.split('\n').map(l => l.trim()).filter(Boolean))];
+}
+
 /** An install verb must sit at a COMMAND position (segment start, or
  *  right after && ; | ( ) — a substring match once let a quoted
  *  `grep -c "apt-get install"` row count as an install row (round-4). */

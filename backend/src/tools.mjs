@@ -48,6 +48,38 @@ const spawnStageEnum = Type.Enum(
   Object.fromEntries(SPAWNABLE_KEYS.map((key) => [key, key])),
 );
 
+/** 席位硬依赖(外部 CLI)——派发前能力对账面(dispatch-capability.test 锁)。
+ *  收录准则(机械判定): 席位提示词/技能里点名的外部 CLI 且缺了该席位
+ *  方法论即断线的件; bash/python 内置、平台自研(bin/ 与共享 py 层)、
+ *  账本供给件(fetch 系脚本/bootstrap)不列。改席位提示词的"工具位"段须
+ *  同步此表(逐席位对照)。 */
+export const SEAT_HARD_DEPS = {
+  recon: ['nmap', 'subfinder', 'httpx', 'whatweb'],
+  nday: ['nuclei'],
+  weakcred: ['hydra', 'nmap', 'ffuf', 'dirsearch'],
+  exploit: ['semgrep'],
+};
+
+/** 派发回执的能力缺口注记: 披露不拦截(环境可能由部署脚本另装——平台
+ *  只如实)。定向探测(caps.probeCliTools)——探测失败(null: 沙箱失联等)
+ *  跳过对账, 绝不当作"全缺"; 无该注入面(旧测试世界)静默跳过。 */
+async function capabilityGapNote(agents, caps) {
+  if (typeof caps?.probeCliTools !== 'function') return '';
+  const deps = [...new Set(agents.flatMap(k => SEAT_HARD_DEPS[k] ?? []))];
+  if (!deps.length) return '';
+  let found;
+  try { found = await caps.probeCliTools(deps); } catch { return ''; }
+  if (found == null) return '';  // 探测失败≠全缺(跳过, 不制造最大假缺口)
+  const foundSet = new Set(found.map(String));
+  const missing = [];
+  for (const key of agents) {
+    for (const dep of SEAT_HARD_DEPS[key] ?? []) {
+      if (!foundSet.has(dep)) missing.push(`${key}:${dep}`);
+    }
+  }
+  if (!missing.length) return '';
+  return `\n⚠ 能力缺口(派发照常, 披露不拦截): ${missing.join(', ')} 不在共享层——已由部署脚本另装则忽略; 否则派 cli-config 席位安装(装完 wake_agent 验证), 或调整派发面。`;
+}
 /**
  * Shared intel tools — the project intel base every agent reads and
  * writes. Task reports are the PROCESS record (mandatory at every quiet
@@ -953,8 +985,9 @@ export function buildOrchestratorTools(record, caps) {
             };
           }
         }
+        const gapNoteW = await capabilityGapNote(params.agents, caps);
         return {
-          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席——r52/loop1 前旧中断数据的历史口径, 假死根因(/idle 长挂撞 headersTimeout)已拔除, 7 席/波实测存活 7min+; 上限保留为资源节流而非可靠性约束, 大波次可按需放宽); 波间错峰 90s(总并发会话的资源因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` }],
+          content: [{ type: 'text', text: `已分 ${waves.length} 波派发(单波 ≤5 席——r52/loop1 前旧中断数据的历史口径, 假死根因(/idle 长挂撞 headersTimeout)已拔除, 7 席/波实测存活 7min+; 上限保留为资源节流而非可靠性约束, 大波次可按需放宽); 波间错峰 90s(总并发会话的资源因素):\n${started2.map((x, i) => `- 波${i + 1}: ${x.engagementId}(${waves[i].join(',')})`).join('\n')}\nrelay/cancel 需按波次 engagementId 操作(无参回落取最新 RUNNING 含目标席位者)。` + gapNoteW }],
           details: { waves: started2.map(x => x.engagementId) },
         };
       }
@@ -979,6 +1012,7 @@ export function buildOrchestratorTools(record, caps) {
       }
       record.activeEngagement = started;
       caps.persistMetaNow?.(record);  // r20-②: 即时落 WAL(重启可恢复)
+      const gapNote = await capabilityGapNote(params.agents, caps);
       return {
         content: [{
           type: 'text',
@@ -986,7 +1020,7 @@ export function buildOrchestratorTools(record, caps) {
             `${started.agents.join(', ')} running. Results will be ` +
             `reported to you as [DM] messages — relay them with ` +
             `relay_to_agents when other agents need to know. 并发建议: 上游 LLM 有限速, 单波 ≤5 席(loop41 实测 7 席/波仍 7/10 中断; 10 并发曾 3 席 429 击杀)——更大编队自动分波。` +
-            (verdict.warn ? `\n${verdict.warn}` : ''),
+            (verdict.warn ? `\n${verdict.warn}` : '') + gapNote,
         }],
         details: started,
       };
