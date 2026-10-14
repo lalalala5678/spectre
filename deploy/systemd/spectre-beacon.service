@@ -1,0 +1,29 @@
+[Unit]
+Description=SPECTRE beacon listener (C2 会话任务信道 HTTP :19997, 与 OOB 收集器同形态无认证)
+After=network.target
+StartLimitIntervalSec=0
+
+[Service]
+EnvironmentFile=/etc/spectre/spectre.env
+ExecStart=/bin/sh -c 'exec /usr/bin/python3 ${SPECTRE_REPO}/deploy/beacon-listener.py'
+Restart=always
+RestartSec=2
+# 公网监听单元——镜像 spectre-oob 基线(R18-F2)。
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=read-only
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectControlGroups=true
+ProtectKernelLogs=true
+RestrictAddressFamilies=AF_INET AF_INET6 AF_UNIX
+RestrictNamespaces=true
+LockPersonality=true
+MemoryDenyWriteExecute=true
+SystemCallArchitectures=native
+# 队列落盘唯一写路径是数据目录
+ReadWritePaths=/var/lib/spectre/beacon
+
+[Install]
+WantedBy=multi-user.target

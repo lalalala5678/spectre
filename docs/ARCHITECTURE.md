@@ -125,6 +125,7 @@ gateway (Python :8081, 仅 127.0.0.1)
 | spectre-worker | Temporal worker | -(轮询) |
 | temporal-dev | 编排引擎 + UI | 127.0.0.1:7233/7234 |
 | spectre-oob | OOB 回调收集器(TCP, 带配额/限速) | 0.0.0.0:19999(OOB_PORT) |
+| spectre-beacon | C2 会话任务信道(HTTP, 双向: 拉取任务/回传结果, 与 OOB 同形态无认证) | 0.0.0.0:19997(BEACON_PORT) |
 | spectre-private-qa | 私有 QA 面板 | 127.0.0.1:8899 |
 
 ## 6. 已验证能力(基座,2026-09-07 全链路浏览器实测)

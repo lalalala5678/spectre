@@ -125,12 +125,12 @@ function realRouter({ store, bus, caps, wal }) {
       // R32D84-N1: 必填/格式要求一次性列全(此前逐字段逐轮揭示——
       // target→name→transportRef 三轮才见全貌)。
       if (!body?.target) {
-        return bad(res, 400, 'target 必填; 通道必填面: target+name(建议 目标-面-权限)+transportRef(web 含 {CMD}/ssh user:pass@host[:port]/local 容器名[:用户]); 可选: transport(local/ssh/web 缺省 web), note, tags, ttlHours');
+        return bad(res, 400, 'target 必填; 通道必填面: target+name(建议 目标-面-权限)+transportRef(web 含 {CMD}/ssh user:pass@host[:port]/local 容器名[:用户]/beacon 监听器 URL); 可选: transport(local/ssh/web/beacon 缺省 web), note, tags, ttlHours');
       }
       // F51/CS24-F4: 枚举早期校验(此前 'quantum' 可注册,exec 才报未接入)。
       // 缺省统一 'web'(CS23-N16, 与 tools.mjs 工具面一致——agent 自注册
       // 无本地沙箱语义)——先归一再校验, 此前 || 'web' 在守卫后不可达。
-      const KNOWN_TRANSPORTS = ['local', 'ssh', 'web'];
+      const KNOWN_TRANSPORTS = ['local', 'ssh', 'web', 'beacon'];
       const transport = String(body.transport || 'web').toLowerCase();  // CS27-14: 与 agent 入口同归一('WEB'→'web' 不再 400)
       if (!KNOWN_TRANSPORTS.includes(transport)) {
         return bad(res, 400, `transport 必须是 ${KNOWN_TRANSPORTS.join('/')} 之一`);

