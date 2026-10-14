@@ -637,13 +637,24 @@ function ToolStepRow({ step, open, onToggle }: {
   onToggle: () => void;
 }) {
   const err = step.result?.isError;
-  const pending = step.running;  // R23-F3: 行级 pending 由前沿派生(running 非 optional, ?? 右臂死——CS3-N20)
+  const pending = step.running;
   const firstLine = (step.result?.text ?? '')
     .split('\n').find(l => l.trim()) ?? '';
   const argsJson = step.args != null && typeof step.args === 'object'
     && Object.keys(step.args as object).length > 0
     ? JSON.stringify(step.args, null, 1) : null;
-
+  // 同名工具区分: 从 args 提取首个有意义的字符串短摘要
+  const argStr = (() => {
+    if (!step.args || typeof step.args !== 'object') return null;
+    const a = step.args as Record<string, unknown>;
+    for (const k of ['command', 'url', 'target', 'q', 'text', 'hint', 'path', 'action', 'cmd']) {
+      const v = a[k];
+      if (typeof v === 'string' && v.trim()) return v.slice(0, 48);
+    }
+    const vals = Object.values(a).filter(v => typeof v === 'string' && v.trim());
+    return vals.length ? String(vals[0]).slice(0, 48) : null;
+  })();
+  const argsSummary = argStr;
   return (
     <div className="relative">
       <span className={cn(
@@ -665,6 +676,11 @@ function ToolStepRow({ step, open, onToggle }: {
         )}>
           {step.name}
         </span>
+        {argsSummary && !open && (
+          <span className="shrink-0 max-w-[200px] truncate font-mono text-[11px] text-faint">
+            {argsSummary}
+          </span>
+        )}
         {pending && (
           <span className="shrink-0 text-xs text-warning-text">运行中…</span>
         )}
