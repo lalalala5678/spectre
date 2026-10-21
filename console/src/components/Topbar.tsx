@@ -281,18 +281,18 @@ export function Topbar({ onMenu }: { onMenu?: () => void }) {
 
       <div className="flex-1" />
 
-      {/* 主题切换: light → carbon → abyss 循环 */}
+      {/* 主题切换: light → glacier → carbon → ember → rubicon → tuxedo → silverink 循环 */}
       <Button
         variant="ghostChrome"
         size="icon"
         onClick={() => {
-          const order = ['light', 'carbon', 'abyss'];
+          const order = ['light', 'glacier', 'carbon', 'ember', 'rubicon', 'tuxedo', 'silverink'];
           const cur = document.documentElement.dataset.theme ?? 'light';
           const next = order[(order.indexOf(cur) + 1) % order.length];
           document.documentElement.dataset.theme = next;
           localStorage.setItem('spectre-theme', next);
         }}
-        title="切换主题(浅色 / 暗色 / 深海)"
+        title="切换主题(七套循环)"
       >
         <Palette className="h-4 w-4" />
       </Button>

@@ -417,15 +417,15 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
   return (
     <div className="flex h-full min-h-0 flex-col">
       {/* 页头：agent 信息 + 会话控制 */}
-      <div className="flex shrink-0 items-center gap-3 border-b border-line bg-surface px-6 h-12">
+      <div className="flex shrink-0 items-center gap-3 border-b border-chrome-line bg-chrome-surface px-6 h-12">
         <button onClick={() => setRightOpen(v => !v)} aria-label="切换信息面板"
-          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-secondary hover:bg-surface-2 hover:text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:hidden">
+          className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring lg:hidden">
           <PanelRight className="h-4 w-4" />
         </button>
         <div className="min-w-0">
           <div className="flex items-center gap-2">
-            <h1 className="text-[15px] font-semibold text-primary">{agent.name}</h1>
-            <Badge tone="neutral">{agent.codename}</Badge>
+            <h1 className="text-[15px] font-semibold text-chrome-primary">{agent.name}</h1>
+            <Badge tone="neutral" className="border-chrome-line bg-chrome-surface-2 text-chrome-secondary">{agent.codename}</Badge>
             {/* F24: 删假 status/version(mock 硬编码,与真实会话态无关) */}
           </div>
           {/* 用户令: 标题下描述删除 */}
@@ -442,11 +442,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         <div className="relative">
           <button
             onClick={() => setSwitcherOpen(v => !v)}
-            className="flex h-8 items-center gap-2 rounded-md border border-line-strong bg-surface px-2.5 text-sm text-secondary hover:bg-surface-2 hover:text-primary"
+            className="flex h-8 items-center gap-2 rounded-md border border-chrome-line bg-chrome-surface px-2.5 text-sm text-chrome-secondary hover:bg-chrome-surface-2 hover:text-chrome-primary"
           >
             <Dot tone={current?.busy ? 'accent' : 'neutral'} pulse={current?.busy} />
             <span className="max-w-56 truncate font-medium">{workSession.label}</span>
-            <ChevronDown className="h-4 w-4 text-faint" />
+            <ChevronDown className="h-4 w-4 text-chrome-tertiary" />
           </button>
           {switcherOpen && (
             <div className="animate-enter absolute right-0 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
@@ -531,7 +531,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
         </div>
       )}
       {/* Tab */}
-      <div className="flex shrink-0 items-stretch border-b border-line bg-surface px-4 h-10">
+      <div className="flex shrink-0 items-stretch border-b border-chrome-line bg-chrome-surface px-4 h-10">
         {([
           ['session', '会话', Play],
           ...(isAuto ? [['bus', '消息总线', ArrowRightLeft] as const] : []),
@@ -544,8 +544,8 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
             className={cn(
               'flex items-center gap-1.5 border-b-2 px-3 text-sm transition-colors',
               tab === k
-                ? 'border-accent text-primary'
-                : 'border-transparent text-secondary hover:text-primary',
+                ? 'border-chrome-accent-text text-chrome-primary'
+                : 'border-transparent text-chrome-secondary hover:text-chrome-primary',
             )}
           >
             <Icon className="h-4 w-4" /> {label}
@@ -557,11 +557,11 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
           <>
             <button
               onClick={() => setOrchSwitcherOpen(v => !v)}
-              className="flex h-7 items-center gap-2 rounded-md border border-line bg-surface px-2 text-[13px] text-tertiary hover:bg-surface-2 hover:text-primary"
+              className="flex h-7 items-center gap-2 rounded-md border border-chrome-line bg-chrome-surface px-2 text-[13px] text-chrome-tertiary hover:bg-chrome-surface-2 hover:text-chrome-primary"
             >
               <Dot tone={current?.busy ? 'accent' : 'neutral'} pulse={current?.busy} />
               <span className="max-w-48 truncate">{orchSessions.find(o => o.id === sessionId)?.name ?? '主控会话'}</span>
-              <ChevronDown className="h-3.5 w-3.5 text-faint" />
+              <ChevronDown className="h-3.5 w-3.5 text-chrome-tertiary" />
             </button>
             {orchSwitcherOpen && (
               <div className="animate-enter absolute right-1 top-full z-20 mt-1 min-w-56 rounded-lg border border-line bg-surface p-1 shadow-lg">
@@ -671,7 +671,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                       drillSession 残留使渲染链停在会话, 点条目'不跳转' */}
                   <VulnPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
                   <IntelNotesPanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
-                  <ScopePanel workSessionId={workSession.id} onOpen={seq => { setEntryView(e => ({ ...e, seq } as typeof e)); setDrillSession(null); }} />
+                  <ScopePanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
                 </PanelStack>
               ) : (
                 <PanelStack storageKey="spectre.panel.stackRatios.stage">
@@ -692,7 +692,7 @@ export function AgentWorkspacePage({ agent }: { agent: AgentMeta }) {
                     workSessionId={workSession.id}
                     onOpen={e => { setEntryView(e); setDrillSession(null); }}
                   />
-                  <ScopePanel workSessionId={workSession.id} onOpen={seq => { setEntryView(e => ({ ...e, seq } as typeof e)); setDrillSession(null); }} />
+                    <ScopePanel workSessionId={workSession.id} onOpen={e => { setEntryView(e); setDrillSession(null); }} />
                   {agent.id === 'phish' && <PhishCampaignsPanel />}
                 </PanelStack>
               )}

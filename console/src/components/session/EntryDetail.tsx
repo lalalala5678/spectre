@@ -14,6 +14,14 @@ import { stripEventTitle } from './eventTitle';
 const SEVERITIES = ['info', 'low', 'medium', 'high', 'critical'] as const;
 const STATUSES = ['success', 'partial', 'failed', 'no-result'] as const;
 
+/** scope 条目载荷(ScopePanel 同源): detail 字段是 JSON 而非 markdown */
+interface ScopePort { port: number; service: string | null; version: string | null; product: string | null; }
+interface ScopeProject { name: string | null; repo: string | null; version: string | null; }
+interface ScopeData {
+  target: string; ports: ScopePort[]; os: string | null; projects: ScopeProject[];
+  cdn: string | null; ip: string | null; title: string | null; notes: string | null; tags: string[];
+}
+
 /**
  * Entry detail view (漏洞 / 情报 / 任务报告). Shows the CURRENT version
  * (folds the revision chain — newest revision wins, originals stay
@@ -27,9 +35,10 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   onBack: () => void;
   onOpenSession?: (sessionId: string) => void;
 }) {
+  const isScope = event.type === 'scope';
   const isReport = event.type === 'task-report';
   const isNote = event.type === 'intel-note';
-  const isVuln = !isReport && !isNote;
+  const isVuln = !isReport && !isNote && !isScope;
 
   // Live revision chain: refetch on any bus event that revises this seq.
   const [saveError, setSaveError] = useState('');
@@ -87,8 +96,18 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
   const isOrphan = folded.orphaned === true || event.revises != null;
   const current = folded.current;
   const severity = current.severity ?? 'info';
-  const title = current.title
-    ?? stripEventTitle(current.summary, Infinity);  // CS44-F9: 单源(详情不截)
+  // scope 条目: detail 是 JSON 载荷, 无 title/summary 语义。残缺事件(仅 seq)
+  // 曾让 title 计算在 undefined 上调 replace → TypeError → 整树卸载(全屏空白)
+  const scopeData = useMemo(() => {
+    if (!isScope) return null;
+    try { return JSON.parse(current.detail ?? '{}') as ScopeData; } catch { return null; }
+  }, [isScope, current.detail]);
+  const title = isScope
+    ? (scopeData?.target || '资产档案')
+    : current.title
+      ?? (current.summary ? stripEventTitle(current.summary, Infinity) : '');  // CS44-F9: 单源(详情不截)
+  const exportMd = () => buildEntryMarkdown(folded, current, title, severity, revisions,
+    isScope && scopeData ? JSON.stringify(scopeData, null, 2) : undefined);
   const revisions = useMemo(
     () => chain.filter(e => e.revises === rootSeq)
       .sort((a, b) => (b.revision?.n ?? 0) - (a.revision?.n ?? 0)),
@@ -135,13 +154,12 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
         </Button>
         <div className="flex-1" />
         <Button onClick={() => {
-          const md = buildEntryMarkdown(folded, current, title, severity, revisions);
-          void navigator.clipboard.writeText(md);
+          void navigator.clipboard.writeText(exportMd());
         }} variant="ghost" size="sm" title="复制为 Markdown">
           <Copy className="h-3.5 w-3.5" />
         </Button>
         <Button onClick={() => {
-          const md = buildEntryMarkdown(folded, current, title, severity, revisions);
+          const md = exportMd();
           const blob = new Blob([md], { type: 'text/markdown' });
           const a = document.createElement('a');
           a.href = URL.createObjectURL(blob);
@@ -155,6 +173,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
       <div className="min-h-0 flex-1 space-y-3 overflow-y-auto rounded-lg border border-line bg-bg p-4">
         <div className="mb-1 flex flex-wrap items-center gap-2">
           {isReport && <StatusBadge status={current.status ?? 'no-result'} />}
+          {isScope && <Badge tone="accent">资产</Badge>}
           {isNote && (
             <Badge tone="info">情报</Badge>
           )}
@@ -277,14 +296,15 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
           />
         ) : (
           <>
-            {current.detail
+            {isScope && scopeData ? <ScopeDossier data={scopeData} />
+              : current.detail
               ? <Markdown>{String(current.detail).replace(/^复现要点/gm, 'POC')}</Markdown>
               : (
                 <p className="whitespace-pre-wrap text-sm leading-relaxed text-secondary">
                   {current.summary}
                 </p>
               )}
-            {!isOrphan && (
+            {!isOrphan && !isScope && (
               <Button onClick={() => setEditing(true)} variant="secondary" size="sm" className="mt-1 w-fit">
                 <PencilLine className="h-3 w-3" /> 直接编辑
               </Button>
@@ -306,7 +326,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
           <div className="shrink-0 rounded-lg border border-line bg-bg p-3">
             <p className="text-xs text-tertiary">修订对话框不可用——原始条目已裁剪, 修订链封存(仅存档审计)</p>
           </div>
-        ) : (
+        ) : !isScope ? (
         <div className="shrink-0 rounded-lg border border-line bg-bg py-1.5 focus-within:border-line-strong">
           {/* agent composer 同款(ChatInput 形态): › 前缀+透明输入+右侧提示/发送 */}
           <p className="px-3 pt-1 text-xs font-medium text-secondary">
@@ -350,7 +370,7 @@ export function EntryDetail({ event, onBack, onOpenSession }: {
             </div>
           )}
         </div>
-        )}
+        ) : null}
     </div>
   );
 }
@@ -443,6 +463,7 @@ function buildEntryMarkdown(
   title: string,
   severity: string,
   revisions: ApiBusEvent[],
+  bodyOverride?: string,
 ): string {
   const lines: string[] = [
     `# ${title}`,
@@ -458,7 +479,7 @@ function buildEntryMarkdown(
     '',
     '---',
     '',
-    current.detail ?? current.summary ?? '',
+    bodyOverride ?? current.detail ?? current.summary ?? '',
   ];
   if (revisions.length > 0) {
     lines.push('', '## 修订历史', '');
@@ -467,4 +488,78 @@ function buildEntryMarkdown(
     }
   }
   return lines.filter(Boolean).join('\n');
+}
+
+/** scope 条目全量档案: 面板行只露摘要(8 端口/4 项目截断), 此处全量展开 */
+function ScopeDossier({ data }: { data: ScopeData }) {
+  const kv = ([
+    ['IP', data.ip],
+    ['操作系统', data.os],
+    ['CDN', data.cdn],
+    ['站点标题', data.title],
+  ] as const).filter(([, v]) => v);
+  return (
+    <div className="space-y-4">
+      {kv.length > 0 && (
+        <div className="space-y-1 font-mono text-[13px]">
+          {kv.map(([k, v]) => (
+            <div key={k} className="flex gap-4">
+              <span className="w-16 shrink-0 text-tertiary">{k}</span>
+              <span className="min-w-0 break-all text-secondary">{v}</span>
+            </div>
+          ))}
+        </div>
+      )}
+      {data.tags?.length > 0 && (
+        <div className="flex flex-wrap gap-1.5">
+          {data.tags.map(t => <Badge key={t} tone="neutral" className="text-[10px]">{t}</Badge>)}
+        </div>
+      )}
+      {data.ports?.length > 0 && (
+        <section>
+          <h3 className="mb-1.5 text-[13px] font-semibold text-secondary">端口与服务（{data.ports.length}）</h3>
+          <div className="overflow-hidden rounded-lg border border-line">
+            <table className="w-full font-mono text-[13px]">
+              <thead>
+                <tr className="border-b border-line bg-surface-2/50 text-left text-xs text-tertiary">
+                  <th className="px-3 py-1.5 font-medium">端口</th>
+                  <th className="px-3 py-1.5 font-medium">服务</th>
+                  <th className="px-3 py-1.5 font-medium">产品 / 版本</th>
+                </tr>
+              </thead>
+              <tbody>
+                {data.ports.map((p, i) => (
+                  <tr key={i} className="border-b border-line last:border-b-0">
+                    <td className="px-3 py-1.5 text-accent-text">{p.port}</td>
+                    <td className="px-3 py-1.5 text-secondary">{p.service ?? '—'}</td>
+                    <td className="px-3 py-1.5 text-tertiary">{[p.product, p.version].filter(Boolean).join(' ') || '—'}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      )}
+      {data.projects?.length > 0 && (
+        <section>
+          <h3 className="mb-1.5 text-[13px] font-semibold text-secondary">开源项目（{data.projects.length}）</h3>
+          <div className="space-y-1">
+            {data.projects.map((p, i) => (
+              <div key={i} className="flex flex-wrap items-baseline gap-2 rounded-md border border-line bg-surface px-2.5 py-1.5 font-mono text-[13px]">
+                <span className="font-semibold text-primary">{p.name ?? '—'}</span>
+                {p.version && <span className="text-tertiary">{p.version}</span>}
+                {p.repo && <a href={p.repo} target="_blank" rel="noreferrer" className="min-w-0 break-all text-accent-text hover:underline">{p.repo}</a>}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
+      {data.notes && (
+        <section>
+          <h3 className="mb-1.5 text-[13px] font-semibold text-secondary">备注</h3>
+          <Markdown>{data.notes}</Markdown>
+        </section>
+      )}
+    </div>
+  );
 }

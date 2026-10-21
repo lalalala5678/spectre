@@ -1,12 +1,13 @@
 @import "tailwindcss";
 
 /* ═══════════════════════════════════════════════════════════════
-   SPECTRE Design System v2 — 三主题: light / carbon / abyss
+   SPECTRE Design System v2 — 七主题: light / glacier / carbon / ember / rubicon / tuxedo / silverink
    每套独立调色, 非反转变换。切换走 <html data-theme="…">。
    ═══════════════════════════════════════════════════════════════ */
 
 @custom-variant dark (&:where([data-theme="carbon"], [data-theme="carbon"] *,
-                               [data-theme="abyss"], [data-theme="abyss"] *));
+                               [data-theme="ember"], [data-theme="ember"] *,
+                               [data-theme="rubicon"], [data-theme="rubicon"] *));
 
 /* ---------- 字体栈: 自托管 Inter/JBM, 中文走系统栈 ---------- */
 :root {
@@ -34,112 +35,259 @@
   unicode-range: U+0000-00FF, U+2000-206F;
 }
 
-/* ═══ Light(默认) — 暖白·专业蓝 ═══ */
+/* ═══ Light(默认) — 宣纸墨青·深空青的日间形态 ═══ */
 :root, [data-theme="light"] {
   color-scheme: light;
-  --bg:            #fafbfc;
+  --bg:            #f9f8f4;
   --surface:       #ffffff;
-  --surface-2:     #f3f4f6;
-  --surface-3:     #e8eaed;
-  --line:          #e5e7eb;
-  --line-strong:   #9ca3af;
-  --text-primary:   #111827;
-  --text-secondary: #4b5563;
-  --text-tertiary:  #6b7280;
-  --text-faint:     #9ca3af;
-  --accent:        #2563eb;
-  --accent-hover:  #1d4ed8;
-  --accent-subtle: #eff6ff;
-  --accent-text:   #1d4ed8;
-  --ring:          #2563eb;
+  --surface-2:     #f0eee5;
+  --surface-3:     #e3e0d3;
+  --line:          #e7e4d8;
+  --line-strong:   #a9a48e;
+  --text-primary:   #1c2430;
+  --text-secondary: #4c5a68;
+  --text-tertiary:  #6d7a87;
+  --text-faint:     #9aa5b0;
+  --accent:        #0e7490;
+  --accent-hover:  #0a5f78;
+  --accent-subtle: #e3f1f5;
+  --accent-text:   #0c6480;
+  --ring:          #0e7490;
   --success-text: #065f46; --success-bg: #ecfdf5; --success-line: #a7f3d0;
   --warning-text: #92400e; --warning-bg: #fffbeb; --warning-line: #fde68a;
   --danger-text:  #991b1b; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
   --info-text:    #075985; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
   --shadow-color: 15 23 42;
   --shadow-opacity: 1;
-  /* chrome(导航壳): 浅色模式壳=内容同色系 */
-  --chrome-bg:            #f0f1f3;
-  --chrome-surface:       #ffffff;
-  --chrome-surface-2:     #f5f6f8;
-  --chrome-line:          #e2e4e8;
-  --chrome-text-primary:   #1a1f28;
-  --chrome-text-secondary: #556070;
-  --chrome-text-tertiary:  #8791a0;
-  --chrome-accent-text:    #2563eb;
+  /* chrome(导航壳): 外层纸色, 比内容画布重一档 */
+  --chrome-bg:            #ded9ca;
+  --chrome-surface:       #e7e3d7;
+  --chrome-surface-2:     #ddd8c8;
+  --chrome-line:          #cbc4ae;
+  --chrome-text-primary:   #202e38;
+  --chrome-text-secondary: #55666f;
+  --chrome-text-tertiary:  #75858d;
+  --chrome-accent-text:    #0c6480;
   --chrome-danger-text:    #dc2626;
   --chrome-warning-text:   #d97706;
 }
 
-/* ═══ Carbon(暗色) — 深炭·冷蓝调 ═══ */
+/* ═══ Carbon(暗色) — 深空青·声呐 ops(壳与内容同色温, 电光青英雄色) ═══ */
 [data-theme="carbon"] {
   color-scheme: dark;
-  --bg:            #0c0e12;
-  --surface:       #141721;
-  --surface-2:     #1c202c;
-  --surface-3:     #252a38;
-  --line:          #2a2f3d;
-  --line-strong:   #4b5262;
-  --text-primary:   #e4e7ed;
-  --text-secondary: #a8b0bd;
-  --text-tertiary:  #7e8797;
-  --text-faint:     #535d6e;
-  --accent:        #5b9dff;
-  --accent-hover:  #7ab3ff;
-  --accent-subtle: #16233a;
-  --accent-text:   #7ab3ff;
-  --ring:          #5b9dff;
+  --bg:            #0c2532;
+  --surface:       #123c4e;
+  --surface-2:     #1a4a60;
+  --surface-3:     #225a72;
+  --line:          #1d4a5e;
+  --line-strong:   #4d84a0;
+  --text-primary:   #dceaf0;
+  --text-secondary: #a3bcc6;
+  --text-tertiary:  #7899a5;
+  --text-faint:     #527280;
+  --accent:        #22d3ee;
+  --accent-hover:  #67e3f4;
+  --accent-subtle: #144054;
+  --accent-text:   #3fcfe8;
+  --ring:          #22d3ee;
   --success-text: #4ade80; --success-bg: #052e1a; --success-line: #166534;
   --warning-text: #fbbf24; --warning-bg: #2d2005; --warning-line: #92400e;
   --danger-text:  #f87171; --danger-bg:  #2d0f0f; --danger-line:  #7f1d1d;
   --info-text:    #67e8f9; --info-bg:    #0c2233; --info-line:    #155e75;
   --shadow-color: 0 0 0;
   --shadow-opacity: 0;
-  --chrome-bg:            #090b0e;
-  --chrome-surface:       #111420;
-  --chrome-surface-2:     #181c28;
-  --chrome-line:          #1f2430;
-  --chrome-text-primary:   #dee3ea;
-  --chrome-text-secondary: #9aa3b2;
-  --chrome-text-tertiary:  #6d7788;
-  --chrome-accent-text:    #5b9dff;
+  --chrome-bg:            #010304;
+  --chrome-surface:       #020608;
+  --chrome-surface-2:     #0f3a4e;
+  --chrome-line:          #0d2e3c;
+  --chrome-text-primary:   #d3eef2;
+  --chrome-text-secondary: #8fb8c2;
+  --chrome-text-tertiary:  #5f8b96;
+  --chrome-accent-text:    #3fcfe8;
   --chrome-danger-text:    #f87171;
   --chrome-warning-text:   #fbbf24;
 }
 
-/* ═══ Abyss(深海) — 深蓝紫·柔和 ═══ */
-[data-theme="abyss"] {
+/* ═══ Tuxedo(墨金) — 焦茶黑壳×象牙白内×黄铜印(外黑内白·印刷美学) ═══ */
+[data-theme="tuxedo"] {
+  color-scheme: light;
+  --bg:            #f7f4ec;
+  --surface:       #fdfcf8;
+  --surface-2:     #efeade;
+  --surface-3:     #e4dfd0;
+  --line:          #e8e2d3;
+  --line-strong:   #b3a98f;
+  --text-primary:   #201c15;
+  --text-secondary: #4d463a;
+  --text-tertiary:  #6e675a;
+  --text-faint:     #9d9686;
+  --accent:        #a16207;
+  --accent-hover:  #854d0e;
+  --accent-subtle: #f5ecdb;
+  --accent-text:   #91590a;
+  --ring:          #a16207;
+  --success-text: #065f46; --success-bg: #ecfdf5; --success-line: #a7f3d0;
+  --warning-text: #92400e; --warning-bg: #fffbeb; --warning-line: #fde68a;
+  --danger-text:  #991b1b; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
+  --info-text:    #075985; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
+  --shadow-color: 20 16 8;
+  --shadow-opacity: 1;
+  /* chrome(导航壳): 焦茶暖黑, 与象牙内层构成外黑内白 */
+  --chrome-bg:            #0c0a08;
+  --chrome-surface:       #14110d;
+  --chrome-surface-2:     #221d15;
+  --chrome-line:          #2a241c;
+  --chrome-text-primary:   #e8e2d6;
+  --chrome-text-secondary: #a89f8d;
+  --chrome-text-tertiary:  #756d5c;
+  --chrome-accent-text:    #c9a227;
+  --chrome-danger-text:    #f87171;
+  --chrome-warning-text:   #fbbf24;
+}
+
+/* ═══ Ember(熔金) — 暖黑·琥珀指挥席(外重内轻, 金只上焦点) ═══ */
+[data-theme="ember"] {
   color-scheme: dark;
-  --bg:            #12101f;
-  --surface:       #1a1730;
-  --surface-2:     #232040;
-  --surface-3:     #2d2950;
-  --line:          #302a52;
-  --line-strong:   #504878;
-  --text-primary:   #e2dfee;
-  --text-secondary: #a89ec2;
-  --text-tertiary:  #7e74a0;
-  --text-faint:     #554d72;
-  --accent:        #a78bfa;
-  --accent-hover:  #c4b0fd;
-  --accent-subtle: #221d3d;
-  --accent-text:   #c4b0fd;
-  --ring:          #a78bfa;
-  --success-text: #6ee7b7; --success-bg: #0a2e26; --success-line: #065f46;
-  --warning-text: #fcd34d; --warning-bg: #2d240a; --warning-line: #92400e;
-  --danger-text:  #fca5a5; --danger-bg:  #2d1010; --danger-line:  #7f1d1d;
-  --info-text:    #93c5fd; --info-bg:    #0e1e3a; --info-line:    #1e40af;
+  --bg:            #2e1f0c;
+  --surface:       #463113;
+  --surface-2:     #57411a;
+  --surface-3:     #695022;
+  --line:          #4f3914;
+  --line-strong:   #9a7838;
+  --text-primary:   #f2e8d8;
+  --text-secondary: #c9b8a0;
+  --text-tertiary:  #a08d75;
+  --text-faint:     #73624e;
+  --accent:        #f5a623;
+  --accent-hover:  #ffc14d;
+  --accent-subtle: #4f3510;
+  --accent-text:   #ffb84d;
+  --ring:          #f5a623;
+  --success-text: #4ade80; --success-bg: #052e1a; --success-line: #166534;
+  --warning-text: #fbbf24; --warning-bg: #2d2005; --warning-line: #92400e;
+  --danger-text:  #f87171; --danger-bg:  #2d0f0f; --danger-line:  #7f1d1d;
+  --info-text:    #67e8f9; --info-bg:    #0c2233; --info-line:    #155e75;
   --shadow-color: 0 0 0;
   --shadow-opacity: 0;
-  --chrome-bg:            #0d0b18;
-  --chrome-surface:       #151227;
-  --chrome-surface-2:     #1c1835;
-  --chrome-line:          #252042;
-  --chrome-text-primary:   #dcd5ec;
-  --chrome-text-secondary: #a095c0;
-  --chrome-text-tertiary:  #726a94;
-  --chrome-danger-text:    #fca5a5;
-  --chrome-warning-text:   #fcd34d;
+  --chrome-bg:            #060302;
+  --chrome-surface:       #0a0502;
+  --chrome-surface-2:     #42300f;
+  --chrome-line:          #3a2a10;
+  --chrome-text-primary:   #efe3cf;
+  --chrome-text-secondary: #c2ad90;
+  --chrome-text-tertiary:  #93805f;
+  --chrome-accent-text:    #ffb84d;
+  --chrome-danger-text:    #f87171;
+  --chrome-warning-text:   #fbbf24;
+}
+
+/* ═══ Rubicon(朱砂) — 冷黑·朱红攻势(红只属焦点, 语义红仍归 Badge) ═══ */
+[data-theme="rubicon"] {
+  color-scheme: dark;
+  --bg:            #3a1a20;
+  --surface:       #5c272e;
+  --surface-2:     #733239;
+  --surface-3:     #873e47;
+  --line:          #57252c;
+  --line-strong:   #a44a55;
+  --text-primary:   #f5e3e6;
+  --text-secondary: #cba3aa;
+  --text-tertiary:  #a37e85;
+  --text-faint:     #75575d;
+  --accent:        #ff6a3d;
+  --accent-hover:  #ff8a63;
+  --accent-subtle: #5c2a1f;
+  --accent-text:   #ff7f55;
+  --ring:          #ff6a3d;
+  --success-text: #4ade80; --success-bg: #052e1a; --success-line: #166534;
+  --warning-text: #fbbf24; --warning-bg: #2d2005; --warning-line: #92400e;
+  --danger-text:  #f87171; --danger-bg:  #2d0f0f; --danger-line:  #7f1d1d;
+  --info-text:    #67e8f9; --info-bg:    #0c2233; --info-line:    #155e75;
+  --shadow-color: 0 0 0;
+  --shadow-opacity: 0;
+  --chrome-bg:            #080304;
+  --chrome-surface:       #0d0506;
+  --chrome-surface-2:     #4a1e24;
+  --chrome-line:          #421c22;
+  --chrome-text-primary:   #f2dde0;
+  --chrome-text-secondary: #c49aa1;
+  --chrome-text-tertiary:  #977278;
+  --chrome-accent-text:    #ff7f55;
+  --chrome-danger-text:    #f87171;
+  --chrome-warning-text:   #fbbf24;
+}
+
+/* ═══ Silverink(银墨) — 石墨蓝黑壳×雪白内×钴蓝印(外黑内白·瑞士印刷) ═══ */
+[data-theme="silverink"] {
+  color-scheme: light;
+  --bg:            #f5f7f9;
+  --surface:       #ffffff;
+  --surface-2:     #eaedf1;
+  --surface-3:     #dde2e8;
+  --line:          #e3e8ee;
+  --line-strong:   #a8b4c0;
+  --text-primary:   #101418;
+  --text-secondary: #414a54;
+  --text-tertiary:  #5f6a75;
+  --text-faint:     #939da7;
+  --accent:        #1d4ed8;
+  --accent-hover:  #1e40af;
+  --accent-subtle: #e8eefd;
+  --accent-text:   #1e40af;
+  --ring:          #1d4ed8;
+  --success-text: #065f46; --success-bg: #ecfdf5; --success-line: #a7f3d0;
+  --warning-text: #92400e; --warning-bg: #fffbeb; --warning-line: #fde68a;
+  --danger-text:  #991b1b; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
+  --info-text:    #075985; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
+  --shadow-color: 15 23 42;
+  --shadow-opacity: 1;
+  /* chrome(导航壳): 石墨蓝黑, 与雪白内层构成外黑内白 */
+  --chrome-bg:            #0a0c0e;
+  --chrome-surface:       #101417;
+  --chrome-surface-2:     #1a2024;
+  --chrome-line:          #232a30;
+  --chrome-text-primary:   #e6eaee;
+  --chrome-text-secondary: #9aa4ad;
+  --chrome-text-tertiary:  #6b757e;
+  --chrome-accent-text:    #7ab3ff;
+  --chrome-danger-text:    #f87171;
+  --chrome-warning-text:   #fbbf24;
+}
+
+/* ═══ Glacier(冰川) — 冷白瓷·暖橙焦点(第二浅色: 冰蓝白+朱橙撞色) ═══ */
+[data-theme="glacier"] {
+  color-scheme: light;
+  --bg:            #f5f9fd;
+  --surface:       #ffffff;
+  --surface-2:     #eaf1f7;
+  --surface-3:     #dce7f0;
+  --line:          #e2ebf3;
+  --line-strong:   #9fb4c8;
+  --text-primary:   #101820;
+  --text-secondary: #3e4c5c;
+  --text-tertiary:  #5f6d7e;
+  --text-faint:     #8b99a9;
+  --accent:        #ea580c;
+  --accent-hover:  #c2410c;
+  --accent-subtle: #fdeadd;
+  --accent-text:   #c2410c;
+  --ring:          #ea580c;
+  --success-text: #065f46; --success-bg: #ecfdf5; --success-line: #a7f3d0;
+  --warning-text: #92400e; --warning-bg: #fffbeb; --warning-line: #fde68a;
+  --danger-text:  #991b1b; --danger-bg:  #fef2f2; --danger-line:  #fecaca;
+  --info-text:    #075985; --info-bg:    #f0f9ff; --info-line:    #bae6fd;
+  --shadow-color: 15 23 42;
+  --shadow-opacity: 1;
+  --chrome-bg:            #cfdde9;
+  --chrome-surface:       #dbe5ef;
+  --chrome-surface-2:     #cddbe8;
+  --chrome-line:          #b9cbdb;
+  --chrome-text-primary:   #16202b;
+  --chrome-text-secondary: #4a586a;
+  --chrome-text-tertiary:  #6b7b8d;
+  --chrome-accent-text:    #c2410c;
+  --chrome-danger-text:    #dc2626;
+  --chrome-warning-text:   #d97706;
 }
 /* ---------- 工具类 → token(类名直接引用 CSS 变量, 随 data-theme 自动切换) ---------- */
 @theme inline {

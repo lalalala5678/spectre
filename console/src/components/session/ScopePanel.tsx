@@ -7,6 +7,7 @@ import { useMemo } from 'react';
 import { Globe, Server, Cpu, Shield } from 'lucide-react';
 import { Badge } from '../ui/Badge';
 import { useBusPanelEntries } from '../../api/useBusPanelEntries';
+import type { ApiBusEvent } from '../../api/client';
 import { EmptyState } from '../ui/EmptyState';
 import { Skeleton } from '../ui/Skeleton';
 
@@ -35,14 +36,14 @@ interface ScopeEntry {
 
 export function ScopePanel({ workSessionId, onOpen }: {
   workSessionId: string | null;
-  onOpen?: (seq: number) => void;
+  onOpen?: (event: ApiBusEvent) => void;
 }) {
   const { events: entries, loaded: loading } = useBusPanelEntries(
     (e) => e.type === 'scope', { ws: workSessionId ?? undefined });
 
   const scopes = useMemo(() => {
     // 同 target 取最新现行版(修订链折叠)
-    const byTarget = new Map<string, { seq: number; data: ScopeEntry; revised: number }>();
+    const byTarget = new Map<string, { seq: number; data: ScopeEntry; revised: number; event: ApiBusEvent }>();
     for (const e of entries) {
       try {
         const data = JSON.parse(e.current?.detail ?? e.detail ?? '{}') as ScopeEntry;
@@ -50,37 +51,32 @@ export function ScopePanel({ workSessionId, onOpen }: {
         const prev = byTarget.get(data.target);
         const rev = e.revisedCount ?? 0;
         if (!prev || rev >= prev.revised) {
-          byTarget.set(data.target, { seq: e.seq, data, revised: rev });
+          byTarget.set(data.target, { seq: e.seq, data, revised: rev, event: e });
         }
       } catch { /* corrupt */ }
     }
     return [...byTarget.values()].sort((a, b) => a.data.target.localeCompare(b.data.target));
   }, [entries]);
 
-  if (loading && scopes.length === 0) {
-    return <Skeleton className="h-32 w-full rounded-lg" />;
-  }
-  if (scopes.length === 0) {
-    return (
-      <EmptyState
-        icon={Globe}
-        title="无资产档案"
-        hint="recon 测绘后逐资产 publish_scope 落地"
-      />
-    );
-  }
-
   return (
-    <div className="space-y-2 overflow-y-auto">
-      <div className="px-1 pb-1 text-[11px] font-medium tracking-wide text-tertiary">
-        资产档案 · {scopes.length} 条
-      </div>
-      {scopes.map(({ seq, data, revised }) => (
+    <div className="animate-enter flex min-h-0 flex-1 flex-col rounded-lg border border-line bg-surface shadow-xs">
+      <header className="flex items-center justify-between border-b border-line bg-surface-2/50 px-3 py-1.5">
+        <h3 className="text-[13px] font-semibold text-secondary">
+          资产档案
+        </h3>
+        <span className="text-xs tabular-nums text-tertiary">{scopes.length}</span>
+      </header>
+      <div className="flex-1 space-y-2 overflow-y-auto p-2" tabIndex={0} aria-label="资产档案列表">
+        {scopes.length === 0 && (!loading
+          ? <EmptyState icon={Globe} title="无资产档案" hint="recon 测绘后逐资产 publish_scope 落地" />
+          : <Skeleton className="mx-1 my-2 h-11" />
+        )}
+      {scopes.map(({ data, revised, event }) => (
         <button
           key={data.target}
-          onClick={() => onOpen?.(seq)}
-          className="group block w-full rounded-lg border border-line bg-surface p-3 text-left
-            transition-colors hover:border-line-strong hover:bg-surface-2"
+          onClick={() => onOpen?.(event)}
+          className="group block w-full rounded-md border border-line-strong bg-surface p-3 text-left
+            transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
         >
           {/* 头行: target + CDN badge + 修订 */}
           <div className="flex items-center gap-2">
@@ -146,6 +142,7 @@ export function ScopePanel({ workSessionId, onOpen }: {
           )}
         </button>
       ))}
+      </div>
     </div>
   );
 }
