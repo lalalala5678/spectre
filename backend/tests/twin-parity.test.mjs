@@ -32,7 +32,7 @@ test('tools/bin ↔ docs: 期望清单内逐字节一致且双侧必须存在', 
   assert.deepEqual(missing, [], `双胞胎缺侧: ${missing.join(', ')}`);
   assert.deepEqual(drifted, [], `双胞胎漂移(docs 为权威): ${drifted.join(', ')}`);
 });
-// 技能双胞胎期望清单(CS10-2: 全量 43 对枚举锁定(七组技能合并: cve-intel+exploit-triage→cve-triage、variant-bypass→poc-adapt、source-acquire+surface-map→source-surface、lateral-prep+lateral-exec→lateral-movement、email-craft+smtp-send→email-send、cdn-bypass+web-topology→infra-analysis、payload-gen+variant-engine→payload-pipeline; scope-gate 废止; new-skills 同内容滞留副本连带清)(skills-root 运行时发现)——
+// 技能双胞胎期望清单(CS10-2: 全量 40 对枚举锁定(七组技能合并: cve-intel+exploit-triage→cve-triage、variant-bypass→poc-adapt、source-acquire+surface-map→source-surface、lateral-prep+lateral-exec→lateral-movement、email-craft+smtp-send→email-send、cdn-bypass+web-topology→infra-analysis、payload-gen+variant-engine→payload-pipeline; scope-gate 废止; new-skills 同内容滞留副本连带清; 取证单源化删 3 死副本: ad-abuse/kerberoast-chain/pi-discovery——seed.map 只播顶层侧, 组目录孪生从未挂载)(skills-root 运行时发现)——
 // 新增双胞胎须入表;
 // skills-root 独有件(无顶层双胞胎)不受约, 删侧逃避因双侧存在性断言封死)。
 const EXPECTED_SKILL_TWINS = [
@@ -63,10 +63,8 @@ const EXPECTED_SKILL_TWINS = [
   'phish-skills/email-send',
   'phish-skills/landing-page',
   'phish-skills/track-report',
-  'postex-skills/ad-abuse',
   'postex-skills/file-ops',
   'postex-skills/host-recon',
-  'postex-skills/kerberoast-chain',
   'postex-skills/lateral-movement',
   'postex-skills/priv-enum',
   'recon-skills/attribution-hunt',
@@ -75,7 +73,6 @@ const EXPECTED_SKILL_TWINS = [
   'recon-skills/host-profile',
   'recon-skills/nmap-cheatsheet',
   'recon-skills/osint-dork',
-  'recon-skills/pi-discovery',
   'recon-skills/recon-report',
   'recon-skills/subdomain-sweep',
   'recon-skills/vhost-collide',
